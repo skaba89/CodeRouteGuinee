@@ -1,6 +1,13 @@
-import { useEffect, useState } from 'react';
+import { type FormEvent, useEffect, useState } from 'react';
 
-import { type DashboardData, type EntrySummary, getDashboard, getEntrySummary } from './api';
+import {
+  type DashboardData,
+  type EntrySummary,
+  type EntryValidationResult,
+  getDashboard,
+  getEntrySummary,
+  validateEntry,
+} from './api';
 
 const fallbackDashboard: DashboardData = {
   candidates: 1250,
@@ -45,6 +52,12 @@ export default function App() {
   const [dashboard, setDashboard] = useState<DashboardData>(fallbackDashboard);
   const [entrySummary, setEntrySummary] = useState<EntrySummary>(fallbackEntrySummary);
   const [apiStatus, setApiStatus] = useState<'connected' | 'offline'>('offline');
+  const [entryReference, setEntryReference] = useState('GN-CONV-2026-000001');
+  const [verificationCode, setVerificationCode] = useState('');
+  const [centerCode, setCenterCode] = useState('CTR-KALOUM');
+  const [entryResult, setEntryResult] = useState<EntryValidationResult | null>(null);
+  const [entryError, setEntryError] = useState<string | null>(null);
+  const [isSubmittingEntry, setIsSubmittingEntry] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -64,6 +77,28 @@ export default function App() {
       isMounted = false;
     };
   }, []);
+
+  async function handleEntrySubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setIsSubmittingEntry(true);
+    setEntryError(null);
+    setEntryResult(null);
+    try {
+      const result = await validateEntry({
+        reference: entryReference,
+        verification_code: verificationCode,
+        center_code: centerCode,
+      });
+      setEntryResult(result);
+      const latestSummary = await getEntrySummary();
+      setEntrySummary(latestSummary);
+      setApiStatus('connected');
+    } catch (error) {
+      setEntryError("Impossible de valider l'entree. Verifiez que l'API est demarree.");
+    } finally {
+      setIsSubmittingEntry(false);
+    }
+  }
 
   const metrics = [
     { label: 'Candidats inscrits', value: formatNumber(dashboard.candidates) },
@@ -148,22 +183,34 @@ export default function App() {
       </section>
 
       <section id="centre" className="screen two-columns inverted">
-        <div className="scanner-card">
+        <form className="scanner-card" onSubmit={handleEntrySubmit}>
           <h2>Controle entree centre</h2>
           <p>Scan QR, verification du code et passage automatique du statut en checked_in.</p>
-          <div className="form-line">Reference convocation</div>
-          <div className="form-line">Code verification</div>
-          <button>Valider entree</button>
-        </div>
+          <label>
+            Reference convocation
+            <input value={entryReference} onChange={(event) => setEntryReference(event.target.value)} />
+          </label>
+          <label>
+            Code verification
+            <input value={verificationCode} onChange={(event) => setVerificationCode(event.target.value)} placeholder="Code de la convocation" />
+          </label>
+          <label>
+            Code centre
+            <input value={centerCode} onChange={(event) => setCenterCode(event.target.value)} />
+          </label>
+          <button disabled={isSubmittingEntry || !entryReference || !verificationCode}>
+            {isSubmittingEntry ? 'Validation...' : 'Valider entree'}
+          </button>
+        </form>
         <div>
           <p className="eyebrow dark">Centre agree</p>
           <h2>Validation en temps reel</h2>
           <table>
             <tbody>
-              <tr><th>Statut</th><td><span className="badge ok">checked_in</span></td></tr>
-              <tr><th>Candidat</th><td>Mariama Barry</td></tr>
-              <tr><th>Centre</th><td>CTR-KALOUM</td></tr>
-              <tr><th>Heure</th><td>08:42</td></tr>
+              <tr><th>Statut</th><td><span className={entryResult?.allowed ? 'badge ok' : 'badge'}>{entryResult?.status ?? 'En attente'}</span></td></tr>
+              <tr><th>Reference</th><td>{entryResult?.reference ?? entryReference}</td></tr>
+              <tr><th>Centre</th><td>{entryResult?.center_code ?? centerCode}</td></tr>
+              <tr><th>Message</th><td>{entryResult?.message ?? entryResult?.reason ?? entryError ?? 'Aucune validation lancee'}</td></tr>
             </tbody>
           </table>
         </div>
