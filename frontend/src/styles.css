@@ -54,6 +54,12 @@ body {
   font-weight: 800;
 }
 
+.top-nav a.active,
+.brand-link {
+  background: #0b2e58;
+  color: white !important;
+}
+
 .hero {
   background: linear-gradient(135deg, #0b2e58, #0f766e);
   color: white;
@@ -155,6 +161,7 @@ button:disabled {
 .mini-card,
 .qr-card,
 .scanner-card,
+.payment-form,
 .timer-card {
   background: white;
   border: 1px solid #e6eaf2;
@@ -240,19 +247,22 @@ button:disabled {
   background: #f8fafc;
 }
 
-.scanner-card {
+.scanner-card,
+.payment-form {
   display: grid;
   gap: 12px;
 }
 
-.scanner-card label {
+.scanner-card label,
+.payment-form label {
   display: grid;
   gap: 8px;
   color: #0b2e58;
   font-weight: 900;
 }
 
-.scanner-card input {
+.scanner-card input,
+.payment-form input {
   width: 100%;
   border: 1px solid #d8deea;
   border-radius: 16px;
@@ -262,9 +272,29 @@ button:disabled {
   background: #f8fafc;
 }
 
-.scanner-card input:focus {
+.scanner-card input:focus,
+.payment-form input:focus {
   outline: 3px solid rgba(15, 118, 110, 0.18);
   border-color: #0f766e;
+}
+
+.payment-result {
+  margin-top: 18px;
+  border: 1px solid #bbf7d0;
+  background: #ecfdf3;
+  border-radius: 18px;
+  padding: 16px;
+  text-align: left;
+}
+
+.form-error {
+  margin-top: 18px;
+  border: 1px solid #fecaca;
+  background: #fef2f2;
+  border-radius: 18px;
+  padding: 14px;
+  color: #b42318;
+  font-weight: 800;
 }
 
 table {
