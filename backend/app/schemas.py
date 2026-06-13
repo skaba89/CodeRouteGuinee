@@ -92,6 +92,29 @@ class ExamSessionRead(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class ExamStartRequest(BaseModel):
+    candidate_id: str
+    session_id: str
+
+
+class ExamSubmitRequest(BaseModel):
+    answers: dict[str, str]
+
+
+class ExamAttemptRead(BaseModel):
+    id: str
+    candidate_id: str
+    session_id: str
+    status: str
+    answers: dict | None = None
+    score: int | None = None
+    passed: bool | None = None
+    started_at: datetime
+    submitted_at: datetime | None = None
+
+    model_config = {"from_attributes": True}
+
+
 class DashboardRead(BaseModel):
     candidates: int
     accredited_centers: int
