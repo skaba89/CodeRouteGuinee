@@ -12,6 +12,14 @@ export type EntrySummary = {
   by_center: Record<string, { allowed: number; denied: number }>;
 };
 
+export type ExamSummary = {
+  total_attempts: number;
+  submitted_attempts: number;
+  passed_attempts: number;
+  failed_attempts: number;
+  average_score: number;
+};
+
 export type EntryValidationPayload = {
   reference: string;
   verification_code: string;
@@ -74,6 +82,10 @@ export function getDashboard(): Promise<DashboardData> {
 
 export function getEntrySummary(): Promise<EntrySummary> {
   return getJson<EntrySummary>('/api/v1/entries/summary');
+}
+
+export function getExamSummary(): Promise<ExamSummary> {
+  return getJson<ExamSummary>('/api/v1/exams/summary');
 }
 
 export function validateEntry(payload: EntryValidationPayload): Promise<EntryValidationResult> {
