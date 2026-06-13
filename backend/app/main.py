@@ -1,15 +1,32 @@
+from contextlib import asynccontextmanager
+from collections.abc import AsyncIterator
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.core.config import get_settings
+from app.db.session import init_db
+from app.routers import auth, candidates, centers, dashboard, questions, sessions
+
+settings = get_settings()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    init_db()
+    yield
+
+
 app = FastAPI(
-    title="CodeRoute Guinee API",
+    title=settings.project_name,
     description="Plateforme nationale d'examen du code de la route en Guinee",
-    version="0.1.0",
+    version="0.2.0",
+    lifespan=lifespan,
 )
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=settings.cors_origin_list,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -18,24 +35,12 @@ app.add_middleware(
 
 @app.get("/health")
 def health() -> dict:
-    return {"status": "ok", "service": "CodeRoute Guinee API"}
+    return {"status": "ok", "service": settings.project_name}
 
 
-@app.get("/api/v1/dashboard")
-def dashboard() -> dict:
-    return {
-        "candidates": 1250,
-        "accredited_centers": 18,
-        "exam_sessions": 96,
-        "success_rate": 72,
-        "fraud_alerts": 3,
-    }
-
-
-@app.get("/api/v1/centers")
-def centers() -> list[dict]:
-    return [
-        {"name": "Centre agree Kaloum", "city": "Conakry", "status": "active"},
-        {"name": "Centre agree Matoto", "city": "Conakry", "status": "active"},
-        {"name": "Centre agree Kankan", "city": "Kankan", "status": "pending_audit"},
-    ]
+app.include_router(auth.router, prefix=settings.api_v1_prefix)
+app.include_router(candidates.router, prefix=settings.api_v1_prefix)
+app.include_router(centers.router, prefix=settings.api_v1_prefix)
+app.include_router(questions.router, prefix=settings.api_v1_prefix)
+app.include_router(sessions.router, prefix=settings.api_v1_prefix)
+app.include_router(dashboard.router, prefix=settings.api_v1_prefix)
