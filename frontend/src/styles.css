@@ -120,6 +120,11 @@ button {
   cursor: pointer;
 }
 
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 .actions .secondary {
   background: rgba(255, 255, 255, 0.15);
   color: white;
@@ -233,6 +238,33 @@ button {
   color: #667085;
   margin-bottom: 12px;
   background: #f8fafc;
+}
+
+.scanner-card {
+  display: grid;
+  gap: 12px;
+}
+
+.scanner-card label {
+  display: grid;
+  gap: 8px;
+  color: #0b2e58;
+  font-weight: 900;
+}
+
+.scanner-card input {
+  width: 100%;
+  border: 1px solid #d8deea;
+  border-radius: 16px;
+  padding: 14px 16px;
+  font: inherit;
+  color: #172033;
+  background: #f8fafc;
+}
+
+.scanner-card input:focus {
+  outline: 3px solid rgba(15, 118, 110, 0.18);
+  border-color: #0f766e;
 }
 
 table {
