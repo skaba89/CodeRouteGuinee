@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 
+import { demoRoles, navigationItems, type UserRole } from './auth';
 import { AdminPage, CandidatePage, CenterPage, ExamPage, HomePage, ResultsPage } from './pages';
 
 type AppRoute = 'home' | 'candidate' | 'center' | 'admin' | 'exam' | 'results';
@@ -14,12 +15,15 @@ function getRouteFromHash(): AppRoute {
 
 export default function App() {
   const [route, setRoute] = useState<AppRoute>(getRouteFromHash());
+  const [role, setRole] = useState<UserRole>('super_admin');
 
   useEffect(() => {
     const onHashChange = () => setRoute(getRouteFromHash());
     window.addEventListener('hashchange', onHashChange);
     return () => window.removeEventListener('hashchange', onHashChange);
   }, []);
+
+  const visibleNavigation = navigationItems.filter((item) => item.roles.includes(role));
 
   const page = {
     home: <HomePage />,
@@ -35,12 +39,17 @@ export default function App() {
       <nav className="top-nav">
         <strong><a href="#/" className="brand-link">CodeRoute Guinee</a></strong>
         <div>
-          <a href="#/candidate" className={route === 'candidate' ? 'active' : ''}>Candidat</a>
-          <a href="#/center" className={route === 'center' ? 'active' : ''}>Centre</a>
-          <a href="#/admin" className={route === 'admin' ? 'active' : ''}>Admin</a>
-          <a href="#/exam" className={route === 'exam' ? 'active' : ''}>Examen</a>
-          <a href="#/results" className={route === 'results' ? 'active' : ''}>Resultats</a>
+          {visibleNavigation.map((item) => {
+            const itemRoute = item.href.replace('#/', '') || 'home';
+            return <a key={item.href} href={item.href} className={route === itemRoute ? 'active' : ''}>{item.label}</a>;
+          })}
         </div>
+        <label className="role-switcher">
+          Role
+          <select value={role} onChange={(event) => setRole(event.target.value as UserRole)}>
+            {demoRoles.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+          </select>
+        </label>
       </nav>
       {page}
     </main>
