@@ -1,0 +1,3 @@
+# QR status
+
+Ready.
