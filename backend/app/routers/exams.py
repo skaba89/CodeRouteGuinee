@@ -22,6 +22,25 @@ def start_exam(payload: ExamStartRequest, db: Session = Depends(get_db)) -> Exam
     return attempt
 
 
+@router.get("/summary")
+def get_exam_summary(db: Session = Depends(get_db)) -> dict:
+    attempts = db.scalars(select(ExamAttempt)).all()
+    submitted = [attempt for attempt in attempts if attempt.status == "submitted"]
+    passed = [attempt for attempt in submitted if attempt.passed]
+    failed = [attempt for attempt in submitted if attempt.passed is False]
+    average_score = 0
+    if submitted:
+        scores = [attempt.score or 0 for attempt in submitted]
+        average_score = round(sum(scores) / len(scores), 2)
+    return {
+        "total_attempts": len(attempts),
+        "submitted_attempts": len(submitted),
+        "passed_attempts": len(passed),
+        "failed_attempts": len(failed),
+        "average_score": average_score,
+    }
+
+
 @router.post("/{attempt_id}/submit", response_model=ExamAttemptRead)
 def submit_exam(attempt_id: str, payload: ExamSubmitRequest, db: Session = Depends(get_db)) -> ExamAttempt:
     attempt = db.get(ExamAttempt, attempt_id)
