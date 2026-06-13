@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -9,6 +9,7 @@ from app.models_booking import Booking
 from app.models_candidate import Candidate
 from app.models_center import Center
 from app.models_session import ExamSession
+from app.qr_service import generate_qr_svg
 from app.schemas import BookingCreate, BookingRead, BookingVerificationRead
 
 router = APIRouter(prefix="/bookings", tags=["bookings"])
@@ -49,6 +50,15 @@ def get_convocation(reference: str, db: Session = Depends(get_db)) -> dict:
     if not candidate or not session or not center:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Incomplete booking data")
     return build_convocation_payload(booking, candidate, session, center)
+
+
+@router.get("/{reference}/convocation/qr.svg")
+def get_convocation_qr(reference: str, db: Session = Depends(get_db)) -> Response:
+    booking = db.scalar(select(Booking).where(Booking.reference == reference))
+    if not booking:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Booking not found")
+    svg = generate_qr_svg(f"CODEROUTE-GN|REF={booking.reference}|VERIFY={booking.verification_code}")
+    return Response(content=svg, media_type="image/svg+xml")
 
 
 @router.get("/verify/{verification_code}", response_model=BookingVerificationRead)
