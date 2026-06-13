@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 
 import { demoRoles, navigationItems, type UserRole } from './auth';
 import { AdminPage, CandidatePage, CenterPage, ExamPage, HomePage, ResultsPage } from './pages';
+import './role.css';
 
 type AppRoute = 'home' | 'candidate' | 'center' | 'admin' | 'exam' | 'results';
 
