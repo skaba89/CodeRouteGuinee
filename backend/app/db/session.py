@@ -13,7 +13,7 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
 def init_db() -> None:
-    from app import models  # noqa: F401
+    from app import models_candidate, models_center, models_question, models_session, models_user  # noqa: F401
 
     Base.metadata.create_all(bind=engine)
 
