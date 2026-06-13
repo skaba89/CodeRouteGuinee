@@ -22,6 +22,22 @@
   letter-spacing: normal;
 }
 
+.access-denied {
+  max-width: 720px;
+  margin: 48px auto 0;
+  text-align: center;
+  border: 1px solid #fed7aa;
+  background: #fff7ed;
+}
+
+.access-denied h2 {
+  color: #9a3412;
+}
+
+.access-denied p {
+  color: #7c2d12;
+}
+
 @media (max-width: 1000px) {
   .role-switcher {
     width: 100%;
