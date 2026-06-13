@@ -1,9 +1,24 @@
-const metrics = [
-  { label: 'Candidats inscrits', value: '1 250' },
-  { label: 'Centres agrees', value: '18' },
-  { label: 'Sessions organisees', value: '96' },
-  { label: 'Alertes entree', value: '19' },
-];
+import { useEffect, useState } from 'react';
+
+import { type DashboardData, type EntrySummary, getDashboard, getEntrySummary } from './api';
+
+const fallbackDashboard: DashboardData = {
+  candidates: 1250,
+  accredited_centers: 18,
+  exam_sessions: 96,
+  questions: 0,
+  fraud_alerts: 19,
+};
+
+const fallbackEntrySummary: EntrySummary = {
+  total: 421,
+  by_result: { allowed: 402, denied: 19 },
+  by_center: {
+    'CTR-KALOUM': { allowed: 122, denied: 3 },
+    'CTR-MATOTO': { allowed: 98, denied: 12 },
+    'CTR-KANKAN': { allowed: 66, denied: 4 },
+  },
+};
 
 const modules = [
   'Inscription candidat',
@@ -16,13 +31,56 @@ const modules = [
   'Dashboard national',
 ];
 
-const centerRows = [
-  ['CTR-KALOUM', '122', '3', 'Normal'],
-  ['CTR-MATOTO', '98', '12', 'A verifier'],
-  ['CTR-KANKAN', '66', '4', 'Audit'],
-];
+function formatNumber(value: number): string {
+  return new Intl.NumberFormat('fr-FR').format(value);
+}
+
+function buildRiskLabel(denied: number): string {
+  if (denied >= 10) return 'A verifier';
+  if (denied >= 4) return 'Audit';
+  return 'Normal';
+}
 
 export default function App() {
+  const [dashboard, setDashboard] = useState<DashboardData>(fallbackDashboard);
+  const [entrySummary, setEntrySummary] = useState<EntrySummary>(fallbackEntrySummary);
+  const [apiStatus, setApiStatus] = useState<'connected' | 'offline'>('offline');
+
+  useEffect(() => {
+    let isMounted = true;
+    Promise.allSettled([getDashboard(), getEntrySummary()]).then(([dashboardResult, entryResult]) => {
+      if (!isMounted) return;
+      if (dashboardResult.status === 'fulfilled') {
+        setDashboard(dashboardResult.value);
+      }
+      if (entryResult.status === 'fulfilled') {
+        setEntrySummary(entryResult.value);
+      }
+      if (dashboardResult.status === 'fulfilled' || entryResult.status === 'fulfilled') {
+        setApiStatus('connected');
+      }
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const metrics = [
+    { label: 'Candidats inscrits', value: formatNumber(dashboard.candidates) },
+    { label: 'Centres agrees', value: formatNumber(dashboard.accredited_centers) },
+    { label: 'Sessions organisees', value: formatNumber(dashboard.exam_sessions) },
+    { label: 'Alertes entree', value: formatNumber(dashboard.fraud_alerts) },
+  ];
+
+  const allowedEntries = entrySummary.by_result.allowed ?? 0;
+  const deniedEntries = entrySummary.by_result.denied ?? 0;
+  const centerRows = Object.entries(entrySummary.by_center).map(([center, values]) => [
+    center,
+    String(values.allowed ?? 0),
+    String(values.denied ?? 0),
+    buildRiskLabel(values.denied ?? 0),
+  ]);
+
   return (
     <main className="app-shell">
       <nav className="top-nav">
@@ -51,7 +109,7 @@ export default function App() {
           <span>Convocation QR</span><strong>Actif</strong>
           <span>Paiement Mobile Money</span><strong>Sandbox</strong>
           <span>Controle entree</span><strong>Actif</strong>
-          <span>Logs supervision</span><strong>Actif</strong>
+          <span>API frontend</span><strong>{apiStatus === 'connected' ? 'Connectee' : 'Fallback'}</strong>
         </div>
       </section>
 
@@ -115,17 +173,17 @@ export default function App() {
         <p className="eyebrow dark">Administration nationale</p>
         <h2>Supervision centres et entrees</h2>
         <div className="metrics compact">
-          <article><strong>402</strong><span>Entrees validees</span></article>
-          <article><strong>19</strong><span>Entrees refusees</span></article>
+          <article><strong>{formatNumber(allowedEntries)}</strong><span>Entrees validees</span></article>
+          <article><strong>{formatNumber(deniedEntries)}</strong><span>Entrees refusees</span></article>
           <article><strong>58.5M</strong><span>GNF encaisses</span></article>
-          <article><strong>3</strong><span>Alertes centre</span></article>
+          <article><strong>{formatNumber(dashboard.fraud_alerts)}</strong><span>Alertes centre</span></article>
         </div>
         <table>
           <thead><tr><th>Centre</th><th>Validees</th><th>Refusees</th><th>Risque</th></tr></thead>
           <tbody>
             {centerRows.map((row) => (
               <tr key={row[0]}>
-                {row.map((cell, index) => <td key={cell}>{index === 3 ? <span className="badge">{cell}</span> : cell}</td>)}
+                {row.map((cell, index) => <td key={`${row[0]}-${index}`}>{index === 3 ? <span className="badge">{cell}</span> : cell}</td>)}
               </tr>
             ))}
           </tbody>
