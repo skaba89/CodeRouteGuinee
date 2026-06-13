@@ -1,0 +1,60 @@
+from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from app.db.session import get_db
+from app.models_booking import Booking
+from app.models_payment import Payment
+from app.payment_service import build_payment_reference, build_receipt_number
+
+router = APIRouter(prefix="/payments", tags=["payments"])
+
+
+class PaymentIn(BaseModel):
+    booking_reference: str
+    amount_gnf: int = 250000
+    provider: str = "sandbox"
+    phone: str
+
+
+@router.post("", status_code=status.HTTP_201_CREATED)
+def create_payment(payload: PaymentIn, db: Session = Depends(get_db)) -> dict:
+    booking = db.scalar(select(Booking).where(Booking.reference == payload.booking_reference))
+    if not booking:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Booking not found")
+    reference = build_payment_reference(db.query(Payment).count() + 1)
+    payment = Payment(
+        reference=reference,
+        booking_reference=payload.booking_reference,
+        amount_gnf=payload.amount_gnf,
+        provider=payload.provider,
+        phone=payload.phone,
+        receipt_number=build_receipt_number(reference),
+    )
+    db.add(payment)
+    db.commit()
+    db.refresh(payment)
+    return {
+        "reference": payment.reference,
+        "booking_reference": payment.booking_reference,
+        "amount_gnf": payment.amount_gnf,
+        "provider": payment.provider,
+        "status": payment.status,
+        "receipt_number": payment.receipt_number,
+    }
+
+
+@router.get("/{reference}")
+def get_payment(reference: str, db: Session = Depends(get_db)) -> dict:
+    payment = db.scalar(select(Payment).where(Payment.reference == reference))
+    if not payment:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Payment not found")
+    return {
+        "reference": payment.reference,
+        "booking_reference": payment.booking_reference,
+        "amount_gnf": payment.amount_gnf,
+        "provider": payment.provider,
+        "status": payment.status,
+        "receipt_number": payment.receipt_number,
+    }
