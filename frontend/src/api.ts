@@ -28,6 +28,24 @@ export type EntryValidationResult = {
   reason?: string;
 };
 
+export type PaymentPayload = {
+  booking_reference: string;
+  amount_gnf: number;
+  provider: string;
+  phone: string;
+};
+
+export type PaymentResult = {
+  reference: string;
+  booking_reference: string;
+  amount_gnf: number;
+  provider: string;
+  status: string;
+  receipt_number: string;
+  external_reference?: string;
+  message?: string;
+};
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000';
 
 async function getJson<T>(path: string): Promise<T> {
@@ -60,4 +78,8 @@ export function getEntrySummary(): Promise<EntrySummary> {
 
 export function validateEntry(payload: EntryValidationPayload): Promise<EntryValidationResult> {
   return postJson<EntryValidationResult>('/api/v1/entries/validate', payload);
+}
+
+export function createPayment(payload: PaymentPayload): Promise<PaymentResult> {
+  return postJson<PaymentResult>('/api/v1/payments', payload);
 }
