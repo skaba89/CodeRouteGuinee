@@ -6,12 +6,19 @@ import './role.css';
 
 type AppRoute = 'home' | 'candidate' | 'center' | 'admin' | 'exam' | 'results';
 
+const ROLE_STORAGE_KEY = 'coderoute-demo-role';
+
 function getRouteFromHash(): AppRoute {
   const route = window.location.hash.replace('#/', '');
   if (route === 'candidate' || route === 'center' || route === 'admin' || route === 'exam' || route === 'results') {
     return route;
   }
   return 'home';
+}
+
+function getInitialRole(): UserRole {
+  const savedRole = window.localStorage.getItem(ROLE_STORAGE_KEY) as UserRole | null;
+  return demoRoles.some((item) => item.value === savedRole) ? savedRole : 'super_admin';
 }
 
 function AccessDenied({ role }: { role: UserRole }) {
@@ -29,13 +36,17 @@ function AccessDenied({ role }: { role: UserRole }) {
 
 export default function App() {
   const [route, setRoute] = useState<AppRoute>(getRouteFromHash());
-  const [role, setRole] = useState<UserRole>('super_admin');
+  const [role, setRole] = useState<UserRole>(getInitialRole);
 
   useEffect(() => {
     const onHashChange = () => setRoute(getRouteFromHash());
     window.addEventListener('hashchange', onHashChange);
     return () => window.removeEventListener('hashchange', onHashChange);
   }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem(ROLE_STORAGE_KEY, role);
+  }, [role]);
 
   const visibleNavigation = navigationItems.filter((item) => item.roles.includes(role));
   const currentHref = route === 'home' ? '#/' : `#/${route}`;
