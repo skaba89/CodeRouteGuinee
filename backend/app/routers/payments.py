@@ -4,6 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
+from app.mobile_money import simulate_mobile_money_payment
 from app.models_booking import Booking
 from app.models_payment import Payment
 from app.payment_service import build_payment_reference, build_receipt_number
@@ -23,13 +24,15 @@ def create_payment(payload: PaymentIn, db: Session = Depends(get_db)) -> dict:
     booking = db.scalar(select(Booking).where(Booking.reference == payload.booking_reference))
     if not booking:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Booking not found")
+    provider_result = simulate_mobile_money_payment(payload.provider, payload.phone, payload.amount_gnf)
     reference = build_payment_reference(db.query(Payment).count() + 1)
     payment = Payment(
         reference=reference,
         booking_reference=payload.booking_reference,
         amount_gnf=payload.amount_gnf,
-        provider=payload.provider,
+        provider=provider_result.provider,
         phone=payload.phone,
+        status=provider_result.status,
         receipt_number=build_receipt_number(reference),
     )
     db.add(payment)
@@ -42,6 +45,8 @@ def create_payment(payload: PaymentIn, db: Session = Depends(get_db)) -> dict:
         "provider": payment.provider,
         "status": payment.status,
         "receipt_number": payment.receipt_number,
+        "external_reference": provider_result.external_reference,
+        "message": provider_result.message,
     }
 
 
