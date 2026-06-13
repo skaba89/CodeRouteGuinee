@@ -4,6 +4,8 @@ import {
   type DashboardData,
   type EntrySummary,
   type EntryValidationResult,
+  type PaymentResult,
+  createPayment,
   getDashboard,
   getEntrySummary,
   validateEntry,
@@ -108,6 +110,29 @@ export function HomePage() {
 }
 
 export function CandidatePage() {
+  const [bookingReference, setBookingReference] = useState('GN-BOOK-2026-000001');
+  const [amount, setAmount] = useState(250000);
+  const [provider, setProvider] = useState('orange_money');
+  const [phone, setPhone] = useState('+224622000000');
+  const [paymentResult, setPaymentResult] = useState<PaymentResult | null>(null);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
+  const [isPaying, setIsPaying] = useState(false);
+
+  async function handlePaymentSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setIsPaying(true);
+    setPaymentError(null);
+    setPaymentResult(null);
+    try {
+      const result = await createPayment({ booking_reference: bookingReference, amount_gnf: amount, provider, phone });
+      setPaymentResult(result);
+    } catch (error) {
+      setPaymentError("Impossible de traiter le paiement. Verifiez que l'API est demarree.");
+    } finally {
+      setIsPaying(false);
+    }
+  }
+
   return (
     <section className="screen two-columns">
       <div>
@@ -116,12 +141,28 @@ export function CandidatePage() {
         <p>Le candidat suit son dossier, reserve une session, paie et telecharge sa convocation PDF avec QR code.</p>
         <div className="mini-card">Reference candidat : <strong>GN-CODE-2026-000001</strong></div>
         <div className="mini-card">Session : <strong>Centre Kaloum - 20/06/2026</strong></div>
-        <div className="mini-card">Paiement : <strong>Orange Money - paye</strong></div>
+        <div className="mini-card">Paiement : <strong>{paymentResult?.status ?? 'En attente'}</strong></div>
+        <form className="payment-form" onSubmit={handlePaymentSubmit}>
+          <h2>Paiement Mobile Money</h2>
+          <label>Reference reservation<input value={bookingReference} onChange={(event) => setBookingReference(event.target.value)} /></label>
+          <label>Montant GNF<input type="number" value={amount} onChange={(event) => setAmount(Number(event.target.value))} /></label>
+          <label>Operateur<input value={provider} onChange={(event) => setProvider(event.target.value)} /></label>
+          <label>Telephone<input value={phone} onChange={(event) => setPhone(event.target.value)} /></label>
+          <button disabled={isPaying}>{isPaying ? 'Traitement...' : 'Payer maintenant'}</button>
+        </form>
       </div>
       <div className="qr-card">
         <div className="qr-box" />
         <strong>Convocation verifiable</strong>
         <span>GN-CONV-2026-000001</span>
+        {paymentResult && (
+          <div className="payment-result">
+            <strong>Recu : {paymentResult.receipt_number}</strong>
+            <span>Reference : {paymentResult.reference}</span>
+            <span>Statut : {paymentResult.status}</span>
+          </div>
+        )}
+        {paymentError && <p className="form-error">{paymentError}</p>}
       </div>
     </section>
   );
