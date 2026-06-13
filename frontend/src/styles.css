@@ -162,6 +162,7 @@ button:disabled {
 .qr-card,
 .scanner-card,
 .payment-form,
+.result-card,
 .timer-card {
   background: white;
   border: 1px solid #e6eaf2;
@@ -362,6 +363,27 @@ th {
 .answer.selected {
   border-color: #0f766e;
   background: #ecfdf3;
+}
+
+.result-card {
+  text-align: center;
+}
+
+.result-card > strong {
+  display: block;
+  color: #0b2e58;
+  font-size: 72px;
+  margin: 18px 0 10px;
+}
+
+.result-actions {
+  justify-content: center;
+}
+
+.result-actions .secondary {
+  color: #0b2e58;
+  background: #f2f6fb;
+  border: 1px solid #d8deea;
 }
 
 .timer-card {
