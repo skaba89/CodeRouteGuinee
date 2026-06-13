@@ -4,11 +4,13 @@ import {
   type DashboardData,
   type EntrySummary,
   type EntryValidationResult,
+  type ExamSummary,
   type PaymentResult,
   createPayment,
   getConvocationPdfUrl,
   getDashboard,
   getEntrySummary,
+  getExamSummary,
   validateEntry,
 } from './api';
 
@@ -28,6 +30,14 @@ const fallbackEntrySummary: EntrySummary = {
     'CTR-MATOTO': { allowed: 98, denied: 12 },
     'CTR-KANKAN': { allowed: 66, denied: 4 },
   },
+};
+
+const fallbackExamSummary: ExamSummary = {
+  total_attempts: 118,
+  submitted_attempts: 104,
+  passed_attempts: 74,
+  failed_attempts: 30,
+  average_score: 34.8,
 };
 
 const modules = [
@@ -223,10 +233,12 @@ export function CenterPage() {
 export function AdminPage() {
   const [dashboard, setDashboard] = useState<DashboardData>(fallbackDashboard);
   const [entrySummary, setEntrySummary] = useState<EntrySummary>(fallbackEntrySummary);
+  const [examSummary, setExamSummary] = useState<ExamSummary>(fallbackExamSummary);
 
   useEffect(() => {
     getDashboard().then(setDashboard).catch(() => undefined);
     getEntrySummary().then(setEntrySummary).catch(() => undefined);
+    getExamSummary().then(setExamSummary).catch(() => undefined);
   }, []);
 
   const allowedEntries = entrySummary.by_result.allowed ?? 0;
@@ -241,10 +253,16 @@ export function AdminPage() {
   return (
     <section className="panel admin-panel">
       <p className="eyebrow dark">Administration nationale</p>
-      <h2>Supervision centres et entrees</h2>
+      <h2>Supervision centres, entrees et examens</h2>
       <div className="metrics compact">
         <article><strong>{formatNumber(allowedEntries)}</strong><span>Entrees validees</span></article>
         <article><strong>{formatNumber(deniedEntries)}</strong><span>Entrees refusees</span></article>
+        <article><strong>{formatNumber(examSummary.submitted_attempts)}</strong><span>Examens soumis</span></article>
+        <article><strong>{formatNumber(examSummary.passed_attempts)}</strong><span>Reussites examen</span></article>
+      </div>
+      <div className="metrics compact">
+        <article><strong>{formatNumber(examSummary.failed_attempts)}</strong><span>Echecs examen</span></article>
+        <article><strong>{examSummary.average_score}</strong><span>Score moyen</span></article>
         <article><strong>58.5M</strong><span>GNF encaisses</span></article>
         <article><strong>{formatNumber(dashboard.fraud_alerts)}</strong><span>Alertes centre</span></article>
       </div>
@@ -277,6 +295,11 @@ export function ExamPage() {
 }
 
 export function ResultsPage() {
+  const [examSummary, setExamSummary] = useState<ExamSummary>(fallbackExamSummary);
+  useEffect(() => {
+    getExamSummary().then(setExamSummary).catch(() => undefined);
+  }, []);
+
   const score = 36;
   const total = 40;
   const threshold = 35;
@@ -290,11 +313,16 @@ export function ResultsPage() {
         <div className="mini-card">Reference candidat : <strong>GN-CODE-2026-000001</strong></div>
         <div className="mini-card">Session : <strong>Centre Kaloum - 20/06/2026</strong></div>
         <div className="mini-card">Seuil de reussite : <strong>{threshold} / {total}</strong></div>
+        <div className="mini-card">Score moyen national : <strong>{examSummary.average_score} / {total}</strong></div>
       </div>
       <div className="result-card">
         <span className={passed ? 'badge ok' : 'badge'}>{passed ? 'Admis' : 'Non admis'}</span>
         <strong>{score} / {total}</strong>
         <p>{passed ? 'Resultat positif. Certificat numerique pret pour validation administrative.' : 'Resultat insuffisant. Nouvelle presentation possible selon les regles nationales.'}</p>
+        <div className="metrics compact">
+          <article><strong>{formatNumber(examSummary.submitted_attempts)}</strong><span>Examens soumis</span></article>
+          <article><strong>{formatNumber(examSummary.passed_attempts)}</strong><span>Admis</span></article>
+        </div>
         <div className="actions result-actions">
           <a href="#/candidate">Retour dossier</a>
           <a href="#/admin" className="secondary">Voir supervision</a>
