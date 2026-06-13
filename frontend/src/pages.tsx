@@ -275,3 +275,31 @@ export function ExamPage() {
     </section>
   );
 }
+
+export function ResultsPage() {
+  const score = 36;
+  const total = 40;
+  const threshold = 35;
+  const passed = score >= threshold;
+  return (
+    <section className="screen two-columns">
+      <div>
+        <p className="eyebrow dark">Resultat candidat</p>
+        <h2>Examen du code de la route</h2>
+        <p>Le candidat consulte son score, son statut et les prochaines etapes apres correction automatique.</p>
+        <div className="mini-card">Reference candidat : <strong>GN-CODE-2026-000001</strong></div>
+        <div className="mini-card">Session : <strong>Centre Kaloum - 20/06/2026</strong></div>
+        <div className="mini-card">Seuil de reussite : <strong>{threshold} / {total}</strong></div>
+      </div>
+      <div className="result-card">
+        <span className={passed ? 'badge ok' : 'badge'}>{passed ? 'Admis' : 'Non admis'}</span>
+        <strong>{score} / {total}</strong>
+        <p>{passed ? 'Resultat positif. Certificat numerique pret pour validation administrative.' : 'Resultat insuffisant. Nouvelle presentation possible selon les regles nationales.'}</p>
+        <div className="actions result-actions">
+          <a href="#/candidate">Retour dossier</a>
+          <a href="#/admin" className="secondary">Voir supervision</a>
+        </div>
+      </div>
+    </section>
+  );
+}
