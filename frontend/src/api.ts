@@ -83,3 +83,7 @@ export function validateEntry(payload: EntryValidationPayload): Promise<EntryVal
 export function createPayment(payload: PaymentPayload): Promise<PaymentResult> {
   return postJson<PaymentResult>('/api/v1/payments', payload);
 }
+
+export function getConvocationPdfUrl(reference: string): string {
+  return `${API_BASE_URL}/api/v1/documents/convocations/${encodeURIComponent(reference)}.pdf`;
+}

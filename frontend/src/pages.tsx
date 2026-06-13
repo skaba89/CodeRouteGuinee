@@ -6,6 +6,7 @@ import {
   type EntryValidationResult,
   type PaymentResult,
   createPayment,
+  getConvocationPdfUrl,
   getDashboard,
   getEntrySummary,
   validateEntry,
@@ -117,6 +118,7 @@ export function CandidatePage() {
   const [paymentResult, setPaymentResult] = useState<PaymentResult | null>(null);
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [isPaying, setIsPaying] = useState(false);
+  const convocationUrl = getConvocationPdfUrl(bookingReference);
 
   async function handlePaymentSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -154,7 +156,8 @@ export function CandidatePage() {
       <div className="qr-card">
         <div className="qr-box" />
         <strong>Convocation verifiable</strong>
-        <span>GN-CONV-2026-000001</span>
+        <span>{bookingReference}</span>
+        <a className="download-link" href={convocationUrl} target="_blank" rel="noreferrer">Telecharger la convocation PDF</a>
         {paymentResult && (
           <div className="payment-result">
             <strong>Recu : {paymentResult.receipt_number}</strong>
