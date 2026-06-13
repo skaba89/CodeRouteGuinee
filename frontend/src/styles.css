@@ -278,6 +278,18 @@ button:disabled {
   border-color: #0f766e;
 }
 
+.download-link {
+  display: inline-flex;
+  justify-content: center;
+  margin-top: 18px;
+  background: #f5b400;
+  color: #172033;
+  padding: 13px 18px;
+  border-radius: 999px;
+  text-decoration: none;
+  font-weight: 900;
+}
+
 .payment-result {
   margin-top: 18px;
   border: 1px solid #bbf7d0;
