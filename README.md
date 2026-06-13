@@ -1,3 +1,69 @@
 # CodeRoute Guinee
 
-Plateforme nationale d'examen du code de la route en Guinee.
+CodeRoute Guinee est une plateforme nationale d'examen du code de la route pour la Republique de Guinee.
+
+Le projet vise a digitaliser l'inscription, la reservation, le passage, la correction et la certification des examens theoriques du permis de conduire dans des centres agrees supervises par l'administration.
+
+## Positionnement
+
+CodeRoute Guinee est un produit national, pas un simple SaaS prive. La plateforme doit permettre a l'Etat, aux centres agrees, aux auto-ecoles et aux candidats de disposer d'un processus fiable, securise et tracable.
+
+## Modules MVP
+
+- Authentification et gestion des roles.
+- Gestion des candidats.
+- Gestion des centres agrees.
+- Reservation des sessions d'examen.
+- Convocation avec QR code.
+- Banque de questions.
+- Examen en ligne en centre agree.
+- Correction automatique.
+- Resultats securises.
+- Tableau de bord administratif.
+- Journal d'audit et premiers controles anti-fraude.
+
+## Stack cible
+
+- Frontend : React, Vite, TypeScript.
+- Backend : FastAPI, Python.
+- Base de donnees : PostgreSQL.
+- Conteneurisation : Docker Compose.
+- CI : GitHub Actions.
+
+## Demarrage local
+
+```bash
+cp .env.example .env
+docker compose up --build
+```
+
+Endpoints :
+
+- API : http://localhost:8000
+- Swagger : http://localhost:8000/docs
+- Frontend : http://localhost:5173
+
+## Roadmap
+
+### Phase 1 - MVP national
+
+- Socle backend et frontend.
+- Gestion des candidats, centres, questions et sessions.
+- Examen en ligne et correction automatique.
+- Dashboard admin initial.
+
+### Phase 2 - Securite renforcee
+
+- Verification photo le jour de l'examen.
+- Controle d'identite renforce.
+- Logs anti-fraude.
+- Detection de taux de reussite anormaux.
+- Signature numerique des resultats.
+
+### Phase 3 - Plateforme nationale avancee
+
+- Paiement Mobile Money.
+- Integration permis biometrique.
+- Application mobile.
+- API partenaires.
+- BI nationale securite routiere.
