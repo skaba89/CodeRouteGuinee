@@ -7,6 +7,7 @@ from app.db.session import get_db
 from app.mobile_money import simulate_mobile_money_payment
 from app.models_booking import Booking
 from app.models_payment import Payment
+from app.payment_recap import summarize_payments
 from app.payment_service import build_payment_reference, build_receipt_number
 
 router = APIRouter(prefix="/payments", tags=["payments"])
@@ -48,6 +49,12 @@ def create_payment(payload: PaymentIn, db: Session = Depends(get_db)) -> dict:
         "external_reference": provider_result.external_reference,
         "message": provider_result.message,
     }
+
+
+@router.get("/recap/summary")
+def get_payment_summary(db: Session = Depends(get_db)) -> dict:
+    payments = db.scalars(select(Payment)).all()
+    return summarize_payments(payments)
 
 
 @router.get("/{reference}")
