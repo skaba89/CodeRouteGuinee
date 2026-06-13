@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-import { demoRoles, navigationItems, type UserRole } from './auth';
+import { canAccessRoute, demoRoles, navigationItems, type UserRole } from './auth';
 import { AdminPage, CandidatePage, CenterPage, ExamPage, HomePage, ResultsPage } from './pages';
 import './role.css';
 
@@ -14,6 +14,19 @@ function getRouteFromHash(): AppRoute {
   return 'home';
 }
 
+function AccessDenied({ role }: { role: UserRole }) {
+  return (
+    <section className="screen access-denied">
+      <p className="eyebrow dark">Acces restreint</p>
+      <h2>Page non autorisee pour ce role</h2>
+      <p>Le role actif <strong>{role}</strong> ne dispose pas des permissions necessaires pour consulter cette page.</p>
+      <div className="actions result-actions">
+        <a href="#/">Retour accueil</a>
+      </div>
+    </section>
+  );
+}
+
 export default function App() {
   const [route, setRoute] = useState<AppRoute>(getRouteFromHash());
   const [role, setRole] = useState<UserRole>('super_admin');
@@ -25,15 +38,17 @@ export default function App() {
   }, []);
 
   const visibleNavigation = navigationItems.filter((item) => item.roles.includes(role));
+  const currentHref = route === 'home' ? '#/' : `#/${route}`;
+  const hasAccess = canAccessRoute(role, currentHref);
 
-  const page = {
+  const page = hasAccess ? {
     home: <HomePage />,
     candidate: <CandidatePage />,
     center: <CenterPage />,
     admin: <AdminPage />,
     exam: <ExamPage />,
     results: <ResultsPage />,
-  }[route];
+  }[route] : <AccessDenied role={role} />;
 
   return (
     <main className="app-shell">
