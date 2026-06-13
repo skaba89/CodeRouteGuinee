@@ -52,3 +52,16 @@ def validate_entry(payload: EntryIn, db: Session = Depends(get_db)) -> dict:
     _record_entry_log(db, payload.reference, "allowed", None, payload.center_code)
     db.commit()
     return build_entry_success(payload.reference, payload.center_code)
+
+
+@router.get("/logs")
+def list_entry_logs(db: Session = Depends(get_db)) -> list[dict]:
+    logs = db.scalars(select(AuditLog).where(AuditLog.action == "entry_validation").order_by(AuditLog.created_at.desc()).limit(100)).all()
+    return [
+        {
+            "id": log.id,
+            "details": log.details,
+            "created_at": log.created_at.isoformat(),
+        }
+        for log in logs
+    ]
