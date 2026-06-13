@@ -54,6 +54,24 @@ def validate_entry(payload: EntryIn, db: Session = Depends(get_db)) -> dict:
     return build_entry_success(payload.reference, payload.center_code)
 
 
+@router.get("/summary")
+def get_entry_summary(db: Session = Depends(get_db)) -> dict:
+    logs = db.scalars(select(AuditLog).where(AuditLog.action == "entry_validation")).all()
+    total = 0
+    by_result: dict[str, int] = {}
+    by_center: dict[str, dict[str, int]] = {}
+    for log in logs:
+        details = log.details or {}
+        result = details.get("result", "unknown")
+        center_code = details.get("center_code") or "unknown"
+        total += 1
+        by_result[result] = by_result.get(result, 0) + 1
+        by_center.setdefault(center_code, {"allowed": 0, "denied": 0})
+        if result in by_center[center_code]:
+            by_center[center_code][result] += 1
+    return {"total": total, "by_result": by_result, "by_center": by_center}
+
+
 @router.get("/logs")
 def list_entry_logs(db: Session = Depends(get_db)) -> list[dict]:
     logs = db.scalars(select(AuditLog).where(AuditLog.action == "entry_validation").order_by(AuditLog.created_at.desc()).limit(100)).all()
