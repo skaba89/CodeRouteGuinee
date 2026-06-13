@@ -115,6 +115,29 @@ class ExamAttemptRead(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class BookingCreate(BaseModel):
+    candidate_id: str
+    session_id: str
+
+
+class BookingRead(BaseModel):
+    id: str
+    reference: str
+    candidate_id: str
+    session_id: str
+    status: str
+    verification_code: str
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class BookingVerificationRead(BaseModel):
+    valid: bool
+    reference: str | None = None
+    status: str | None = None
+
+
 class DashboardRead(BaseModel):
     candidates: int
     accredited_centers: int

@@ -1,0 +1,42 @@
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from app.booking_service import build_booking_reference, build_verification_code
+from app.db.session import get_db
+from app.models_booking import Booking
+from app.schemas import BookingCreate, BookingRead, BookingVerificationRead
+
+router = APIRouter(prefix="/bookings", tags=["bookings"])
+
+
+@router.post("", response_model=BookingRead, status_code=status.HTTP_201_CREATED)
+def create_booking(payload: BookingCreate, db: Session = Depends(get_db)) -> Booking:
+    sequence_number = db.query(Booking).count() + 1
+    reference = build_booking_reference(sequence_number)
+    booking = Booking(
+        reference=reference,
+        candidate_id=payload.candidate_id,
+        session_id=payload.session_id,
+        verification_code=build_verification_code(reference),
+    )
+    db.add(booking)
+    db.commit()
+    db.refresh(booking)
+    return booking
+
+
+@router.get("/{reference}", response_model=BookingRead)
+def get_booking(reference: str, db: Session = Depends(get_db)) -> Booking:
+    booking = db.scalar(select(Booking).where(Booking.reference == reference))
+    if not booking:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Booking not found")
+    return booking
+
+
+@router.get("/verify/{verification_code}", response_model=BookingVerificationRead)
+def verify_booking(verification_code: str, db: Session = Depends(get_db)) -> BookingVerificationRead:
+    booking = db.scalar(select(Booking).where(Booking.verification_code == verification_code))
+    if not booking:
+        return BookingVerificationRead(valid=False)
+    return BookingVerificationRead(valid=True, reference=booking.reference, status=booking.status)
