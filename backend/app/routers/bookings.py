@@ -3,8 +3,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.booking_service import build_booking_reference, build_verification_code
+from app.convocation_service import build_convocation_payload
 from app.db.session import get_db
 from app.models_booking import Booking
+from app.models_candidate import Candidate
+from app.models_center import Center
+from app.models_session import ExamSession
 from app.schemas import BookingCreate, BookingRead, BookingVerificationRead
 
 router = APIRouter(prefix="/bookings", tags=["bookings"])
@@ -32,6 +36,19 @@ def get_booking(reference: str, db: Session = Depends(get_db)) -> Booking:
     if not booking:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Booking not found")
     return booking
+
+
+@router.get("/{reference}/convocation")
+def get_convocation(reference: str, db: Session = Depends(get_db)) -> dict:
+    booking = db.scalar(select(Booking).where(Booking.reference == reference))
+    if not booking:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Booking not found")
+    candidate = db.get(Candidate, booking.candidate_id)
+    session = db.get(ExamSession, booking.session_id)
+    center = db.get(Center, session.center_id) if session else None
+    if not candidate or not session or not center:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Incomplete booking data")
+    return build_convocation_payload(booking, candidate, session, center)
 
 
 @router.get("/verify/{verification_code}", response_model=BookingVerificationRead)
