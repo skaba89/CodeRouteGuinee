@@ -12,10 +12,38 @@ export type EntrySummary = {
   by_center: Record<string, { allowed: number; denied: number }>;
 };
 
+export type EntryValidationPayload = {
+  reference: string;
+  verification_code: string;
+  center_code?: string;
+};
+
+export type EntryValidationResult = {
+  allowed: boolean;
+  reference: string;
+  status: string;
+  center_code?: string;
+  checked_in_at?: string;
+  message?: string;
+  reason?: string;
+};
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000';
 
 async function getJson<T>(path: string): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`);
+  if (!response.ok) {
+    throw new Error(`API error ${response.status}`);
+  }
+  return response.json() as Promise<T>;
+}
+
+async function postJson<T>(path: string, body: unknown): Promise<T> {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
   if (!response.ok) {
     throw new Error(`API error ${response.status}`);
   }
@@ -28,4 +56,8 @@ export function getDashboard(): Promise<DashboardData> {
 
 export function getEntrySummary(): Promise<EntrySummary> {
   return getJson<EntrySummary>('/api/v1/entries/summary');
+}
+
+export function validateEntry(payload: EntryValidationPayload): Promise<EntryValidationResult> {
+  return postJson<EntryValidationResult>('/api/v1/entries/validate', payload);
 }
