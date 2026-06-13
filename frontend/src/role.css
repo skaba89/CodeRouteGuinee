@@ -1,0 +1,33 @@
+.role-switcher {
+  display: grid;
+  gap: 4px;
+  color: #0b2e58;
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.role-switcher select {
+  min-width: 150px;
+  border: 1px solid #d8deea;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #0b2e58;
+  padding: 8px 12px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+@media (max-width: 1000px) {
+  .role-switcher {
+    width: 100%;
+  }
+
+  .role-switcher select {
+    width: 100%;
+  }
+}
