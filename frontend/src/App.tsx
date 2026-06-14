@@ -4,13 +4,13 @@ import { canAccessRoute, demoRoles, navigationItems, type UserRole } from './aut
 import { AdminPage, CandidatePage, CenterPage, ExamPage, HomePage, ResultsPage } from './pages';
 import './role.css';
 
-type AppRoute = 'home' | 'candidate' | 'center' | 'admin' | 'exam' | 'results';
+type AppRoute = 'home' | 'candidate' | 'center' | 'admin' | 'exam' | 'results' | 'login';
 
 const ROLE_STORAGE_KEY = 'coderoute-demo-role';
 
 function getRouteFromHash(): AppRoute {
   const route = window.location.hash.replace('#/', '');
-  if (route === 'candidate' || route === 'center' || route === 'admin' || route === 'exam' || route === 'results') {
+  if (route === 'candidate' || route === 'center' || route === 'admin' || route === 'exam' || route === 'results' || route === 'login') {
     return route;
   }
   return 'home';
@@ -34,6 +34,26 @@ function AccessDenied({ role }: { role: UserRole }) {
   );
 }
 
+function LoginPage({ role, onRoleChange }: { role: UserRole; onRoleChange: (role: UserRole) => void }) {
+  return (
+    <section className="screen login-screen">
+      <p className="eyebrow dark">Connexion de demonstration</p>
+      <h2>Choisir un espace utilisateur</h2>
+      <p>Cette page prepare le futur branchement avec l'authentification reelle et les jetons JWT.</p>
+      <div className="login-role-grid">
+        {demoRoles.map((item) => (
+          <button key={item.value} className={role === item.value ? 'active-role' : ''} onClick={() => onRoleChange(item.value)}>
+            {item.label}
+          </button>
+        ))}
+      </div>
+      <div className="actions result-actions">
+        <a href="#/">Continuer avec ce role</a>
+      </div>
+    </section>
+  );
+}
+
 export default function App() {
   const [route, setRoute] = useState<AppRoute>(getRouteFromHash());
   const [role, setRole] = useState<UserRole>(getInitialRole);
@@ -52,13 +72,14 @@ export default function App() {
   const currentHref = route === 'home' ? '#/' : `#/${route}`;
   const hasAccess = canAccessRoute(role, currentHref);
 
-  const page = hasAccess ? {
+  const page = route === 'login' ? <LoginPage role={role} onRoleChange={setRole} /> : hasAccess ? {
     home: <HomePage />,
     candidate: <CandidatePage />,
     center: <CenterPage />,
     admin: <AdminPage />,
     exam: <ExamPage />,
     results: <ResultsPage />,
+    login: <LoginPage role={role} onRoleChange={setRole} />,
   }[route] : <AccessDenied role={role} />;
 
   return (
@@ -70,6 +91,7 @@ export default function App() {
             const itemRoute = item.href.replace('#/', '') || 'home';
             return <a key={item.href} href={item.href} className={route === itemRoute ? 'active' : ''}>{item.label}</a>;
           })}
+          <a href="#/login" className={route === 'login' ? 'active' : ''}>Connexion</a>
         </div>
         <label className="role-switcher">
           Role

@@ -22,10 +22,14 @@
   letter-spacing: normal;
 }
 
-.access-denied {
+.access-denied,
+.login-screen {
   max-width: 720px;
   margin: 48px auto 0;
   text-align: center;
+}
+
+.access-denied {
   border: 1px solid #fed7aa;
   background: #fff7ed;
 }
@@ -38,6 +42,28 @@
   color: #7c2d12;
 }
 
+.login-role-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 24px 0;
+}
+
+.login-role-grid button {
+  border: 1px solid #d8deea;
+  border-radius: 18px;
+  background: #ffffff;
+  color: #0b2e58;
+  cursor: pointer;
+  font-weight: 900;
+  padding: 18px;
+}
+
+.login-role-grid button.active-role {
+  background: #0b2e58;
+  color: #ffffff;
+}
+
 @media (max-width: 1000px) {
   .role-switcher {
     width: 100%;
@@ -45,5 +71,9 @@
 
   .role-switcher select {
     width: 100%;
+  }
+
+  .login-role-grid {
+    grid-template-columns: 1fr;
   }
 }
