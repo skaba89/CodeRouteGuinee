@@ -97,6 +97,10 @@ export function getDashboard(): Promise<DashboardData> {
   return getJson<DashboardData>('/api/v1/dashboard');
 }
 
+export function getDashboardCsvUrl(): string {
+  return `${API_BASE_URL}/api/v1/dashboard/export.csv`;
+}
+
 export function getEntrySummary(): Promise<EntrySummary> {
   return getJson<EntrySummary>('/api/v1/entries/summary');
 }
