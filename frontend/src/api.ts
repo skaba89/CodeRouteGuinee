@@ -103,6 +103,10 @@ export function getDashboardCsvUrl(): string {
   return `${API_BASE_URL}/api/v1/dashboard/export.csv`;
 }
 
+export function getExamAttemptsCsvUrl(): string {
+  return `${API_BASE_URL}/api/v1/exams/export.csv`;
+}
+
 export async function downloadDashboardCsv(): Promise<void> {
   const response = await fetch(getDashboardCsvUrl(), {
     headers: getAuthHeaders(),
@@ -116,6 +120,25 @@ export async function downloadDashboardCsv(): Promise<void> {
   const link = document.createElement('a');
   link.href = url;
   link.download = 'coderoute-dashboard-export.csv';
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
+}
+
+export async function downloadExamAttemptsCsv(): Promise<void> {
+  const response = await fetch(getExamAttemptsCsvUrl(), {
+    headers: getAuthHeaders(),
+  });
+  if (!response.ok) {
+    throw new Error(`API error ${response.status}`);
+  }
+
+  const blob = await response.blob();
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = 'coderoute-exam-attempts.csv';
   document.body.appendChild(link);
   link.click();
   link.remove();
