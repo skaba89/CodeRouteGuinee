@@ -20,9 +20,10 @@ def list_audit_logs(
     current_user: User = Depends(require_roles("admin", "super_admin")),
 ) -> list[AuditLog]:
     safe_limit = max(1, min(limit, 200))
-    query = select(AuditLog).order_by(AuditLog.created_at.desc()).limit(safe_limit)
+    query = select(AuditLog)
     if action:
         query = query.where(AuditLog.action == action)
     if entity:
         query = query.where(AuditLog.entity == entity)
+    query = query.order_by(AuditLog.created_at.desc()).limit(safe_limit)
     return list(db.scalars(query).all())
