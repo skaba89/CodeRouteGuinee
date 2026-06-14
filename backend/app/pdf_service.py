@@ -57,3 +57,23 @@ def build_convocation_pdf(convocation: dict) -> bytes:
         "Instruction: presenter cette convocation et une piece d'identite au centre agree.",
     ]
     return build_simple_pdf("CodeRoute Guinee - Convocation officielle", lines)
+
+
+def build_result_certificate_pdf(candidate: dict, session: dict, center: dict, attempt: dict) -> bytes:
+    decision = "ADMIS" if attempt.get("passed") else "NON ADMIS"
+    lines = [
+        f"Decision: {decision}",
+        f"Reference candidat: {candidate['reference']}",
+        f"Candidat: {candidate['full_name']}",
+        f"Identite: {candidate['identity_number']}",
+        f"Categorie permis: {candidate['permit_category']}",
+        f"Session: {session['reference']}",
+        f"Date examen: {session['starts_at']}",
+        f"Centre: {center['name']}",
+        f"Ville: {center['city']}",
+        f"Score: {attempt.get('score')}",
+        f"Statut tentative: {attempt.get('status')}",
+        f"Date soumission: {attempt.get('submitted_at')}",
+        "Document genere par CodeRoute Guinee pour verification administrative.",
+    ]
+    return build_simple_pdf("CodeRoute Guinee - Attestation de resultat", lines)

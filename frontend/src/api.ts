@@ -99,3 +99,7 @@ export function createPayment(payload: PaymentPayload): Promise<PaymentResult> {
 export function getConvocationPdfUrl(reference: string): string {
   return `${API_BASE_URL}/api/v1/documents/convocations/${encodeURIComponent(reference)}.pdf`;
 }
+
+export function getExamCertificatePdfUrl(attemptId: string): string {
+  return `${API_BASE_URL}/api/v1/exams/${encodeURIComponent(attemptId)}/certificate.pdf`;
+}

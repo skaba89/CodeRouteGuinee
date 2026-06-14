@@ -10,6 +10,7 @@ import {
   getConvocationPdfUrl,
   getDashboard,
   getEntrySummary,
+  getExamCertificatePdfUrl,
   getExamSummary,
   validateEntry,
 } from './api';
@@ -296,6 +297,7 @@ export function ExamPage() {
 
 export function ResultsPage() {
   const [examSummary, setExamSummary] = useState<ExamSummary>(fallbackExamSummary);
+  const [attemptId, setAttemptId] = useState('');
   useEffect(() => {
     getExamSummary().then(setExamSummary).catch(() => undefined);
   }, []);
@@ -304,6 +306,7 @@ export function ResultsPage() {
   const total = 40;
   const threshold = 35;
   const passed = score >= threshold;
+  const certificateUrl = attemptId ? getExamCertificatePdfUrl(attemptId) : null;
   return (
     <section className="screen two-columns">
       <div>
@@ -314,6 +317,7 @@ export function ResultsPage() {
         <div className="mini-card">Session : <strong>Centre Kaloum - 20/06/2026</strong></div>
         <div className="mini-card">Seuil de reussite : <strong>{threshold} / {total}</strong></div>
         <div className="mini-card">Score moyen national : <strong>{examSummary.average_score} / {total}</strong></div>
+        <label className="certificate-field">ID tentative examen<input value={attemptId} onChange={(event) => setAttemptId(event.target.value)} placeholder="Coller l'ID de tentative seedee" /></label>
       </div>
       <div className="result-card">
         <span className={passed ? 'badge ok' : 'badge'}>{passed ? 'Admis' : 'Non admis'}</span>
@@ -326,6 +330,7 @@ export function ResultsPage() {
         <div className="actions result-actions">
           <a href="#/candidate">Retour dossier</a>
           <a href="#/admin" className="secondary">Voir supervision</a>
+          {certificateUrl && <a href={certificateUrl} target="_blank" rel="noreferrer">Telecharger attestation PDF</a>}
         </div>
       </div>
     </section>
