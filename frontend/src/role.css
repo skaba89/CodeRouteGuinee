@@ -150,6 +150,25 @@
   color: #166534;
 }
 
+.audit-panel {
+  margin-top: 28px;
+  border: 1px solid #d8deea;
+  border-radius: 22px;
+  background: #ffffff;
+  padding: 18px;
+  overflow-x: auto;
+}
+
+.audit-panel h3 {
+  color: #0b2e58;
+  margin: 0 0 12px;
+}
+
+.audit-panel td:last-child {
+  max-width: 360px;
+  word-break: break-word;
+}
+
 .login-role-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
