@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.deps import require_roles
+from app.models_audit import AuditLog
 from app.models_candidate import Candidate
 from app.models_center import Center
 from app.models_question import Question
@@ -34,6 +35,25 @@ def export_dashboard_csv(
     current_user: User = Depends(require_roles("admin", "super_admin")),
 ) -> Response:
     data = _build_dashboard(db)
+    audit_log = AuditLog(
+        actor_id=current_user.id,
+        action="dashboard.export_csv",
+        entity="dashboard",
+        entity_id="national-dashboard",
+        details={
+            "format": "csv",
+            "metrics": {
+                "candidates": data.candidates,
+                "accredited_centers": data.accredited_centers,
+                "exam_sessions": data.exam_sessions,
+                "questions": data.questions,
+                "fraud_alerts": data.fraud_alerts,
+            },
+        },
+    )
+    db.add(audit_log)
+    db.commit()
+
     rows = [
         "metric,value",
         f"candidates,{data.candidates}",
