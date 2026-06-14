@@ -20,6 +20,23 @@ export type ExamSummary = {
   average_score: number;
 };
 
+export type ExamCertificateVerification = {
+  valid: boolean;
+  attempt_id: string;
+  status: string;
+  candidate_reference?: string;
+  candidate_name?: string;
+  identity_number?: string;
+  permit_category?: string;
+  session_reference?: string;
+  center_name?: string;
+  center_city?: string;
+  score?: number;
+  passed?: boolean;
+  submitted_at?: string;
+  reason?: string;
+};
+
 export type EntryValidationPayload = {
   reference: string;
   verification_code: string;
@@ -102,4 +119,8 @@ export function getConvocationPdfUrl(reference: string): string {
 
 export function getExamCertificatePdfUrl(attemptId: string): string {
   return `${API_BASE_URL}/api/v1/exams/${encodeURIComponent(attemptId)}/certificate.pdf`;
+}
+
+export function verifyExamCertificate(attemptId: string): Promise<ExamCertificateVerification> {
+  return getJson<ExamCertificateVerification>(`/api/v1/exams/${encodeURIComponent(attemptId)}/certificate/verify`);
 }
