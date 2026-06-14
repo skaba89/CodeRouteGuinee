@@ -115,6 +115,23 @@ class ExamAttemptRead(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class ExamCertificateVerificationRead(BaseModel):
+    valid: bool
+    attempt_id: str
+    status: str
+    candidate_reference: str | None = None
+    candidate_name: str | None = None
+    identity_number: str | None = None
+    permit_category: str | None = None
+    session_reference: str | None = None
+    center_name: str | None = None
+    center_city: str | None = None
+    score: int | None = None
+    passed: bool | None = None
+    submitted_at: str | None = None
+    reason: str | None = None
+
+
 class BookingCreate(BaseModel):
     candidate_id: str
     session_id: str

@@ -4,6 +4,7 @@ import {
   type DashboardData,
   type EntrySummary,
   type EntryValidationResult,
+  type ExamCertificateVerification,
   type ExamSummary,
   type PaymentResult,
   createPayment,
@@ -13,6 +14,7 @@ import {
   getExamCertificatePdfUrl,
   getExamSummary,
   validateEntry,
+  verifyExamCertificate,
 } from './api';
 
 const fallbackDashboard: DashboardData = {
@@ -298,9 +300,28 @@ export function ExamPage() {
 export function ResultsPage() {
   const [examSummary, setExamSummary] = useState<ExamSummary>(fallbackExamSummary);
   const [attemptId, setAttemptId] = useState('');
+  const [certificateVerification, setCertificateVerification] = useState<ExamCertificateVerification | null>(null);
+  const [certificateError, setCertificateError] = useState<string | null>(null);
+  const [isVerifyingCertificate, setIsVerifyingCertificate] = useState(false);
   useEffect(() => {
     getExamSummary().then(setExamSummary).catch(() => undefined);
   }, []);
+
+  async function handleCertificateVerification(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!attemptId) return;
+    setIsVerifyingCertificate(true);
+    setCertificateVerification(null);
+    setCertificateError(null);
+    try {
+      const result = await verifyExamCertificate(attemptId);
+      setCertificateVerification(result);
+    } catch {
+      setCertificateError("Verification impossible. Verifiez que l'API est demarree.");
+    } finally {
+      setIsVerifyingCertificate(false);
+    }
+  }
 
   const score = 36;
   const total = 40;
@@ -317,7 +338,18 @@ export function ResultsPage() {
         <div className="mini-card">Session : <strong>Centre Kaloum - 20/06/2026</strong></div>
         <div className="mini-card">Seuil de reussite : <strong>{threshold} / {total}</strong></div>
         <div className="mini-card">Score moyen national : <strong>{examSummary.average_score} / {total}</strong></div>
-        <label className="certificate-field">ID tentative examen<input value={attemptId} onChange={(event) => setAttemptId(event.target.value)} placeholder="Coller l'ID de tentative seedee" /></label>
+        <form className="certificate-field" onSubmit={handleCertificateVerification}>
+          <label>ID tentative examen<input value={attemptId} onChange={(event) => setAttemptId(event.target.value)} placeholder="Coller l'ID de tentative seedee" /></label>
+          <button disabled={isVerifyingCertificate || !attemptId}>{isVerifyingCertificate ? 'Verification...' : 'Verifier certificat'}</button>
+        </form>
+        {certificateVerification && (
+          <div className={certificateVerification.valid ? 'certificate-verification ok' : 'certificate-verification'}>
+            <strong>{certificateVerification.valid ? 'Certificat authentique' : 'Certificat non valide'}</strong>
+            <span>{certificateVerification.reason ?? certificateVerification.candidate_name ?? certificateVerification.status}</span>
+            {certificateVerification.valid && <span>{certificateVerification.center_name} - Score {certificateVerification.score}</span>}
+          </div>
+        )}
+        {certificateError && <p className="form-error">{certificateError}</p>}
       </div>
       <div className="result-card">
         <span className={passed ? 'badge ok' : 'badge'}>{passed ? 'Admis' : 'Non admis'}</span>
