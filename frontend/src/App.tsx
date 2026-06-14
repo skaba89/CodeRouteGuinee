@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 
 import { canAccessRoute, demoRoles, navigationItems, type UserRole } from './auth';
+import { getCurrentUser, loginUser, logoutUser } from './authClient';
 import { AdminPage, CandidatePage, CenterPage, ExamPage, HomePage, ResultsPage } from './pages';
 import './role.css';
 
@@ -14,6 +15,10 @@ function getRouteFromHash(): AppRoute {
     return route;
   }
   return 'home';
+}
+
+function normalizeRole(role: string): UserRole {
+  return demoRoles.some((item) => item.value === role) ? role as UserRole : 'candidate';
 }
 
 function getInitialRole(): UserRole {
@@ -34,12 +39,33 @@ function AccessDenied({ role }: { role: UserRole }) {
   );
 }
 
-function LoginPage({ role, onRoleChange }: { role: UserRole; onRoleChange: (role: UserRole) => void }) {
+function LoginPage({ role, onRoleChange, onLogin }: { role: UserRole; onRoleChange: (role: UserRole) => void; onLogin: (email: string, password: string) => Promise<void> }) {
+  const [email, setEmail] = useState('admin@coderoute.gov.gn');
+  const [password, setPassword] = useState('password123');
+  const [status, setStatus] = useState<string | null>(null);
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setStatus('Connexion en cours...');
+    try {
+      await onLogin(email, password);
+      setStatus('Connexion reussie. Redirection...');
+    } catch {
+      setStatus('Connexion impossible avec ces identifiants. Verifie le compte ou utilise encore le mode demo.');
+    }
+  }
+
   return (
     <section className="screen login-screen">
-      <p className="eyebrow dark">Connexion de demonstration</p>
-      <h2>Choisir un espace utilisateur</h2>
-      <p>Cette page prepare le futur branchement avec l'authentification reelle et les jetons JWT.</p>
+      <p className="eyebrow dark">Connexion</p>
+      <h2>Acceder a CodeRoute Guinee</h2>
+      <p>Connexion reelle via JWT ou selection de role de demonstration pendant la phase MVP.</p>
+      <form className="login-form" onSubmit={handleSubmit}>
+        <input value={email} onChange={(event) => setEmail(event.target.value)} placeholder="Email" type="email" />
+        <input value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Mot de passe" type="password" />
+        <button type="submit">Se connecter</button>
+      </form>
+      {status && <p className="login-status">{status}</p>}
       <div className="login-role-grid">
         {demoRoles.map((item) => (
           <button key={item.value} className={role === item.value ? 'active-role' : ''} onClick={() => onRoleChange(item.value)}>
@@ -68,7 +94,15 @@ export default function App() {
     window.localStorage.setItem(ROLE_STORAGE_KEY, role);
   }, [role]);
 
+  async function handleLogin(email: string, password: string) {
+    await loginUser(email, password);
+    const user = await getCurrentUser();
+    setRole(normalizeRole(user.role));
+    window.location.hash = '#/';
+  }
+
   function handleLogout() {
+    logoutUser();
     window.localStorage.removeItem(ROLE_STORAGE_KEY);
     setRole('super_admin');
     window.location.hash = '#/login';
@@ -79,14 +113,14 @@ export default function App() {
   const hasAccess = canAccessRoute(role, currentHref);
   const currentRoleLabel = demoRoles.find((item) => item.value === role)?.label ?? role;
 
-  const page = route === 'login' ? <LoginPage role={role} onRoleChange={setRole} /> : hasAccess ? {
+  const page = route === 'login' ? <LoginPage role={role} onRoleChange={setRole} onLogin={handleLogin} /> : hasAccess ? {
     home: <HomePage />,
     candidate: <CandidatePage />,
     center: <CenterPage />,
     admin: <AdminPage />,
     exam: <ExamPage />,
     results: <ResultsPage />,
-    login: <LoginPage role={role} onRoleChange={setRole} />,
+    login: <LoginPage role={role} onRoleChange={setRole} onLogin={handleLogin} />,
   }[route] : <AccessDenied role={role} />;
 
   return (
