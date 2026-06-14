@@ -1,13 +1,17 @@
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.exam_engine import score_answers
+from app.models_candidate import Candidate
+from app.models_center import Center
 from app.models_exam_attempt import ExamAttempt
 from app.models_question import Question
+from app.models_session import ExamSession
+from app.pdf_service import build_result_certificate_pdf
 from app.schemas import ExamAttemptRead, ExamStartRequest, ExamSubmitRequest
 
 router = APIRouter(prefix="/exams", tags=["exams"])
@@ -62,3 +66,37 @@ def submit_exam(attempt_id: str, payload: ExamSubmitRequest, db: Session = Depen
     db.commit()
     db.refresh(attempt)
     return attempt
+
+
+@router.get("/{attempt_id}/certificate.pdf")
+def get_exam_certificate(attempt_id: str, db: Session = Depends(get_db)) -> Response:
+    attempt = db.get(ExamAttempt, attempt_id)
+    if not attempt:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Exam attempt not found")
+    if attempt.status != "submitted":
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Exam attempt not submitted")
+
+    candidate = db.get(Candidate, attempt.candidate_id)
+    session = db.get(ExamSession, attempt.session_id)
+    center = db.get(Center, session.center_id) if session else None
+    if not candidate or not session or not center:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Incomplete certificate data")
+
+    pdf = build_result_certificate_pdf(
+        candidate={
+            "reference": candidate.reference,
+            "full_name": f"{candidate.first_name} {candidate.last_name}",
+            "identity_number": candidate.identity_number,
+            "permit_category": candidate.permit_category,
+        },
+        session={"reference": session.reference, "starts_at": session.starts_at.isoformat()},
+        center={"name": center.name, "city": center.city},
+        attempt={
+            "score": attempt.score,
+            "passed": attempt.passed,
+            "status": attempt.status,
+            "submitted_at": attempt.submitted_at.isoformat() if attempt.submitted_at else None,
+        },
+    )
+    headers = {"Content-Disposition": f"attachment; filename=coderoute-result-{attempt.id}.pdf"}
+    return Response(content=pdf, media_type="application/pdf", headers=headers)
