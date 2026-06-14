@@ -68,9 +68,16 @@ export default function App() {
     window.localStorage.setItem(ROLE_STORAGE_KEY, role);
   }, [role]);
 
+  function handleLogout() {
+    window.localStorage.removeItem(ROLE_STORAGE_KEY);
+    setRole('super_admin');
+    window.location.hash = '#/login';
+  }
+
   const visibleNavigation = navigationItems.filter((item) => item.roles.includes(role));
   const currentHref = route === 'home' ? '#/' : `#/${route}`;
   const hasAccess = canAccessRoute(role, currentHref);
+  const currentRoleLabel = demoRoles.find((item) => item.value === role)?.label ?? role;
 
   const page = route === 'login' ? <LoginPage role={role} onRoleChange={setRole} /> : hasAccess ? {
     home: <HomePage />,
@@ -92,6 +99,10 @@ export default function App() {
             return <a key={item.href} href={item.href} className={route === itemRoute ? 'active' : ''}>{item.label}</a>;
           })}
           <a href="#/login" className={route === 'login' ? 'active' : ''}>Connexion</a>
+        </div>
+        <div className="session-panel">
+          <span>Session : {currentRoleLabel}</span>
+          <button onClick={handleLogout}>Deconnexion</button>
         </div>
         <label className="role-switcher">
           Role
