@@ -10,6 +10,7 @@ import {
   createPayment,
   getConvocationPdfUrl,
   getDashboard,
+  getDashboardCsvUrl,
   getEntrySummary,
   getExamCertificatePdfUrl,
   getExamSummary,
@@ -237,6 +238,7 @@ export function AdminPage() {
   const [dashboard, setDashboard] = useState<DashboardData>(fallbackDashboard);
   const [entrySummary, setEntrySummary] = useState<EntrySummary>(fallbackEntrySummary);
   const [examSummary, setExamSummary] = useState<ExamSummary>(fallbackExamSummary);
+  const dashboardCsvUrl = getDashboardCsvUrl();
 
   useEffect(() => {
     getDashboard().then(setDashboard).catch(() => undefined);
@@ -257,6 +259,9 @@ export function AdminPage() {
     <section className="panel admin-panel">
       <p className="eyebrow dark">Administration nationale</p>
       <h2>Supervision centres, entrees et examens</h2>
+      <div className="actions result-actions admin-actions">
+        <a href={dashboardCsvUrl} target="_blank" rel="noreferrer">Exporter le dashboard CSV</a>
+      </div>
       <div className="metrics compact">
         <article><strong>{formatNumber(allowedEntries)}</strong><span>Entrees validees</span></article>
         <article><strong>{formatNumber(deniedEntries)}</strong><span>Entrees refusees</span></article>
