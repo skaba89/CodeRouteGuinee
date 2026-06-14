@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy import select
@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.exam_engine import score_answers
+from app.models_audit import AuditLog
 from app.models_candidate import Candidate
 from app.models_center import Center
 from app.models_exam_attempt import ExamAttempt
@@ -15,6 +16,12 @@ from app.pdf_service import build_result_certificate_pdf
 from app.schemas import ExamAttemptRead, ExamCertificateVerificationRead, ExamStartRequest, ExamSubmitRequest
 
 router = APIRouter(prefix="/exams", tags=["exams"])
+
+EXAM_DURATION_MINUTES = 30
+
+
+def _is_attempt_expired(attempt: ExamAttempt, now: datetime) -> bool:
+    return now - attempt.started_at > timedelta(minutes=EXAM_DURATION_MINUTES)
 
 
 @router.post("/start", response_model=ExamAttemptRead, status_code=status.HTTP_201_CREATED)
@@ -52,6 +59,33 @@ def submit_exam(attempt_id: str, payload: ExamSubmitRequest, db: Session = Depen
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Exam attempt not found")
     if attempt.status == "submitted":
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Exam attempt already submitted")
+    if attempt.status == "expired":
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Exam attempt expired")
+    if attempt.status != "started":
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Exam attempt is not active")
+
+    now = datetime.utcnow()
+    if _is_attempt_expired(attempt, now):
+        attempt.status = "expired"
+        attempt.submitted_at = now
+        db.add(
+            AuditLog(
+                actor_id=None,
+                action="exam.attempt_expired",
+                entity="exam_attempt",
+                entity_id=attempt.id,
+                details={
+                    "candidate_id": attempt.candidate_id,
+                    "session_id": attempt.session_id,
+                    "duration_minutes": EXAM_DURATION_MINUTES,
+                    "started_at": attempt.started_at.isoformat(),
+                    "expired_at": now.isoformat(),
+                },
+            )
+        )
+        db.add(attempt)
+        db.commit()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Exam attempt expired")
 
     questions = db.scalars(select(Question).where(Question.is_active.is_(True))).all()
     answer_key = {question.id: question.correct_answer for question in questions}
@@ -61,7 +95,7 @@ def submit_exam(attempt_id: str, payload: ExamSubmitRequest, db: Session = Depen
     attempt.score = result["correct_answers"]
     attempt.passed = result["passed"]
     attempt.status = "submitted"
-    attempt.submitted_at = datetime.utcnow()
+    attempt.submitted_at = now
     db.add(attempt)
     db.commit()
     db.refresh(attempt)
