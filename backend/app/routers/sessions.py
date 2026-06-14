@@ -5,6 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
+from app.deps import require_roles
 from app.models_session import ExamSession
 from app.schemas import ExamSessionCreate, ExamSessionRead
 
@@ -21,7 +22,7 @@ def list_sessions(db: Session = Depends(get_db)) -> list[ExamSession]:
     return list(db.scalars(select(ExamSession).order_by(ExamSession.starts_at.desc())).all())
 
 
-@router.post("", response_model=ExamSessionRead, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=ExamSessionRead, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_roles("admin", "super_admin"))])
 def create_session(payload: ExamSessionCreate, db: Session = Depends(get_db)) -> ExamSession:
     exam_session = ExamSession(reference=build_session_reference(db), **payload.model_dump())
     db.add(exam_session)
