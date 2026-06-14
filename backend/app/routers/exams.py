@@ -7,6 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
+from app.deps import require_roles
 from app.exam_engine import score_answers
 from app.models_audit import AuditLog
 from app.models_candidate import Candidate
@@ -14,6 +15,7 @@ from app.models_center import Center
 from app.models_exam_attempt import ExamAttempt
 from app.models_question import Question
 from app.models_session import ExamSession
+from app.models_user import User
 from app.pdf_service import build_result_certificate_pdf
 from app.schemas import ExamAttemptRead, ExamCertificateVerificationRead, ExamStartRequest, ExamSubmitRequest
 
@@ -85,7 +87,10 @@ def get_exam_summary(db: Session = Depends(get_db)) -> dict:
 
 
 @router.get("/export.csv")
-def export_exam_attempts_csv(db: Session = Depends(get_db)) -> Response:
+def export_exam_attempts_csv(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "super_admin")),
+) -> Response:
     attempts = db.scalars(select(ExamAttempt).order_by(ExamAttempt.started_at.desc())).all()
     output = io.StringIO()
     writer = csv.writer(output, delimiter=";")
@@ -123,6 +128,19 @@ def export_exam_attempts_csv(db: Session = Depends(get_db)) -> Response:
             attempt.started_at.isoformat() if attempt.started_at else "",
             attempt.submitted_at.isoformat() if attempt.submitted_at else "",
         ])
+    audit_log = AuditLog(
+        actor_id=current_user.id,
+        action="exams.export_csv",
+        entity="exam_attempt",
+        entity_id="national-exam-attempts",
+        details={
+            "format": "csv",
+            "attempts_exported": len(attempts),
+            "submitted_attempts": len([attempt for attempt in attempts if attempt.status == "submitted"]),
+        },
+    )
+    db.add(audit_log)
+    db.commit()
     headers = {"Content-Disposition": "attachment; filename=coderoute-exam-attempts.csv"}
     return Response(content=output.getvalue(), media_type="text/csv", headers=headers)
 
