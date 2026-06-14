@@ -12,7 +12,7 @@ from app.models_exam_attempt import ExamAttempt
 from app.models_question import Question
 from app.models_session import ExamSession
 from app.pdf_service import build_result_certificate_pdf
-from app.schemas import ExamAttemptRead, ExamStartRequest, ExamSubmitRequest
+from app.schemas import ExamAttemptRead, ExamCertificateVerificationRead, ExamStartRequest, ExamSubmitRequest
 
 router = APIRouter(prefix="/exams", tags=["exams"])
 
@@ -66,6 +66,52 @@ def submit_exam(attempt_id: str, payload: ExamSubmitRequest, db: Session = Depen
     db.commit()
     db.refresh(attempt)
     return attempt
+
+
+@router.get("/{attempt_id}/certificate/verify", response_model=ExamCertificateVerificationRead)
+def verify_exam_certificate(attempt_id: str, db: Session = Depends(get_db)) -> ExamCertificateVerificationRead:
+    attempt = db.get(ExamAttempt, attempt_id)
+    if not attempt:
+        return ExamCertificateVerificationRead(
+            valid=False,
+            attempt_id=attempt_id,
+            status="not_found",
+            reason="Tentative d'examen introuvable",
+        )
+    if attempt.status != "submitted":
+        return ExamCertificateVerificationRead(
+            valid=False,
+            attempt_id=attempt.id,
+            status=attempt.status,
+            reason="Tentative d'examen non soumise",
+        )
+
+    candidate = db.get(Candidate, attempt.candidate_id)
+    session = db.get(ExamSession, attempt.session_id)
+    center = db.get(Center, session.center_id) if session else None
+    if not candidate or not session or not center:
+        return ExamCertificateVerificationRead(
+            valid=False,
+            attempt_id=attempt.id,
+            status="incomplete",
+            reason="Donnees du certificat incompletes",
+        )
+
+    return ExamCertificateVerificationRead(
+        valid=True,
+        attempt_id=attempt.id,
+        status=attempt.status,
+        candidate_reference=candidate.reference,
+        candidate_name=f"{candidate.first_name} {candidate.last_name}",
+        identity_number=candidate.identity_number,
+        permit_category=candidate.permit_category,
+        session_reference=session.reference,
+        center_name=center.name,
+        center_city=center.city,
+        score=attempt.score,
+        passed=attempt.passed,
+        submitted_at=attempt.submitted_at.isoformat() if attempt.submitted_at else None,
+    )
 
 
 @router.get("/{attempt_id}/certificate.pdf")
