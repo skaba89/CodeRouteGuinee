@@ -1,3 +1,5 @@
+import csv
+import io
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
@@ -80,6 +82,49 @@ def get_exam_summary(db: Session = Depends(get_db)) -> dict:
         "failed_attempts": len(failed),
         "average_score": average_score,
     }
+
+
+@router.get("/export.csv")
+def export_exam_attempts_csv(db: Session = Depends(get_db)) -> Response:
+    attempts = db.scalars(select(ExamAttempt).order_by(ExamAttempt.started_at.desc())).all()
+    output = io.StringIO()
+    writer = csv.writer(output, delimiter=";")
+    writer.writerow([
+        "attempt_id",
+        "candidate_reference",
+        "candidate_name",
+        "permit_category",
+        "session_reference",
+        "center_code",
+        "center_name",
+        "center_city",
+        "status",
+        "score",
+        "passed",
+        "started_at",
+        "submitted_at",
+    ])
+    for attempt in attempts:
+        candidate = db.get(Candidate, attempt.candidate_id)
+        session = db.get(ExamSession, attempt.session_id)
+        center = db.get(Center, session.center_id) if session else None
+        writer.writerow([
+            attempt.id,
+            candidate.reference if candidate else "",
+            f"{candidate.first_name} {candidate.last_name}" if candidate else "",
+            candidate.permit_category if candidate else "",
+            session.reference if session else "",
+            center.code if center else "",
+            center.name if center else "",
+            center.city if center else "",
+            attempt.status,
+            attempt.score if attempt.score is not None else "",
+            str(attempt.passed).lower() if attempt.passed is not None else "",
+            attempt.started_at.isoformat() if attempt.started_at else "",
+            attempt.submitted_at.isoformat() if attempt.submitted_at else "",
+        ])
+    headers = {"Content-Disposition": "attachment; filename=coderoute-exam-attempts.csv"}
+    return Response(content=output.getvalue(), media_type="text/csv", headers=headers)
 
 
 @router.post("/{attempt_id}/submit", response_model=ExamAttemptRead)
