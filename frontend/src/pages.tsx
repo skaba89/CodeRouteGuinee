@@ -9,6 +9,7 @@ import {
   type PaymentResult,
   createPayment,
   downloadDashboardCsv,
+  downloadExamAttemptsCsv,
   getConvocationPdfUrl,
   getDashboard,
   getEntrySummary,
@@ -239,7 +240,9 @@ export function AdminPage() {
   const [entrySummary, setEntrySummary] = useState<EntrySummary>(fallbackEntrySummary);
   const [examSummary, setExamSummary] = useState<ExamSummary>(fallbackExamSummary);
   const [csvExportStatus, setCsvExportStatus] = useState<string | null>(null);
+  const [examCsvExportStatus, setExamCsvExportStatus] = useState<string | null>(null);
   const [isExportingCsv, setIsExportingCsv] = useState(false);
+  const [isExportingExamCsv, setIsExportingExamCsv] = useState(false);
 
   useEffect(() => {
     getDashboard().then(setDashboard).catch(() => undefined);
@@ -252,11 +255,24 @@ export function AdminPage() {
     setCsvExportStatus(null);
     try {
       await downloadDashboardCsv();
-      setCsvExportStatus('Export CSV telecharge avec succes.');
+      setCsvExportStatus('Export dashboard CSV telecharge avec succes.');
     } catch {
-      setCsvExportStatus('Export impossible : connectez-vous avec un role admin ou super admin.');
+      setCsvExportStatus('Export dashboard impossible : connectez-vous avec un role admin ou super admin.');
     } finally {
       setIsExportingCsv(false);
+    }
+  }
+
+  async function handleExamAttemptsCsvExport() {
+    setIsExportingExamCsv(true);
+    setExamCsvExportStatus(null);
+    try {
+      await downloadExamAttemptsCsv();
+      setExamCsvExportStatus('Export examens CSV telecharge avec succes.');
+    } catch {
+      setExamCsvExportStatus('Export examens impossible : connectez-vous avec un role admin ou super admin.');
+    } finally {
+      setIsExportingExamCsv(false);
     }
   }
 
@@ -275,8 +291,10 @@ export function AdminPage() {
       <h2>Supervision centres, entrees et examens</h2>
       <div className="actions result-actions admin-actions">
         <button onClick={handleDashboardCsvExport} disabled={isExportingCsv}>{isExportingCsv ? 'Export...' : 'Exporter le dashboard CSV'}</button>
+        <button onClick={handleExamAttemptsCsvExport} disabled={isExportingExamCsv}>{isExportingExamCsv ? 'Export...' : 'Exporter les examens CSV'}</button>
       </div>
       {csvExportStatus && <p className="login-status">{csvExportStatus}</p>}
+      {examCsvExportStatus && <p className="login-status">{examCsvExportStatus}</p>}
       <div className="metrics compact">
         <article><strong>{formatNumber(allowedEntries)}</strong><span>Entrees validees</span></article>
         <article><strong>{formatNumber(deniedEntries)}</strong><span>Entrees refusees</span></article>
