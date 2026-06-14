@@ -2,10 +2,12 @@ from fastapi import APIRouter, Depends, Response
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
+from app.deps import require_roles
 from app.models_candidate import Candidate
 from app.models_center import Center
 from app.models_question import Question
 from app.models_session import ExamSession
+from app.models_user import User
 from app.schemas import DashboardRead
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
@@ -27,7 +29,10 @@ def dashboard(db: Session = Depends(get_db)) -> DashboardRead:
 
 
 @router.get("/export.csv")
-def export_dashboard_csv(db: Session = Depends(get_db)) -> Response:
+def export_dashboard_csv(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "super_admin")),
+) -> Response:
     data = _build_dashboard(db)
     rows = [
         "metric,value",
