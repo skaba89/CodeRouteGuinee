@@ -61,6 +61,41 @@
   color: #7c2d12;
 }
 
+.login-form {
+  display: grid;
+  gap: 12px;
+  margin: 24px auto;
+  max-width: 420px;
+}
+
+.login-form input {
+  border: 1px solid #d8deea;
+  border-radius: 16px;
+  color: #0b2e58;
+  font: inherit;
+  padding: 14px 16px;
+}
+
+.login-form button {
+  border: 0;
+  border-radius: 999px;
+  background: #0b2e58;
+  color: #ffffff;
+  cursor: pointer;
+  font-weight: 900;
+  padding: 14px 18px;
+}
+
+.login-status {
+  border-radius: 16px;
+  background: #eef4ff;
+  color: #0b2e58;
+  font-weight: 800;
+  margin: 12px auto 0;
+  max-width: 520px;
+  padding: 12px 14px;
+}
+
 .login-role-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
