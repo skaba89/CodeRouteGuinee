@@ -8,9 +8,9 @@ import {
   type ExamSummary,
   type PaymentResult,
   createPayment,
+  downloadDashboardCsv,
   getConvocationPdfUrl,
   getDashboard,
-  getDashboardCsvUrl,
   getEntrySummary,
   getExamCertificatePdfUrl,
   getExamSummary,
@@ -238,13 +238,27 @@ export function AdminPage() {
   const [dashboard, setDashboard] = useState<DashboardData>(fallbackDashboard);
   const [entrySummary, setEntrySummary] = useState<EntrySummary>(fallbackEntrySummary);
   const [examSummary, setExamSummary] = useState<ExamSummary>(fallbackExamSummary);
-  const dashboardCsvUrl = getDashboardCsvUrl();
+  const [csvExportStatus, setCsvExportStatus] = useState<string | null>(null);
+  const [isExportingCsv, setIsExportingCsv] = useState(false);
 
   useEffect(() => {
     getDashboard().then(setDashboard).catch(() => undefined);
     getEntrySummary().then(setEntrySummary).catch(() => undefined);
     getExamSummary().then(setExamSummary).catch(() => undefined);
   }, []);
+
+  async function handleDashboardCsvExport() {
+    setIsExportingCsv(true);
+    setCsvExportStatus(null);
+    try {
+      await downloadDashboardCsv();
+      setCsvExportStatus('Export CSV telecharge avec succes.');
+    } catch {
+      setCsvExportStatus('Export impossible : connectez-vous avec un role admin ou super admin.');
+    } finally {
+      setIsExportingCsv(false);
+    }
+  }
 
   const allowedEntries = entrySummary.by_result.allowed ?? 0;
   const deniedEntries = entrySummary.by_result.denied ?? 0;
@@ -260,8 +274,9 @@ export function AdminPage() {
       <p className="eyebrow dark">Administration nationale</p>
       <h2>Supervision centres, entrees et examens</h2>
       <div className="actions result-actions admin-actions">
-        <a href={dashboardCsvUrl} target="_blank" rel="noreferrer">Exporter le dashboard CSV</a>
+        <button onClick={handleDashboardCsvExport} disabled={isExportingCsv}>{isExportingCsv ? 'Export...' : 'Exporter le dashboard CSV'}</button>
       </div>
+      {csvExportStatus && <p className="login-status">{csvExportStatus}</p>}
       <div className="metrics compact">
         <article><strong>{formatNumber(allowedEntries)}</strong><span>Entrees validees</span></article>
         <article><strong>{formatNumber(deniedEntries)}</strong><span>Entrees refusees</span></article>
