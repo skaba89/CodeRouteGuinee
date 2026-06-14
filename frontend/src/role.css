@@ -22,6 +22,25 @@
   letter-spacing: normal;
 }
 
+.session-panel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #0b2e58;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.session-panel button {
+  border: 0;
+  border-radius: 999px;
+  background: #fee2e2;
+  color: #991b1b;
+  cursor: pointer;
+  font-weight: 900;
+  padding: 8px 12px;
+}
+
 .access-denied,
 .login-screen {
   max-width: 720px;
@@ -65,12 +84,17 @@
 }
 
 @media (max-width: 1000px) {
-  .role-switcher {
+  .role-switcher,
+  .session-panel {
     width: 100%;
   }
 
   .role-switcher select {
     width: 100%;
+  }
+
+  .session-panel {
+    justify-content: space-between;
   }
 
   .login-role-grid {
