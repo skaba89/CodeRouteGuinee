@@ -43,6 +43,30 @@ Endpoints :
 - Swagger : http://localhost:8000/docs
 - Frontend : http://localhost:5173
 
+## Donnees de demonstration
+
+Apres le demarrage des conteneurs :
+
+```bash
+docker compose exec backend python -m app.seed_demo
+```
+
+Le script prepare un jeu de donnees utilisable pour une demonstration : admin, centre agree, candidat, session, reservation, paiement, convocation, questions et resultat d'examen.
+
+## Verification E2E locale rapide
+
+```bash
+python scripts/smoke_local.py
+```
+
+Ce script verifie les endpoints principaux : health, dashboard, convocation, paiement sandbox, validation entree centre et resume examen.
+
+Pour le scenario complet de presentation, consulter :
+
+```text
+DEMO_LOCAL.md
+```
+
 ## Roadmap
 
 ### Phase 1 - MVP national
