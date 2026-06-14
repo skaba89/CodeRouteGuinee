@@ -24,6 +24,36 @@ def _is_attempt_expired(attempt: ExamAttempt, now: datetime) -> bool:
     return now - attempt.started_at > timedelta(minutes=EXAM_DURATION_MINUTES)
 
 
+def _write_exam_guard_log(
+    db: Session,
+    attempt: ExamAttempt,
+    action: str,
+    reason: str,
+    checked_at: datetime,
+    extra_details: dict | None = None,
+) -> None:
+    details = {
+        "candidate_id": attempt.candidate_id,
+        "session_id": attempt.session_id,
+        "attempt_status": attempt.status,
+        "reason": reason,
+        "started_at": attempt.started_at.isoformat(),
+        "submitted_at": attempt.submitted_at.isoformat() if attempt.submitted_at else None,
+        "checked_at": checked_at.isoformat(),
+    }
+    if extra_details:
+        details.update(extra_details)
+    db.add(
+        AuditLog(
+            actor_id=None,
+            action=action,
+            entity="exam_attempt",
+            entity_id=attempt.id,
+            details=details,
+        )
+    )
+
+
 @router.post("/start", response_model=ExamAttemptRead, status_code=status.HTTP_201_CREATED)
 def start_exam(payload: ExamStartRequest, db: Session = Depends(get_db)) -> ExamAttempt:
     attempt = ExamAttempt(candidate_id=payload.candidate_id, session_id=payload.session_id)
@@ -57,31 +87,31 @@ def submit_exam(attempt_id: str, payload: ExamSubmitRequest, db: Session = Depen
     attempt = db.get(ExamAttempt, attempt_id)
     if not attempt:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Exam attempt not found")
-    if attempt.status == "submitted":
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Exam attempt already submitted")
-    if attempt.status == "expired":
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Exam attempt expired")
-    if attempt.status != "started":
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Exam attempt is not active")
 
     now = datetime.utcnow()
+    if attempt.status == "submitted":
+        _write_exam_guard_log(db, attempt, "exam.replay_submission", "already_submitted", now)
+        db.commit()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Exam attempt already submitted")
+    if attempt.status == "expired":
+        _write_exam_guard_log(db, attempt, "exam.expired_submission_replay", "already_expired", now)
+        db.commit()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Exam attempt expired")
+    if attempt.status != "started":
+        _write_exam_guard_log(db, attempt, "exam.non_active_submission", "invalid_status", now)
+        db.commit()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Exam attempt is not active")
+
     if _is_attempt_expired(attempt, now):
         attempt.status = "expired"
         attempt.submitted_at = now
-        db.add(
-            AuditLog(
-                actor_id=None,
-                action="exam.attempt_expired",
-                entity="exam_attempt",
-                entity_id=attempt.id,
-                details={
-                    "candidate_id": attempt.candidate_id,
-                    "session_id": attempt.session_id,
-                    "duration_minutes": EXAM_DURATION_MINUTES,
-                    "started_at": attempt.started_at.isoformat(),
-                    "expired_at": now.isoformat(),
-                },
-            )
+        _write_exam_guard_log(
+            db,
+            attempt,
+            "exam.late_submission",
+            "duration_exceeded",
+            now,
+            {"duration_minutes": EXAM_DURATION_MINUTES},
         )
         db.add(attempt)
         db.commit()
