@@ -8,9 +8,12 @@ import {
   type ExamCertificateVerification,
   type ExamSummary,
   type PaymentResult,
+  type PaymentSummary,
   createPayment,
+  downloadAdminPaymentsCsv,
   downloadDashboardCsv,
   downloadExamAttemptsCsv,
+  getAdminPaymentSummary,
   getAuditLogs,
   getConvocationPdfUrl,
   getDashboard,
@@ -47,6 +50,13 @@ const fallbackExamSummary: ExamSummary = {
   average_score: 34.8,
 };
 
+const fallbackPaymentSummary: PaymentSummary = {
+  total_count: 0,
+  total_amount_gnf: 0,
+  by_status: {},
+  by_provider: {},
+};
+
 const modules = [
   'Inscription candidat',
   'Reservation examen',
@@ -60,6 +70,10 @@ const modules = [
 
 function formatNumber(value: number): string {
   return new Intl.NumberFormat('fr-FR').format(value);
+}
+
+function formatCurrency(value: number): string {
+  return `${formatNumber(value)} GNF`;
 }
 
 function buildRiskLabel(denied: number): string {
@@ -247,17 +261,27 @@ export function AdminPage() {
   const [dashboard, setDashboard] = useState<DashboardData>(fallbackDashboard);
   const [entrySummary, setEntrySummary] = useState<EntrySummary>(fallbackEntrySummary);
   const [examSummary, setExamSummary] = useState<ExamSummary>(fallbackExamSummary);
+  const [paymentSummary, setPaymentSummary] = useState<PaymentSummary>(fallbackPaymentSummary);
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
   const [auditStatus, setAuditStatus] = useState<string | null>(null);
+  const [financeStatus, setFinanceStatus] = useState<string | null>(null);
   const [csvExportStatus, setCsvExportStatus] = useState<string | null>(null);
   const [examCsvExportStatus, setExamCsvExportStatus] = useState<string | null>(null);
+  const [paymentCsvExportStatus, setPaymentCsvExportStatus] = useState<string | null>(null);
   const [isExportingCsv, setIsExportingCsv] = useState(false);
   const [isExportingExamCsv, setIsExportingExamCsv] = useState(false);
+  const [isExportingPaymentCsv, setIsExportingPaymentCsv] = useState(false);
 
   useEffect(() => {
     getDashboard().then(setDashboard).catch(() => undefined);
     getEntrySummary().then(setEntrySummary).catch(() => undefined);
     getExamSummary().then(setExamSummary).catch(() => undefined);
+    getAdminPaymentSummary()
+      .then((summary) => {
+        setPaymentSummary(summary);
+        setFinanceStatus(null);
+      })
+      .catch(() => setFinanceStatus('Finance indisponible : connectez-vous avec un role admin ou super admin.'));
     getAuditLogs()
       .then((logs) => {
         setAuditLogs(logs);
@@ -266,13 +290,21 @@ export function AdminPage() {
       .catch(() => setAuditStatus('Logs indisponibles : connectez-vous avec un role admin ou super admin.'));
   }, []);
 
+  async function refreshAuditLogs() {
+    try {
+      setAuditLogs(await getAuditLogs());
+    } catch {
+      setAuditStatus('Logs indisponibles : connectez-vous avec un role admin ou super admin.');
+    }
+  }
+
   async function handleDashboardCsvExport() {
     setIsExportingCsv(true);
     setCsvExportStatus(null);
     try {
       await downloadDashboardCsv();
       setCsvExportStatus('Export dashboard CSV telecharge avec succes.');
-      setAuditLogs(await getAuditLogs());
+      await refreshAuditLogs();
     } catch {
       setCsvExportStatus('Export dashboard impossible : connectez-vous avec un role admin ou super admin.');
     } finally {
@@ -286,11 +318,25 @@ export function AdminPage() {
     try {
       await downloadExamAttemptsCsv();
       setExamCsvExportStatus('Export examens CSV telecharge avec succes.');
-      setAuditLogs(await getAuditLogs());
+      await refreshAuditLogs();
     } catch {
       setExamCsvExportStatus('Export examens impossible : connectez-vous avec un role admin ou super admin.');
     } finally {
       setIsExportingExamCsv(false);
+    }
+  }
+
+  async function handlePaymentCsvExport() {
+    setIsExportingPaymentCsv(true);
+    setPaymentCsvExportStatus(null);
+    try {
+      await downloadAdminPaymentsCsv();
+      setPaymentCsvExportStatus('Export paiements CSV telecharge avec succes.');
+      await refreshAuditLogs();
+    } catch {
+      setPaymentCsvExportStatus('Export paiements impossible : connectez-vous avec un role admin ou super admin.');
+    } finally {
+      setIsExportingPaymentCsv(false);
     }
   }
 
@@ -302,17 +348,30 @@ export function AdminPage() {
     String(values.denied ?? 0),
     buildRiskLabel(values.denied ?? 0),
   ]);
+  const paymentProviderRows = Object.entries(paymentSummary.by_provider).map(([provider, values]) => [
+    provider,
+    String(values.count),
+    formatCurrency(values.amount_gnf),
+  ]);
+  const paymentStatusRows = Object.entries(paymentSummary.by_status).map(([status, values]) => [
+    status,
+    String(values.count),
+    formatCurrency(values.amount_gnf),
+  ]);
 
   return (
     <section className="panel admin-panel">
       <p className="eyebrow dark">Administration nationale</p>
-      <h2>Supervision centres, entrees et examens</h2>
+      <h2>Supervision centres, entrees, examens et finances</h2>
       <div className="actions result-actions admin-actions">
         <button onClick={handleDashboardCsvExport} disabled={isExportingCsv}>{isExportingCsv ? 'Export...' : 'Exporter le dashboard CSV'}</button>
         <button onClick={handleExamAttemptsCsvExport} disabled={isExportingExamCsv}>{isExportingExamCsv ? 'Export...' : 'Exporter les examens CSV'}</button>
+        <button onClick={handlePaymentCsvExport} disabled={isExportingPaymentCsv}>{isExportingPaymentCsv ? 'Export...' : 'Exporter les paiements CSV'}</button>
       </div>
       {csvExportStatus && <p className="login-status">{csvExportStatus}</p>}
       {examCsvExportStatus && <p className="login-status">{examCsvExportStatus}</p>}
+      {paymentCsvExportStatus && <p className="login-status">{paymentCsvExportStatus}</p>}
+      {financeStatus && <p className="form-error">{financeStatus}</p>}
       <div className="metrics compact">
         <article><strong>{formatNumber(allowedEntries)}</strong><span>Entrees validees</span></article>
         <article><strong>{formatNumber(deniedEntries)}</strong><span>Entrees refusees</span></article>
@@ -322,8 +381,27 @@ export function AdminPage() {
       <div className="metrics compact">
         <article><strong>{formatNumber(examSummary.failed_attempts)}</strong><span>Echecs examen</span></article>
         <article><strong>{examSummary.average_score}</strong><span>Score moyen</span></article>
-        <article><strong>58.5M</strong><span>GNF encaisses</span></article>
-        <article><strong>{formatNumber(dashboard.fraud_alerts)}</strong><span>Alertes centre</span></article>
+        <article><strong>{formatCurrency(paymentSummary.total_amount_gnf)}</strong><span>GNF encaisses</span></article>
+        <article><strong>{formatNumber(paymentSummary.total_count)}</strong><span>Paiements</span></article>
+      </div>
+      <div className="finance-panel">
+        <h3>Supervision financiere</h3>
+        <div className="grid modules-grid">
+          <div>
+            <strong>Par operateur</strong>
+            <table>
+              <thead><tr><th>Operateur</th><th>Transactions</th><th>Montant</th></tr></thead>
+              <tbody>{paymentProviderRows.map((row) => <tr key={row[0]}>{row.map((cell) => <td key={cell}>{cell}</td>)}</tr>)}</tbody>
+            </table>
+          </div>
+          <div>
+            <strong>Par statut</strong>
+            <table>
+              <thead><tr><th>Statut</th><th>Transactions</th><th>Montant</th></tr></thead>
+              <tbody>{paymentStatusRows.map((row) => <tr key={row[0]}>{row.map((cell) => <td key={cell}>{cell}</td>)}</tr>)}</tbody>
+            </table>
+          </div>
+        </div>
       </div>
       <table>
         <thead><tr><th>Centre</th><th>Validees</th><th>Refusees</th><th>Risque</th></tr></thead>
