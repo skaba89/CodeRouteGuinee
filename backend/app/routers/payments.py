@@ -1,9 +1,10 @@
 import csv
 import io
+from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import Select, select
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
@@ -24,6 +25,24 @@ class PaymentIn(BaseModel):
     amount_gnf: int = 250000
     provider: str = "sandbox"
     phone: str
+
+
+def _filtered_payments_query(
+    provider: str | None = None,
+    payment_status: str | None = None,
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
+) -> Select[tuple[Payment]]:
+    query = select(Payment)
+    if provider:
+        query = query.where(Payment.provider == provider)
+    if payment_status:
+        query = query.where(Payment.status == payment_status)
+    if date_from:
+        query = query.where(Payment.created_at >= date_from)
+    if date_to:
+        query = query.where(Payment.created_at <= date_to)
+    return query
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
@@ -91,10 +110,14 @@ def get_payment_summary(db: Session = Depends(get_db)) -> dict:
 
 @router.get("/admin/summary")
 def get_admin_payment_summary(
+    provider: str | None = None,
+    payment_status: str | None = Query(default=None, alias="status"),
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("admin", "super_admin")),
 ) -> dict:
-    payments = db.scalars(select(Payment)).all()
+    payments = db.scalars(_filtered_payments_query(provider, payment_status, date_from, date_to)).all()
     summary = summarize_payments(payments)
     db.add(
         AuditLog(
@@ -102,7 +125,14 @@ def get_admin_payment_summary(
             action="payments.summary_viewed",
             entity="payment",
             entity_id="national-payments",
-            details={"total_count": summary["total_count"], "total_amount_gnf": summary["total_amount_gnf"]},
+            details={
+                "total_count": summary["total_count"],
+                "total_amount_gnf": summary["total_amount_gnf"],
+                "provider": provider,
+                "status": payment_status,
+                "date_from": date_from.isoformat() if date_from else None,
+                "date_to": date_to.isoformat() if date_to else None,
+            },
         )
     )
     db.commit()
@@ -111,10 +141,14 @@ def get_admin_payment_summary(
 
 @router.get("/admin/export.csv")
 def export_admin_payments_csv(
+    provider: str | None = None,
+    payment_status: str | None = Query(default=None, alias="status"),
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("admin", "super_admin")),
 ) -> Response:
-    payments = db.scalars(select(Payment).order_by(Payment.created_at.desc())).all()
+    payments = db.scalars(_filtered_payments_query(provider, payment_status, date_from, date_to).order_by(Payment.created_at.desc())).all()
     output = io.StringIO()
     writer = csv.writer(output, delimiter=";")
     writer.writerow(["reference", "booking_reference", "amount_gnf", "provider", "status", "receipt_number", "created_at"])
@@ -134,7 +168,15 @@ def export_admin_payments_csv(
             action="payments.export_csv",
             entity="payment",
             entity_id="national-payments",
-            details={"format": "csv", "payments_exported": len(payments), "total_amount_gnf": sum(payment.amount_gnf for payment in payments)},
+            details={
+                "format": "csv",
+                "payments_exported": len(payments),
+                "total_amount_gnf": sum(payment.amount_gnf for payment in payments),
+                "provider": provider,
+                "status": payment_status,
+                "date_from": date_from.isoformat() if date_from else None,
+                "date_to": date_to.isoformat() if date_to else None,
+            },
         )
     )
     db.commit()
