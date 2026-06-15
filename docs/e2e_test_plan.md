@@ -13,9 +13,17 @@ Ce plan couvre les parcours critiques de la plateforme nationale.
 - Exporter les paiements en CSV.
 - Verifier la presence des logs d'audit.
 
+## Parcours candidat reservation et centre
+
+- Creer un candidat.
+- Creer une reservation sur une session.
+- Declencher un paiement Mobile Money sandbox.
+- Recuperer la convocation numerique.
+- Generer la convocation PDF.
+- Valider l'entree dans un centre agree.
+- Refuser une deuxieme entree deja consommee.
+
 ## Parcours a completer ensuite
 
-- Candidat : inscription, reservation, paiement, convocation PDF/QR.
-- Centre agree : validation entree et refus d'entree.
 - Examen : demarrage, soumission, scoring et anti-fraude.
 - Resultats : certificat PDF et verification publique.
