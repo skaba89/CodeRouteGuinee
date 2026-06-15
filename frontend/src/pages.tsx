@@ -7,6 +7,7 @@ import {
   type EntryValidationResult,
   type ExamCertificateVerification,
   type ExamSummary,
+  type PaymentAlert,
   type PaymentFilters,
   type PaymentReconciliationItem,
   type PaymentResult,
@@ -22,6 +23,7 @@ import {
   getEntrySummary,
   getExamCertificatePdfUrl,
   getExamSummary,
+  getPaymentAlerts,
   getPaymentReconciliationItems,
   validateEntry,
   verifyExamCertificate,
@@ -275,6 +277,7 @@ export function AdminPage() {
   const [examSummary, setExamSummary] = useState<ExamSummary>(fallbackExamSummary);
   const [paymentSummary, setPaymentSummary] = useState<PaymentSummary>(fallbackPaymentSummary);
   const [paymentItems, setPaymentItems] = useState<PaymentReconciliationItem[]>([]);
+  const [paymentAlerts, setPaymentAlerts] = useState<PaymentAlert[]>([]);
   const [paymentFilters, setPaymentFilters] = useState<PaymentFilters>({});
   const [activePaymentFilters, setActivePaymentFilters] = useState<PaymentFilters>({});
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
@@ -292,8 +295,10 @@ export function AdminPage() {
       const cleanFilters = sanitizePaymentFilters(filters);
       const summary = await getAdminPaymentSummary(cleanFilters);
       const items = await getPaymentReconciliationItems({ ...cleanFilters, limit: 25 });
+      const alerts = await getPaymentAlerts({ ...cleanFilters, limit: 25 });
       setPaymentSummary(summary);
       setPaymentItems(items);
+      setPaymentAlerts(alerts);
       setActivePaymentFilters(cleanFilters);
       setFinanceStatus(null);
     } catch {
@@ -444,6 +449,20 @@ export function AdminPage() {
           <button type="submit">Appliquer les filtres</button>
           <button type="button" className="secondary-button" onClick={resetPaymentFilters}>Reinitialiser</button>
         </form>
+        <div className="finance-alerts-panel">
+          <strong>Alertes financieres</strong>
+          {paymentAlerts.length === 0 ? <p>Aucune alerte financiere sur le perimetre filtre.</p> : (
+            <div className="alert-list">
+              {paymentAlerts.slice(0, 8).map((alert) => (
+                <article className={`finance-alert severity-${alert.severity}`} key={`${alert.type}-${alert.reference}-${alert.receipt_number}`}>
+                  <span>{alert.severity}</span>
+                  <strong>{alert.message}</strong>
+                  <small>{alert.reference} - {alert.provider} - {formatCurrency(alert.amount_gnf)}</small>
+                </article>
+              ))}
+            </div>
+          )}
+        </div>
         <div className="grid modules-grid">
           <div>
             <strong>Par operateur</strong>
