@@ -32,6 +32,18 @@ export type AuditLogEntry = {
   created_at: string;
 };
 
+export type PaymentSummaryBucket = {
+  count: number;
+  amount_gnf: number;
+};
+
+export type PaymentSummary = {
+  total_count: number;
+  total_amount_gnf: number;
+  by_status: Record<string, PaymentSummaryBucket>;
+  by_provider: Record<string, PaymentSummaryBucket>;
+};
+
 export type ExamCertificateVerification = {
   valid: boolean;
   attempt_id: string;
@@ -127,6 +139,10 @@ export function getExamAttemptsCsvUrl(): string {
 
 export function getAuditLogs(): Promise<AuditLogEntry[]> {
   return getPrivateJson<AuditLogEntry[]>('/api/v1/supervision/audit-logs?limit=25');
+}
+
+export function getAdminPaymentSummary(): Promise<PaymentSummary> {
+  return getPrivateJson<PaymentSummary>('/api/v1/payments/admin/summary');
 }
 
 export async function downloadDashboardCsv(): Promise<void> {
