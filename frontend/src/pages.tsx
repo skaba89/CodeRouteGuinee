@@ -7,6 +7,7 @@ import {
   type EntryValidationResult,
   type ExamCertificateVerification,
   type ExamSummary,
+  type PaymentFilters,
   type PaymentResult,
   type PaymentSummary,
   createPayment,
@@ -86,6 +87,15 @@ function formatAuditDetails(details?: AuditLogEntry['details']): string {
   if (!details) return 'Aucun detail';
   const entries = Object.entries(details).slice(0, 3);
   return entries.map(([key, value]) => `${key}: ${String(value)}`).join(' | ');
+}
+
+function sanitizePaymentFilters(filters: PaymentFilters): PaymentFilters {
+  return {
+    provider: filters.provider || undefined,
+    status: filters.status || undefined,
+    date_from: filters.date_from || undefined,
+    date_to: filters.date_to || undefined,
+  };
 }
 
 export function HomePage() {
@@ -262,6 +272,8 @@ export function AdminPage() {
   const [entrySummary, setEntrySummary] = useState<EntrySummary>(fallbackEntrySummary);
   const [examSummary, setExamSummary] = useState<ExamSummary>(fallbackExamSummary);
   const [paymentSummary, setPaymentSummary] = useState<PaymentSummary>(fallbackPaymentSummary);
+  const [paymentFilters, setPaymentFilters] = useState<PaymentFilters>({});
+  const [activePaymentFilters, setActivePaymentFilters] = useState<PaymentFilters>({});
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
   const [auditStatus, setAuditStatus] = useState<string | null>(null);
   const [financeStatus, setFinanceStatus] = useState<string | null>(null);
@@ -272,16 +284,23 @@ export function AdminPage() {
   const [isExportingExamCsv, setIsExportingExamCsv] = useState(false);
   const [isExportingPaymentCsv, setIsExportingPaymentCsv] = useState(false);
 
+  async function loadPaymentSummary(filters: PaymentFilters) {
+    try {
+      const cleanFilters = sanitizePaymentFilters(filters);
+      const summary = await getAdminPaymentSummary(cleanFilters);
+      setPaymentSummary(summary);
+      setActivePaymentFilters(cleanFilters);
+      setFinanceStatus(null);
+    } catch {
+      setFinanceStatus('Finance indisponible : connectez-vous avec un role admin ou super admin.');
+    }
+  }
+
   useEffect(() => {
     getDashboard().then(setDashboard).catch(() => undefined);
     getEntrySummary().then(setEntrySummary).catch(() => undefined);
     getExamSummary().then(setExamSummary).catch(() => undefined);
-    getAdminPaymentSummary()
-      .then((summary) => {
-        setPaymentSummary(summary);
-        setFinanceStatus(null);
-      })
-      .catch(() => setFinanceStatus('Finance indisponible : connectez-vous avec un role admin ou super admin.'));
+    loadPaymentSummary({});
     getAuditLogs()
       .then((logs) => {
         setAuditLogs(logs);
@@ -330,7 +349,7 @@ export function AdminPage() {
     setIsExportingPaymentCsv(true);
     setPaymentCsvExportStatus(null);
     try {
-      await downloadAdminPaymentsCsv();
+      await downloadAdminPaymentsCsv(activePaymentFilters);
       setPaymentCsvExportStatus('Export paiements CSV telecharge avec succes.');
       await refreshAuditLogs();
     } catch {
@@ -338,6 +357,18 @@ export function AdminPage() {
     } finally {
       setIsExportingPaymentCsv(false);
     }
+  }
+
+  async function handlePaymentFiltersSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await loadPaymentSummary(paymentFilters);
+    await refreshAuditLogs();
+  }
+
+  async function resetPaymentFilters() {
+    setPaymentFilters({});
+    await loadPaymentSummary({});
+    await refreshAuditLogs();
   }
 
   const allowedEntries = entrySummary.by_result.allowed ?? 0;
@@ -386,6 +417,28 @@ export function AdminPage() {
       </div>
       <div className="finance-panel">
         <h3>Supervision financiere</h3>
+        <form className="finance-filters" onSubmit={handlePaymentFiltersSubmit}>
+          <label>Operateur
+            <select value={paymentFilters.provider ?? ''} onChange={(event) => setPaymentFilters((current) => ({ ...current, provider: event.target.value || undefined }))}>
+              <option value="">Tous</option>
+              <option value="orange_money">Orange Money</option>
+              <option value="mtn_money">MTN Money</option>
+              <option value="sandbox">Sandbox</option>
+            </select>
+          </label>
+          <label>Statut
+            <select value={paymentFilters.status ?? ''} onChange={(event) => setPaymentFilters((current) => ({ ...current, status: event.target.value || undefined }))}>
+              <option value="">Tous</option>
+              <option value="paid">Paid</option>
+              <option value="pending">Pending</option>
+              <option value="failed">Failed</option>
+            </select>
+          </label>
+          <label>Date debut<input type="datetime-local" value={paymentFilters.date_from ?? ''} onChange={(event) => setPaymentFilters((current) => ({ ...current, date_from: event.target.value || undefined }))} /></label>
+          <label>Date fin<input type="datetime-local" value={paymentFilters.date_to ?? ''} onChange={(event) => setPaymentFilters((current) => ({ ...current, date_to: event.target.value || undefined }))} /></label>
+          <button type="submit">Appliquer les filtres</button>
+          <button type="button" className="secondary-button" onClick={resetPaymentFilters}>Reinitialiser</button>
+        </form>
         <div className="grid modules-grid">
           <div>
             <strong>Par operateur</strong>
