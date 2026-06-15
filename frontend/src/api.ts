@@ -125,6 +125,22 @@ async function postJson<T>(path: string, body: unknown): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+async function downloadProtectedCsv(url: string, filename: string): Promise<void> {
+  const response = await fetch(url, { headers: getAuthHeaders() });
+  if (!response.ok) {
+    throw new Error(`API error ${response.status}`);
+  }
+  const blob = await response.blob();
+  const objectUrl = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = objectUrl;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(objectUrl);
+}
+
 export function getDashboard(): Promise<DashboardData> {
   return getJson<DashboardData>('/api/v1/dashboard');
 }
@@ -137,6 +153,10 @@ export function getExamAttemptsCsvUrl(): string {
   return `${API_BASE_URL}/api/v1/exams/export.csv`;
 }
 
+export function getAdminPaymentsCsvUrl(): string {
+  return `${API_BASE_URL}/api/v1/payments/admin/export.csv`;
+}
+
 export function getAuditLogs(): Promise<AuditLogEntry[]> {
   return getPrivateJson<AuditLogEntry[]>('/api/v1/supervision/audit-logs?limit=25');
 }
@@ -145,42 +165,16 @@ export function getAdminPaymentSummary(): Promise<PaymentSummary> {
   return getPrivateJson<PaymentSummary>('/api/v1/payments/admin/summary');
 }
 
-export async function downloadDashboardCsv(): Promise<void> {
-  const response = await fetch(getDashboardCsvUrl(), {
-    headers: getAuthHeaders(),
-  });
-  if (!response.ok) {
-    throw new Error(`API error ${response.status}`);
-  }
-
-  const blob = await response.blob();
-  const url = window.URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = 'coderoute-dashboard-export.csv';
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  window.URL.revokeObjectURL(url);
+export function downloadDashboardCsv(): Promise<void> {
+  return downloadProtectedCsv(getDashboardCsvUrl(), 'coderoute-dashboard-export.csv');
 }
 
-export async function downloadExamAttemptsCsv(): Promise<void> {
-  const response = await fetch(getExamAttemptsCsvUrl(), {
-    headers: getAuthHeaders(),
-  });
-  if (!response.ok) {
-    throw new Error(`API error ${response.status}`);
-  }
+export function downloadExamAttemptsCsv(): Promise<void> {
+  return downloadProtectedCsv(getExamAttemptsCsvUrl(), 'coderoute-exam-attempts.csv');
+}
 
-  const blob = await response.blob();
-  const url = window.URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = 'coderoute-exam-attempts.csv';
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  window.URL.revokeObjectURL(url);
+export function downloadAdminPaymentsCsv(): Promise<void> {
+  return downloadProtectedCsv(getAdminPaymentsCsvUrl(), 'coderoute-payments.csv');
 }
 
 export function getEntrySummary(): Promise<EntrySummary> {

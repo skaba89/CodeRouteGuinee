@@ -1,4 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+import csv
+import io
+
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -33,12 +36,7 @@ def create_payment(payload: PaymentIn, db: Session = Depends(get_db)) -> dict:
                 action="payment.failed",
                 entity="payment",
                 entity_id=payload.booking_reference,
-                details={
-                    "reason": "booking_not_found",
-                    "booking_reference": payload.booking_reference,
-                    "amount_gnf": payload.amount_gnf,
-                    "provider": payload.provider,
-                },
+                details={"reason": "booking_not_found", "booking_reference": payload.booking_reference, "amount_gnf": payload.amount_gnf, "provider": payload.provider},
             )
         )
         db.commit()
@@ -104,14 +102,44 @@ def get_admin_payment_summary(
             action="payments.summary_viewed",
             entity="payment",
             entity_id="national-payments",
-            details={
-                "total_count": summary["total_count"],
-                "total_amount_gnf": summary["total_amount_gnf"],
-            },
+            details={"total_count": summary["total_count"], "total_amount_gnf": summary["total_amount_gnf"]},
         )
     )
     db.commit()
     return summary
+
+
+@router.get("/admin/export.csv")
+def export_admin_payments_csv(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "super_admin")),
+) -> Response:
+    payments = db.scalars(select(Payment).order_by(Payment.created_at.desc())).all()
+    output = io.StringIO()
+    writer = csv.writer(output, delimiter=";")
+    writer.writerow(["reference", "booking_reference", "amount_gnf", "provider", "status", "receipt_number", "created_at"])
+    for payment in payments:
+        writer.writerow([
+            payment.reference,
+            payment.booking_reference,
+            payment.amount_gnf,
+            payment.provider,
+            payment.status,
+            payment.receipt_number,
+            payment.created_at.isoformat() if payment.created_at else "",
+        ])
+    db.add(
+        AuditLog(
+            actor_id=current_user.id,
+            action="payments.export_csv",
+            entity="payment",
+            entity_id="national-payments",
+            details={"format": "csv", "payments_exported": len(payments), "total_amount_gnf": sum(payment.amount_gnf for payment in payments)},
+        )
+    )
+    db.commit()
+    headers = {"Content-Disposition": "attachment; filename=coderoute-payments.csv"}
+    return Response(content=output.getvalue(), media_type="text/csv", headers=headers)
 
 
 @router.get("/{reference}")
