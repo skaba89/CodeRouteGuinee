@@ -62,6 +62,12 @@ export type PaymentReconciliationItem = {
   created_at?: string | null;
 };
 
+export type PaymentAlert = PaymentReconciliationItem & {
+  type: string;
+  severity: 'low' | 'medium' | 'high' | string;
+  message: string;
+};
+
 export type ExamCertificateVerification = {
   valid: boolean;
   attempt_id: string;
@@ -197,6 +203,11 @@ export function getAdminPaymentSummary(filters: PaymentFilters = {}): Promise<Pa
 export function getPaymentReconciliationItems(filters: PaymentFilters = {}): Promise<PaymentReconciliationItem[]> {
   const query = buildPaymentQuery({ ...filters, limit: filters.limit ?? 25 });
   return getPrivateJson<PaymentReconciliationItem[]>(`/api/v1/payments/admin/reconciliation/items${query}`);
+}
+
+export function getPaymentAlerts(filters: PaymentFilters = {}): Promise<PaymentAlert[]> {
+  const query = buildPaymentQuery({ ...filters, limit: filters.limit ?? 25 });
+  return getPrivateJson<PaymentAlert[]>(`/api/v1/payments/admin/reconciliation/alerts${query}`);
 }
 
 export function downloadDashboardCsv(): Promise<void> {

@@ -213,6 +213,65 @@
   color: #0b2e58;
 }
 
+.finance-alerts-panel {
+  margin: 18px 0 22px;
+  border: 1px solid #fde68a;
+  border-radius: 18px;
+  background: #fffbeb;
+  padding: 14px;
+}
+
+.finance-alerts-panel p {
+  color: #0b2e58;
+  font-weight: 700;
+  margin: 0;
+}
+
+.alert-list {
+  display: grid;
+  gap: 10px;
+}
+
+.finance-alert {
+  border: 1px solid #facc15;
+  border-radius: 16px;
+  background: #ffffff;
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+}
+
+.finance-alert span {
+  width: fit-content;
+  border-radius: 999px;
+  background: #fef3c7;
+  color: #92400e;
+  font-size: 11px;
+  font-weight: 900;
+  padding: 4px 8px;
+  text-transform: uppercase;
+}
+
+.finance-alert.severity-high {
+  border-color: #fecaca;
+  background: #fff1f2;
+}
+
+.finance-alert.severity-high span {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.finance-alert.severity-medium span {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.finance-alert small {
+  color: #475569;
+  font-weight: 800;
+}
+
 .payment-items-panel {
   margin-top: 22px;
   border-top: 1px solid #d8deea;
