@@ -150,7 +150,8 @@
   color: #166534;
 }
 
-.audit-panel {
+.audit-panel,
+.finance-panel {
   margin-top: 28px;
   border: 1px solid #d8deea;
   border-radius: 22px;
@@ -159,9 +160,16 @@
   overflow-x: auto;
 }
 
-.audit-panel h3 {
+.audit-panel h3,
+.finance-panel h3 {
   color: #0b2e58;
   margin: 0 0 12px;
+}
+
+.finance-panel strong {
+  color: #0b2e58;
+  display: block;
+  margin-bottom: 10px;
 }
 
 .audit-panel td:last-child {
