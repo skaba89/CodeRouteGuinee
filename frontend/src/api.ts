@@ -22,6 +22,16 @@ export type ExamSummary = {
   average_score: number;
 };
 
+export type AuditLogEntry = {
+  id: string;
+  actor_id?: string;
+  action: string;
+  entity: string;
+  entity_id?: string;
+  details?: Record<string, string | number | boolean | null>;
+  created_at: string;
+};
+
 export type ExamCertificateVerification = {
   valid: boolean;
   attempt_id: string;
@@ -83,6 +93,14 @@ async function getJson<T>(path: string): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+async function getPrivateJson<T>(path: string): Promise<T> {
+  const response = await fetch(`${API_BASE_URL}${path}`, { headers: getAuthHeaders() });
+  if (!response.ok) {
+    throw new Error(`API error ${response.status}`);
+  }
+  return response.json() as Promise<T>;
+}
+
 async function postJson<T>(path: string, body: unknown): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     method: 'POST',
@@ -105,6 +123,10 @@ export function getDashboardCsvUrl(): string {
 
 export function getExamAttemptsCsvUrl(): string {
   return `${API_BASE_URL}/api/v1/exams/export.csv`;
+}
+
+export function getAuditLogs(): Promise<AuditLogEntry[]> {
+  return getPrivateJson<AuditLogEntry[]>('/api/v1/supervision/audit-logs?limit=25');
 }
 
 export async function downloadDashboardCsv(): Promise<void> {

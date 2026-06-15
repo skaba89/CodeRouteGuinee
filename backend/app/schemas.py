@@ -161,3 +161,15 @@ class DashboardRead(BaseModel):
     exam_sessions: int
     questions: int
     fraud_alerts: int = 0
+
+
+class AuditLogRead(BaseModel):
+    id: str
+    actor_id: str | None = None
+    action: str
+    entity: str
+    entity_id: str | None = None
+    details: dict | None = None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}

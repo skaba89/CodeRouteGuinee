@@ -1,6 +1,7 @@
 import { type FormEvent, useEffect, useState } from 'react';
 
 import {
+  type AuditLogEntry,
   type DashboardData,
   type EntrySummary,
   type EntryValidationResult,
@@ -10,6 +11,7 @@ import {
   createPayment,
   downloadDashboardCsv,
   downloadExamAttemptsCsv,
+  getAuditLogs,
   getConvocationPdfUrl,
   getDashboard,
   getEntrySummary,
@@ -64,6 +66,12 @@ function buildRiskLabel(denied: number): string {
   if (denied >= 10) return 'A verifier';
   if (denied >= 4) return 'Audit';
   return 'Normal';
+}
+
+function formatAuditDetails(details?: AuditLogEntry['details']): string {
+  if (!details) return 'Aucun detail';
+  const entries = Object.entries(details).slice(0, 3);
+  return entries.map(([key, value]) => `${key}: ${String(value)}`).join(' | ');
 }
 
 export function HomePage() {
@@ -239,6 +247,8 @@ export function AdminPage() {
   const [dashboard, setDashboard] = useState<DashboardData>(fallbackDashboard);
   const [entrySummary, setEntrySummary] = useState<EntrySummary>(fallbackEntrySummary);
   const [examSummary, setExamSummary] = useState<ExamSummary>(fallbackExamSummary);
+  const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
+  const [auditStatus, setAuditStatus] = useState<string | null>(null);
   const [csvExportStatus, setCsvExportStatus] = useState<string | null>(null);
   const [examCsvExportStatus, setExamCsvExportStatus] = useState<string | null>(null);
   const [isExportingCsv, setIsExportingCsv] = useState(false);
@@ -248,6 +258,12 @@ export function AdminPage() {
     getDashboard().then(setDashboard).catch(() => undefined);
     getEntrySummary().then(setEntrySummary).catch(() => undefined);
     getExamSummary().then(setExamSummary).catch(() => undefined);
+    getAuditLogs()
+      .then((logs) => {
+        setAuditLogs(logs);
+        setAuditStatus(null);
+      })
+      .catch(() => setAuditStatus('Logs indisponibles : connectez-vous avec un role admin ou super admin.'));
   }, []);
 
   async function handleDashboardCsvExport() {
@@ -256,6 +272,7 @@ export function AdminPage() {
     try {
       await downloadDashboardCsv();
       setCsvExportStatus('Export dashboard CSV telecharge avec succes.');
+      setAuditLogs(await getAuditLogs());
     } catch {
       setCsvExportStatus('Export dashboard impossible : connectez-vous avec un role admin ou super admin.');
     } finally {
@@ -269,6 +286,7 @@ export function AdminPage() {
     try {
       await downloadExamAttemptsCsv();
       setExamCsvExportStatus('Export examens CSV telecharge avec succes.');
+      setAuditLogs(await getAuditLogs());
     } catch {
       setExamCsvExportStatus('Export examens impossible : connectez-vous avec un role admin ou super admin.');
     } finally {
@@ -315,6 +333,23 @@ export function AdminPage() {
           ))}
         </tbody>
       </table>
+      <div className="audit-panel">
+        <h3>Journal d'audit national</h3>
+        {auditStatus && <p className="form-error">{auditStatus}</p>}
+        <table>
+          <thead><tr><th>Date</th><th>Action</th><th>Entite</th><th>Details</th></tr></thead>
+          <tbody>
+            {auditLogs.slice(0, 8).map((log) => (
+              <tr key={log.id}>
+                <td>{new Date(log.created_at).toLocaleString('fr-FR')}</td>
+                <td><span className="badge">{log.action}</span></td>
+                <td>{log.entity}</td>
+                <td>{formatAuditDetails(log.details)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </section>
   );
 }
