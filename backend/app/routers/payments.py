@@ -4,10 +4,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
+from app.deps import require_roles
 from app.mobile_money import simulate_mobile_money_payment
 from app.models_audit import AuditLog
 from app.models_booking import Booking
 from app.models_payment import Payment
+from app.models_user import User
 from app.payment_recap import summarize_payments
 from app.payment_service import build_payment_reference, build_receipt_number
 
@@ -87,6 +89,29 @@ def create_payment(payload: PaymentIn, db: Session = Depends(get_db)) -> dict:
 def get_payment_summary(db: Session = Depends(get_db)) -> dict:
     payments = db.scalars(select(Payment)).all()
     return summarize_payments(payments)
+
+
+@router.get("/admin/summary")
+def get_admin_payment_summary(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "super_admin")),
+) -> dict:
+    payments = db.scalars(select(Payment)).all()
+    summary = summarize_payments(payments)
+    db.add(
+        AuditLog(
+            actor_id=current_user.id,
+            action="payments.summary_viewed",
+            entity="payment",
+            entity_id="national-payments",
+            details={
+                "total_count": summary["total_count"],
+                "total_amount_gnf": summary["total_amount_gnf"],
+            },
+        )
+    )
+    db.commit()
+    return summary
 
 
 @router.get("/{reference}")
