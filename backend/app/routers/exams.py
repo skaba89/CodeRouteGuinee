@@ -286,6 +286,7 @@ def verify_exam_certificate(attempt_id: str, db: Session = Depends(get_db)) -> E
         valid=True,
         status_label=attempt.status,
         checked_at=checked_at,
+        reason="Certificat authentique",
         extra_details={
             "candidate_reference": candidate.reference,
             "session_reference": session.reference,
