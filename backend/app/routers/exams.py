@@ -58,6 +58,34 @@ def _write_exam_guard_log(
     )
 
 
+def _write_certificate_verification_log(
+    db: Session,
+    attempt_id: str,
+    valid: bool,
+    status_label: str,
+    checked_at: datetime,
+    reason: str | None = None,
+    extra_details: dict | None = None,
+) -> None:
+    details = {
+        "valid": valid,
+        "status": status_label,
+        "reason": reason,
+        "checked_at": checked_at.isoformat(),
+    }
+    if extra_details:
+        details.update(extra_details)
+    db.add(
+        AuditLog(
+            actor_id=None,
+            action="certificate.verify",
+            entity="exam_certificate",
+            entity_id=attempt_id,
+            details=details,
+        )
+    )
+
+
 @router.post("/start", response_model=ExamAttemptRead, status_code=status.HTTP_201_CREATED)
 def start_exam(payload: ExamStartRequest, db: Session = Depends(get_db)) -> ExamAttempt:
     attempt = ExamAttempt(candidate_id=payload.candidate_id, session_id=payload.session_id)
@@ -197,8 +225,18 @@ def submit_exam(attempt_id: str, payload: ExamSubmitRequest, db: Session = Depen
 
 @router.get("/{attempt_id}/certificate/verify", response_model=ExamCertificateVerificationRead)
 def verify_exam_certificate(attempt_id: str, db: Session = Depends(get_db)) -> ExamCertificateVerificationRead:
+    checked_at = datetime.utcnow()
     attempt = db.get(ExamAttempt, attempt_id)
     if not attempt:
+        _write_certificate_verification_log(
+            db,
+            attempt_id=attempt_id,
+            valid=False,
+            status_label="not_found",
+            checked_at=checked_at,
+            reason="Tentative d'examen introuvable",
+        )
+        db.commit()
         return ExamCertificateVerificationRead(
             valid=False,
             attempt_id=attempt_id,
@@ -206,6 +244,15 @@ def verify_exam_certificate(attempt_id: str, db: Session = Depends(get_db)) -> E
             reason="Tentative d'examen introuvable",
         )
     if attempt.status != "submitted":
+        _write_certificate_verification_log(
+            db,
+            attempt_id=attempt.id,
+            valid=False,
+            status_label=attempt.status,
+            checked_at=checked_at,
+            reason="Tentative d'examen non soumise",
+        )
+        db.commit()
         return ExamCertificateVerificationRead(
             valid=False,
             attempt_id=attempt.id,
@@ -217,6 +264,15 @@ def verify_exam_certificate(attempt_id: str, db: Session = Depends(get_db)) -> E
     session = db.get(ExamSession, attempt.session_id)
     center = db.get(Center, session.center_id) if session else None
     if not candidate or not session or not center:
+        _write_certificate_verification_log(
+            db,
+            attempt_id=attempt.id,
+            valid=False,
+            status_label="incomplete",
+            checked_at=checked_at,
+            reason="Donnees du certificat incompletes",
+        )
+        db.commit()
         return ExamCertificateVerificationRead(
             valid=False,
             attempt_id=attempt.id,
@@ -224,6 +280,21 @@ def verify_exam_certificate(attempt_id: str, db: Session = Depends(get_db)) -> E
             reason="Donnees du certificat incompletes",
         )
 
+    _write_certificate_verification_log(
+        db,
+        attempt_id=attempt.id,
+        valid=True,
+        status_label=attempt.status,
+        checked_at=checked_at,
+        extra_details={
+            "candidate_reference": candidate.reference,
+            "session_reference": session.reference,
+            "center_name": center.name,
+            "score": attempt.score,
+            "passed": attempt.passed,
+        },
+    )
+    db.commit()
     return ExamCertificateVerificationRead(
         valid=True,
         attempt_id=attempt.id,
