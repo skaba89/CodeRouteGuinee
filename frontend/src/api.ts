@@ -44,6 +44,13 @@ export type PaymentSummary = {
   by_provider: Record<string, PaymentSummaryBucket>;
 };
 
+export type PaymentFilters = {
+  provider?: string;
+  status?: string;
+  date_from?: string;
+  date_to?: string;
+};
+
 export type ExamCertificateVerification = {
   valid: boolean;
   attempt_id: string;
@@ -96,6 +103,16 @@ export type PaymentResult = {
 };
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000';
+
+function buildPaymentQuery(filters: PaymentFilters = {}): string {
+  const query = new URLSearchParams();
+  if (filters.provider) query.set('provider', filters.provider);
+  if (filters.status) query.set('status', filters.status);
+  if (filters.date_from) query.set('date_from', filters.date_from);
+  if (filters.date_to) query.set('date_to', filters.date_to);
+  const queryString = query.toString();
+  return queryString ? `?${queryString}` : '';
+}
 
 async function getJson<T>(path: string): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`);
@@ -153,16 +170,16 @@ export function getExamAttemptsCsvUrl(): string {
   return `${API_BASE_URL}/api/v1/exams/export.csv`;
 }
 
-export function getAdminPaymentsCsvUrl(): string {
-  return `${API_BASE_URL}/api/v1/payments/admin/export.csv`;
+export function getAdminPaymentsCsvUrl(filters: PaymentFilters = {}): string {
+  return `${API_BASE_URL}/api/v1/payments/admin/export.csv${buildPaymentQuery(filters)}`;
 }
 
 export function getAuditLogs(): Promise<AuditLogEntry[]> {
   return getPrivateJson<AuditLogEntry[]>('/api/v1/supervision/audit-logs?limit=25');
 }
 
-export function getAdminPaymentSummary(): Promise<PaymentSummary> {
-  return getPrivateJson<PaymentSummary>('/api/v1/payments/admin/summary');
+export function getAdminPaymentSummary(filters: PaymentFilters = {}): Promise<PaymentSummary> {
+  return getPrivateJson<PaymentSummary>(`/api/v1/payments/admin/summary${buildPaymentQuery(filters)}`);
 }
 
 export function downloadDashboardCsv(): Promise<void> {
@@ -173,8 +190,8 @@ export function downloadExamAttemptsCsv(): Promise<void> {
   return downloadProtectedCsv(getExamAttemptsCsvUrl(), 'coderoute-exam-attempts.csv');
 }
 
-export function downloadAdminPaymentsCsv(): Promise<void> {
-  return downloadProtectedCsv(getAdminPaymentsCsvUrl(), 'coderoute-payments.csv');
+export function downloadAdminPaymentsCsv(filters: PaymentFilters = {}): Promise<void> {
+  return downloadProtectedCsv(getAdminPaymentsCsvUrl(filters), 'coderoute-payments.csv');
 }
 
 export function getEntrySummary(): Promise<EntrySummary> {
