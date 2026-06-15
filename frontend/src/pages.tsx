@@ -8,6 +8,7 @@ import {
   type ExamCertificateVerification,
   type ExamSummary,
   type PaymentFilters,
+  type PaymentReconciliationItem,
   type PaymentResult,
   type PaymentSummary,
   createPayment,
@@ -21,6 +22,7 @@ import {
   getEntrySummary,
   getExamCertificatePdfUrl,
   getExamSummary,
+  getPaymentReconciliationItems,
   validateEntry,
   verifyExamCertificate,
 } from './api';
@@ -272,6 +274,7 @@ export function AdminPage() {
   const [entrySummary, setEntrySummary] = useState<EntrySummary>(fallbackEntrySummary);
   const [examSummary, setExamSummary] = useState<ExamSummary>(fallbackExamSummary);
   const [paymentSummary, setPaymentSummary] = useState<PaymentSummary>(fallbackPaymentSummary);
+  const [paymentItems, setPaymentItems] = useState<PaymentReconciliationItem[]>([]);
   const [paymentFilters, setPaymentFilters] = useState<PaymentFilters>({});
   const [activePaymentFilters, setActivePaymentFilters] = useState<PaymentFilters>({});
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
@@ -288,7 +291,9 @@ export function AdminPage() {
     try {
       const cleanFilters = sanitizePaymentFilters(filters);
       const summary = await getAdminPaymentSummary(cleanFilters);
+      const items = await getPaymentReconciliationItems({ ...cleanFilters, limit: 25 });
       setPaymentSummary(summary);
+      setPaymentItems(items);
       setActivePaymentFilters(cleanFilters);
       setFinanceStatus(null);
     } catch {
@@ -454,6 +459,25 @@ export function AdminPage() {
               <tbody>{paymentStatusRows.map((row) => <tr key={row[0]}>{row.map((cell) => <td key={cell}>{cell}</td>)}</tr>)}</tbody>
             </table>
           </div>
+        </div>
+        <div className="payment-items-panel">
+          <strong>Paiements recents filtres</strong>
+          <table>
+            <thead><tr><th>Reference</th><th>Reservation</th><th>Operateur</th><th>Statut</th><th>Montant</th><th>Recu</th><th>Date</th></tr></thead>
+            <tbody>
+              {paymentItems.map((payment) => (
+                <tr key={payment.reference}>
+                  <td>{payment.reference}</td>
+                  <td>{payment.booking_reference}</td>
+                  <td>{payment.provider}</td>
+                  <td><span className="badge">{payment.status}</span></td>
+                  <td>{formatCurrency(payment.amount_gnf)}</td>
+                  <td>{payment.receipt_number}</td>
+                  <td>{payment.created_at ? new Date(payment.created_at).toLocaleString('fr-FR') : '-'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
       <table>

@@ -49,6 +49,17 @@ export type PaymentFilters = {
   status?: string;
   date_from?: string;
   date_to?: string;
+  limit?: number;
+};
+
+export type PaymentReconciliationItem = {
+  reference: string;
+  booking_reference: string;
+  amount_gnf: number;
+  provider: string;
+  status: string;
+  receipt_number: string;
+  created_at?: string | null;
 };
 
 export type ExamCertificateVerification = {
@@ -110,6 +121,7 @@ function buildPaymentQuery(filters: PaymentFilters = {}): string {
   if (filters.status) query.set('status', filters.status);
   if (filters.date_from) query.set('date_from', filters.date_from);
   if (filters.date_to) query.set('date_to', filters.date_to);
+  if (filters.limit) query.set('limit', String(filters.limit));
   const queryString = query.toString();
   return queryString ? `?${queryString}` : '';
 }
@@ -180,6 +192,11 @@ export function getAuditLogs(): Promise<AuditLogEntry[]> {
 
 export function getAdminPaymentSummary(filters: PaymentFilters = {}): Promise<PaymentSummary> {
   return getPrivateJson<PaymentSummary>(`/api/v1/payments/admin/summary${buildPaymentQuery(filters)}`);
+}
+
+export function getPaymentReconciliationItems(filters: PaymentFilters = {}): Promise<PaymentReconciliationItem[]> {
+  const query = buildPaymentQuery({ ...filters, limit: filters.limit ?? 25 });
+  return getPrivateJson<PaymentReconciliationItem[]>(`/api/v1/payments/admin/reconciliation/items${query}`);
 }
 
 export function downloadDashboardCsv(): Promise<void> {
