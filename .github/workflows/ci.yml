@@ -25,6 +25,8 @@ jobs:
             test_file: tests/test_e2e_device_session_tracking.py
           - name: exam-certificate
             test_file: tests/test_e2e_exam_certificate.py
+          - name: exam-monitoring-events
+            test_file: tests/test_e2e_exam_monitoring_events.py
     name: backend-tests (${{ matrix.name }})
     steps:
       - uses: actions/checkout@v4
