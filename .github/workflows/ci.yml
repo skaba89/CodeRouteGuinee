@@ -32,6 +32,8 @@ jobs:
         run: pip install -q -r requirements.txt
       - name: Run backend tests
         working-directory: backend
+        env:
+          PYTHONPATH: ${{ github.workspace }}/backend
         run: |
           set +e
           pytest -q --tb=short --disable-warnings ${{ matrix.test_file }} > pytest-output.txt 2>&1
