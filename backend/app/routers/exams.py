@@ -96,21 +96,19 @@ def _write_certificate_verification_log(
 @router.post("/start", response_model=ExamAttemptRead, status_code=status.HTTP_201_CREATED)
 def start_exam(payload: ExamStartRequest, db: Session = Depends(get_db)) -> ExamAttempt:
     questions = list(db.scalars(select(Question).where(Question.is_active.is_(True)).order_by(Question.id)).all())
-    if not questions:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="No active question available")
-
     attempt = ExamAttempt(candidate_id=payload.candidate_id, session_id=payload.session_id)
     db.add(attempt)
     db.flush()
 
     question_ids = [question.id for question in questions]
     bank_hash = _build_question_bank_hash(questions)
+    version_label = f"active-bank-{bank_hash[:12]}" if question_ids else "active-bank-empty"
     trace = ExamQuestionTrace(
         attempt_id=attempt.id,
         question_ids=question_ids,
         question_count=len(question_ids),
         bank_hash=bank_hash,
-        version_label=f"active-bank-{bank_hash[:12]}",
+        version_label=version_label,
         selection_mode="active_bank_snapshot",
     )
     db.add(trace)
@@ -249,7 +247,7 @@ def submit_exam(attempt_id: str, payload: ExamSubmitRequest, db: Session = Depen
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Exam attempt expired")
 
     trace = db.scalar(select(ExamQuestionTrace).where(ExamQuestionTrace.attempt_id == attempt.id))
-    if trace:
+    if trace and trace.question_ids:
         questions = list(db.scalars(select(Question).where(Question.id.in_(trace.question_ids))).all())
     else:
         questions = list(db.scalars(select(Question).where(Question.is_active.is_(True))).all())
