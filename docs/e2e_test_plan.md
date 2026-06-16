@@ -45,8 +45,20 @@ Ce plan couvre les parcours critiques de la plateforme nationale.
 - Demarrer et soumettre l'examen.
 - Verifier le certificat et telecharger le PDF.
 
+## Parcours incident centre et reprise d'examen
+
+- Demarrer une tentative candidat.
+- Declarer un incident centre lie a la tentative.
+- Bloquer la tentative initiale pour empecher une soumission non fiable.
+- Refuser la soumission de la tentative bloquee.
+- Resoudre l'incident cote admin.
+- Autoriser une reprise encadree.
+- Creer automatiquement une nouvelle tentative.
+- Soumettre la nouvelle tentative.
+- Verifier les logs d'audit de declaration et resolution.
+
 ## Parcours a completer ensuite
 
-- Incidents centre et reprise d'examen.
 - Tests UI navigateur via Playwright.
 - Tests de charge et monitoring.
+- Journalisation avancee des appareils de session.
