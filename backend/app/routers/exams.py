@@ -1,4 +1,5 @@
 import csv
+import hashlib
 import io
 from datetime import datetime, timedelta
 
@@ -13,6 +14,7 @@ from app.models_audit import AuditLog
 from app.models_candidate import Candidate
 from app.models_center import Center
 from app.models_exam_attempt import ExamAttempt
+from app.models_exam_question_trace import ExamQuestionTrace
 from app.models_question import Question
 from app.models_session import ExamSession
 from app.models_user import User
@@ -26,6 +28,11 @@ EXAM_DURATION_MINUTES = 30
 
 def _is_attempt_expired(attempt: ExamAttempt, now: datetime) -> bool:
     return now - attempt.started_at > timedelta(minutes=EXAM_DURATION_MINUTES)
+
+
+def _build_question_bank_hash(questions: list[Question]) -> str:
+    payload = "|".join(f"{question.id}:{question.correct_answer}:{question.is_active}" for question in questions)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
 def _write_exam_guard_log(
@@ -88,8 +95,39 @@ def _write_certificate_verification_log(
 
 @router.post("/start", response_model=ExamAttemptRead, status_code=status.HTTP_201_CREATED)
 def start_exam(payload: ExamStartRequest, db: Session = Depends(get_db)) -> ExamAttempt:
+    questions = list(db.scalars(select(Question).where(Question.is_active.is_(True)).order_by(Question.id)).all())
     attempt = ExamAttempt(candidate_id=payload.candidate_id, session_id=payload.session_id)
     db.add(attempt)
+    db.flush()
+
+    question_ids = [question.id for question in questions]
+    bank_hash = _build_question_bank_hash(questions)
+    version_label = f"active-bank-{bank_hash[:12]}" if question_ids else "active-bank-empty"
+    trace = ExamQuestionTrace(
+        attempt_id=attempt.id,
+        question_ids=question_ids,
+        question_count=len(question_ids),
+        bank_hash=bank_hash,
+        version_label=version_label,
+        selection_mode="active_bank_snapshot",
+    )
+    db.add(trace)
+    db.add(
+        AuditLog(
+            actor_id=None,
+            action="exam.question_trace_created",
+            entity="exam_question_trace",
+            entity_id=trace.id,
+            details={
+                "attempt_id": attempt.id,
+                "candidate_id": attempt.candidate_id,
+                "session_id": attempt.session_id,
+                "question_count": len(question_ids),
+                "bank_hash": bank_hash,
+                "version_label": trace.version_label,
+            },
+        )
+    )
     db.commit()
     db.refresh(attempt)
     return attempt
@@ -208,7 +246,11 @@ def submit_exam(attempt_id: str, payload: ExamSubmitRequest, db: Session = Depen
         db.commit()
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Exam attempt expired")
 
-    questions = db.scalars(select(Question).where(Question.is_active.is_(True))).all()
+    trace = db.scalar(select(ExamQuestionTrace).where(ExamQuestionTrace.attempt_id == attempt.id))
+    if trace and trace.question_ids:
+        questions = list(db.scalars(select(Question).where(Question.id.in_(trace.question_ids))).all())
+    else:
+        questions = list(db.scalars(select(Question).where(Question.is_active.is_(True))).all())
     answer_key = {question.id: question.correct_answer for question in questions}
     result = score_answers(answer_key, payload.answers)
 

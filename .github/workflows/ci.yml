@@ -31,6 +31,8 @@ jobs:
             test_file: tests/test_e2e_exam_certificate.py
           - name: exam-monitoring-events
             test_file: tests/test_e2e_exam_monitoring_events.py
+          - name: exam-question-trace
+            test_file: tests/test_e2e_exam_question_trace.py
           - name: manual-review-decisions
             test_file: tests/test_e2e_manual_review_decisions.py
           - name: next-feature-69
