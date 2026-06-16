@@ -3,10 +3,12 @@ from uuid import uuid4
 
 from fastapi.testclient import TestClient
 
+from app.db.session import init_db
 from app.main import app
 
 
 def _admin_headers(client: TestClient) -> dict[str, str]:
+    init_db()
     suffix = uuid4().hex
     email = f"admin-candidate-e2e-{suffix}@coderoute.local"
     password = "AdminPass123!"
