@@ -54,6 +54,7 @@ def report_center_incident(
         db.add(attempt)
 
     db.add(incident)
+    db.flush()
     db.add(
         AuditLog(
             actor_id=current_user.id,
