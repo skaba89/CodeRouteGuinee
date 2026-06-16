@@ -85,11 +85,12 @@ def list_center_incidents(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("admin", "super_admin")),
 ) -> list[CenterIncident]:
-    query = select(CenterIncident).order_by(CenterIncident.created_at.desc()).limit(limit)
+    query = select(CenterIncident)
     if status_filter:
         query = query.where(CenterIncident.status == status_filter)
     if center_id:
         query = query.where(CenterIncident.center_id == center_id)
+    query = query.order_by(CenterIncident.created_at.desc()).limit(limit)
     return list(db.scalars(query).all())
 
 
