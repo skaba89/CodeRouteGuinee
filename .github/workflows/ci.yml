@@ -29,10 +29,10 @@ jobs:
           python-version: '3.12'
       - name: Install backend dependencies
         working-directory: backend
-        run: pip install -r requirements.txt
+        run: pip install -q -r requirements.txt
       - name: Run backend tests
         working-directory: backend
-        run: pytest ${{ matrix.test_file }}
+        run: pytest -q --tb=short --disable-warnings ${{ matrix.test_file }}
 
   frontend-build:
     runs-on: ubuntu-latest
