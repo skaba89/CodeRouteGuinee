@@ -3,7 +3,7 @@ from uuid import uuid4
 
 from fastapi.testclient import TestClient
 
-from app.db.session import SessionLocal
+from app.db.session import SessionLocal, init_db
 from app.main import app
 from app.models_candidate import Candidate
 from app.models_center import Center
@@ -11,7 +11,8 @@ from app.models_question import Question
 from app.models_session import ExamSession
 
 
-def _seed_exam_context() -> tuple[str, str, list[Question]]:
+def _seed_exam_context() -> tuple[str, str]:
+    init_db()
     db = SessionLocal()
     suffix = uuid4().hex[:8]
     try:
@@ -45,31 +46,27 @@ def _seed_exam_context() -> tuple[str, str, list[Question]]:
         )
         db.add(candidate)
 
-        questions = []
         for index in range(40):
-            question = Question(
-                category="signalisation",
-                text=f"Question E2E {suffix}-{index}",
-                options=["A", "B", "C", "D"],
-                correct_answer="A",
-                explanation="Reponse de test",
+            db.add(
+                Question(
+                    category="signalisation",
+                    text=f"Question E2E {suffix}-{index}",
+                    options=["A", "B", "C", "D"],
+                    correct_answer="A",
+                    explanation="Reponse de test",
+                )
             )
-            db.add(question)
-            questions.append(question)
 
         db.commit()
         db.refresh(candidate)
         db.refresh(session)
-        for question in questions:
-            db.refresh(question)
-        return candidate.id, session.id, questions
+        return candidate.id, session.id
     finally:
         db.close()
 
 
 def test_exam_scoring_certificate_and_public_verification_end_to_end() -> None:
-    candidate_id, session_id, questions = _seed_exam_context()
-    answers = {question.id: "A" for question in questions}
+    candidate_id, session_id = _seed_exam_context()
 
     with TestClient(app) as client:
         start_response = client.post(
@@ -79,6 +76,11 @@ def test_exam_scoring_certificate_and_public_verification_end_to_end() -> None:
         assert start_response.status_code == 201
         attempt = start_response.json()
         assert attempt["status"] == "started"
+
+        questions_response = client.get("/api/v1/questions")
+        assert questions_response.status_code == 200
+        answers = {question["id"]: question["correct_answer"] for question in questions_response.json()}
+        assert len(answers) >= 40
 
         submit_response = client.post(
             f"/api/v1/exams/{attempt['id']}/submit",

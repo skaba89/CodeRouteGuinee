@@ -22,8 +22,11 @@ function normalizeRole(role: string): UserRole {
 }
 
 function getInitialRole(): UserRole {
-  const savedRole = window.localStorage.getItem(ROLE_STORAGE_KEY) as UserRole | null;
-  return demoRoles.some((item) => item.value === savedRole) ? savedRole : 'super_admin';
+  const savedRole = window.localStorage.getItem(ROLE_STORAGE_KEY);
+  if (savedRole && demoRoles.some((item) => item.value === savedRole)) {
+    return savedRole as UserRole;
+  }
+  return 'super_admin';
 }
 
 function AccessDenied({ role }: { role: UserRole }) {
@@ -41,7 +44,7 @@ function AccessDenied({ role }: { role: UserRole }) {
 
 function LoginPage({ role, onRoleChange, onLogin }: { role: UserRole; onRoleChange: (role: UserRole) => void; onLogin: (email: string, password: string) => Promise<void> }) {
   const [email, setEmail] = useState('admin@coderoute.gov.gn');
-  const [password, setPassword] = useState('password123');
+  const [password, setPassword] = useState('');
   const [status, setStatus] = useState<string | null>(null);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {

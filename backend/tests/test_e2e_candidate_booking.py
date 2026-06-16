@@ -3,13 +3,14 @@ from uuid import uuid4
 
 from fastapi.testclient import TestClient
 
-from app.db.session import SessionLocal
+from app.db.session import SessionLocal, init_db
 from app.main import app
 from app.models_center import Center
 from app.models_session import ExamSession
 
 
 def _seed_center_and_session() -> tuple[str, str, str]:
+    init_db()
     db = SessionLocal()
     suffix = uuid4().hex[:8]
     try:
