@@ -9,8 +9,10 @@ def build_convocation_payload(booking: object, candidate: object, session: objec
     return {
         "title": "Convocation examen CodeRoute Guinee",
         "reference": booking.reference,
+        "booking_reference": booking.reference,
         "candidate": {
             "id": candidate.id,
+            "reference": candidate.reference,
             "full_name": f"{candidate.first_name} {candidate.last_name}",
             "identity_number": candidate.identity_number,
             "phone": candidate.phone,
@@ -23,6 +25,7 @@ def build_convocation_payload(booking: object, candidate: object, session: objec
         },
         "center": {
             "id": center.id,
+            "code": center.code,
             "name": center.name,
             "city": center.city,
             "address": center.address,
