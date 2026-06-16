@@ -115,7 +115,10 @@ def test_exam_question_trace_is_created_and_used_for_scoring() -> None:
         assert len(trace["question_ids"]) == trace["question_count"]
         assert {question["id"] for question in created_questions}.issubset(set(trace["question_ids"]))
 
-        answers = {question_id: "A" for question_id in trace["question_ids"]}
+        active_questions_response = client.get("/api/v1/questions")
+        assert active_questions_response.status_code == 200
+        active_answer_key = {question["id"]: question["correct_answer"] for question in active_questions_response.json()}
+        answers = {question_id: active_answer_key.get(question_id, "A") for question_id in trace["question_ids"]}
         submit_response = client.post(
             f"/api/v1/exams/{attempt['id']}/submit",
             json={"answers": answers},
