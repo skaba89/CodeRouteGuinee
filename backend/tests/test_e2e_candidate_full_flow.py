@@ -105,11 +105,13 @@ def test_candidate_booking_payment_entry_exam_certificate_flow() -> None:
         convocation = convocation_response.json()
         assert convocation["reference"] == booking["reference"]
         assert convocation["candidate"]["reference"] == candidate["reference"]
+        assert convocation["qr_payload"].startswith("CODEROUTE-GN")
 
         qr_response = client.get(f"/api/v1/bookings/{booking['reference']}/convocation/qr.svg")
         assert qr_response.status_code == 200
         assert "image/svg+xml" in qr_response.headers["content-type"]
-        assert "CODEROUTE-GN" in qr_response.text
+        assert qr_response.text.lstrip().startswith("<?xml")
+        assert "<svg" in qr_response.text
 
         payment_response = client.post(
             "/api/v1/payments",
