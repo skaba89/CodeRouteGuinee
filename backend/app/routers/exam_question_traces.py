@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -31,7 +31,7 @@ class ExamQuestionTraceRead(BaseModel):
     version_label: str
     selection_mode: str
     created_at: datetime
-    questions: list[TraceQuestionRead] = []
+    questions: list[TraceQuestionRead] = Field(default_factory=list)
 
     model_config = {"from_attributes": True}
 
