@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -12,9 +13,35 @@ from app.models_device_session import DeviceSession
 from app.models_exam_attempt import ExamAttempt
 from app.models_session import ExamSession
 from app.models_user import User
-from app.schemas import DeviceSessionHeartbeat, DeviceSessionRead
 
 router = APIRouter(prefix="/device-sessions", tags=["device-sessions"])
+
+
+class DeviceSessionHeartbeat(BaseModel):
+    center_id: str
+    session_id: str
+    attempt_id: str | None = None
+    device_key: str = Field(min_length=4)
+    device_label: str | None = None
+    ip_address: str | None = None
+    user_agent: str | None = None
+
+
+class DeviceSessionRead(BaseModel):
+    id: str
+    center_id: str
+    session_id: str
+    attempt_id: str | None = None
+    device_key: str
+    device_label: str | None = None
+    ip_address: str | None = None
+    user_agent: str | None = None
+    status: str
+    risk_reason: str | None = None
+    created_at: datetime
+    last_seen_at: datetime
+
+    model_config = {"from_attributes": True}
 
 
 @router.post("/heartbeat", response_model=DeviceSessionRead, status_code=status.HTTP_201_CREATED)
