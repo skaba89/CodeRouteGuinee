@@ -22,6 +22,7 @@ def init_db() -> None:
         models_device_session,
         models_exam_attempt,
         models_exam_monitoring,
+        models_exam_review,
         models_payment,
         models_question,
         models_session,
