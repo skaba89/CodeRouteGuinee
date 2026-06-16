@@ -31,6 +31,8 @@ jobs:
             test_file: tests/test_e2e_exam_monitoring_events.py
           - name: manual-review-decisions
             test_file: tests/test_e2e_manual_review_decisions.py
+          - name: next-feature-69
+            test_file: tests/test_e2e_candidate_submissions.py
     name: backend-tests (${{ matrix.name }})
     steps:
       - uses: actions/checkout@v4
