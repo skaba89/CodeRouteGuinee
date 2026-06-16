@@ -132,6 +132,39 @@ class ExamCertificateVerificationRead(BaseModel):
     reason: str | None = None
 
 
+class CenterIncidentCreate(BaseModel):
+    center_id: str
+    session_id: str | None = None
+    attempt_id: str | None = None
+    incident_type: str = "technical_issue"
+    severity: str = "medium"
+    description: str = Field(min_length=5)
+
+
+class CenterIncidentResolveRequest(BaseModel):
+    resolution_notes: str = Field(min_length=5)
+    allow_retake: bool = False
+
+
+class CenterIncidentRead(BaseModel):
+    id: str
+    center_id: str
+    session_id: str | None = None
+    attempt_id: str | None = None
+    incident_type: str
+    severity: str
+    status: str
+    description: str
+    resolution_notes: str | None = None
+    reported_by_id: str | None = None
+    resolved_by_id: str | None = None
+    new_attempt_id: str | None = None
+    created_at: datetime
+    resolved_at: datetime | None = None
+
+    model_config = {"from_attributes": True}
+
+
 class BookingCreate(BaseModel):
     candidate_id: str
     session_id: str
