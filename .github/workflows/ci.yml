@@ -32,7 +32,18 @@ jobs:
         run: pip install -q -r requirements.txt
       - name: Run backend tests
         working-directory: backend
-        run: pytest -q --tb=short --disable-warnings ${{ matrix.test_file }}
+        run: |
+          set +e
+          pytest -q --tb=short --disable-warnings ${{ matrix.test_file }} > pytest-output.txt 2>&1
+          status=$?
+          cat pytest-output.txt
+          exit $status
+      - name: Upload backend test output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytest-${{ matrix.name }}
+          path: backend/pytest-output.txt
 
   frontend-build:
     runs-on: ubuntu-latest
