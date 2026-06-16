@@ -29,6 +29,8 @@ jobs:
             test_file: tests/test_e2e_exam_certificate.py
           - name: exam-monitoring-events
             test_file: tests/test_e2e_exam_monitoring_events.py
+          - name: manual-review-decisions
+            test_file: tests/test_e2e_manual_review_decisions.py
     name: backend-tests (${{ matrix.name }})
     steps:
       - uses: actions/checkout@v4
