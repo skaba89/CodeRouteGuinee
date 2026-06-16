@@ -19,6 +19,8 @@ jobs:
             test_file: tests/test_e2e_candidate_booking.py
           - name: candidate-full-flow
             test_file: tests/test_e2e_candidate_full_flow.py
+          - name: center-incident-recovery
+            test_file: tests/test_e2e_center_incident_recovery.py
           - name: exam-certificate
             test_file: tests/test_e2e_exam_certificate.py
     name: backend-tests (${{ matrix.name }})
@@ -33,7 +35,7 @@ jobs:
       - name: Run backend tests
         working-directory: backend
         env:
-          PYTHONPATH: ${{ github.workspace }}/backend
+          PYTHONPATH: .
         run: |
           set +e
           pytest -q --tb=short --disable-warnings ${{ matrix.test_file }} > pytest-output.txt 2>&1
