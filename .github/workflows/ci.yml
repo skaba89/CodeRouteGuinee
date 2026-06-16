@@ -9,6 +9,19 @@ on:
 jobs:
   backend-tests:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: admin-finance
+            test_file: tests/test_e2e_admin_finance.py
+          - name: candidate-booking
+            test_file: tests/test_e2e_candidate_booking.py
+          - name: candidate-full-flow
+            test_file: tests/test_e2e_candidate_full_flow.py
+          - name: exam-certificate
+            test_file: tests/test_e2e_exam_certificate.py
+    name: backend-tests (${{ matrix.name }})
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -19,7 +32,7 @@ jobs:
         run: pip install -r requirements.txt
       - name: Run backend tests
         working-directory: backend
-        run: pytest
+        run: pytest ${{ matrix.test_file }}
 
   frontend-build:
     runs-on: ubuntu-latest
