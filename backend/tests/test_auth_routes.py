@@ -61,3 +61,19 @@ def test_privileged_registration_can_require_bootstrap_token() -> None:
             assert allowed_response.json()["role"] == "admin"
     finally:
         auth.settings.admin_registration_token = previous_token
+
+
+def test_register_rejects_unknown_role() -> None:
+    with TestClient(app) as client:
+        suffix = str(uuid4())[:8]
+        response = client.post(
+            "/api/v1/auth/register",
+            json={
+                "email": f"unknown-role-{suffix}@coderoute.gn",
+                "full_name": "Unknown Role",
+                "password": "StrongPass123",
+                "role": "root",
+            },
+        )
+
+    assert response.status_code == 422

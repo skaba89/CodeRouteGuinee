@@ -119,7 +119,11 @@ export type PaymentResult = {
   message?: string;
 };
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
+function normalizeApiBaseUrl(value: string): string {
+  return value.replace(/\/api\/v1\/?$/, '').replace(/\/$/, '');
+}
+
+const API_BASE_URL = normalizeApiBaseUrl(import.meta.env.VITE_API_BASE_URL ?? import.meta.env.VITE_API_URL ?? 'http://localhost:8000');
 
 function buildPaymentQuery(filters: PaymentFilters = {}): string {
   const query = new URLSearchParams();
