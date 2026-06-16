@@ -32,11 +32,11 @@ function getInitialRole(): UserRole {
 function AccessDenied({ role }: { role: UserRole }) {
   return (
     <section className="screen access-denied">
-      <p className="eyebrow dark">Accès restreint</p>
-      <h2>Page non autorisée pour ce rôle</h2>
-      <p>Le rôle actif <strong>{role}</strong> ne dispose pas des permissions nécessaires pour consulter cette page.</p>
+      <p className="eyebrow dark">Acces restreint</p>
+      <h2>Page non autorisee pour ce role</h2>
+      <p>Le role actif <strong>{role}</strong> ne dispose pas des permissions necessaires pour consulter cette page.</p>
       <div className="actions result-actions">
-        <a href="#/">Retour à l’accueil</a>
+        <a href="#/">Retour accueil</a>
       </div>
     </section>
   );
@@ -52,17 +52,17 @@ function LoginPage({ role, onRoleChange, onLogin }: { role: UserRole; onRoleChan
     setStatus('Connexion en cours...');
     try {
       await onLogin(email, password);
-      setStatus('Connexion réussie. Redirection...');
+      setStatus('Connexion reussie. Redirection...');
     } catch {
-      setStatus('Connexion impossible avec ces identifiants. Vérifiez le compte ou utilisez le mode démo.');
+      setStatus('Connexion impossible avec ces identifiants. Verifie le compte ou utilise encore le mode demo.');
     }
   }
 
   return (
     <section className="screen login-screen">
-      <p className="eyebrow dark">Connexion sécurisée</p>
-      <h2>Accéder à CodeRoute Guinée</h2>
-      <p>Connexion réelle via JWT ou sélection d’un rôle de démonstration pendant la phase MVP.</p>
+      <p className="eyebrow dark">Connexion</p>
+      <h2>Acceder a CodeRoute Guinee</h2>
+      <p>Connexion reelle via JWT ou selection de role de demonstration pendant la phase MVP.</p>
       <form className="login-form" onSubmit={handleSubmit}>
         <input value={email} onChange={(event) => setEmail(event.target.value)} placeholder="Email" type="email" />
         <input value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Mot de passe" type="password" />
@@ -77,7 +77,7 @@ function LoginPage({ role, onRoleChange, onLogin }: { role: UserRole; onRoleChan
         ))}
       </div>
       <div className="actions result-actions">
-        <a href="#/">Continuer avec ce rôle</a>
+        <a href="#/">Continuer avec ce role</a>
       </div>
     </section>
   );
@@ -128,30 +128,21 @@ export default function App() {
 
   return (
     <main className="app-shell">
-      <nav className="top-nav" aria-label="Navigation principale">
-        <a href="#/" className="brand-link" aria-label="Retour à l’accueil CodeRoute Guinée">
-          <span className="brand-logo">CR</span>
-          <span className="brand-text">
-            <strong>CodeRoute Guinée</strong>
-            <small>Plateforme nationale d’examen</small>
-          </span>
-        </a>
-
-        <div className="nav-links">
+      <nav className="top-nav">
+        <strong><a href="#/" className="brand-link">CodeRoute Guinee</a></strong>
+        <div>
           {visibleNavigation.map((item) => {
             const itemRoute = item.href.replace('#/', '') || 'home';
             return <a key={item.href} href={item.href} className={route === itemRoute ? 'active' : ''}>{item.label}</a>;
           })}
           <a href="#/login" className={route === 'login' ? 'active' : ''}>Connexion</a>
         </div>
-
         <div className="session-panel">
           <span>Session : {currentRoleLabel}</span>
-          <button onClick={handleLogout}>Déconnexion</button>
+          <button onClick={handleLogout}>Deconnexion</button>
         </div>
-
         <label className="role-switcher">
-          Rôle
+          Role
           <select value={role} onChange={(event) => setRole(event.target.value as UserRole)}>
             {demoRoles.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
           </select>
