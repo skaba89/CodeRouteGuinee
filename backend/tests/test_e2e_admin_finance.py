@@ -2,12 +2,13 @@ from uuid import uuid4
 
 from fastapi.testclient import TestClient
 
-from app.db.session import SessionLocal
+from app.db.session import SessionLocal, init_db
 from app.main import app
 from app.models_payment import Payment
 
 
 def _admin_headers(client: TestClient) -> dict[str, str]:
+    init_db()
     suffix = uuid4().hex
     email = f"admin-e2e-{suffix}@coderoute.local"
     password = "AdminPass123!"
@@ -33,6 +34,7 @@ def _admin_headers(client: TestClient) -> dict[str, str]:
 
 
 def _seed_payments(provider: str) -> None:
+    init_db()
     db = SessionLocal()
     try:
         db.add_all(
