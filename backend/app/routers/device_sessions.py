@@ -9,6 +9,7 @@ from app.db.session import get_db
 from app.deps import require_roles
 from app.models_audit import AuditLog
 from app.models_center import Center
+from app.models_center_station import CenterStation
 from app.models_device_session import DeviceSession
 from app.models_exam_attempt import ExamAttempt
 from app.models_session import ExamSession
@@ -42,6 +43,29 @@ class DeviceSessionRead(BaseModel):
     last_seen_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+def station_risk_reason(db: Session, center_id: str, device_key: str) -> tuple[str | None, str | None]:
+    has_active_registry = db.scalar(
+        select(CenterStation.id).where(
+            CenterStation.center_id == center_id,
+            CenterStation.status == "active",
+        )
+    )
+    if not has_active_registry:
+        return None, None
+
+    station = db.scalar(
+        select(CenterStation).where(
+            CenterStation.center_id == center_id,
+            CenterStation.device_key == device_key,
+        )
+    )
+    if not station:
+        return "unregistered_center_station", None
+    if station.status != "active":
+        return "inactive_center_station", station.id
+    return None, station.id
 
 
 @router.post("/heartbeat", response_model=DeviceSessionRead, status_code=status.HTTP_201_CREATED)
@@ -95,12 +119,17 @@ def register_device_heartbeat(
     )
     status_label = "active"
     risk_reason = None
+    station_reason, center_station_id = station_risk_reason(db, center.id, payload.device_key)
+    if station_reason:
+        status_label = "suspicious"
+        risk_reason = station_reason
+
     if duplicate and duplicate.attempt_id != payload.attempt_id:
         duplicate.status = "suspicious"
         duplicate.risk_reason = "same_device_key_used_for_multiple_attempts"
         duplicate.last_seen_at = now
         status_label = "suspicious"
-        risk_reason = "same_device_key_used_for_multiple_attempts"
+        risk_reason = risk_reason or "same_device_key_used_for_multiple_attempts"
         db.add(duplicate)
 
     device_session = DeviceSession(
@@ -119,8 +148,10 @@ def register_device_heartbeat(
     db.flush()
 
     action = "device_session.heartbeat"
-    if status_label == "suspicious":
+    if status_label == "suspicious" and risk_reason == "same_device_key_used_for_multiple_attempts":
         action = "device_session.suspicious_duplicate"
+    elif status_label == "suspicious":
+        action = "device_session.station_alert"
     db.add(
         AuditLog(
             actor_id=current_user.id,
@@ -136,6 +167,7 @@ def register_device_heartbeat(
                 "status": status_label,
                 "risk_reason": risk_reason,
                 "duplicate_device_session_id": duplicate.id if duplicate else None,
+                "center_station_id": center_station_id,
             },
         )
     )
