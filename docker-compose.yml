@@ -15,24 +15,13 @@ services:
       test: ["CMD-SHELL", "pg_isready -U coderoute -d coderoute"]
       interval: 10s
       timeout: 5s
-      retries: 10
-    networks:
-      - coderoute-network
+      retries: 5
 
   backend:
     build: ./backend
     container_name: coderoute-backend
     env_file:
       - .env
-    environment:
-      # Important: inside Docker, the database hostname is the compose service name `postgres`.
-      # This override prevents local .env values such as localhost/db from breaking seed scripts.
-      PROJECT_NAME: ${PROJECT_NAME:-CodeRoute Guinée API}
-      API_V1_PREFIX: ${API_V1_PREFIX:-/api/v1}
-      SECRET_KEY: ${SECRET_KEY:-change-me-in-production}
-      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-120}
-      DATABASE_URL: postgresql+psycopg://coderoute:coderoute@postgres:5432/coderoute
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}
     ports:
       - "8000:8000"
     volumes:
@@ -40,34 +29,17 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)\" || exit 1"]
-      interval: 15s
-      timeout: 5s
-      retries: 8
-      start_period: 25s
-    networks:
-      - coderoute-network
 
   frontend:
     build: ./frontend
     container_name: coderoute-frontend
-    environment:
-      VITE_API_URL: ${VITE_API_URL:-http://localhost:8000/api/v1}
     ports:
       - "5173:5173"
     volumes:
       - ./frontend:/app
       - /app/node_modules
     depends_on:
-      backend:
-        condition: service_healthy
-    networks:
-      - coderoute-network
+      - backend
 
 volumes:
   postgres_data:
-
-networks:
-  coderoute-network:
-    driver: bridge
