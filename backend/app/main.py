@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
 from app.db.session import init_db
-from app.routers import auth, bookings, candidates, candidate_submissions, center_incidents, centers, dashboard, device_sessions, documents, entries, exam_monitoring, exam_reviews, exams, payment_reconciliation, payments, questions, sessions, supervision
+from app.routers import auth, bookings, candidates, candidate_submissions, center_incidents, center_stations, centers, dashboard, device_sessions, documents, entries, exam_monitoring, exam_reviews, exams, payment_reconciliation, payments, questions, sessions, supervision
 
 settings = get_settings()
 
@@ -20,7 +20,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 app = FastAPI(
     title=settings.project_name,
     description="Plateforme nationale d'examen du code de la route en Guinee",
-    version="0.12.0",
+    version="0.13.0",
     lifespan=lifespan,
 )
 
@@ -50,6 +50,7 @@ app.include_router(payments.router, prefix=settings.api_v1_prefix)
 app.include_router(payment_reconciliation.router, prefix=settings.api_v1_prefix)
 app.include_router(entries.router, prefix=settings.api_v1_prefix)
 app.include_router(center_incidents.router, prefix=settings.api_v1_prefix)
+app.include_router(center_stations.router, prefix=settings.api_v1_prefix)
 app.include_router(device_sessions.router, prefix=settings.api_v1_prefix)
 app.include_router(exam_monitoring.router, prefix=settings.api_v1_prefix)
 app.include_router(exam_reviews.router, prefix=settings.api_v1_prefix)
