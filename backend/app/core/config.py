@@ -6,6 +6,7 @@ class Settings(BaseSettings):
     project_name: str = "CodeRoute Guinee API"
     api_v1_prefix: str = "/api/v1"
     secret_key: str = "change-me-in-production"
+    admin_registration_token: str | None = None
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 120
     database_url: str = "sqlite:///./coderoute.db"

@@ -37,6 +37,11 @@ cp .env.example .env
 docker compose up --build
 ```
 
+Pour verrouiller la creation de comptes `admin` ou `super_admin` via `/api/v1/auth/register`,
+configurez `ADMIN_REGISTRATION_TOKEN` et envoyez la meme valeur dans l'en-tete
+`X-Admin-Registration-Token` lors des creations autorisees. Ce jeton doit etre active
+en staging et production.
+
 Endpoints :
 
 - API : http://localhost:8000
