@@ -670,11 +670,34 @@ export function AdminPage() {
     ['Identites', Object.values(institutionalReport.identity_checks_by_status).reduce((sum, value) => sum + value, 0)],
     ['Habilitations', Object.values(institutionalReport.authorizations_by_status).reduce((sum, value) => sum + value, 0)],
   ];
+  const adminSections = [
+    { href: '#centres', label: 'Centres' },
+    { href: '#identites', label: 'Identites' },
+    { href: '#questions', label: 'Questions' },
+    { href: '#habilitations', label: 'Habilitations' },
+    { href: '#rapport', label: 'Rapport' },
+    { href: '#finance', label: 'Finance' },
+    { href: '#audit', label: 'Audit' },
+  ];
 
   return (
     <section className="panel admin-panel">
-      <p className="eyebrow dark">Administration nationale</p>
-      <h2>Supervision centres, entrees, examens et finances</h2>
+      <div className="admin-hero">
+        <div>
+          <p className="eyebrow dark">Administration nationale</p>
+          <strong className="admin-kicker">Console institutionnelle CodeRoute Guinee</strong>
+          <h2>Supervision centres, entrees, examens et finances</h2>
+          <p>Vue de pilotage pour suivre les centres, les candidats, les questions officielles, les habilitations, les finances et les preuves d'audit.</p>
+        </div>
+        <div className="admin-score-card">
+          <span>Maturite institutionnelle</span>
+          <strong>{institutionalReport.readiness_score}%</strong>
+          <small>{institutionalReport.readiness_label}</small>
+        </div>
+      </div>
+      <div className="admin-section-nav" aria-label="Sections administration">
+        {adminSections.map((section) => <a key={section.href} href={section.href}>{section.label}</a>)}
+      </div>
       <div className="actions result-actions admin-actions">
         <button onClick={handleDashboardCsvExport} disabled={isExportingCsv}>{isExportingCsv ? 'Export...' : 'Exporter le dashboard CSV'}</button>
         <button onClick={handleInstitutionalReportCsvExport} disabled={isExportingInstitutionalReport}>{isExportingInstitutionalReport ? 'Export...' : 'Exporter le rapport institutionnel'}</button>
@@ -698,36 +721,39 @@ export function AdminPage() {
         <article><strong>{formatCurrency(paymentSummary.total_amount_gnf)}</strong><span>GNF encaisses</span></article>
         <article><strong>{formatNumber(paymentSummary.total_count)}</strong><span>Paiements</span></article>
       </div>
-      <div className="center-governance-panel">
+      <div id="centres" className="center-governance-panel admin-section">
         <h3>Gouvernance des centres agrees</h3>
         <p>Suivi administratif des centres : audit initial, activation, accreditation et suspension.</p>
         {centerStatus && <p className={centerStatus.includes('impossible') ? 'form-error' : 'login-status'}>{centerStatus}</p>}
-        <table>
-          <thead><tr><th>Code</th><th>Centre</th><th>Ville</th><th>Capacite</th><th>Statut</th><th>Decision</th></tr></thead>
-          <tbody>
-            {centers.slice(0, 8).map((center) => (
-              <tr key={center.id}>
-                <td>{center.code}</td>
-                <td>{center.name}</td>
-                <td>{center.city}</td>
-                <td>{center.capacity}</td>
-                <td><span className="badge">{center.status}</span></td>
-                <td>
-                  <div className="table-actions">
-                    <button onClick={() => handleCenterStatus(center.id, 'accredited', 'Accreditation institutionnelle validee')}>Accrediter</button>
-                    <button onClick={() => handleCenterStatus(center.id, 'suspended', 'Suspension administrative pour controle')}>Suspendre</button>
-                    <button onClick={() => handleCenterStatus(center.id, 'pending_audit', 'Retour en audit administratif')}>Audit</button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div className="table-shell">
+          <table>
+            <thead><tr><th>Code</th><th>Centre</th><th>Ville</th><th>Capacite</th><th>Statut</th><th>Decision</th></tr></thead>
+            <tbody>
+              {centers.slice(0, 8).map((center) => (
+                <tr key={center.id}>
+                  <td>{center.code}</td>
+                  <td>{center.name}</td>
+                  <td>{center.city}</td>
+                  <td>{center.capacity}</td>
+                  <td><span className="badge">{center.status}</span></td>
+                  <td>
+                    <div className="table-actions">
+                      <button onClick={() => handleCenterStatus(center.id, 'accredited', 'Accreditation institutionnelle validee')}>Accrediter</button>
+                      <button onClick={() => handleCenterStatus(center.id, 'suspended', 'Suspension administrative pour controle')}>Suspendre</button>
+                      <button onClick={() => handleCenterStatus(center.id, 'pending_audit', 'Retour en audit administratif')}>Audit</button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
-      <div className="identity-panel">
+      <div id="identites" className="identity-panel admin-section">
         <h3>Verification identite candidat</h3>
         <p>Controle administratif des pieces avant convocation, entree en centre et emission des attestations.</p>
         {identityStatus && <p className={identityStatus.includes('impossible') || identityStatus.includes('Mode demo') ? 'form-error' : 'login-status'}>{identityStatus}</p>}
+        <div className="table-shell">
         <table>
           <thead><tr><th>Candidat</th><th>Document</th><th>Reference</th><th>Statut</th><th>Date</th><th>Decision</th></tr></thead>
           <tbody>
@@ -749,11 +775,13 @@ export function AdminPage() {
             ))}
           </tbody>
         </table>
+        </div>
       </div>
-      <div className="question-governance-panel">
+      <div id="questions" className="question-governance-panel admin-section">
         <h3>Banque nationale de questions</h3>
         <p>Publication, suspension et relecture officielle des questions utilisees dans les examens.</p>
         {questionGovernanceStatus && <p className={questionGovernanceStatus.includes('impossible') || questionGovernanceStatus.includes('Mode demo') ? 'form-error' : 'login-status'}>{questionGovernanceStatus}</p>}
+        <div className="table-shell">
         <table>
           <thead><tr><th>Categorie</th><th>Question</th><th>Statut</th><th>Active</th><th>Decision</th></tr></thead>
           <tbody>
@@ -774,8 +802,9 @@ export function AdminPage() {
             ))}
           </tbody>
         </table>
+        </div>
       </div>
-      <div className="authorization-panel">
+      <div id="habilitations" className="authorization-panel admin-section">
         <h3>Habilitations institutionnelles</h3>
         <p>Registre des conventions, autorisations ministerielles et cadres de validite du dispositif.</p>
         {authorizationStatus && <p className={authorizationStatus.includes('impossible') || authorizationStatus.includes('Mode demo') ? 'form-error' : 'login-status'}>{authorizationStatus}</p>}
@@ -786,6 +815,7 @@ export function AdminPage() {
           <label>Perimetre<input value={authorizationForm.scope} onChange={(event) => setAuthorizationForm((current) => ({ ...current, scope: event.target.value }))} /></label>
           <button type="submit">Enregistrer habilitation</button>
         </form>
+        <div className="table-shell">
         <table>
           <thead><tr><th>Reference</th><th>Autorite</th><th>Titre</th><th>Statut</th><th>Validite</th><th>Decision</th></tr></thead>
           <tbody>
@@ -807,8 +837,9 @@ export function AdminPage() {
             ))}
           </tbody>
         </table>
+        </div>
       </div>
-      <div className="institutional-panel">
+      <div className="institutional-panel admin-section">
         <div className="institutional-header">
           <div>
             <h3>Dossier institutionnel Etat guineen</h3>
@@ -829,7 +860,7 @@ export function AdminPage() {
           ))}
         </div>
       </div>
-      <div className="institutional-report-panel">
+      <div id="rapport" className="institutional-report-panel admin-section">
         <h3>Rapport institutionnel exportable</h3>
         <p>{institutionalReport.generated_for}</p>
         <div className="metrics compact">
@@ -838,6 +869,7 @@ export function AdminPage() {
           <article><strong>{formatNumber(institutionalReport.audit_events)}</strong><span>Evenements d audit</span></article>
           <article><strong>{formatNumber(institutionalReport.recommendations.length)}</strong><span>Actions recommandees</span></article>
         </div>
+        <div className="table-shell compact-table">
         <table>
           <tbody>
             {reportRows.map(([label, value]) => (
@@ -845,13 +877,14 @@ export function AdminPage() {
             ))}
           </tbody>
         </table>
+        </div>
         <div className="recommendation-list">
           {institutionalReport.recommendations.slice(0, 3).map((recommendation) => (
             <p key={recommendation}>{recommendation}</p>
           ))}
         </div>
       </div>
-      <div className="finance-panel">
+      <div id="finance" className="finance-panel admin-section">
         <h3>Supervision financiere</h3>
         <form className="finance-filters" onSubmit={handlePaymentFiltersSubmit}>
           <label>Operateur
@@ -925,15 +958,21 @@ export function AdminPage() {
           </table>
         </div>
       </div>
-      <table>
-        <thead><tr><th>Centre</th><th>Validees</th><th>Refusees</th><th>Risque</th></tr></thead>
-        <tbody>
-          {centerRows.map((row) => (
-            <tr key={row[0]}>{row.map((cell, index) => <td key={`${row[0]}-${index}`}>{index === 3 ? <span className="badge">{cell}</span> : cell}</td>)}</tr>
-          ))}
-        </tbody>
-      </table>
-      <div className="audit-panel">
+      <div className="risk-table-panel admin-section">
+        <h3>Controle entree par centre</h3>
+        <p>Lecture rapide des validations et refus pour orienter les controles terrain.</p>
+        <div className="table-shell compact-table">
+          <table>
+            <thead><tr><th>Centre</th><th>Validees</th><th>Refusees</th><th>Risque</th></tr></thead>
+            <tbody>
+              {centerRows.map((row) => (
+                <tr key={row[0]}>{row.map((cell, index) => <td key={`${row[0]}-${index}`}>{index === 3 ? <span className="badge">{cell}</span> : cell}</td>)}</tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div id="audit" className="audit-panel admin-section">
         <h3>Journal d'audit national</h3>
         {auditStatus && <p className="form-error">{auditStatus}</p>}
         <table>
