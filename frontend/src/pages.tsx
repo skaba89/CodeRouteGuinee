@@ -1567,6 +1567,29 @@ export function AdminPage() {
 }
 
 export function ExamPage() {
+  const examQuestions = [
+    {
+      category: 'Signalisation lumineuse',
+      text: 'Que devez-vous faire face a un feu rouge fixe ?',
+      answers: ['Marquer l arret obligatoire', 'Passer si la voie est libre', 'Klaxonner puis avancer', 'Continuer a vitesse reduite'],
+    },
+    {
+      category: 'Priorite',
+      text: 'A une intersection sans panneau, quelle regle appliquez-vous ?',
+      answers: ['La priorite a droite', 'Le vehicule le plus rapide passe', 'La priorite au vehicule le plus gros', 'Le premier qui klaxonne passe'],
+    },
+    {
+      category: 'Securite routiere',
+      text: 'Quand devez-vous attacher votre ceinture ?',
+      answers: ['Avant tout demarrage', 'Uniquement sur autoroute', 'Seulement la nuit', 'Apres avoir atteint 50 km/h'],
+    },
+  ];
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [selectedAnswers, setSelectedAnswers] = useState<Record<number, number>>({ 0: 0 });
+  const currentQuestion = examQuestions[currentQuestionIndex];
+  const displayQuestionNumber = currentQuestionIndex + 12;
+  const answeredCount = Object.keys(selectedAnswers).length;
+  const progress = Math.round((displayQuestionNumber / 40) * 100);
   const examChecks = [
     ['Identite', 'Verifiee'],
     ['Poste', 'CTR-KALOUM-12'],
@@ -1585,23 +1608,30 @@ export function ExamPage() {
         <p className="eyebrow dark">Examen securise</p>
         <div className="exam-header">
           <div>
-            <h2>Question 12 / 40</h2>
+            <h2>Question {displayQuestionNumber} / 40</h2>
             <p>Mode centre agree avec surveillance, minuterie et trace d'audit de la tentative.</p>
           </div>
           <span className="badge ok">Tentative active</span>
         </div>
-        <div className="exam-progress" aria-label="Progression examen"><span style={{ width: '30%' }} /></div>
+        <div className="exam-progress" aria-label="Progression examen"><span style={{ width: `${progress}%` }} /></div>
         <article className="question-card">
-          <span className="question-category">Signalisation lumineuse</span>
-          <p className="question">Que devez-vous faire face a un feu rouge fixe ?</p>
-          <div className="answer selected"><strong>A.</strong> Marquer l'arret obligatoire</div>
-          <div className="answer"><strong>B.</strong> Passer si la voie est libre</div>
-          <div className="answer"><strong>C.</strong> Klaxonner puis avancer</div>
-          <div className="answer"><strong>D.</strong> Continuer a vitesse reduite</div>
+          <span className="question-category">{currentQuestion.category}</span>
+          <p className="question">{currentQuestion.text}</p>
+          {currentQuestion.answers.map((answer, index) => (
+            <button
+              type="button"
+              className={selectedAnswers[currentQuestionIndex] === index ? 'answer selected' : 'answer'}
+              key={answer}
+              onClick={() => setSelectedAnswers((current) => ({ ...current, [currentQuestionIndex]: index }))}
+            >
+              <strong>{String.fromCharCode(65 + index)}.</strong> {answer}
+            </button>
+          ))}
         </article>
         <div className="exam-navigation">
-          <button className="secondary-button">Question precedente</button>
-          <button>Question suivante</button>
+          <button className="secondary-button" disabled={currentQuestionIndex === 0} onClick={() => setCurrentQuestionIndex((index) => Math.max(0, index - 1))}>Question precedente</button>
+          <span>{answeredCount} reponse(s) saisie(s)</span>
+          <button disabled={currentQuestionIndex === examQuestions.length - 1} onClick={() => setCurrentQuestionIndex((index) => Math.min(examQuestions.length - 1, index + 1))}>Question suivante</button>
         </div>
       </div>
       <aside className="timer-card exam-control-card">

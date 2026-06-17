@@ -36,7 +36,7 @@ test.describe('CodeRoute Guinee UI smoke tests', () => {
     await page.goto('/#/login');
 
     await page.getByRole('button', { name: 'Candidat' }).click();
-    await page.getByRole('link', { name: /Continuer avec ce r(o|ô)le/ }).click();
+    await page.getByRole('link', { name: /Continuer avec ce r.le/ }).click();
 
     await expect(page.getByText('Session : Candidat')).toBeVisible();
     await expect(page.getByRole('link', { name: 'Candidat' })).toBeVisible();
@@ -52,7 +52,11 @@ test.describe('CodeRoute Guinee UI smoke tests', () => {
 
     await page.getByRole('link', { name: 'Examen' }).click();
     await expect(page.getByRole('heading', { name: /Question 12 \/ 40/ })).toBeVisible();
-    await expect(page.getByText(/Examen s(e|é)curis(e|é)/)).toBeVisible();
+    await expect(page.getByText(/Examen s.curis./)).toBeVisible();
+    await page.getByRole('button', { name: 'Question suivante' }).click();
+    await expect(page.getByRole('heading', { name: /Question 13 \/ 40/ })).toBeVisible();
+    await page.getByRole('button', { name: /La priorite a droite/ }).click();
+    await expect(page.getByText('2 reponse(s) saisie(s)')).toBeVisible();
 
     await page.getByRole('link', { name: /R.sultats/ }).click();
     await expect(page.getByRole('heading', { name: 'Releve officiel du code de la route' })).toBeVisible();
