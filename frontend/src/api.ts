@@ -252,6 +252,29 @@ function normalizeApiBaseUrl(value: string): string {
 
 const API_BASE_URL = normalizeApiBaseUrl(import.meta.env.VITE_API_BASE_URL ?? import.meta.env.VITE_API_URL ?? 'http://localhost:8000');
 
+export class ApiError extends Error {
+  status: number;
+
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+  }
+}
+
+async function buildApiError(response: Response): Promise<ApiError> {
+  let message = `API error ${response.status}`;
+  try {
+    const payload = await response.json();
+    if (typeof payload.detail === 'string') {
+      message = payload.detail;
+    }
+  } catch {
+    // Keep the HTTP fallback when the backend does not return JSON.
+  }
+  return new ApiError(response.status, message);
+}
+
 function buildPaymentQuery(filters: PaymentFilters = {}): string {
   const query = new URLSearchParams();
   if (filters.provider) query.set('provider', filters.provider);
@@ -266,7 +289,7 @@ function buildPaymentQuery(filters: PaymentFilters = {}): string {
 async function getJson<T>(path: string): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`);
   if (!response.ok) {
-    throw new Error(`API error ${response.status}`);
+    throw await buildApiError(response);
   }
   return response.json() as Promise<T>;
 }
@@ -274,7 +297,7 @@ async function getJson<T>(path: string): Promise<T> {
 async function getPrivateJson<T>(path: string): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, { headers: getAuthHeaders() });
   if (!response.ok) {
-    throw new Error(`API error ${response.status}`);
+    throw await buildApiError(response);
   }
   return response.json() as Promise<T>;
 }
@@ -286,7 +309,7 @@ async function postJson<T>(path: string, body: unknown): Promise<T> {
     body: JSON.stringify(body),
   });
   if (!response.ok) {
-    throw new Error(`API error ${response.status}`);
+    throw await buildApiError(response);
   }
   return response.json() as Promise<T>;
 }
@@ -307,7 +330,7 @@ async function postPrivateJson<T>(path: string, body: unknown): Promise<T> {
     body: JSON.stringify(body),
   });
   if (!response.ok) {
-    throw new Error(`API error ${response.status}`);
+    throw await buildApiError(response);
   }
   return response.json() as Promise<T>;
 }
@@ -319,7 +342,7 @@ async function patchPrivateJson<T>(path: string, body: unknown): Promise<T> {
     body: JSON.stringify(body),
   });
   if (!response.ok) {
-    throw new Error(`API error ${response.status}`);
+    throw await buildApiError(response);
   }
   return response.json() as Promise<T>;
 }
@@ -327,7 +350,7 @@ async function patchPrivateJson<T>(path: string, body: unknown): Promise<T> {
 async function downloadProtectedCsv(url: string, filename: string): Promise<void> {
   const response = await fetch(url, { headers: getAuthHeaders() });
   if (!response.ok) {
-    throw new Error(`API error ${response.status}`);
+    throw await buildApiError(response);
   }
   const blob = await response.blob();
   const objectUrl = window.URL.createObjectURL(blob);

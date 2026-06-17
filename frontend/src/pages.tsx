@@ -308,6 +308,10 @@ function sanitizePaymentFilters(filters: PaymentFilters): PaymentFilters {
   };
 }
 
+function getActionErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message ? error.message : fallback;
+}
+
 export function HomePage() {
   const [dashboard, setDashboard] = useState<DashboardData>(fallbackDashboard);
   const [readiness, setReadiness] = useState<OperationalReadiness>(fallbackOperationalReadiness);
@@ -465,7 +469,7 @@ export function CandidatePage() {
       const result = await createPayment({ booking_reference: bookingReference, amount_gnf: amount, provider, phone });
       setPaymentResult(result);
     } catch (error) {
-      setPaymentError("Impossible de traiter le paiement. Verifiez que l'API est demarree.");
+      setPaymentError(getActionErrorMessage(error, "Impossible de traiter le paiement. Verifiez que l'API est demarree."));
     } finally {
       setIsPaying(false);
     }
@@ -544,7 +548,7 @@ export function CenterPage() {
       const result = await validateEntry({ reference: entryReference, verification_code: verificationCode, center_code: centerCode });
       setEntryResult(result);
     } catch (error) {
-      setEntryError("Impossible de valider l'entree. Verifiez que l'API est demarree.");
+      setEntryError(getActionErrorMessage(error, "Impossible de valider l'entree. Verifiez que l'API est demarree."));
     } finally {
       setIsSubmittingEntry(false);
     }
