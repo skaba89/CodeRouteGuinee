@@ -1233,18 +1233,63 @@ export function AdminPage() {
 }
 
 export function ExamPage() {
+  const examChecks = [
+    ['Identite', 'Verifiee'],
+    ['Poste', 'CTR-KALOUM-12'],
+    ['Session', 'GN-SESSION-2026-000014'],
+    ['Reseau', 'Stable'],
+  ];
+  const monitoringEvents = [
+    ['08:42', 'Connexion poste autorisee', 'ok'],
+    ['08:51', 'Questionnaire charge et scelle', 'ok'],
+    ['09:03', 'Aucune alerte de comportement', 'ok'],
+  ];
+
   return (
     <section className="screen exam-screen">
-      <div>
+      <div className="exam-workspace">
         <p className="eyebrow dark">Examen securise</p>
-        <h2>Question 12 / 40</h2>
-        <p>Mode centre agree avec surveillance, minuterie et trace d'audit de la tentative.</p>
-        <p className="question">Que devez-vous faire face a un feu rouge fixe ?</p>
-        <div className="answer selected">A. Marquer l'arret obligatoire</div>
-        <div className="answer">B. Passer si la voie est libre</div>
-        <div className="answer">C. Klaxonner puis avancer</div>
+        <div className="exam-header">
+          <div>
+            <h2>Question 12 / 40</h2>
+            <p>Mode centre agree avec surveillance, minuterie et trace d'audit de la tentative.</p>
+          </div>
+          <span className="badge ok">Tentative active</span>
+        </div>
+        <div className="exam-progress" aria-label="Progression examen"><span style={{ width: '30%' }} /></div>
+        <article className="question-card">
+          <span className="question-category">Signalisation lumineuse</span>
+          <p className="question">Que devez-vous faire face a un feu rouge fixe ?</p>
+          <div className="answer selected"><strong>A.</strong> Marquer l'arret obligatoire</div>
+          <div className="answer"><strong>B.</strong> Passer si la voie est libre</div>
+          <div className="answer"><strong>C.</strong> Klaxonner puis avancer</div>
+          <div className="answer"><strong>D.</strong> Continuer a vitesse reduite</div>
+        </article>
+        <div className="exam-navigation">
+          <button className="secondary-button">Question precedente</button>
+          <button>Question suivante</button>
+        </div>
       </div>
-      <aside className="timer-card"><span>Temps restant</span><strong>18:24</strong><p>Score requis : 35 / 40</p></aside>
+      <aside className="timer-card exam-control-card">
+        <span>Temps restant</span>
+        <strong>18:24</strong>
+        <p>Score requis : 35 / 40</p>
+        <div className="exam-check-grid">
+          {examChecks.map(([label, value]) => (
+            <div key={label}><small>{label}</small><b>{value}</b></div>
+          ))}
+        </div>
+        <div className="monitoring-feed">
+          <strong>Surveillance</strong>
+          {monitoringEvents.map(([time, label, status]) => (
+            <div className="monitoring-event" key={`${time}-${label}`}>
+              <span>{time}</span>
+              <p>{label}</p>
+              <i className={`status-dot ${status}`} />
+            </div>
+          ))}
+        </div>
+      </aside>
     </section>
   );
 }

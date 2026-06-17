@@ -628,6 +628,122 @@ tr:last-child td {
   border-radius: 20px;
 }
 
+.exam-workspace {
+  display: grid;
+  gap: 18px;
+}
+
+.exam-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.exam-progress {
+  overflow: hidden;
+  height: 12px;
+  border-radius: 999px;
+  background: #e6edf5;
+}
+
+.exam-progress span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--premium-green), var(--premium-gold));
+}
+
+.question-card {
+  display: grid;
+  gap: 12px;
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  background: #ffffff;
+}
+
+.question-category {
+  color: var(--teal);
+  font-size: 12px;
+  font-weight: 950;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.exam-navigation {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.exam-control-card {
+  display: grid;
+  gap: 16px;
+  align-content: start;
+}
+
+.exam-check-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.exam-check-grid div {
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.exam-check-grid small,
+.exam-check-grid b {
+  display: block;
+}
+
+.exam-check-grid b {
+  margin-top: 4px;
+  color: #ffffff;
+}
+
+.monitoring-feed {
+  display: grid;
+  gap: 8px;
+  margin-top: 4px;
+  text-align: left;
+}
+
+.monitoring-feed > strong {
+  color: #ffffff;
+}
+
+.monitoring-event {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.monitoring-event span,
+.monitoring-event p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.74);
+  font-size: 13px;
+}
+
+.status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--premium-gold);
+}
+
+.status-dot.ok {
+  background: var(--premium-green);
+}
+
 @media (max-width: 1180px) {
   .top-nav {
     grid-template-columns: 1fr;
