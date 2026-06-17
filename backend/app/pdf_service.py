@@ -1,15 +1,43 @@
+import qrcode
+
+
 def _escape_pdf_text(value: object) -> str:
     text = str(value).replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
     return text.encode("latin-1", "replace").decode("latin-1")
 
 
-def build_simple_pdf(title: str, lines: list[str]) -> bytes:
+def _qr_pdf_commands(payload: str, x: float = 418, y: float = 604, size: float = 118) -> list[str]:
+    qr = qrcode.QRCode(border=1)
+    qr.add_data(payload)
+    qr.make(fit=True)
+    matrix = qr.get_matrix()
+    cell = size / len(matrix)
+    commands = ["0 0 0 rg"]
+    for row_index, row in enumerate(matrix):
+        for column_index, enabled in enumerate(row):
+            if enabled:
+                cell_x = x + (column_index * cell)
+                cell_y = y + size - ((row_index + 1) * cell)
+                commands.append(f"{cell_x:.2f} {cell_y:.2f} {cell:.2f} {cell:.2f} re f")
+    return commands
+
+
+def build_simple_pdf(title: str, lines: list[str], qr_payload: str | None = None) -> bytes:
     text_lines = [title, ""] + lines
     stream_lines = ["BT", "/F1 16 Tf", "72 760 Td", "20 TL"]
     for line in text_lines:
         stream_lines.append(f"({_escape_pdf_text(line)}) Tj")
         stream_lines.append("T*")
     stream_lines.append("ET")
+    if qr_payload:
+        stream_lines.extend(_qr_pdf_commands(qr_payload))
+        stream_lines.extend([
+            "BT",
+            "/F1 9 Tf",
+            "404 590 Td",
+            "(QR verification centre) Tj",
+            "ET",
+        ])
     stream = "\n".join(stream_lines).encode("latin-1", "replace")
 
     objects = [
@@ -71,7 +99,7 @@ def build_convocation_pdf(convocation: dict) -> bytes:
         "Tout retard, substitution ou tentative de fraude peut entrainer un refus d entree.",
         "Document verifiable par le centre agree via CodeRoute Guinee.",
     ]
-    return build_simple_pdf("CodeRoute Guinee - Convocation officielle", lines)
+    return build_simple_pdf("CodeRoute Guinee - Convocation officielle", lines, qr_payload=convocation["qr_payload"])
 
 
 def build_result_certificate_pdf(candidate: dict, session: dict, center: dict, attempt: dict) -> bytes:
