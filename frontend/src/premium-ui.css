@@ -695,6 +695,90 @@ body {
   font-weight: 760;
 }
 
+.security-matrix-panel {
+  display: grid;
+  gap: 16px;
+  padding: 22px;
+  border: 1px solid rgba(6, 43, 82, 0.08);
+  border-radius: 24px;
+  background: linear-gradient(180deg, #ffffff, rgba(241, 245, 249, 0.86));
+  box-shadow: var(--premium-shadow-soft);
+}
+
+.security-matrix-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.security-matrix-header h3,
+.security-matrix-header p {
+  margin: 0;
+}
+
+.security-matrix-header h3 {
+  margin-bottom: 6px;
+}
+
+.security-matrix-header span {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  padding: 8px 12px;
+  color: #ffffff;
+  background: var(--premium-navy);
+  font-weight: 950;
+}
+
+.security-matrix-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.security-matrix-grid article {
+  display: grid;
+  gap: 12px;
+  min-height: 230px;
+  padding: 16px;
+  border: 1px solid rgba(6, 43, 82, 0.08);
+  border-radius: 20px;
+  background: #ffffff;
+}
+
+.security-matrix-grid article > div {
+  display: grid;
+  gap: 8px;
+}
+
+.security-matrix-grid strong {
+  color: var(--premium-navy);
+  font-size: 17px;
+}
+
+.security-matrix-grid span {
+  width: fit-content;
+  border-radius: 999px;
+  padding: 5px 9px;
+  color: #166534;
+  background: #dcfce7;
+  font-size: 12px;
+  font-weight: 950;
+}
+
+.security-matrix-grid p,
+.security-matrix-grid small {
+  margin: 0;
+  color: var(--premium-muted);
+  font-weight: 760;
+  line-height: 1.5;
+}
+
+.security-matrix-grid small {
+  padding-top: 10px;
+  border-top: 1px solid rgba(6, 43, 82, 0.08);
+}
+
 .roadmap-panel {
   display: grid;
   gap: 16px;
@@ -1241,6 +1325,7 @@ tr:last-child td {
   .priority-grid,
   .operational-flow-grid,
   .state-dossier-grid,
+  .security-matrix-grid,
   .roadmap-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -1287,11 +1372,13 @@ tr:last-child td {
   .priority-grid,
   .operational-flow-grid,
   .state-dossier-grid,
+  .security-matrix-grid,
   .roadmap-grid {
     grid-template-columns: 1fr;
   }
 
   .state-dossier-intro,
+  .security-matrix-header,
   .roadmap-header {
     flex-direction: column;
   }

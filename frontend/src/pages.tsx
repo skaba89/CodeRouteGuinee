@@ -836,6 +836,7 @@ export function AdminPage() {
     { href: '#questions', label: 'Questions' },
     { href: '#habilitations', label: 'Habilitations' },
     { href: '#dossier-etat', label: 'Dossier Etat' },
+    { href: '#securite', label: 'Securite' },
     { href: '#roadmap', label: 'Roadmap' },
     { href: '#rapport', label: 'Rapport' },
     { href: '#finance', label: 'Finance' },
@@ -930,6 +931,32 @@ export function AdminPage() {
     ['Semaine 3-4', 'Import des donnees officielles, formation agents et tests en centre.'],
     ['Mois 2', 'Pilote controle avec candidats reels, supervision nationale et rapport hebdomadaire.'],
     ['Mois 3', 'Bilan, corrections, extension progressive vers les regions prioritaires.'],
+  ];
+  const securityMatrix = [
+    {
+      domain: 'Acces et roles',
+      status: 'Operationnel',
+      evidence: 'Roles admin, centre et candidat avec navigation restreinte et actions sensibles tracees.',
+      next: 'Ajouter politiques de mot de passe et expiration de session en production.',
+    },
+    {
+      domain: 'Tracabilite',
+      status: 'Operationnel',
+      evidence: 'Journaux d audit consultables et exportables pour les decisions administratives.',
+      next: 'Signer les exports critiques et definir la duree de conservation officielle.',
+    },
+    {
+      domain: 'Antifraude examen',
+      status: 'A renforcer',
+      evidence: 'Controle entree, session securisee, surveillance et certificat numerique.',
+      next: 'Brancher photo candidat, camera centre et detection d anomalies.',
+    },
+    {
+      domain: 'Donnees personnelles',
+      status: 'A cadrer',
+      evidence: 'Parcours identite modelise et verification administrative presente.',
+      next: 'Formaliser consentement, minimisation, retention et acces aux donnees sensibles.',
+    },
   ];
 
   return (
@@ -1226,6 +1253,27 @@ export function AdminPage() {
               <span>{period}</span>
               <p>{detail}</p>
             </div>
+          ))}
+        </div>
+      </div>
+      <div id="securite" className="security-matrix-panel admin-section">
+        <div className="security-matrix-header">
+          <div>
+            <h3>Securite et conformite</h3>
+            <p>Matrice de controle pour cadrer les exigences avant homologation et passage en production.</p>
+          </div>
+          <span>{securityMatrix.filter((item) => item.status === 'Operationnel').length} / {securityMatrix.length} couverts</span>
+        </div>
+        <div className="security-matrix-grid">
+          {securityMatrix.map((item) => (
+            <article key={item.domain}>
+              <div>
+                <strong>{item.domain}</strong>
+                <span>{item.status}</span>
+              </div>
+              <p>{item.evidence}</p>
+              <small>{item.next}</small>
+            </article>
           ))}
         </div>
       </div>
