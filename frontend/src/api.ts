@@ -79,6 +79,15 @@ export type PaymentAlert = PaymentReconciliationItem & {
   message: string;
 };
 
+export type InstitutionalUser = {
+  id: string;
+  email: string;
+  full_name: string;
+  role: string;
+  is_active: boolean;
+  created_at: string;
+};
+
 export type InstitutionalReadinessItem = {
   pillar: string;
   status: 'ready' | 'partial' | 'todo' | string;
@@ -328,6 +337,18 @@ export function getAdminPaymentsCsvUrl(filters: PaymentFilters = {}): string {
 
 export function getAuditLogs(): Promise<AuditLogEntry[]> {
   return getPrivateJson<AuditLogEntry[]>('/api/v1/supervision/audit-logs?limit=25');
+}
+
+export function getInstitutionalUsers(): Promise<InstitutionalUser[]> {
+  return getPrivateJson<InstitutionalUser[]>('/api/v1/users?limit=50');
+}
+
+export function updateInstitutionalUserRole(userId: string, role: string, reason: string): Promise<InstitutionalUser> {
+  return patchPrivateJson<InstitutionalUser>(`/api/v1/users/${encodeURIComponent(userId)}/role`, { role, reason });
+}
+
+export function updateInstitutionalUserStatus(userId: string, isActive: boolean, reason: string): Promise<InstitutionalUser> {
+  return patchPrivateJson<InstitutionalUser>(`/api/v1/users/${encodeURIComponent(userId)}/status`, { is_active: isActive, reason });
 }
 
 export function getAdminPaymentSummary(filters: PaymentFilters = {}): Promise<PaymentSummary> {

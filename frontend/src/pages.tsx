@@ -14,6 +14,7 @@ import {
   type InstitutionalActionCenter,
   type InstitutionalReport,
   type InstitutionalReadiness,
+  type InstitutionalUser,
   type PaymentAlert,
   type PaymentFilters,
   type PaymentReconciliationItem,
@@ -41,12 +42,15 @@ import {
   getInstitutionalReport,
   getInstitutionalReadiness,
   getInstitutionalAuthorizations,
+  getInstitutionalUsers,
   getPaymentAlerts,
   getPaymentReconciliationItems,
   getQuestionGovernanceItems,
   validateEntry,
   updateCenterStatus,
   updateInstitutionalAuthorizationStatus,
+  updateInstitutionalUserRole,
+  updateInstitutionalUserStatus,
   verifyExamCertificate,
 } from './api';
 
@@ -208,6 +212,25 @@ const fallbackInstitutionalAuthorizations: InstitutionalAuthorization[] = [
     title: 'Cadre de supervision des centres agrees',
     scope: 'Habilitation pour le suivi audit, suspension et accreditation des centres.',
     status: 'pending_signature',
+    created_at: new Date().toISOString(),
+  },
+];
+
+const fallbackInstitutionalUsers: InstitutionalUser[] = [
+  {
+    id: 'demo-user-1',
+    email: 'admin@coderoute.gov.gn',
+    full_name: 'Administrateur National CodeRoute',
+    role: 'super_admin',
+    is_active: true,
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: 'demo-user-2',
+    email: 'centre.kaloum@coderoute.gov.gn',
+    full_name: 'Responsable Centre Kaloum',
+    role: 'center',
+    is_active: true,
     created_at: new Date().toISOString(),
   },
 ];
@@ -443,6 +466,8 @@ export function AdminPage() {
     scope: 'Autorisation pilote pour la digitalisation des examens du code de la route.',
   });
   const [institutionalReadiness, setInstitutionalReadiness] = useState<InstitutionalReadiness>(fallbackInstitutionalReadiness);
+  const [institutionalUsers, setInstitutionalUsers] = useState<InstitutionalUser[]>(fallbackInstitutionalUsers);
+  const [userGovernanceStatus, setUserGovernanceStatus] = useState<string | null>(null);
   const [institutionalActionCenter, setInstitutionalActionCenter] = useState<InstitutionalActionCenter>(fallbackInstitutionalActionCenter);
   const [actionCenterStatus, setActionCenterStatus] = useState<string | null>(null);
   const [institutionalReport, setInstitutionalReport] = useState<InstitutionalReport>(fallbackInstitutionalReport);
@@ -519,6 +544,12 @@ export function AdminPage() {
         setAuthorizationStatus(null);
       })
       .catch(() => setAuthorizationStatus('Mode demo : connectez-vous avec un role admin pour charger les habilitations API.'));
+    getInstitutionalUsers()
+      .then((users) => {
+        setInstitutionalUsers(users.length > 0 ? users : fallbackInstitutionalUsers);
+        setUserGovernanceStatus(null);
+      })
+      .catch(() => setUserGovernanceStatus('Mode demo : connectez-vous avec un role admin pour charger les comptes API.'));
     getAuditLogs()
       .then((logs) => {
         setAuditLogs(logs);
@@ -595,6 +626,30 @@ export function AdminPage() {
       await refreshAuditLogs();
     } catch {
       setAuthorizationStatus('Decision habilitation impossible : connectez-vous avec un role admin ou super admin.');
+    }
+  }
+
+  async function handleUserRole(userId: string, role: string, reason: string) {
+    setUserGovernanceStatus(null);
+    try {
+      const updated = await updateInstitutionalUserRole(userId, role, reason);
+      setInstitutionalUsers((current) => current.map((user) => (user.id === userId ? updated : user)));
+      setUserGovernanceStatus(`Compte ${updated.email} : role ${updated.role}.`);
+      await refreshAuditLogs();
+    } catch {
+      setUserGovernanceStatus('Decision role impossible : seul un super admin peut modifier les habilitations.');
+    }
+  }
+
+  async function handleUserStatus(userId: string, isActive: boolean, reason: string) {
+    setUserGovernanceStatus(null);
+    try {
+      const updated = await updateInstitutionalUserStatus(userId, isActive, reason);
+      setInstitutionalUsers((current) => current.map((user) => (user.id === userId ? updated : user)));
+      setUserGovernanceStatus(`Compte ${updated.email} : ${updated.is_active ? 'actif' : 'suspendu'}.`);
+      await refreshAuditLogs();
+    } catch {
+      setUserGovernanceStatus('Decision statut impossible : seul un super admin peut activer ou suspendre un compte.');
     }
   }
 
@@ -691,6 +746,7 @@ export function AdminPage() {
     ['Habilitations', Object.values(institutionalReport.authorizations_by_status).reduce((sum, value) => sum + value, 0)],
   ];
   const adminSections = [
+    { href: '#comptes', label: 'Comptes' },
     { href: '#centres', label: 'Centres' },
     { href: '#identites', label: 'Identites' },
     { href: '#questions', label: 'Questions' },
@@ -756,6 +812,36 @@ export function AdminPage() {
         <article><strong>{examSummary.average_score}</strong><span>Score moyen</span></article>
         <article><strong>{formatCurrency(paymentSummary.total_amount_gnf)}</strong><span>GNF encaisses</span></article>
         <article><strong>{formatNumber(paymentSummary.total_count)}</strong><span>Paiements</span></article>
+      </div>
+      <div id="comptes" className="user-governance-panel admin-section">
+        <h3>Comptes et roles institutionnels</h3>
+        <p>Gouvernance des acces administratifs, agents de centre et comptes candidats rattaches au dispositif.</p>
+        {userGovernanceStatus && <p className={userGovernanceStatus.includes('impossible') || userGovernanceStatus.includes('Mode demo') ? 'form-error' : 'login-status'}>{userGovernanceStatus}</p>}
+        <div className="table-shell">
+          <table>
+            <thead><tr><th>Compte</th><th>Nom</th><th>Role</th><th>Statut</th><th>Creation</th><th>Decision</th></tr></thead>
+            <tbody>
+              {institutionalUsers.slice(0, 10).map((user) => (
+                <tr key={user.id}>
+                  <td>{user.email}</td>
+                  <td>{user.full_name}</td>
+                  <td><span className={user.role === 'super_admin' ? 'badge ok' : 'badge'}>{user.role}</span></td>
+                  <td><span className={user.is_active ? 'badge ok' : 'badge'}>{user.is_active ? 'Actif' : 'Suspendu'}</span></td>
+                  <td>{new Date(user.created_at).toLocaleDateString('fr-FR')}</td>
+                  <td>
+                    <div className="table-actions">
+                      <button onClick={() => handleUserRole(user.id, 'admin', 'Affectation officielle a la supervision nationale')}>Admin</button>
+                      <button onClick={() => handleUserRole(user.id, 'center', 'Affectation officielle a un centre agree')}>Centre</button>
+                      <button onClick={() => handleUserStatus(user.id, !user.is_active, user.is_active ? 'Suspension administrative temporaire' : 'Reactivation administrative du compte')}>
+                        {user.is_active ? 'Suspendre' : 'Reactiver'}
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
       <div id="centres" className="center-governance-panel admin-section">
         <h3>Gouvernance des centres agrees</h3>

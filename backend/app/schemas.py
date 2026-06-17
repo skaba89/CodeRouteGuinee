@@ -22,8 +22,19 @@ class UserRead(BaseModel):
     full_name: str
     role: str
     is_active: bool
+    created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class UserRoleUpdate(BaseModel):
+    role: Literal["super_admin", "admin", "center", "candidate"]
+    reason: str = Field(min_length=5)
+
+
+class UserStatusUpdate(BaseModel):
+    is_active: bool
+    reason: str = Field(min_length=5)
 
 
 class CandidateCreate(BaseModel):

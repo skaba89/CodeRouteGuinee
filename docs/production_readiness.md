@@ -50,6 +50,23 @@ Les tentatives de connexion echouees sont limitees par couple email/IP. Les even
 - `auth.login_failed`
 - `auth.login_blocked`
 
+## Gouvernance des comptes
+
+Les comptes sont consultables par les roles `admin` et `super_admin` via `/api/v1/users`.
+
+Seul le role `super_admin` peut:
+
+- changer le role d'un compte;
+- activer ou suspendre un compte;
+- reaffecter un compte vers `admin`, `center` ou `candidate`.
+
+Les decisions sont historisees dans `audit_logs`:
+
+- `user.role_updated`
+- `user.status_updated`
+
+Un `super_admin` ne peut pas suspendre son propre compte ni se retrograder lui-meme.
+
 ## Controle avant presentation
 
 ```bash
