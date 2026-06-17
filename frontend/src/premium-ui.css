@@ -142,6 +142,7 @@ body {
 .finance-panel,
 .action-center-panel,
 .center-governance-panel,
+.center-incident-panel,
 .identity-panel,
 .question-governance-panel,
 .authorization-panel,
@@ -155,6 +156,7 @@ body {
 }
 
 .center-governance-panel,
+.center-incident-panel,
 .action-center-panel,
 .identity-panel,
 .question-governance-panel,
@@ -168,6 +170,8 @@ body {
 
 .center-governance-panel h3,
 .center-governance-panel p,
+.center-incident-panel h3,
+.center-incident-panel p,
 .action-center-panel h3,
 .action-center-panel p,
 .identity-panel h3,
@@ -447,6 +451,50 @@ body {
 .action-item.severity-normal span {
   color: #166534;
   background: #dcfce7;
+}
+
+.incident-admin-header {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.incident-resolution-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: end;
+}
+
+.incident-resolution-controls label {
+  display: grid;
+  gap: 8px;
+  color: var(--premium-navy);
+  font-weight: 900;
+}
+
+.incident-resolution-controls textarea {
+  min-height: 86px;
+  resize: vertical;
+  border: 1px solid rgba(6, 43, 82, 0.12);
+  border-radius: 16px;
+  padding: 12px 14px;
+  color: var(--premium-ink);
+  background: #ffffff;
+  font: inherit;
+}
+
+.incident-resolution-controls .checkbox-line {
+  grid-auto-flow: column;
+  align-items: center;
+  justify-content: start;
+  min-height: 46px;
+  border: 1px solid rgba(0, 148, 96, 0.16);
+  border-radius: 999px;
+  padding: 10px 14px;
+  background: rgba(236, 253, 245, 0.72);
+  white-space: nowrap;
 }
 
 .table-shell {

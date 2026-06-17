@@ -2,6 +2,7 @@ import { type FormEvent, useEffect, useState } from 'react';
 
 import {
   type Center,
+  type CenterIncident,
   type AuditLogEntry,
   type AuditLogFilters,
   type CandidateIdentityCheck,
@@ -40,6 +41,7 @@ import {
   getAuditLogs,
   getCandidateIdentityChecks,
   getCenters,
+  getCenterIncidents,
   getConvocationPdfUrl,
   getDashboard,
   getEntrySummary,
@@ -57,6 +59,7 @@ import {
   getQuestionGovernanceItems,
   resetInstitutionalUserPassword,
   reportCenterIncident,
+  resolveCenterIncident,
   startExamFromBooking,
   submitExamAttempt,
   validateEntry,
@@ -654,6 +657,10 @@ export function AdminPage() {
   const [paymentSummary, setPaymentSummary] = useState<PaymentSummary>(fallbackPaymentSummary);
   const [paymentItems, setPaymentItems] = useState<PaymentReconciliationItem[]>([]);
   const [paymentAlerts, setPaymentAlerts] = useState<PaymentAlert[]>([]);
+  const [centerIncidents, setCenterIncidents] = useState<CenterIncident[]>([]);
+  const [incidentResolutionNotes, setIncidentResolutionNotes] = useState('Incident analyse par la supervision nationale. Reprise autorisee si necessaire.');
+  const [allowIncidentRetake, setAllowIncidentRetake] = useState(true);
+  const [incidentAdminStatus, setIncidentAdminStatus] = useState<string | null>(null);
   const [identityChecks, setIdentityChecks] = useState<CandidateIdentityCheck[]>(fallbackIdentityChecks);
   const [identityStatus, setIdentityStatus] = useState<string | null>(null);
   const [questionGovernance, setQuestionGovernance] = useState<QuestionGovernanceItem[]>(fallbackQuestionGovernance);
@@ -699,6 +706,16 @@ export function AdminPage() {
   const [isExportingPaymentCsv, setIsExportingPaymentCsv] = useState(false);
   const [isExportingAuditCsv, setIsExportingAuditCsv] = useState(false);
 
+  async function refreshCenterIncidents() {
+    try {
+      const incidents = await getCenterIncidents('open', 25);
+      setCenterIncidents(incidents);
+      setIncidentAdminStatus(null);
+    } catch {
+      setIncidentAdminStatus('Incidents indisponibles : connectez-vous avec un role admin ou super admin.');
+    }
+  }
+
   async function loadPaymentSummary(filters: PaymentFilters) {
     try {
       const cleanFilters = sanitizePaymentFilters(filters);
@@ -721,6 +738,7 @@ export function AdminPage() {
     getEntrySummary().then(setEntrySummary).catch(() => undefined);
     getExamSummary().then(setExamSummary).catch(() => undefined);
     loadPaymentSummary({});
+    refreshCenterIncidents();
     getInstitutionalReadiness()
       .then((readiness) => {
         setInstitutionalReadiness(readiness);
@@ -770,6 +788,18 @@ export function AdminPage() {
       })
       .catch(() => setAuditStatus('Logs indisponibles : connectez-vous avec un role admin ou super admin.'));
   }, []);
+
+  async function handleResolveIncident(incidentId: string) {
+    setIncidentAdminStatus(null);
+    try {
+      const resolved = await resolveCenterIncident(incidentId, incidentResolutionNotes, allowIncidentRetake);
+      setCenterIncidents((current) => current.filter((incident) => incident.id !== resolved.id));
+      setIncidentAdminStatus(`Incident ${resolved.id} resolu${resolved.new_attempt_id ? `, nouvelle tentative ${resolved.new_attempt_id}` : ''}.`);
+      await refreshAuditLogs();
+    } catch (error) {
+      setIncidentAdminStatus(getActionErrorMessage(error, 'Resolution incident impossible.'));
+    }
+  }
 
   async function refreshAuditLogs(filters: AuditLogFilters = activeAuditFilters) {
     try {
@@ -1017,6 +1047,7 @@ export function AdminPage() {
   const adminSections = [
     { href: '#comptes', label: 'Comptes' },
     { href: '#centres', label: 'Centres' },
+    { href: '#incidents', label: 'Incidents' },
     { href: '#identites', label: 'Identites' },
     { href: '#questions', label: 'Questions' },
     { href: '#habilitations', label: 'Habilitations' },
@@ -1298,6 +1329,41 @@ export function AdminPage() {
                       <button onClick={() => handleCenterStatus(center.id, 'pending_audit', 'Retour en audit administratif')}>Audit</button>
                     </div>
                   </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div id="incidents" className="center-incident-panel admin-section">
+        <div className="incident-admin-header">
+          <div>
+            <h3>Incidents centres et reprises</h3>
+            <p>Suivi des incidents declares par les centres, decision de resolution et creation eventuelle d une nouvelle tentative.</p>
+          </div>
+          <button className="secondary-button" onClick={refreshCenterIncidents}>Actualiser</button>
+        </div>
+        {incidentAdminStatus && <p className={incidentAdminStatus.includes('impossible') || incidentAdminStatus.includes('indisponibles') ? 'form-error' : 'login-status'}>{incidentAdminStatus}</p>}
+        <div className="incident-resolution-controls">
+          <label>Note de resolution<textarea value={incidentResolutionNotes} onChange={(event) => setIncidentResolutionNotes(event.target.value)} /></label>
+          <label className="checkbox-line"><input type="checkbox" checked={allowIncidentRetake} onChange={(event) => setAllowIncidentRetake(event.target.checked)} /> Autoriser une nouvelle tentative</label>
+        </div>
+        <div className="table-shell">
+          <table>
+            <thead><tr><th>Incident</th><th>Centre</th><th>Session</th><th>Tentative</th><th>Type</th><th>Gravite</th><th>Description</th><th>Decision</th></tr></thead>
+            <tbody>
+              {centerIncidents.length === 0 ? (
+                <tr><td colSpan={8}>Aucun incident ouvert charge.</td></tr>
+              ) : centerIncidents.map((incident) => (
+                <tr key={incident.id}>
+                  <td>{incident.id}</td>
+                  <td>{incident.center_id}</td>
+                  <td>{incident.session_id ?? '-'}</td>
+                  <td>{incident.attempt_id ?? '-'}</td>
+                  <td>{incident.incident_type}</td>
+                  <td><span className="badge">{incident.severity}</span></td>
+                  <td>{incident.description}</td>
+                  <td><button onClick={() => handleResolveIncident(incident.id)} disabled={incidentResolutionNotes.length < 5}>Resoudre</button></td>
                 </tr>
               ))}
             </tbody>

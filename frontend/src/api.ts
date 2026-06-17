@@ -564,6 +564,20 @@ export function reportCenterIncident(payload: CenterIncidentPayload): Promise<Ce
   return postPrivateJson<CenterIncident>('/api/v1/center-incidents', payload);
 }
 
+export function getCenterIncidents(statusFilter = 'open', limit = 25): Promise<CenterIncident[]> {
+  const query = new URLSearchParams();
+  if (statusFilter) query.set('status_filter', statusFilter);
+  query.set('limit', String(limit));
+  return getPrivateJson<CenterIncident[]>(`/api/v1/center-incidents?${query.toString()}`);
+}
+
+export function resolveCenterIncident(incidentId: string, resolutionNotes: string, allowRetake: boolean): Promise<CenterIncident> {
+  return postPrivateJson<CenterIncident>(`/api/v1/center-incidents/${encodeURIComponent(incidentId)}/resolve`, {
+    resolution_notes: resolutionNotes,
+    allow_retake: allowRetake,
+  });
+}
+
 export function createPayment(payload: PaymentPayload): Promise<PaymentResult> {
   return postJson<PaymentResult>('/api/v1/payments', payload);
 }
