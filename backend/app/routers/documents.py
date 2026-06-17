@@ -24,4 +24,5 @@ def get_convocation_pdf(reference: str, db: Session = Depends(get_db)) -> Respon
     if not candidate or not session or not center:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Incomplete booking data")
     convocation = build_convocation_payload(booking, candidate, session, center)
-    return Response(content=build_convocation_pdf(convocation), media_type="application/pdf")
+    headers = {"Content-Disposition": f"attachment; filename=coderoute-convocation-{booking.reference}.pdf"}
+    return Response(content=build_convocation_pdf(convocation), media_type="application/pdf", headers=headers)

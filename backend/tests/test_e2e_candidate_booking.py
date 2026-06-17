@@ -87,6 +87,9 @@ def test_candidate_booking_payment_convocation_and_entry_flow() -> None:
         pdf_response = client.get(f"/api/v1/documents/convocations/{booking['reference']}.pdf")
         assert pdf_response.status_code == 200
         assert pdf_response.content.startswith(b"%PDF")
+        assert pdf_response.headers["content-type"] == "application/pdf"
+        assert f"coderoute-convocation-{booking['reference']}.pdf" in pdf_response.headers["content-disposition"]
+        assert b"Document administratif - Convocation candidat" in pdf_response.content
 
         entry_response = client.post(
             "/api/v1/entries/validate",
