@@ -44,7 +44,8 @@ test.describe('CodeRoute Guinee UI smoke tests', () => {
     await expect(page.getByText(/Examen s(e|é)curis(e|é)/)).toBeVisible();
 
     await page.getByRole('link', { name: /R.sultats/ }).click();
-    await expect(page.getByRole('heading', { name: 'Examen du code de la route' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Releve officiel du code de la route' })).toBeVisible();
+    await expect(page.getByText('Suite administrative', { exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: /V.rifier certificat/ })).toBeVisible();
   });
 });
