@@ -56,6 +56,7 @@ import {
   getPaymentReconciliationItems,
   getQuestionGovernanceItems,
   resetInstitutionalUserPassword,
+  reportCenterIncident,
   startExamFromBooking,
   submitExamAttempt,
   validateEntry,
@@ -543,6 +544,16 @@ export function CenterPage() {
   const [entryResult, setEntryResult] = useState<EntryValidationResult | null>(null);
   const [entryError, setEntryError] = useState<string | null>(null);
   const [isSubmittingEntry, setIsSubmittingEntry] = useState(false);
+  const [centers, setCenters] = useState<Center[]>([]);
+  const [incidentType, setIncidentType] = useState('technical_issue');
+  const [incidentSeverity, setIncidentSeverity] = useState('medium');
+  const [incidentDescription, setIncidentDescription] = useState('Poste candidat indisponible pendant le controle.');
+  const [incidentStatus, setIncidentStatus] = useState<string | null>(null);
+  const [isReportingIncident, setIsReportingIncident] = useState(false);
+
+  useEffect(() => {
+    getCenters().then(setCenters).catch(() => undefined);
+  }, []);
 
   async function handleEntrySubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -559,16 +570,64 @@ export function CenterPage() {
     }
   }
 
+  async function handleIncidentSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setIncidentStatus(null);
+    const center = centers.find((item) => item.code === centerCode);
+    if (!center) {
+      setIncidentStatus('Centre introuvable : verifiez le code centre ou chargez les donnees API.');
+      return;
+    }
+    setIsReportingIncident(true);
+    try {
+      const incident = await reportCenterIncident({
+        center_id: center.id,
+        incident_type: incidentType,
+        severity: incidentSeverity,
+        description: incidentDescription,
+      });
+      setIncidentStatus(`Incident ${incident.id} enregistre en statut ${incident.status}.`);
+    } catch (error) {
+      setIncidentStatus(getActionErrorMessage(error, 'Declaration incident impossible.'));
+    } finally {
+      setIsReportingIncident(false);
+    }
+  }
+
   return (
     <section className="screen two-columns inverted">
-      <form className="scanner-card" onSubmit={handleEntrySubmit}>
-        <h2>Controle entree centre</h2>
-        <p>Scan QR, verification du code et passage automatique du statut en checked_in.</p>
-        <label>Reference convocation<input value={entryReference} onChange={(event) => setEntryReference(event.target.value)} /></label>
-        <label>Code verification<input value={verificationCode} onChange={(event) => setVerificationCode(event.target.value)} placeholder="Code de la convocation" /></label>
-        <label>Code centre<input value={centerCode} onChange={(event) => setCenterCode(event.target.value)} /></label>
-        <button disabled={isSubmittingEntry || !entryReference || !verificationCode}>{isSubmittingEntry ? 'Validation...' : 'Valider entree'}</button>
-      </form>
+      <div className="center-action-stack">
+        <form className="scanner-card" onSubmit={handleEntrySubmit}>
+          <h2>Controle entree centre</h2>
+          <p>Scan QR, verification du code et passage automatique du statut en checked_in.</p>
+          <label>Reference convocation<input value={entryReference} onChange={(event) => setEntryReference(event.target.value)} /></label>
+          <label>Code verification<input value={verificationCode} onChange={(event) => setVerificationCode(event.target.value)} placeholder="Code de la convocation" /></label>
+          <label>Code centre<input value={centerCode} onChange={(event) => setCenterCode(event.target.value)} /></label>
+          <button disabled={isSubmittingEntry || !entryReference || !verificationCode}>{isSubmittingEntry ? 'Validation...' : 'Valider entree'}</button>
+        </form>
+        <form className="scanner-card incident-form" onSubmit={handleIncidentSubmit}>
+          <h2>Declaration incident</h2>
+          <p>Tracer un incident centre pour audit, supervision et reprise de session.</p>
+          <label>Type
+            <select value={incidentType} onChange={(event) => setIncidentType(event.target.value)}>
+              <option value="technical_issue">Probleme technique</option>
+              <option value="identity_dispute">Litige identite</option>
+              <option value="network_outage">Coupure reseau</option>
+              <option value="fraud_suspicion">Suspicion fraude</option>
+            </select>
+          </label>
+          <label>Gravite
+            <select value={incidentSeverity} onChange={(event) => setIncidentSeverity(event.target.value)}>
+              <option value="low">Faible</option>
+              <option value="medium">Moyenne</option>
+              <option value="high">Haute</option>
+              <option value="critical">Critique</option>
+            </select>
+          </label>
+          <label>Description<textarea value={incidentDescription} onChange={(event) => setIncidentDescription(event.target.value)} /></label>
+          <button disabled={isReportingIncident || incidentDescription.length < 5}>{isReportingIncident ? 'Declaration...' : 'Declarer incident'}</button>
+        </form>
+      </div>
       <div>
         <p className="eyebrow dark">Centre agree</p>
         <h2>Validation en temps reel</h2>
@@ -580,6 +639,7 @@ export function CenterPage() {
             <tr><th>Message</th><td>{entryResult?.message ?? entryResult?.reason ?? entryError ?? 'Aucune validation lancee'}</td></tr>
           </tbody>
         </table>
+        {incidentStatus && <p className={incidentStatus.includes('impossible') || incidentStatus.includes('introuvable') ? 'form-error' : 'login-status'}>{incidentStatus}</p>}
       </div>
     </section>
   );

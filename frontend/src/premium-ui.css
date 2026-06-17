@@ -943,6 +943,28 @@ body {
   font-weight: 900;
 }
 
+.center-action-stack {
+  display: grid;
+  gap: 16px;
+}
+
+.incident-form textarea,
+.incident-form select {
+  width: 100%;
+  min-height: 46px;
+  border: 1px solid rgba(6, 43, 82, 0.12);
+  border-radius: 16px;
+  padding: 13px 15px;
+  font: inherit;
+  color: var(--premium-ink);
+  background: #ffffff;
+}
+
+.incident-form textarea {
+  min-height: 96px;
+  resize: vertical;
+}
+
 button,
 .actions a,
 .download-link {

@@ -251,6 +251,26 @@ export type EntryValidationResult = {
   reason?: string;
 };
 
+export type CenterIncidentPayload = {
+  center_id: string;
+  session_id?: string;
+  attempt_id?: string;
+  incident_type: string;
+  severity: string;
+  description: string;
+};
+
+export type CenterIncident = CenterIncidentPayload & {
+  id: string;
+  status: string;
+  resolution_notes?: string | null;
+  reported_by_id?: string | null;
+  resolved_by_id?: string | null;
+  new_attempt_id?: string | null;
+  created_at: string;
+  resolved_at?: string | null;
+};
+
 export type PaymentPayload = {
   booking_reference: string;
   amount_gnf: number;
@@ -538,6 +558,10 @@ export function submitExamAttempt(attemptId: string, answers: Record<string, str
 
 export function validateEntry(payload: EntryValidationPayload): Promise<EntryValidationResult> {
   return postJson<EntryValidationResult>('/api/v1/entries/validate', payload);
+}
+
+export function reportCenterIncident(payload: CenterIncidentPayload): Promise<CenterIncident> {
+  return postPrivateJson<CenterIncident>('/api/v1/center-incidents', payload);
 }
 
 export function createPayment(payload: PaymentPayload): Promise<PaymentResult> {

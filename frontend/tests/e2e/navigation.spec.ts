@@ -18,6 +18,8 @@ test.describe('CodeRoute Guinee UI smoke tests', () => {
     await expect(page.getByRole('heading', { name: 'Controle entree centre' })).toBeVisible();
     await expect(page.locator('input[value="CRG-BOOK-DEMO-001"]')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Valider entree' })).toBeEnabled();
+    await expect(page.getByRole('heading', { name: 'Declaration incident' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Declarer incident' })).toBeEnabled();
 
     await page.getByRole('link', { name: 'Admin' }).click();
     await expect(page.getByRole('heading', { name: 'Supervision centres, entrees, examens et finances' })).toBeVisible();
