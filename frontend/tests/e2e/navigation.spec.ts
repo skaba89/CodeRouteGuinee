@@ -44,7 +44,7 @@ test.describe('CodeRoute Guinee UI smoke tests', () => {
     await page.getByRole('button', { name: 'Candidat' }).click();
     await page.getByRole('link', { name: /Continuer avec ce r.le/ }).click();
 
-    await expect(page.getByText('Session : Candidat')).toBeVisible();
+    await expect(page.getByText('Presentation : Candidat')).toBeVisible();
     await expect(page.getByRole('link', { name: 'Candidat' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Admin' })).toHaveCount(0);
 
