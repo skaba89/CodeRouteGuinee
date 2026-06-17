@@ -6,7 +6,8 @@ from app.db.session import get_db
 from app.deps import require_roles
 from app.models_audit import AuditLog
 from app.models_user import User
-from app.schemas import UserRead, UserRoleUpdate, UserStatusUpdate
+from app.schemas import InstitutionalUserCreate, UserRead, UserRoleUpdate, UserStatusUpdate
+from app.security import get_password_hash
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -52,6 +53,45 @@ def list_users(
         query = query.where(User.is_active == is_active)
     query = query.order_by(User.created_at.desc()).limit(safe_limit)
     return list(db.scalars(query).all())
+
+
+@router.post("", response_model=UserRead, status_code=status.HTTP_201_CREATED)
+def create_institutional_user(
+    payload: InstitutionalUserCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("super_admin")),
+) -> User:
+    email = payload.email.strip().lower()
+    existing = db.scalar(select(User).where(User.email == email))
+    if existing:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered")
+
+    user = User(
+        email=email,
+        full_name=payload.full_name.strip(),
+        password_hash=get_password_hash(payload.initial_password),
+        role=payload.role,
+        is_active=True,
+    )
+    db.add(user)
+    db.flush()
+    db.add(
+        AuditLog(
+            actor_id=current_user.id,
+            action="user.created",
+            entity="user",
+            entity_id=user.id,
+            details={
+                "email": user.email,
+                "role": user.role,
+                "reason": payload.reason,
+                "created_by": current_user.email,
+            },
+        )
+    )
+    db.commit()
+    db.refresh(user)
+    return user
 
 
 @router.patch("/{user_id}/role", response_model=UserRead)

@@ -41,6 +41,61 @@ def test_admin_can_list_users() -> None:
     assert any(user["email"] == admin["email"] for user in response.json())
 
 
+def test_super_admin_can_create_institutional_user_with_audit_log() -> None:
+    with TestClient(app) as client:
+        super_admin = register_user(client, "super_admin")
+        token = login_token(client, super_admin["email"])
+        email = f"agent-{str(uuid4())[:8]}@coderoute.gn"
+
+        response = client.post(
+            "/api/v1/users",
+            headers={"Authorization": f"Bearer {token}"},
+            json={
+                "email": email,
+                "full_name": "Agent Centre Agree",
+                "initial_password": "TemporaryPass123",
+                "role": "center",
+                "reason": "Creation officielle du compte centre",
+            },
+        )
+
+    assert response.status_code == 201
+    created_user = response.json()
+    assert created_user["email"] == email
+    assert created_user["role"] == "center"
+    assert created_user["is_active"] is True
+
+    db = SessionLocal()
+    try:
+        action = db.scalar(
+            select(AuditLog.action).where(AuditLog.entity == "user", AuditLog.entity_id == created_user["id"])
+        )
+    finally:
+        db.close()
+
+    assert action == "user.created"
+
+
+def test_admin_cannot_create_institutional_user() -> None:
+    with TestClient(app) as client:
+        admin = register_user(client, "admin")
+        token = login_token(client, admin["email"])
+
+        response = client.post(
+            "/api/v1/users",
+            headers={"Authorization": f"Bearer {token}"},
+            json={
+                "email": f"agent-{str(uuid4())[:8]}@coderoute.gn",
+                "full_name": "Agent Centre Agree",
+                "initial_password": "TemporaryPass123",
+                "role": "center",
+                "reason": "Creation officielle du compte centre",
+            },
+        )
+
+    assert response.status_code == 403
+
+
 def test_super_admin_can_update_role_and_status_with_audit_log() -> None:
     with TestClient(app) as client:
         super_admin = register_user(client, "super_admin")

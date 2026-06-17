@@ -56,12 +56,14 @@ Les comptes sont consultables par les roles `admin` et `super_admin` via `/api/v
 
 Seul le role `super_admin` peut:
 
+- creer un compte institutionnel avec mot de passe initial controle;
 - changer le role d'un compte;
 - activer ou suspendre un compte;
 - reaffecter un compte vers `admin`, `center` ou `candidate`.
 
 Les decisions sont historisees dans `audit_logs`:
 
+- `user.created`
 - `user.role_updated`
 - `user.status_updated`
 

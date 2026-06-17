@@ -16,6 +16,14 @@ class UserCreate(BaseModel):
     role: Literal["super_admin", "admin", "center", "candidate"] = "candidate"
 
 
+class InstitutionalUserCreate(BaseModel):
+    email: str
+    full_name: str
+    initial_password: str = Field(min_length=12)
+    role: Literal["admin", "center", "candidate"] = "center"
+    reason: str = Field(min_length=5)
+
+
 class UserRead(BaseModel):
     id: str
     email: str

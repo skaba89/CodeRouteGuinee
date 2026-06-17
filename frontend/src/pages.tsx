@@ -15,6 +15,7 @@ import {
   type InstitutionalReport,
   type InstitutionalReadiness,
   type InstitutionalUser,
+  type InstitutionalUserCreatePayload,
   type PaymentAlert,
   type PaymentFilters,
   type PaymentReconciliationItem,
@@ -22,6 +23,7 @@ import {
   type PaymentSummary,
   type QuestionGovernanceItem,
   createInstitutionalAuthorization,
+  createInstitutionalUser,
   createPayment,
   decideCandidateIdentity,
   decideQuestionGovernance,
@@ -468,6 +470,13 @@ export function AdminPage() {
   const [institutionalReadiness, setInstitutionalReadiness] = useState<InstitutionalReadiness>(fallbackInstitutionalReadiness);
   const [institutionalUsers, setInstitutionalUsers] = useState<InstitutionalUser[]>(fallbackInstitutionalUsers);
   const [userGovernanceStatus, setUserGovernanceStatus] = useState<string | null>(null);
+  const [userForm, setUserForm] = useState<InstitutionalUserCreatePayload>({
+    email: 'agent.centre@coderoute.gov.gn',
+    full_name: 'Agent Centre Agree',
+    initial_password: 'TemporaryPass123',
+    role: 'center',
+    reason: 'Creation officielle du compte institutionnel',
+  });
   const [institutionalActionCenter, setInstitutionalActionCenter] = useState<InstitutionalActionCenter>(fallbackInstitutionalActionCenter);
   const [actionCenterStatus, setActionCenterStatus] = useState<string | null>(null);
   const [institutionalReport, setInstitutionalReport] = useState<InstitutionalReport>(fallbackInstitutionalReport);
@@ -638,6 +647,19 @@ export function AdminPage() {
       await refreshAuditLogs();
     } catch {
       setUserGovernanceStatus('Decision role impossible : seul un super admin peut modifier les habilitations.');
+    }
+  }
+
+  async function handleUserSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setUserGovernanceStatus(null);
+    try {
+      const created = await createInstitutionalUser(userForm);
+      setInstitutionalUsers((current) => [created, ...current]);
+      setUserGovernanceStatus(`Compte ${created.email} cree avec le role ${created.role}.`);
+      await refreshAuditLogs();
+    } catch {
+      setUserGovernanceStatus('Creation compte impossible : email deja utilise, mot de passe trop court ou role super admin requis.');
     }
   }
 
@@ -817,6 +839,20 @@ export function AdminPage() {
         <h3>Comptes et roles institutionnels</h3>
         <p>Gouvernance des acces administratifs, agents de centre et comptes candidats rattaches au dispositif.</p>
         {userGovernanceStatus && <p className={userGovernanceStatus.includes('impossible') || userGovernanceStatus.includes('Mode demo') ? 'form-error' : 'login-status'}>{userGovernanceStatus}</p>}
+        <form className="authorization-form" onSubmit={handleUserSubmit}>
+          <label>Email<input value={userForm.email} onChange={(event) => setUserForm((current) => ({ ...current, email: event.target.value }))} /></label>
+          <label>Nom complet<input value={userForm.full_name} onChange={(event) => setUserForm((current) => ({ ...current, full_name: event.target.value }))} /></label>
+          <label>Role
+            <select value={userForm.role} onChange={(event) => setUserForm((current) => ({ ...current, role: event.target.value }))}>
+              <option value="admin">Admin national</option>
+              <option value="center">Agent centre</option>
+              <option value="candidate">Candidat</option>
+            </select>
+          </label>
+          <label>Mot de passe initial<input type="password" value={userForm.initial_password} onChange={(event) => setUserForm((current) => ({ ...current, initial_password: event.target.value }))} /></label>
+          <label>Motif administratif<input value={userForm.reason} onChange={(event) => setUserForm((current) => ({ ...current, reason: event.target.value }))} /></label>
+          <button type="submit">Creer le compte</button>
+        </form>
         <div className="table-shell">
           <table>
             <thead><tr><th>Compte</th><th>Nom</th><th>Role</th><th>Statut</th><th>Creation</th><th>Decision</th></tr></thead>

@@ -88,6 +88,14 @@ export type InstitutionalUser = {
   created_at: string;
 };
 
+export type InstitutionalUserCreatePayload = {
+  email: string;
+  full_name: string;
+  initial_password: string;
+  role: string;
+  reason: string;
+};
+
 export type InstitutionalReadinessItem = {
   pillar: string;
   status: 'ready' | 'partial' | 'todo' | string;
@@ -341,6 +349,10 @@ export function getAuditLogs(): Promise<AuditLogEntry[]> {
 
 export function getInstitutionalUsers(): Promise<InstitutionalUser[]> {
   return getPrivateJson<InstitutionalUser[]>('/api/v1/users?limit=50');
+}
+
+export function createInstitutionalUser(payload: InstitutionalUserCreatePayload): Promise<InstitutionalUser> {
+  return postPrivateJson<InstitutionalUser>('/api/v1/users', payload);
 }
 
 export function updateInstitutionalUserRole(userId: string, role: string, reason: string): Promise<InstitutionalUser> {
