@@ -839,6 +839,54 @@ export function AdminPage() {
     { href: '#finance', label: 'Finance' },
     { href: '#audit', label: 'Audit' },
   ];
+  const passRate = examSummary.submitted_attempts
+    ? Math.round((examSummary.passed_attempts / examSummary.submitted_attempts) * 100)
+    : 0;
+  const entryApprovalRate = allowedEntries + deniedEntries
+    ? Math.round((allowedEntries / (allowedEntries + deniedEntries)) * 100)
+    : 0;
+  const accreditedCenters = centers.filter((center) => center.status === 'accredited').length
+    || (institutionalReport.centers_by_status.accredited ?? 0);
+  const pendingCenters = centers.filter((center) => center.status !== 'accredited').length
+    || Object.entries(institutionalReport.centers_by_status)
+      .filter(([status]) => status !== 'accredited')
+      .reduce((sum, [, value]) => sum + value, 0);
+  const paidPayments = paymentSummary.by_status.paid?.count ?? 0;
+  const pendingPayments = Object.entries(paymentSummary.by_status)
+    .filter(([status]) => status !== 'paid')
+    .reduce((sum, [, values]) => sum + values.count, 0);
+  const nationalPriorities = [
+    {
+      label: 'Maturite dossier Etat',
+      value: `${institutionalReport.readiness_score}%`,
+      status: institutionalReport.readiness_score >= 80 ? 'Pret' : 'A consolider',
+      tone: institutionalReport.readiness_score >= 80 ? 'ready' : 'watch',
+    },
+    {
+      label: 'Centres accredites',
+      value: formatNumber(accreditedCenters),
+      status: pendingCenters > 0 ? `${formatNumber(pendingCenters)} a verifier` : 'Couverture stable',
+      tone: pendingCenters > 0 ? 'watch' : 'ready',
+    },
+    {
+      label: 'Reussite examen',
+      value: `${passRate}%`,
+      status: `${formatNumber(examSummary.passed_attempts)} admis`,
+      tone: passRate >= 70 ? 'ready' : 'watch',
+    },
+    {
+      label: 'Entrees centre',
+      value: `${entryApprovalRate}%`,
+      status: `${formatNumber(deniedEntries)} refus`,
+      tone: deniedEntries > 10 ? 'risk' : 'ready',
+    },
+  ];
+  const operationalFlows = [
+    ['Dossiers candidats', formatNumber(dashboard.candidates), 'Inscription et convocation'],
+    ['Paiements confirmes', formatNumber(paidPayments), `${formatNumber(pendingPayments)} a rapprocher`],
+    ['Audit disponible', formatNumber(institutionalReport.audit_events), 'Tracabilite administrative'],
+    ['Actions ouvertes', formatNumber(institutionalActionCenter.total_actions), `${formatNumber(institutionalActionCenter.critical_actions)} critique(s)`],
+  ];
 
   return (
     <section className="panel admin-panel">
@@ -871,6 +919,31 @@ export function AdminPage() {
       {auditCsvExportStatus && <p className="login-status">{auditCsvExportStatus}</p>}
       {institutionalReportStatus && <p className={institutionalReportStatus.includes('impossible') || institutionalReportStatus.includes('Mode demo') ? 'form-error' : 'login-status'}>{institutionalReportStatus}</p>}
       {financeStatus && <p className="form-error">{financeStatus}</p>}
+      <div className="executive-overview">
+        <div className="executive-summary-card">
+          <span>Decision de pilotage</span>
+          <strong>{institutionalReport.readiness_score >= 80 ? 'Pret pour extension pilote' : 'Pilote a consolider'}</strong>
+          <p>{institutionalReport.readiness_label}</p>
+        </div>
+        <div className="priority-grid">
+          {nationalPriorities.map((priority) => (
+            <article className={`priority-card tone-${priority.tone}`} key={priority.label}>
+              <span>{priority.label}</span>
+              <strong>{priority.value}</strong>
+              <small>{priority.status}</small>
+            </article>
+          ))}
+        </div>
+      </div>
+      <div className="operational-flow-grid">
+        {operationalFlows.map(([label, value, detail]) => (
+          <article key={label}>
+            <span>{label}</span>
+            <strong>{value}</strong>
+            <small>{detail}</small>
+          </article>
+        ))}
+      </div>
       <div className="action-center-panel">
         <div>
           <h3>Centre d'action institutionnel</h3>

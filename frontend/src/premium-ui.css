@@ -267,6 +267,110 @@ body {
   scroll-margin-top: 190px;
 }
 
+.executive-overview {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.45fr) minmax(0, 1fr);
+  gap: 14px;
+  align-items: stretch;
+}
+
+.executive-summary-card {
+  display: grid;
+  gap: 8px;
+  align-content: center;
+  min-height: 180px;
+  padding: 22px;
+  border-radius: 24px;
+  color: #ffffff;
+  background:
+    linear-gradient(135deg, rgba(245, 180, 0, 0.26), transparent),
+    linear-gradient(135deg, #062b52, #007653);
+  box-shadow: var(--premium-shadow-soft);
+}
+
+.executive-summary-card span,
+.executive-summary-card p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.76);
+  font-weight: 850;
+}
+
+.executive-summary-card span {
+  font-size: 12px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.executive-summary-card strong {
+  max-width: 360px;
+  color: #ffffff;
+  font-size: clamp(25px, 3vw, 38px);
+  line-height: 1.02;
+}
+
+.priority-grid,
+.operational-flow-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.priority-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.operational-flow-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.priority-card,
+.operational-flow-grid article {
+  display: grid;
+  gap: 7px;
+  min-height: 126px;
+  padding: 16px;
+  border: 1px solid rgba(6, 43, 82, 0.08);
+  border-radius: 20px;
+  background: #ffffff;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.06);
+}
+
+.priority-card span,
+.operational-flow-grid span {
+  color: var(--premium-muted);
+  font-size: 12px;
+  font-weight: 950;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.priority-card strong,
+.operational-flow-grid strong {
+  color: var(--premium-navy);
+  font-size: 30px;
+  line-height: 1;
+}
+
+.priority-card small,
+.operational-flow-grid small {
+  color: var(--premium-muted);
+  font-weight: 850;
+}
+
+.priority-card.tone-ready {
+  border-color: rgba(0, 148, 96, 0.2);
+  background: linear-gradient(180deg, #ffffff, rgba(236, 253, 245, 0.88));
+}
+
+.priority-card.tone-watch {
+  border-color: rgba(245, 180, 0, 0.34);
+  background: linear-gradient(180deg, #ffffff, rgba(255, 251, 235, 0.92));
+}
+
+.priority-card.tone-risk {
+  border-color: rgba(206, 17, 38, 0.24);
+  background: linear-gradient(180deg, #ffffff, rgba(255, 241, 242, 0.92));
+}
+
 .action-center-panel {
   grid-template-columns: minmax(220px, 0.34fr) minmax(0, 1fr);
   align-items: center;
@@ -935,6 +1039,12 @@ tr:last-child td {
   .results-workspace {
     grid-template-columns: 1fr;
   }
+
+  .executive-overview,
+  .priority-grid,
+  .operational-flow-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 900px) {
@@ -972,6 +1082,12 @@ tr:last-child td {
   .results-header,
   .exam-header {
     flex-direction: column;
+  }
+
+  .executive-overview,
+  .priority-grid,
+  .operational-flow-grid {
+    grid-template-columns: 1fr;
   }
 
   .result-identity-grid,
