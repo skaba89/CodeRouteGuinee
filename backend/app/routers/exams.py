@@ -11,6 +11,7 @@ from app.db.session import get_db
 from app.deps import require_roles
 from app.exam_engine import score_answers
 from app.models_audit import AuditLog
+from app.models_booking import Booking
 from app.models_candidate import Candidate
 from app.models_center import Center
 from app.models_exam_attempt import ExamAttempt
@@ -19,7 +20,7 @@ from app.models_question import Question
 from app.models_session import ExamSession
 from app.models_user import User
 from app.pdf_service import build_result_certificate_pdf
-from app.schemas import ExamAttemptRead, ExamCertificateVerificationRead, ExamStartRequest, ExamSubmitRequest
+from app.schemas import ExamAttemptRead, ExamCertificateVerificationRead, ExamStartFromBookingRequest, ExamStartRequest, ExamSubmitRequest
 
 router = APIRouter(prefix="/exams", tags=["exams"])
 
@@ -33,6 +34,45 @@ def _is_attempt_expired(attempt: ExamAttempt, now: datetime) -> bool:
 def _build_question_bank_hash(questions: list[Question]) -> str:
     payload = "|".join(f"{question.id}:{question.correct_answer}:{question.is_active}" for question in questions)
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _create_exam_attempt(db: Session, candidate_id: str, session_id: str) -> ExamAttempt:
+    questions = list(db.scalars(select(Question).where(Question.is_active.is_(True)).order_by(Question.id)).all())
+    attempt = ExamAttempt(candidate_id=candidate_id, session_id=session_id)
+    db.add(attempt)
+    db.flush()
+
+    question_ids = [question.id for question in questions]
+    bank_hash = _build_question_bank_hash(questions)
+    version_label = f"active-bank-{bank_hash[:12]}" if question_ids else "active-bank-empty"
+    trace = ExamQuestionTrace(
+        attempt_id=attempt.id,
+        question_ids=question_ids,
+        question_count=len(question_ids),
+        bank_hash=bank_hash,
+        version_label=version_label,
+        selection_mode="active_bank_snapshot",
+    )
+    db.add(trace)
+    db.add(
+        AuditLog(
+            actor_id=None,
+            action="exam.question_trace_created",
+            entity="exam_question_trace",
+            entity_id=trace.id,
+            details={
+                "attempt_id": attempt.id,
+                "candidate_id": attempt.candidate_id,
+                "session_id": attempt.session_id,
+                "question_count": len(question_ids),
+                "bank_hash": bank_hash,
+                "version_label": trace.version_label,
+            },
+        )
+    )
+    db.commit()
+    db.refresh(attempt)
+    return attempt
 
 
 def _write_exam_guard_log(
@@ -95,42 +135,17 @@ def _write_certificate_verification_log(
 
 @router.post("/start", response_model=ExamAttemptRead, status_code=status.HTTP_201_CREATED)
 def start_exam(payload: ExamStartRequest, db: Session = Depends(get_db)) -> ExamAttempt:
-    questions = list(db.scalars(select(Question).where(Question.is_active.is_(True)).order_by(Question.id)).all())
-    attempt = ExamAttempt(candidate_id=payload.candidate_id, session_id=payload.session_id)
-    db.add(attempt)
-    db.flush()
+    return _create_exam_attempt(db, payload.candidate_id, payload.session_id)
 
-    question_ids = [question.id for question in questions]
-    bank_hash = _build_question_bank_hash(questions)
-    version_label = f"active-bank-{bank_hash[:12]}" if question_ids else "active-bank-empty"
-    trace = ExamQuestionTrace(
-        attempt_id=attempt.id,
-        question_ids=question_ids,
-        question_count=len(question_ids),
-        bank_hash=bank_hash,
-        version_label=version_label,
-        selection_mode="active_bank_snapshot",
-    )
-    db.add(trace)
-    db.add(
-        AuditLog(
-            actor_id=None,
-            action="exam.question_trace_created",
-            entity="exam_question_trace",
-            entity_id=trace.id,
-            details={
-                "attempt_id": attempt.id,
-                "candidate_id": attempt.candidate_id,
-                "session_id": attempt.session_id,
-                "question_count": len(question_ids),
-                "bank_hash": bank_hash,
-                "version_label": trace.version_label,
-            },
-        )
-    )
-    db.commit()
-    db.refresh(attempt)
-    return attempt
+
+@router.post("/start-from-booking", response_model=ExamAttemptRead, status_code=status.HTTP_201_CREATED)
+def start_exam_from_booking(payload: ExamStartFromBookingRequest, db: Session = Depends(get_db)) -> ExamAttempt:
+    booking = db.scalar(select(Booking).where(Booking.reference == payload.booking_reference))
+    if not booking:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Booking not found")
+    if booking.status not in {"confirmed", "paid", "checked_in"}:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Booking is not eligible for exam start")
+    return _create_exam_attempt(db, booking.candidate_id, booking.session_id)
 
 
 @router.get("/summary")

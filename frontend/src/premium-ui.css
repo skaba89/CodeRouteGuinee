@@ -1311,6 +1311,16 @@ tr:last-child td {
   font-weight: 850;
 }
 
+.exam-api-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.exam-api-actions button {
+  flex: 1 1 220px;
+}
+
 .exam-control-card {
   display: grid;
   gap: 16px;

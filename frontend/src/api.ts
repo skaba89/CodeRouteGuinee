@@ -39,6 +39,29 @@ export type ExamSummary = {
   average_score: number;
 };
 
+export type ExamQuestion = {
+  id: string;
+  category: string;
+  text: string;
+  options: string[];
+  correct_answer: string;
+  explanation?: string | null;
+  is_active: boolean;
+  created_at: string;
+};
+
+export type ExamAttempt = {
+  id: string;
+  candidate_id: string;
+  session_id: string;
+  status: string;
+  answers?: Record<string, string> | null;
+  score?: number | null;
+  passed?: boolean | null;
+  started_at: string;
+  submitted_at?: string | null;
+};
+
 export type AuditLogEntry = {
   id: string;
   actor_id?: string;
@@ -499,6 +522,18 @@ export function getEntrySummary(): Promise<EntrySummary> {
 
 export function getExamSummary(): Promise<ExamSummary> {
   return getJson<ExamSummary>('/api/v1/exams/summary');
+}
+
+export function getQuestions(): Promise<ExamQuestion[]> {
+  return getJson<ExamQuestion[]>('/api/v1/questions');
+}
+
+export function startExamFromBooking(bookingReference: string): Promise<ExamAttempt> {
+  return postJson<ExamAttempt>('/api/v1/exams/start-from-booking', { booking_reference: bookingReference });
+}
+
+export function submitExamAttempt(attemptId: string, answers: Record<string, string>): Promise<ExamAttempt> {
+  return postJson<ExamAttempt>(`/api/v1/exams/${encodeURIComponent(attemptId)}/submit`, { answers });
 }
 
 export function validateEntry(payload: EntryValidationPayload): Promise<EntryValidationResult> {

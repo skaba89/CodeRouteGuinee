@@ -58,6 +58,8 @@ test.describe('CodeRoute Guinee UI smoke tests', () => {
     await expect(page.getByRole('heading', { name: /Question 13 \/ 40/ })).toBeVisible();
     await page.getByRole('button', { name: /La priorite a droite/ }).click();
     await expect(page.getByText('2 reponse(s) saisie(s)')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Demarrer tentative API' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Soumettre les reponses' })).toBeDisabled();
 
     await page.getByRole('link', { name: /R.sultats/ }).click();
     await expect(page.getByRole('heading', { name: 'Releve officiel du code de la route' })).toBeVisible();

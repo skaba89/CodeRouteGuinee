@@ -8,7 +8,9 @@ import {
   type DashboardData,
   type EntrySummary,
   type EntryValidationResult,
+  type ExamAttempt,
   type ExamCertificateVerification,
+  type ExamQuestion,
   type ExamSummary,
   type InstitutionalAuthorization,
   type InstitutionalAuthorizationPayload,
@@ -43,6 +45,7 @@ import {
   getEntrySummary,
   getExamCertificatePdfUrl,
   getExamSummary,
+  getQuestions,
   getInstitutionalActionCenter,
   getInstitutionalReport,
   getInstitutionalReadiness,
@@ -53,6 +56,8 @@ import {
   getPaymentReconciliationItems,
   getQuestionGovernanceItems,
   resetInstitutionalUserPassword,
+  startExamFromBooking,
+  submitExamAttempt,
   validateEntry,
   updateCenterStatus,
   updateInstitutionalAuthorizationStatus,
@@ -1571,29 +1576,99 @@ export function AdminPage() {
 }
 
 export function ExamPage() {
-  const examQuestions = [
+  const fallbackExamQuestions: ExamQuestion[] = [
     {
+      id: 'demo-question-red-light',
       category: 'Signalisation lumineuse',
       text: 'Que devez-vous faire face a un feu rouge fixe ?',
-      answers: ['Marquer l arret obligatoire', 'Passer si la voie est libre', 'Klaxonner puis avancer', 'Continuer a vitesse reduite'],
+      options: ['Marquer l arret obligatoire', 'Passer si la voie est libre', 'Klaxonner puis avancer', 'Continuer a vitesse reduite'],
+      correct_answer: 'Marquer l arret obligatoire',
+      is_active: true,
+      created_at: new Date().toISOString(),
     },
     {
+      id: 'demo-question-priority',
       category: 'Priorite',
       text: 'A une intersection sans panneau, quelle regle appliquez-vous ?',
-      answers: ['La priorite a droite', 'Le vehicule le plus rapide passe', 'La priorite au vehicule le plus gros', 'Le premier qui klaxonne passe'],
+      options: ['La priorite a droite', 'Le vehicule le plus rapide passe', 'La priorite au vehicule le plus gros', 'Le premier qui klaxonne passe'],
+      correct_answer: 'La priorite a droite',
+      is_active: true,
+      created_at: new Date().toISOString(),
     },
     {
+      id: 'demo-question-seatbelt',
       category: 'Securite routiere',
       text: 'Quand devez-vous attacher votre ceinture ?',
-      answers: ['Avant tout demarrage', 'Uniquement sur autoroute', 'Seulement la nuit', 'Apres avoir atteint 50 km/h'],
+      options: ['Avant tout demarrage', 'Uniquement sur autoroute', 'Seulement la nuit', 'Apres avoir atteint 50 km/h'],
+      correct_answer: 'Avant tout demarrage',
+      is_active: true,
+      created_at: new Date().toISOString(),
     },
   ];
+  const [examQuestions, setExamQuestions] = useState<ExamQuestion[]>(fallbackExamQuestions);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedAnswers, setSelectedAnswers] = useState<Record<number, number>>({ 0: 0 });
+  const [examAttempt, setExamAttempt] = useState<ExamAttempt | null>(null);
+  const [examStatus, setExamStatus] = useState<string | null>(null);
+  const [isStartingExam, setIsStartingExam] = useState(false);
+  const [isSubmittingExam, setIsSubmittingExam] = useState(false);
   const currentQuestion = examQuestions[currentQuestionIndex];
   const displayQuestionNumber = currentQuestionIndex + 12;
   const answeredCount = Object.keys(selectedAnswers).length;
   const progress = Math.round((displayQuestionNumber / 40) * 100);
+
+  useEffect(() => {
+    getQuestions()
+      .then((questions) => {
+        const activeQuestions = questions.filter((question) => question.is_active);
+        if (activeQuestions.length > 0) {
+          setExamQuestions(activeQuestions);
+          setCurrentQuestionIndex(0);
+          setSelectedAnswers({});
+        }
+      })
+      .catch(() => setExamStatus('Mode demo : banque de questions API indisponible.'));
+  }, []);
+
+  async function handleStartExam() {
+    setIsStartingExam(true);
+    setExamStatus(null);
+    try {
+      const attempt = await startExamFromBooking('CRG-BOOK-DEMO-001');
+      setExamAttempt(attempt);
+      setExamStatus(`Tentative API demarree : ${attempt.id}`);
+    } catch (error) {
+      setExamStatus(getActionErrorMessage(error, 'Demarrage API impossible. Mode demo maintenu.'));
+    } finally {
+      setIsStartingExam(false);
+    }
+  }
+
+  async function handleSubmitExam() {
+    if (!examAttempt) {
+      setExamStatus('Demarrez une tentative API avant de soumettre.');
+      return;
+    }
+    setIsSubmittingExam(true);
+    setExamStatus(null);
+    const answers = Object.fromEntries(
+      Object.entries(selectedAnswers)
+        .map(([questionIndex, answerIndex]) => {
+          const question = examQuestions[Number(questionIndex)];
+          return question ? [question.id, question.options[answerIndex]] : null;
+        })
+        .filter((entry): entry is [string, string] => Boolean(entry)),
+    );
+    try {
+      const submittedAttempt = await submitExamAttempt(examAttempt.id, answers);
+      setExamAttempt(submittedAttempt);
+      setExamStatus(`Tentative soumise : score ${submittedAttempt.score ?? 0}, statut ${submittedAttempt.status}.`);
+    } catch (error) {
+      setExamStatus(getActionErrorMessage(error, 'Soumission impossible. Verifiez la tentative API.'));
+    } finally {
+      setIsSubmittingExam(false);
+    }
+  }
   const examChecks = [
     ['Identite', 'Verifiee'],
     ['Poste', 'CTR-KALOUM-12'],
@@ -1621,7 +1696,7 @@ export function ExamPage() {
         <article className="question-card">
           <span className="question-category">{currentQuestion.category}</span>
           <p className="question">{currentQuestion.text}</p>
-          {currentQuestion.answers.map((answer, index) => (
+          {currentQuestion.options.map((answer, index) => (
             <button
               type="button"
               className={selectedAnswers[currentQuestionIndex] === index ? 'answer selected' : 'answer'}
@@ -1637,6 +1712,13 @@ export function ExamPage() {
           <span>{answeredCount} reponse(s) saisie(s)</span>
           <button disabled={currentQuestionIndex === examQuestions.length - 1} onClick={() => setCurrentQuestionIndex((index) => Math.min(examQuestions.length - 1, index + 1))}>Question suivante</button>
         </div>
+        <div className="exam-api-actions">
+          <button onClick={handleStartExam} disabled={isStartingExam || examAttempt?.status === 'started'}>{isStartingExam ? 'Demarrage...' : 'Demarrer tentative API'}</button>
+          <button className="secondary-button" onClick={handleSubmitExam} disabled={isSubmittingExam || !examAttempt || examAttempt.status !== 'started'}>
+            {isSubmittingExam ? 'Soumission...' : 'Soumettre les reponses'}
+          </button>
+        </div>
+        {examStatus && <p className={examStatus.includes('impossible') || examStatus.includes('indisponible') ? 'form-error' : 'login-status'}>{examStatus}</p>}
       </div>
       <aside className="timer-card exam-control-card">
         <span>Temps restant</span>

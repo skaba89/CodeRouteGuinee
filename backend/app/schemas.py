@@ -198,6 +198,10 @@ class ExamStartRequest(BaseModel):
     session_id: str
 
 
+class ExamStartFromBookingRequest(BaseModel):
+    booking_reference: str = Field(min_length=3)
+
+
 class ExamSubmitRequest(BaseModel):
     answers: dict[str, str]
 
