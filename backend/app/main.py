@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
 from app.db.session import init_db
-from app.routers import auth, bookings, candidates, candidate_identity, candidate_submissions, center_incidents, center_stations, centers, dashboard, device_sessions, documents, entries, exam_monitoring, exam_question_traces, exam_reviews, exams, payment_reconciliation, payments, questions, sessions, supervision
+from app.routers import auth, bookings, candidates, candidate_identity, candidate_submissions, center_incidents, center_stations, centers, dashboard, device_sessions, documents, entries, exam_monitoring, exam_question_traces, exam_reviews, exams, payment_reconciliation, payments, question_governance, questions, sessions, supervision
 
 settings = get_settings()
 
@@ -43,6 +43,7 @@ app.include_router(candidates.router, prefix=settings.api_v1_prefix)
 app.include_router(candidate_identity.router, prefix=settings.api_v1_prefix)
 app.include_router(centers.router, prefix=settings.api_v1_prefix)
 app.include_router(questions.router, prefix=settings.api_v1_prefix)
+app.include_router(question_governance.router, prefix=settings.api_v1_prefix)
 app.include_router(sessions.router, prefix=settings.api_v1_prefix)
 app.include_router(exams.router, prefix=settings.api_v1_prefix)
 app.include_router(bookings.router, prefix=settings.api_v1_prefix)

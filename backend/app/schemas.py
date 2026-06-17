@@ -107,6 +107,22 @@ class QuestionRead(QuestionCreate):
     model_config = {"from_attributes": True}
 
 
+class QuestionGovernanceDecisionCreate(BaseModel):
+    status: Literal["published", "suspended", "needs_revision"]
+    reason: str = Field(min_length=5)
+
+
+class QuestionGovernanceRead(BaseModel):
+    question_id: str
+    category: str
+    text: str
+    is_active: bool
+    latest_status: str
+    latest_reason: str | None = None
+    decided_by_id: str | None = None
+    decided_at: datetime | None = None
+
+
 class ExamSessionCreate(BaseModel):
     center_id: str
     starts_at: datetime

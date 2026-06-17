@@ -15,8 +15,10 @@ import {
   type PaymentReconciliationItem,
   type PaymentResult,
   type PaymentSummary,
+  type QuestionGovernanceItem,
   createPayment,
   decideCandidateIdentity,
+  decideQuestionGovernance,
   downloadAdminPaymentsCsv,
   downloadDashboardCsv,
   downloadExamAttemptsCsv,
@@ -32,6 +34,7 @@ import {
   getInstitutionalReadiness,
   getPaymentAlerts,
   getPaymentReconciliationItems,
+  getQuestionGovernanceItems,
   validateEntry,
   updateCenterStatus,
   verifyExamCertificate,
@@ -126,6 +129,27 @@ const fallbackIdentityChecks: CandidateIdentityCheck[] = [
     status: 'needs_review',
     decision_reason: 'Controle manuel requis avant convocation',
     created_at: new Date().toISOString(),
+  },
+];
+
+const fallbackQuestionGovernance: QuestionGovernanceItem[] = [
+  {
+    question_id: 'demo-question-1',
+    category: 'signalisation',
+    text: 'Que doit faire un conducteur face a un feu rouge fixe ?',
+    is_active: true,
+    latest_status: 'published',
+    latest_reason: 'Question officielle de demonstration',
+    decided_at: new Date().toISOString(),
+  },
+  {
+    question_id: 'demo-question-2',
+    category: 'priorite',
+    text: 'Dans quel cas la priorite a droite s applique-t-elle ?',
+    is_active: false,
+    latest_status: 'needs_revision',
+    latest_reason: 'Relecture pedagogique requise',
+    decided_at: new Date().toISOString(),
   },
 ];
 
@@ -349,6 +373,8 @@ export function AdminPage() {
   const [paymentAlerts, setPaymentAlerts] = useState<PaymentAlert[]>([]);
   const [identityChecks, setIdentityChecks] = useState<CandidateIdentityCheck[]>(fallbackIdentityChecks);
   const [identityStatus, setIdentityStatus] = useState<string | null>(null);
+  const [questionGovernance, setQuestionGovernance] = useState<QuestionGovernanceItem[]>(fallbackQuestionGovernance);
+  const [questionGovernanceStatus, setQuestionGovernanceStatus] = useState<string | null>(null);
   const [institutionalReadiness, setInstitutionalReadiness] = useState<InstitutionalReadiness>(fallbackInstitutionalReadiness);
   const [readinessStatus, setReadinessStatus] = useState<string | null>(null);
   const [paymentFilters, setPaymentFilters] = useState<PaymentFilters>({});
@@ -397,6 +423,12 @@ export function AdminPage() {
         setIdentityStatus(null);
       })
       .catch(() => setIdentityStatus('Mode demo : connectez-vous avec un role admin pour traiter les identites API.'));
+    getQuestionGovernanceItems()
+      .then((items) => {
+        setQuestionGovernance(items.length > 0 ? items : fallbackQuestionGovernance);
+        setQuestionGovernanceStatus(null);
+      })
+      .catch(() => setQuestionGovernanceStatus('Mode demo : connectez-vous avec un role admin pour gouverner la banque de questions API.'));
     getAuditLogs()
       .then((logs) => {
         setAuditLogs(logs);
@@ -435,6 +467,19 @@ export function AdminPage() {
       await refreshAuditLogs();
     } catch {
       setIdentityStatus('Decision identite impossible : connectez-vous avec un role admin ou super admin.');
+    }
+  }
+
+  async function handleQuestionDecision(questionId: string, status: string, reason: string) {
+    setQuestionGovernanceStatus(null);
+    try {
+      const updatedItem = await decideQuestionGovernance(questionId, status, reason);
+      setQuestionGovernance((current) => current.map((item) => (item.question_id === questionId ? updatedItem : item)));
+      setQuestionGovernanceStatus(`Question ${updatedItem.category} : ${updatedItem.latest_status}.`);
+      await refreshAuditLogs();
+      getDashboard().then(setDashboard).catch(() => undefined);
+    } catch {
+      setQuestionGovernanceStatus('Decision question impossible : connectez-vous avec un role admin ou super admin.');
     }
   }
 
@@ -581,6 +626,31 @@ export function AdminPage() {
                     <button onClick={() => handleIdentityDecision(check.id, 'verified', 'Piece conforme au controle administratif')}>Valider</button>
                     <button onClick={() => handleIdentityDecision(check.id, 'needs_review', 'Controle manuel complementaire requis')}>Revue</button>
                     <button onClick={() => handleIdentityDecision(check.id, 'rejected', 'Piece non conforme ou illisible')}>Rejeter</button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="question-governance-panel">
+        <h3>Banque nationale de questions</h3>
+        <p>Publication, suspension et relecture officielle des questions utilisees dans les examens.</p>
+        {questionGovernanceStatus && <p className={questionGovernanceStatus.includes('impossible') || questionGovernanceStatus.includes('Mode demo') ? 'form-error' : 'login-status'}>{questionGovernanceStatus}</p>}
+        <table>
+          <thead><tr><th>Categorie</th><th>Question</th><th>Statut</th><th>Active</th><th>Decision</th></tr></thead>
+          <tbody>
+            {questionGovernance.slice(0, 8).map((item) => (
+              <tr key={item.question_id}>
+                <td>{item.category}</td>
+                <td>{item.text}</td>
+                <td><span className={item.latest_status === 'published' ? 'badge ok' : 'badge'}>{item.latest_status}</span></td>
+                <td>{item.is_active ? 'Oui' : 'Non'}</td>
+                <td>
+                  <div className="table-actions">
+                    <button onClick={() => handleQuestionDecision(item.question_id, 'published', 'Question validee pour publication officielle')}>Publier</button>
+                    <button onClick={() => handleQuestionDecision(item.question_id, 'needs_revision', 'Relecture pedagogique ou juridique requise')}>Relecture</button>
+                    <button onClick={() => handleQuestionDecision(item.question_id, 'suspended', 'Question suspendue par decision administrative')}>Suspendre</button>
                   </div>
                 </td>
               </tr>

@@ -133,6 +133,7 @@ body {
 .finance-panel,
 .center-governance-panel,
 .identity-panel,
+.question-governance-panel,
 .institutional-panel {
   border: 1px solid rgba(255, 255, 255, 0.76);
   background:
@@ -141,7 +142,8 @@ body {
 }
 
 .center-governance-panel,
-.identity-panel {
+.identity-panel,
+.question-governance-panel {
   display: grid;
   gap: 14px;
   padding: 22px;
@@ -150,7 +152,9 @@ body {
 .center-governance-panel h3,
 .center-governance-panel p,
 .identity-panel h3,
-.identity-panel p {
+.identity-panel p,
+.question-governance-panel h3,
+.question-governance-panel p {
   margin: 0;
 }
 

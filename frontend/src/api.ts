@@ -106,6 +106,17 @@ export type CandidateIdentityCheck = {
   decided_at?: string | null;
 };
 
+export type QuestionGovernanceItem = {
+  question_id: string;
+  category: string;
+  text: string;
+  is_active: boolean;
+  latest_status: string;
+  latest_reason?: string | null;
+  decided_by_id?: string | null;
+  decided_at?: string | null;
+};
+
 export type ExamCertificateVerification = {
   valid: boolean;
   attempt_id: string;
@@ -284,6 +295,14 @@ export function getCandidateIdentityChecks(): Promise<CandidateIdentityCheck[]> 
 
 export function decideCandidateIdentity(checkId: string, status: string, reason: string): Promise<CandidateIdentityCheck> {
   return postPrivateJson<CandidateIdentityCheck>(`/api/v1/candidate-identity/${encodeURIComponent(checkId)}/decision`, { status, reason });
+}
+
+export function getQuestionGovernanceItems(): Promise<QuestionGovernanceItem[]> {
+  return getPrivateJson<QuestionGovernanceItem[]>('/api/v1/question-governance?limit=25');
+}
+
+export function decideQuestionGovernance(questionId: string, status: string, reason: string): Promise<QuestionGovernanceItem> {
+  return postPrivateJson<QuestionGovernanceItem>(`/api/v1/question-governance/${encodeURIComponent(questionId)}/decision`, { status, reason });
 }
 
 export function getPaymentReconciliationItems(filters: PaymentFilters = {}): Promise<PaymentReconciliationItem[]> {
