@@ -7,6 +7,7 @@ import {
   type EntryValidationResult,
   type ExamCertificateVerification,
   type ExamSummary,
+  type InstitutionalReadiness,
   type PaymentAlert,
   type PaymentFilters,
   type PaymentReconciliationItem,
@@ -23,6 +24,7 @@ import {
   getEntrySummary,
   getExamCertificatePdfUrl,
   getExamSummary,
+  getInstitutionalReadiness,
   getPaymentAlerts,
   getPaymentReconciliationItems,
   validateEntry,
@@ -60,6 +62,44 @@ const fallbackPaymentSummary: PaymentSummary = {
   total_amount_gnf: 0,
   by_status: {},
   by_provider: {},
+};
+
+const fallbackInstitutionalReadiness: InstitutionalReadiness = {
+  score: 70,
+  label: 'Mode demonstration - pilote a renforcer',
+  summary: 'Vue de demonstration pour presenter la trajectoire institutionnelle de CodeRoute Guinee.',
+  items: [
+    {
+      pillar: 'Gouvernance nationale',
+      status: 'partial',
+      evidence: 'Mode demo : centres agrees, roles et supervision nationale sont modelises.',
+      next_step: 'Faire valider la gouvernance par le ministere et les directions competentes.',
+    },
+    {
+      pillar: 'Parcours candidat',
+      status: 'ready',
+      evidence: 'Inscription, reservation, paiement, convocation et resultats sont couverts.',
+      next_step: 'Brancher les registres officiels et les pieces d identite.',
+    },
+    {
+      pillar: 'Banque nationale de questions',
+      status: 'partial',
+      evidence: 'Le moteur de questions et correction automatique est operationnel.',
+      next_step: 'Importer une banque officielle par categorie de permis.',
+    },
+    {
+      pillar: 'Tracabilite et audit',
+      status: 'ready',
+      evidence: 'Les actions sensibles generent des journaux consultables.',
+      next_step: 'Definir les durees de conservation et habilitations.',
+    },
+    {
+      pillar: 'Securite antifraude',
+      status: 'partial',
+      evidence: 'Controle entree, monitoring examen et alertes sont presents.',
+      next_step: 'Ajouter verification photo et supervision physique renforcee.',
+    },
+  ],
 };
 
 const modules = [
@@ -278,6 +318,8 @@ export function AdminPage() {
   const [paymentSummary, setPaymentSummary] = useState<PaymentSummary>(fallbackPaymentSummary);
   const [paymentItems, setPaymentItems] = useState<PaymentReconciliationItem[]>([]);
   const [paymentAlerts, setPaymentAlerts] = useState<PaymentAlert[]>([]);
+  const [institutionalReadiness, setInstitutionalReadiness] = useState<InstitutionalReadiness>(fallbackInstitutionalReadiness);
+  const [readinessStatus, setReadinessStatus] = useState<string | null>(null);
   const [paymentFilters, setPaymentFilters] = useState<PaymentFilters>({});
   const [activePaymentFilters, setActivePaymentFilters] = useState<PaymentFilters>({});
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
@@ -311,6 +353,12 @@ export function AdminPage() {
     getEntrySummary().then(setEntrySummary).catch(() => undefined);
     getExamSummary().then(setExamSummary).catch(() => undefined);
     loadPaymentSummary({});
+    getInstitutionalReadiness()
+      .then((readiness) => {
+        setInstitutionalReadiness(readiness);
+        setReadinessStatus(null);
+      })
+      .catch(() => setReadinessStatus('Mode demo : connectez-vous avec un token admin pour charger le score institutionnel API.'));
     getAuditLogs()
       .then((logs) => {
         setAuditLogs(logs);
@@ -425,6 +473,27 @@ export function AdminPage() {
         <article><strong>{formatCurrency(paymentSummary.total_amount_gnf)}</strong><span>GNF encaisses</span></article>
         <article><strong>{formatNumber(paymentSummary.total_count)}</strong><span>Paiements</span></article>
       </div>
+      <div className="institutional-panel">
+        <div className="institutional-header">
+          <div>
+            <h3>Dossier institutionnel Etat guineen</h3>
+            <p>{institutionalReadiness.summary}</p>
+          </div>
+          <strong>{institutionalReadiness.score}%</strong>
+        </div>
+        <span className="badge ok">{institutionalReadiness.label}</span>
+        {readinessStatus && <p className="form-error">{readinessStatus}</p>}
+        <div className="readiness-grid">
+          {institutionalReadiness.items.map((item) => (
+            <article key={item.pillar} className={`readiness-item status-${item.status}`}>
+              <span>{item.status}</span>
+              <strong>{item.pillar}</strong>
+              <p>{item.evidence}</p>
+              <small>{item.next_step}</small>
+            </article>
+          ))}
+        </div>
+      </div>
       <div className="finance-panel">
         <h3>Supervision financiere</h3>
         <form className="finance-filters" onSubmit={handlePaymentFiltersSubmit}>
@@ -532,8 +601,9 @@ export function ExamPage() {
   return (
     <section className="screen exam-screen">
       <div>
-        <p className="eyebrow dark">Interface examen</p>
+        <p className="eyebrow dark">Examen securise</p>
         <h2>Question 12 / 40</h2>
+        <p>Mode centre agree avec surveillance, minuterie et trace d'audit de la tentative.</p>
         <p className="question">Que devez-vous faire face a un feu rouge fixe ?</p>
         <div className="answer selected">A. Marquer l'arret obligatoire</div>
         <div className="answer">B. Passer si la voie est libre</div>

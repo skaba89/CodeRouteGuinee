@@ -130,11 +130,75 @@ body {
 .result-card,
 .timer-card,
 .audit-panel,
-.finance-panel {
+.finance-panel,
+.institutional-panel {
   border: 1px solid rgba(255, 255, 255, 0.76);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 250, 252, 0.92));
   box-shadow: var(--premium-shadow-soft);
+}
+
+.institutional-panel {
+  display: grid;
+  gap: 18px;
+  background: linear-gradient(135deg, rgba(6, 43, 82, 0.98), rgba(0, 118, 83, 0.94));
+  color: #ffffff;
+  padding: 24px;
+}
+
+.institutional-panel p,
+.institutional-panel small {
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.institutional-header {
+  display: flex;
+  gap: 18px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.institutional-header h3 {
+  margin: 0 0 8px;
+}
+
+.institutional-header strong {
+  font-size: 44px;
+  line-height: 1;
+}
+
+.readiness-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.readiness-item {
+  display: grid;
+  gap: 8px;
+  min-height: 190px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 18px;
+  padding: 16px;
+}
+
+.readiness-item span {
+  width: fit-content;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  padding: 5px 9px;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.readiness-item.status-ready span {
+  background: rgba(28, 185, 126, 0.24);
+}
+
+.readiness-item.status-partial span {
+  background: rgba(245, 181, 48, 0.24);
 }
 
 .metrics article {
@@ -311,8 +375,13 @@ tr:last-child td {
   .exam-screen,
   .metrics,
   .compact,
-  .modules-grid {
+  .modules-grid,
+  .readiness-grid {
     grid-template-columns: 1fr;
+  }
+
+  .institutional-header {
+    flex-direction: column;
   }
 
   .hero {

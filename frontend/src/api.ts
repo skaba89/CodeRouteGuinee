@@ -68,6 +68,20 @@ export type PaymentAlert = PaymentReconciliationItem & {
   message: string;
 };
 
+export type InstitutionalReadinessItem = {
+  pillar: string;
+  status: 'ready' | 'partial' | 'todo' | string;
+  evidence: string;
+  next_step: string;
+};
+
+export type InstitutionalReadiness = {
+  score: number;
+  label: string;
+  summary: string;
+  items: InstitutionalReadinessItem[];
+};
+
 export type ExamCertificateVerification = {
   valid: boolean;
   attempt_id: string;
@@ -202,6 +216,10 @@ export function getAuditLogs(): Promise<AuditLogEntry[]> {
 
 export function getAdminPaymentSummary(filters: PaymentFilters = {}): Promise<PaymentSummary> {
   return getPrivateJson<PaymentSummary>(`/api/v1/payments/admin/summary${buildPaymentQuery(filters)}`);
+}
+
+export function getInstitutionalReadiness(): Promise<InstitutionalReadiness> {
+  return getPrivateJson<InstitutionalReadiness>('/api/v1/dashboard/institutional-readiness');
 }
 
 export function getPaymentReconciliationItems(filters: PaymentFilters = {}): Promise<PaymentReconciliationItem[]> {

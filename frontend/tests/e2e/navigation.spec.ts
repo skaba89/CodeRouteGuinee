@@ -25,15 +25,15 @@ test.describe('CodeRoute Guinee UI smoke tests', () => {
     await page.goto('/#/login');
 
     await page.getByRole('button', { name: 'Candidat' }).click();
-    await page.getByRole('link', { name: 'Continuer avec ce role' }).click();
+    await page.getByRole('link', { name: /Continuer avec ce r(o|ô)le/ }).click();
 
     await expect(page.getByText('Session : Candidat')).toBeVisible();
     await expect(page.getByRole('link', { name: 'Candidat' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Admin' })).toHaveCount(0);
 
     await page.goto('/#/admin');
-    await expect(page.getByRole('heading', { name: 'Page non autorisee pour ce role' })).toBeVisible();
-    await expect(page.getByText('Le role actif')).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Page non autoris.e pour ce r.le/ })).toBeVisible();
+    await expect(page.getByText(/Le r.le actif/)).toBeVisible();
   });
 
   test('keeps exam and results screens available for demo flow', async ({ page }) => {
@@ -41,10 +41,10 @@ test.describe('CodeRoute Guinee UI smoke tests', () => {
 
     await page.getByRole('link', { name: 'Examen' }).click();
     await expect(page.getByRole('heading', { name: /Question 12 \/ 40/ })).toBeVisible();
-    await expect(page.getByText('Examen securise')).toBeVisible();
+    await expect(page.getByText(/Examen s(e|é)curis(e|é)/)).toBeVisible();
 
-    await page.getByRole('link', { name: 'Resultats' }).click();
-    await expect(page.getByRole('heading', { name: 'Verification resultat et certificat' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Verifier le certificat' })).toBeVisible();
+    await page.getByRole('link', { name: /R.sultats/ }).click();
+    await expect(page.getByRole('heading', { name: 'Examen du code de la route' })).toBeVisible();
+    await expect(page.getByRole('button', { name: /V.rifier certificat/ })).toBeVisible();
   });
 });

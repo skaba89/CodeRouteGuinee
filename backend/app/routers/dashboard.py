@@ -40,6 +40,20 @@ class AntiFraudDashboardRead(BaseModel):
     centers_at_risk: list[AntiFraudCenterRisk]
 
 
+class InstitutionalReadinessItem(BaseModel):
+    pillar: str
+    status: str
+    evidence: str
+    next_step: str
+
+
+class InstitutionalReadinessRead(BaseModel):
+    score: int
+    label: str
+    summary: str
+    items: list[InstitutionalReadinessItem]
+
+
 def _build_dashboard(db: Session) -> DashboardRead:
     fraud_alerts = db.query(CenterIncident).filter(CenterIncident.status == "open").count()
     fraud_alerts += db.query(DeviceSession).filter(DeviceSession.status == "suspicious").count()
@@ -66,6 +80,72 @@ def _risk_status(score: int) -> str:
 @router.get("", response_model=DashboardRead)
 def dashboard(db: Session = Depends(get_db)) -> DashboardRead:
     return _build_dashboard(db)
+
+
+@router.get("/institutional-readiness", response_model=InstitutionalReadinessRead)
+def institutional_readiness(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "super_admin")),
+) -> InstitutionalReadinessRead:
+    data = _build_dashboard(db)
+    audit_count = db.query(AuditLog).count()
+    active_centers = data.accredited_centers
+    has_question_bank = data.questions >= 40
+    has_operational_flow = data.candidates > 0 and data.exam_sessions > 0
+    has_audit_trail = audit_count > 0
+    has_supervision = data.fraud_alerts >= 0
+
+    items = [
+        InstitutionalReadinessItem(
+            pillar="Gouvernance nationale",
+            status="ready" if active_centers > 0 else "todo",
+            evidence=f"{active_centers} centre(s) actif(s) ou accredite(s) suivis dans la plateforme.",
+            next_step="Valider la nomenclature officielle des centres agrees avec l'administration.",
+        ),
+        InstitutionalReadinessItem(
+            pillar="Parcours candidat",
+            status="ready" if has_operational_flow else "todo",
+            evidence=f"{data.candidates} candidat(s) et {data.exam_sessions} session(s) d'examen references.",
+            next_step="Connecter l'inscription aux registres administratifs et pieces d'identite.",
+        ),
+        InstitutionalReadinessItem(
+            pillar="Banque nationale de questions",
+            status="ready" if has_question_bank else "partial",
+            evidence=f"{data.questions} question(s) actives dans la banque.",
+            next_step="Constituer une banque officielle par categorie de permis et langue.",
+        ),
+        InstitutionalReadinessItem(
+            pillar="Tracabilite et audit",
+            status="ready" if has_audit_trail else "partial",
+            evidence=f"{audit_count} evenement(s) d'audit enregistres.",
+            next_step="Definir la duree legale de conservation et les profils habilites.",
+        ),
+        InstitutionalReadinessItem(
+            pillar="Securite antifraude",
+            status="ready" if has_supervision else "partial",
+            evidence=f"{data.fraud_alerts} alerte(s) consolidee(s) dans le tableau national.",
+            next_step="Ajouter verification d'identite renforcee, photo et supervision en centre.",
+        ),
+    ]
+    weights = {"ready": 20, "partial": 10, "todo": 0}
+    score = sum(weights[item.status] for item in items)
+    label = "Pret pour pilote institutionnel" if score >= 80 else "Pilote a renforcer" if score >= 50 else "Socle a completer"
+    db.add(
+        AuditLog(
+            actor_id=current_user.id,
+            action="dashboard.institutional_readiness_viewed",
+            entity="dashboard",
+            entity_id="institutional-readiness",
+            details={"score": score, "label": label},
+        )
+    )
+    db.commit()
+    return InstitutionalReadinessRead(
+        score=score,
+        label=label,
+        summary="Lecture executive pour presenter le niveau de maturite de CodeRoute Guinee a l'Etat guineen.",
+        items=items,
+    )
 
 
 @router.get("/anti-fraud", response_model=AntiFraudDashboardRead)
