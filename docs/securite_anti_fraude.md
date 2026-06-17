@@ -9,9 +9,14 @@ Garantir que chaque examen est passe par le bon candidat, dans un centre agree, 
 - Convocation avec reference unique.
 - Verification du candidat a l'entree du centre.
 - Journalisation du demarrage et de la soumission de l'examen.
+- Export CSV protege du journal d'audit national.
 - Questions tirees aleatoirement.
 - Ordre des reponses melange dans une version future.
 - Resultat reference et historise.
+- Limitation des tentatives de connexion par email/IP.
+- Audit des connexions reussies, echouees et bloquees.
+- Headers HTTP de securite sur les reponses API.
+- Gouvernance des comptes avec creation, reinitialisation de mot de passe, changement de role et suspension reserves au `super_admin`.
 
 ## Mesures avancees
 

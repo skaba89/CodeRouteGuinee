@@ -6,9 +6,24 @@ from fastapi.testclient import TestClient
 from app.main import app
 
 
+def _admin_headers(client: TestClient) -> dict[str, str]:
+    suffix = str(uuid4())[:8]
+    email = f"admin-api-{suffix}@coderoute.gn"
+    password = "StrongPass123"
+    response = client.post(
+        "/api/v1/auth/register",
+        json={"email": email, "full_name": "Admin API", "password": password, "role": "admin"},
+    )
+    assert response.status_code == 201
+    token_response = client.post("/api/v1/auth/login", data={"username": email, "password": password})
+    assert token_response.status_code == 200
+    return {"Authorization": f"Bearer {token_response.json()['access_token']}"}
+
+
 def test_candidate_center_question_and_dashboard_routes() -> None:
     with TestClient(app) as client:
         suffix = str(uuid4())[:8]
+        headers = _admin_headers(client)
         center_payload = {
             "code": f"CTR-KALOUM-{suffix}",
             "name": "Centre agree Kaloum Test",
@@ -17,7 +32,7 @@ def test_candidate_center_question_and_dashboard_routes() -> None:
             "capacity": 20,
             "status": "active",
         }
-        center_response = client.post("/api/v1/centers", json=center_payload)
+        center_response = client.post("/api/v1/centers", headers=headers, json=center_payload)
         assert center_response.status_code == 201
 
         candidate_response = client.post(
@@ -35,6 +50,7 @@ def test_candidate_center_question_and_dashboard_routes() -> None:
 
         question_response = client.post(
             "/api/v1/questions",
+            headers=headers,
             json={
                 "category": "priorite",
                 "text": "Que faire a un panneau STOP ?",
@@ -50,6 +66,7 @@ def test_candidate_center_question_and_dashboard_routes() -> None:
 
         session_response = client.post(
             "/api/v1/sessions",
+            headers=headers,
             json={
                 "center_id": center_id,
                 "starts_at": (datetime.utcnow() + timedelta(days=1)).isoformat(),

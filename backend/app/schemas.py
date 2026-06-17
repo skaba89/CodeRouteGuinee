@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -12,7 +13,15 @@ class UserCreate(BaseModel):
     email: str
     full_name: str
     password: str = Field(min_length=8)
-    role: str = "candidate"
+    role: Literal["super_admin", "admin", "center", "candidate"] = "candidate"
+
+
+class InstitutionalUserCreate(BaseModel):
+    email: str
+    full_name: str
+    initial_password: str = Field(min_length=12)
+    role: Literal["admin", "center", "candidate"] = "center"
+    reason: str = Field(min_length=5)
 
 
 class UserRead(BaseModel):
@@ -21,8 +30,29 @@ class UserRead(BaseModel):
     full_name: str
     role: str
     is_active: bool
+    created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class UserRoleUpdate(BaseModel):
+    role: Literal["super_admin", "admin", "center", "candidate"]
+    reason: str = Field(min_length=5)
+
+
+class UserStatusUpdate(BaseModel):
+    is_active: bool
+    reason: str = Field(min_length=5)
+
+
+class PasswordChangeRequest(BaseModel):
+    current_password: str = Field(min_length=8)
+    new_password: str = Field(min_length=12)
+
+
+class UserPasswordReset(BaseModel):
+    new_password: str = Field(min_length=12)
+    reason: str = Field(min_length=5)
 
 
 class CandidateCreate(BaseModel):
@@ -42,13 +72,40 @@ class CandidateRead(CandidateCreate):
     model_config = {"from_attributes": True}
 
 
+class CandidateIdentityCreate(BaseModel):
+    candidate_id: str
+    document_type: Literal["national_id", "passport", "driver_file"] = "national_id"
+    document_reference: str = Field(min_length=3)
+    photo_reference: str | None = None
+
+
+class CandidateIdentityDecision(BaseModel):
+    status: Literal["verified", "rejected", "needs_review"]
+    reason: str = Field(min_length=5)
+
+
+class CandidateIdentityRead(BaseModel):
+    id: str
+    candidate_id: str
+    document_type: str
+    document_reference: str
+    photo_reference: str | None = None
+    status: str
+    verified_by_id: str | None = None
+    decision_reason: str | None = None
+    created_at: datetime
+    decided_at: datetime | None = None
+
+    model_config = {"from_attributes": True}
+
+
 class CenterCreate(BaseModel):
     code: str
     name: str
     city: str
     address: str
     capacity: int = 20
-    status: str = "pending_audit"
+    status: Literal["pending_audit", "active", "accredited", "suspended"] = "pending_audit"
 
 
 class CenterRead(CenterCreate):
@@ -56,6 +113,11 @@ class CenterRead(CenterCreate):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class CenterStatusUpdate(BaseModel):
+    status: Literal["pending_audit", "active", "accredited", "suspended"]
+    reason: str = Field(min_length=5)
 
 
 class QuestionCreate(BaseModel):
@@ -70,6 +132,45 @@ class QuestionRead(QuestionCreate):
     id: str
     is_active: bool
     created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class QuestionGovernanceDecisionCreate(BaseModel):
+    status: Literal["published", "suspended", "needs_revision"]
+    reason: str = Field(min_length=5)
+
+
+class QuestionGovernanceRead(BaseModel):
+    question_id: str
+    category: str
+    text: str
+    is_active: bool
+    latest_status: str
+    latest_reason: str | None = None
+    decided_by_id: str | None = None
+    decided_at: datetime | None = None
+
+
+class InstitutionalAuthorizationCreate(BaseModel):
+    authority: str = Field(min_length=3)
+    reference: str = Field(min_length=3)
+    title: str = Field(min_length=3)
+    scope: str = Field(min_length=5)
+    valid_from: datetime | None = None
+    valid_until: datetime | None = None
+
+
+class InstitutionalAuthorizationStatusUpdate(BaseModel):
+    status: Literal["draft", "pending_signature", "approved", "expired", "revoked"]
+    reason: str = Field(min_length=5)
+
+
+class InstitutionalAuthorizationRead(InstitutionalAuthorizationCreate):
+    id: str
+    status: str
+    created_at: datetime
+    updated_at: datetime | None = None
 
     model_config = {"from_attributes": True}
 
