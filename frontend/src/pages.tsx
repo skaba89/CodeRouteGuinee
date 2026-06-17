@@ -835,6 +835,7 @@ export function AdminPage() {
     { href: '#identites', label: 'Identites' },
     { href: '#questions', label: 'Questions' },
     { href: '#habilitations', label: 'Habilitations' },
+    { href: '#roadmap', label: 'Roadmap' },
     { href: '#rapport', label: 'Rapport' },
     { href: '#finance', label: 'Finance' },
     { href: '#audit', label: 'Audit' },
@@ -886,6 +887,36 @@ export function AdminPage() {
     ['Paiements confirmes', formatNumber(paidPayments), `${formatNumber(pendingPayments)} a rapprocher`],
     ['Audit disponible', formatNumber(institutionalReport.audit_events), 'Tracabilite administrative'],
     ['Actions ouvertes', formatNumber(institutionalActionCenter.total_actions), `${formatNumber(institutionalActionCenter.critical_actions)} critique(s)`],
+  ];
+  const institutionalRoadmap = [
+    {
+      phase: 'Lot 1',
+      title: 'Socle officiel et homologation',
+      priority: 'Priorite haute',
+      status: institutionalReport.readiness_score >= 80 ? 'Pret' : 'En cours',
+      items: ['Validation ministerielle', 'Nomenclature centres agrees', 'Politique de conservation des preuves'],
+    },
+    {
+      phase: 'Lot 2',
+      title: 'Donnees nationales connectees',
+      priority: 'Priorite haute',
+      status: 'A brancher',
+      items: ['Registre candidats', 'Pieces identite', 'Banque officielle de questions'],
+    },
+    {
+      phase: 'Lot 3',
+      title: 'Securite examen et antifraude',
+      priority: 'Priorite haute',
+      status: 'A renforcer',
+      items: ['Photo candidat', 'Surveillance centre', 'Journal antifraude horodate'],
+    },
+    {
+      phase: 'Lot 4',
+      title: 'Deploiement national',
+      priority: 'Priorite moyenne',
+      status: 'Planifie',
+      items: ['Formation agents', 'Tableaux de bord regionaux', 'Support et exploitation'],
+    },
   ];
 
   return (
@@ -1155,6 +1186,30 @@ export function AdminPage() {
               <strong>{item.pillar}</strong>
               <p>{item.evidence}</p>
               <small>{item.next_step}</small>
+            </article>
+          ))}
+        </div>
+      </div>
+      <div id="roadmap" className="roadmap-panel admin-section">
+        <div className="roadmap-header">
+          <div>
+            <h3>Feuille de route institutionnelle</h3>
+            <p>Lots restants pour passer du pilote presentable a une plateforme nationale exploitable.</p>
+          </div>
+          <span>{institutionalRoadmap.length} lots</span>
+        </div>
+        <div className="roadmap-grid">
+          {institutionalRoadmap.map((item) => (
+            <article key={item.phase}>
+              <div className="roadmap-card-header">
+                <span>{item.phase}</span>
+                <small>{item.priority}</small>
+              </div>
+              <strong>{item.title}</strong>
+              <em>{item.status}</em>
+              <ul>
+                {item.items.map((detail) => <li key={detail}>{detail}</li>)}
+              </ul>
             </article>
           ))}
         </div>
