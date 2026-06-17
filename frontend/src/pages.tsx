@@ -437,6 +437,24 @@ export function CandidatePage() {
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [isPaying, setIsPaying] = useState(false);
   const convocationUrl = getConvocationPdfUrl(bookingReference);
+  const candidateSteps = [
+    ['Identite', 'Validee', 'Piece nationale controlee avant reservation'],
+    ['Reservation', 'Confirmee', 'Centre Kaloum - 20/06/2026'],
+    ['Paiement', paymentResult?.status ?? 'En attente', paymentResult ? 'Recu mobile money genere' : 'Paiement requis pour verrouiller la place'],
+    ['Convocation', paymentResult ? 'Disponible' : 'Prete apres paiement', 'PDF avec QR code et code de verification'],
+  ];
+  const candidateDocuments = [
+    ['Reference candidat', 'GN-CODE-2026-000001'],
+    ['Categorie permis', 'B - Vehicule leger'],
+    ['Centre', 'CTR-KALOUM'],
+    ['Poste prevu', 'Affectation le jour J'],
+  ];
+  const preparationItems = [
+    'Verifier la piece d identite originale',
+    'Arriver 30 minutes avant la session',
+    'Presenter la convocation QR au centre',
+    'Relire les categories signalisation et priorite',
+  ];
 
   async function handlePaymentSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -454,14 +472,30 @@ export function CandidatePage() {
   }
 
   return (
-    <section className="screen two-columns">
-      <div>
-        <p className="eyebrow dark">Espace candidat</p>
-        <h2>Dossier, reservation et convocation</h2>
-        <p>Le candidat suit son dossier, reserve une session, paie et telecharge sa convocation PDF avec QR code.</p>
-        <div className="mini-card">Reference candidat : <strong>GN-CODE-2026-000001</strong></div>
-        <div className="mini-card">Session : <strong>Centre Kaloum - 20/06/2026</strong></div>
-        <div className="mini-card">Paiement : <strong>{paymentResult?.status ?? 'En attente'}</strong></div>
+    <section className="screen candidate-workspace">
+      <div className="candidate-main">
+        <div className="candidate-header">
+          <div>
+            <p className="eyebrow dark">Espace candidat</p>
+            <h2>Dossier, reservation et convocation</h2>
+            <p>Le candidat suit son dossier, reserve une session, paie et telecharge sa convocation PDF avec QR code.</p>
+          </div>
+          <span className="badge ok">Dossier recevable</span>
+        </div>
+        <div className="candidate-step-grid">
+          {candidateSteps.map(([label, status, detail]) => (
+            <article key={label}>
+              <span>{label}</span>
+              <strong>{status}</strong>
+              <p>{detail}</p>
+            </article>
+          ))}
+        </div>
+        <div className="candidate-document-grid">
+          {candidateDocuments.map(([label, value]) => (
+            <div className="mini-card" key={label}>{label} : <strong>{value}</strong></div>
+          ))}
+        </div>
         <form className="payment-form" onSubmit={handlePaymentSubmit}>
           <h2>Paiement Mobile Money</h2>
           <label>Reference reservation<input value={bookingReference} onChange={(event) => setBookingReference(event.target.value)} /></label>
@@ -471,11 +505,15 @@ export function CandidatePage() {
           <button disabled={isPaying}>{isPaying ? 'Traitement...' : 'Payer maintenant'}</button>
         </form>
       </div>
-      <div className="qr-card">
+      <aside className="qr-card candidate-side-card">
         <div className="qr-box" />
         <strong>Convocation verifiable</strong>
         <span>{bookingReference}</span>
         <a className="download-link" href={convocationUrl} target="_blank" rel="noreferrer">Telecharger la convocation PDF</a>
+        <div className="candidate-prep-list">
+          <strong>Avant la session</strong>
+          {preparationItems.map((item) => <p key={item}>{item}</p>)}
+        </div>
         {paymentResult && (
           <div className="payment-result">
             <strong>Recu : {paymentResult.receipt_number}</strong>
@@ -484,7 +522,7 @@ export function CandidatePage() {
           </div>
         )}
         {paymentError && <p className="form-error">{paymentError}</p>}
-      </div>
+      </aside>
     </section>
   );
 }

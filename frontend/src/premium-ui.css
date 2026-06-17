@@ -1014,6 +1014,100 @@ tr:last-child td {
   box-shadow: inset 0 0 0 10px #ffffff, 0 18px 48px rgba(6, 43, 82, 0.16);
 }
 
+.candidate-workspace {
+  grid-template-columns: minmax(0, 1.28fr) minmax(320px, 0.72fr);
+  align-items: start;
+}
+
+.candidate-main {
+  display: grid;
+  gap: 16px;
+}
+
+.candidate-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.candidate-header h2 {
+  margin-bottom: 10px;
+}
+
+.candidate-step-grid,
+.candidate-document-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.candidate-step-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.candidate-document-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.candidate-step-grid article {
+  display: grid;
+  gap: 7px;
+  min-height: 150px;
+  padding: 16px;
+  border: 1px solid rgba(6, 43, 82, 0.08);
+  border-radius: 20px;
+  background: #ffffff;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.06);
+}
+
+.candidate-step-grid span {
+  color: var(--premium-green);
+  font-size: 12px;
+  font-weight: 950;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.candidate-step-grid strong {
+  color: var(--premium-navy);
+}
+
+.candidate-step-grid p {
+  margin: 0;
+  color: var(--premium-muted);
+  font-size: 14px;
+  font-weight: 760;
+  line-height: 1.45;
+}
+
+.candidate-side-card {
+  display: grid;
+  gap: 16px;
+  align-content: start;
+}
+
+.candidate-prep-list {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border-radius: 18px;
+  background: rgba(6, 43, 82, 0.06);
+  text-align: left;
+}
+
+.candidate-prep-list strong {
+  color: var(--premium-navy);
+}
+
+.candidate-prep-list p {
+  margin: 0;
+  padding-left: 12px;
+  border-left: 3px solid var(--premium-green);
+  color: var(--premium-muted);
+  font-size: 14px;
+  font-weight: 760;
+}
+
 .form-error,
 .login-status,
 .payment-result,
@@ -1446,6 +1540,14 @@ tr:last-child td {
     grid-template-columns: 1fr;
   }
 
+  .candidate-workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .candidate-step-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .dossier-hero,
   .dossier-highlight-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1501,6 +1603,8 @@ tr:last-child td {
   .executive-overview,
   .priority-grid,
   .operational-flow-grid,
+  .candidate-step-grid,
+  .candidate-document-grid,
   .dossier-hero,
   .dossier-highlight-grid,
   .dossier-two-columns,
@@ -1511,6 +1615,7 @@ tr:last-child td {
   }
 
   .state-dossier-intro,
+  .candidate-header,
   .security-matrix-header,
   .roadmap-header {
     flex-direction: column;
