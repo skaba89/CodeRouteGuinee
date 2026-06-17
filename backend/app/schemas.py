@@ -49,7 +49,7 @@ class CenterCreate(BaseModel):
     city: str
     address: str
     capacity: int = 20
-    status: str = "pending_audit"
+    status: Literal["pending_audit", "active", "accredited", "suspended"] = "pending_audit"
 
 
 class CenterRead(CenterCreate):
@@ -57,6 +57,11 @@ class CenterRead(CenterCreate):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class CenterStatusUpdate(BaseModel):
+    status: Literal["pending_audit", "active", "accredited", "suspended"]
+    reason: str = Field(min_length=5)
 
 
 class QuestionCreate(BaseModel):

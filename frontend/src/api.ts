@@ -8,6 +8,17 @@ export type DashboardData = {
   fraud_alerts: number;
 };
 
+export type Center = {
+  id: string;
+  code: string;
+  name: string;
+  city: string;
+  address: string;
+  capacity: number;
+  status: string;
+  created_at: string;
+};
+
 export type EntrySummary = {
   total: number;
   by_result: Record<string, number>;
@@ -178,6 +189,18 @@ async function postJson<T>(path: string, body: unknown): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+async function patchPrivateJson<T>(path: string, body: unknown): Promise<T> {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    throw new Error(`API error ${response.status}`);
+  }
+  return response.json() as Promise<T>;
+}
+
 async function downloadProtectedCsv(url: string, filename: string): Promise<void> {
   const response = await fetch(url, { headers: getAuthHeaders() });
   if (!response.ok) {
@@ -196,6 +219,14 @@ async function downloadProtectedCsv(url: string, filename: string): Promise<void
 
 export function getDashboard(): Promise<DashboardData> {
   return getJson<DashboardData>('/api/v1/dashboard');
+}
+
+export function getCenters(): Promise<Center[]> {
+  return getJson<Center[]>('/api/v1/centers');
+}
+
+export function updateCenterStatus(centerId: string, status: string, reason: string): Promise<Center> {
+  return patchPrivateJson<Center>(`/api/v1/centers/${encodeURIComponent(centerId)}/status`, { status, reason });
 }
 
 export function getDashboardCsvUrl(): string {

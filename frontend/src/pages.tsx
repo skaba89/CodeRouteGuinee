@@ -1,6 +1,7 @@
 import { type FormEvent, useEffect, useState } from 'react';
 
 import {
+  type Center,
   type AuditLogEntry,
   type DashboardData,
   type EntrySummary,
@@ -19,6 +20,7 @@ import {
   downloadExamAttemptsCsv,
   getAdminPaymentSummary,
   getAuditLogs,
+  getCenters,
   getConvocationPdfUrl,
   getDashboard,
   getEntrySummary,
@@ -28,6 +30,7 @@ import {
   getPaymentAlerts,
   getPaymentReconciliationItems,
   validateEntry,
+  updateCenterStatus,
   verifyExamCertificate,
 } from './api';
 
@@ -313,6 +316,8 @@ export function CenterPage() {
 
 export function AdminPage() {
   const [dashboard, setDashboard] = useState<DashboardData>(fallbackDashboard);
+  const [centers, setCenters] = useState<Center[]>([]);
+  const [centerStatus, setCenterStatus] = useState<string | null>(null);
   const [entrySummary, setEntrySummary] = useState<EntrySummary>(fallbackEntrySummary);
   const [examSummary, setExamSummary] = useState<ExamSummary>(fallbackExamSummary);
   const [paymentSummary, setPaymentSummary] = useState<PaymentSummary>(fallbackPaymentSummary);
@@ -350,6 +355,7 @@ export function AdminPage() {
 
   useEffect(() => {
     getDashboard().then(setDashboard).catch(() => undefined);
+    getCenters().then(setCenters).catch(() => undefined);
     getEntrySummary().then(setEntrySummary).catch(() => undefined);
     getExamSummary().then(setExamSummary).catch(() => undefined);
     loadPaymentSummary({});
@@ -372,6 +378,19 @@ export function AdminPage() {
       setAuditLogs(await getAuditLogs());
     } catch {
       setAuditStatus('Logs indisponibles : connectez-vous avec un role admin ou super admin.');
+    }
+  }
+
+  async function handleCenterStatus(centerId: string, status: string, reason: string) {
+    setCenterStatus(null);
+    try {
+      const updatedCenter = await updateCenterStatus(centerId, status, reason);
+      setCenters((current) => current.map((center) => (center.id === centerId ? updatedCenter : center)));
+      setCenterStatus(`Statut du centre ${updatedCenter.code} mis a jour : ${updatedCenter.status}.`);
+      await refreshAuditLogs();
+      getDashboard().then(setDashboard).catch(() => undefined);
+    } catch {
+      setCenterStatus('Mise a jour du centre impossible : connectez-vous avec un role admin ou super admin.');
     }
   }
 
@@ -472,6 +491,32 @@ export function AdminPage() {
         <article><strong>{examSummary.average_score}</strong><span>Score moyen</span></article>
         <article><strong>{formatCurrency(paymentSummary.total_amount_gnf)}</strong><span>GNF encaisses</span></article>
         <article><strong>{formatNumber(paymentSummary.total_count)}</strong><span>Paiements</span></article>
+      </div>
+      <div className="center-governance-panel">
+        <h3>Gouvernance des centres agrees</h3>
+        <p>Suivi administratif des centres : audit initial, activation, accreditation et suspension.</p>
+        {centerStatus && <p className={centerStatus.includes('impossible') ? 'form-error' : 'login-status'}>{centerStatus}</p>}
+        <table>
+          <thead><tr><th>Code</th><th>Centre</th><th>Ville</th><th>Capacite</th><th>Statut</th><th>Decision</th></tr></thead>
+          <tbody>
+            {centers.slice(0, 8).map((center) => (
+              <tr key={center.id}>
+                <td>{center.code}</td>
+                <td>{center.name}</td>
+                <td>{center.city}</td>
+                <td>{center.capacity}</td>
+                <td><span className="badge">{center.status}</span></td>
+                <td>
+                  <div className="table-actions">
+                    <button onClick={() => handleCenterStatus(center.id, 'accredited', 'Accreditation institutionnelle validee')}>Accrediter</button>
+                    <button onClick={() => handleCenterStatus(center.id, 'suspended', 'Suspension administrative pour controle')}>Suspendre</button>
+                    <button onClick={() => handleCenterStatus(center.id, 'pending_audit', 'Retour en audit administratif')}>Audit</button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
       <div className="institutional-panel">
         <div className="institutional-header">

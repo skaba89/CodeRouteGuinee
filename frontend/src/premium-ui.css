@@ -131,11 +131,36 @@ body {
 .timer-card,
 .audit-panel,
 .finance-panel,
+.center-governance-panel,
 .institutional-panel {
   border: 1px solid rgba(255, 255, 255, 0.76);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 250, 252, 0.92));
   box-shadow: var(--premium-shadow-soft);
+}
+
+.center-governance-panel {
+  display: grid;
+  gap: 14px;
+  padding: 22px;
+}
+
+.center-governance-panel h3,
+.center-governance-panel p {
+  margin: 0;
+}
+
+.table-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.table-actions button {
+  min-height: 34px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  font-size: 12px;
 }
 
 .institutional-panel {
