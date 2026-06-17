@@ -86,6 +86,7 @@ python scripts/smoke_local.py
 Puis verifier:
 
 - `/health`
+- `/health/readiness`
 - `/docs`
 - connexion administrateur
 - dashboard national

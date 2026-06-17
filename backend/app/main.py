@@ -7,7 +7,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.core.config import get_settings
 from app.db.session import init_db
-from app.routers import auth, bookings, candidates, candidate_identity, candidate_submissions, center_incidents, center_stations, centers, dashboard, device_sessions, documents, entries, exam_monitoring, exam_question_traces, exam_reviews, exams, institutional_authorizations, payment_reconciliation, payments, question_governance, questions, sessions, supervision, users
+from app.routers import auth, bookings, candidates, candidate_identity, candidate_submissions, center_incidents, center_stations, centers, dashboard, device_sessions, documents, entries, exam_monitoring, exam_question_traces, exam_reviews, exams, health, institutional_authorizations, payment_reconciliation, payments, question_governance, questions, sessions, supervision, users
 
 settings = get_settings()
 
@@ -47,11 +47,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 app.add_middleware(SecurityHeadersMiddleware)
 
 
-@app.get("/health")
-def health() -> dict:
-    return {"status": "ok", "service": settings.project_name}
-
-
+app.include_router(health.router)
 app.include_router(auth.router, prefix=settings.api_v1_prefix)
 app.include_router(candidates.router, prefix=settings.api_v1_prefix)
 app.include_router(candidate_identity.router, prefix=settings.api_v1_prefix)

@@ -16,6 +16,7 @@ import {
   type InstitutionalReadiness,
   type InstitutionalUser,
   type InstitutionalUserCreatePayload,
+  type OperationalReadiness,
   type PaymentAlert,
   type PaymentFilters,
   type PaymentReconciliationItem,
@@ -45,6 +46,7 @@ import {
   getInstitutionalReadiness,
   getInstitutionalAuthorizations,
   getInstitutionalUsers,
+  getOperationalReadiness,
   getPaymentAlerts,
   getPaymentReconciliationItems,
   getQuestionGovernanceItems,
@@ -88,6 +90,12 @@ const fallbackPaymentSummary: PaymentSummary = {
   total_amount_gnf: 0,
   by_status: {},
   by_provider: {},
+};
+
+const fallbackOperationalReadiness: OperationalReadiness = {
+  status: 'degraded',
+  service: 'CodeRoute Guinee API',
+  checks: {},
 };
 
 const fallbackInstitutionalReadiness: InstitutionalReadiness = {
@@ -280,6 +288,7 @@ function sanitizePaymentFilters(filters: PaymentFilters): PaymentFilters {
 
 export function HomePage() {
   const [dashboard, setDashboard] = useState<DashboardData>(fallbackDashboard);
+  const [readiness, setReadiness] = useState<OperationalReadiness>(fallbackOperationalReadiness);
   const [apiStatus, setApiStatus] = useState<'connected' | 'offline'>('offline');
 
   useEffect(() => {
@@ -289,6 +298,7 @@ export function HomePage() {
         setApiStatus('connected');
       })
       .catch(() => setApiStatus('offline'));
+    getOperationalReadiness().then(setReadiness).catch(() => undefined);
   }, []);
 
   const metrics = [
@@ -315,6 +325,7 @@ export function HomePage() {
           <span>Paiement Mobile Money</span><strong>Sandbox</strong>
           <span>Controle entree</span><strong>Actif</strong>
           <span>API frontend</span><strong>{apiStatus === 'connected' ? 'Connectee' : 'Fallback'}</strong>
+          <span>Readiness</span><strong>{readiness.status === 'ready' ? 'Prete' : 'A verifier'}</strong>
         </div>
       </section>
 

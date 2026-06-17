@@ -19,6 +19,12 @@ export type Center = {
   created_at: string;
 };
 
+export type OperationalReadiness = {
+  status: 'ready' | 'degraded' | string;
+  service: string;
+  checks: Record<string, { status: string; detail?: string; version?: string | null }>;
+};
+
 export type EntrySummary = {
   total: number;
   by_result: Record<string, number>;
@@ -321,6 +327,10 @@ async function downloadProtectedCsv(url: string, filename: string): Promise<void
 
 export function getDashboard(): Promise<DashboardData> {
   return getJson<DashboardData>('/api/v1/dashboard');
+}
+
+export function getOperationalReadiness(): Promise<OperationalReadiness> {
+  return getJson<OperationalReadiness>('/health/readiness');
 }
 
 export function getCenters(): Promise<Center[]> {
