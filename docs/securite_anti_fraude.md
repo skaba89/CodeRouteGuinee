@@ -15,7 +15,7 @@ Garantir que chaque examen est passe par le bon candidat, dans un centre agree, 
 - Limitation des tentatives de connexion par email/IP.
 - Audit des connexions reussies, echouees et bloquees.
 - Headers HTTP de securite sur les reponses API.
-- Gouvernance des comptes avec creation, changement de role et suspension reserves au `super_admin`.
+- Gouvernance des comptes avec creation, reinitialisation de mot de passe, changement de role et suspension reserves au `super_admin`.
 
 ## Mesures avancees
 

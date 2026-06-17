@@ -45,6 +45,16 @@ class UserStatusUpdate(BaseModel):
     reason: str = Field(min_length=5)
 
 
+class PasswordChangeRequest(BaseModel):
+    current_password: str = Field(min_length=8)
+    new_password: str = Field(min_length=12)
+
+
+class UserPasswordReset(BaseModel):
+    new_password: str = Field(min_length=12)
+    reason: str = Field(min_length=5)
+
+
 class CandidateCreate(BaseModel):
     first_name: str
     last_name: str

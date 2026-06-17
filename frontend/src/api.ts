@@ -363,6 +363,10 @@ export function updateInstitutionalUserStatus(userId: string, isActive: boolean,
   return patchPrivateJson<InstitutionalUser>(`/api/v1/users/${encodeURIComponent(userId)}/status`, { is_active: isActive, reason });
 }
 
+export function resetInstitutionalUserPassword(userId: string, newPassword: string, reason: string): Promise<InstitutionalUser> {
+  return postPrivateJson<InstitutionalUser>(`/api/v1/users/${encodeURIComponent(userId)}/reset-password`, { new_password: newPassword, reason });
+}
+
 export function getAdminPaymentSummary(filters: PaymentFilters = {}): Promise<PaymentSummary> {
   return getPrivateJson<PaymentSummary>(`/api/v1/payments/admin/summary${buildPaymentQuery(filters)}`);
 }

@@ -9,7 +9,7 @@ from app.core.config import get_settings
 from app.deps import get_current_user
 from app.models_audit import AuditLog
 from app.models_user import User
-from app.schemas import Token, UserCreate, UserRead
+from app.schemas import PasswordChangeRequest, Token, UserCreate, UserRead
 from app.security import create_access_token, get_password_hash, verify_password
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -95,3 +95,35 @@ def login(
 @router.get("/me", response_model=UserRead)
 def me(current_user: User = Depends(get_current_user)) -> User:
     return current_user
+
+
+@router.post("/change-password", status_code=status.HTTP_204_NO_CONTENT)
+def change_password(
+    payload: PasswordChangeRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> None:
+    if not verify_password(payload.current_password, current_user.password_hash):
+        db.add(
+            AuditLog(
+                actor_id=current_user.id,
+                action="auth.password_change_failed",
+                entity="user",
+                entity_id=current_user.id,
+                details={"email": current_user.email},
+            )
+        )
+        db.commit()
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Current password is invalid")
+
+    current_user.password_hash = get_password_hash(payload.new_password)
+    db.add(
+        AuditLog(
+            actor_id=current_user.id,
+            action="auth.password_changed",
+            entity="user",
+            entity_id=current_user.id,
+            details={"email": current_user.email},
+        )
+    )
+    db.commit()

@@ -394,6 +394,28 @@ body {
   align-self: end;
 }
 
+.reset-password-strip {
+  margin: 14px 0 6px;
+  max-width: 360px;
+}
+
+.reset-password-strip label {
+  display: grid;
+  gap: 8px;
+  color: var(--navy);
+  font-weight: 900;
+}
+
+.reset-password-strip input {
+  width: 100%;
+  border: 1px solid #d8deea;
+  border-radius: 16px;
+  padding: 13px 15px;
+  font: inherit;
+  color: var(--text);
+  background: #fff;
+}
+
 .table-actions {
   display: flex;
   flex-wrap: wrap;

@@ -48,6 +48,7 @@ import {
   getPaymentAlerts,
   getPaymentReconciliationItems,
   getQuestionGovernanceItems,
+  resetInstitutionalUserPassword,
   validateEntry,
   updateCenterStatus,
   updateInstitutionalAuthorizationStatus,
@@ -477,6 +478,7 @@ export function AdminPage() {
     role: 'center',
     reason: 'Creation officielle du compte institutionnel',
   });
+  const [passwordResetValue, setPasswordResetValue] = useState('ResetStrongPass123');
   const [institutionalActionCenter, setInstitutionalActionCenter] = useState<InstitutionalActionCenter>(fallbackInstitutionalActionCenter);
   const [actionCenterStatus, setActionCenterStatus] = useState<string | null>(null);
   const [institutionalReport, setInstitutionalReport] = useState<InstitutionalReport>(fallbackInstitutionalReport);
@@ -675,6 +677,18 @@ export function AdminPage() {
     }
   }
 
+  async function handleUserPasswordReset(userId: string) {
+    setUserGovernanceStatus(null);
+    try {
+      const updated = await resetInstitutionalUserPassword(userId, passwordResetValue, 'Reinitialisation administrative controlee');
+      setInstitutionalUsers((current) => current.map((user) => (user.id === userId ? updated : user)));
+      setUserGovernanceStatus(`Mot de passe du compte ${updated.email} reinitialise.`);
+      await refreshAuditLogs();
+    } catch {
+      setUserGovernanceStatus('Reinitialisation impossible : mot de passe trop court ou role super admin requis.');
+    }
+  }
+
   async function handleDashboardCsvExport() {
     setIsExportingCsv(true);
     setCsvExportStatus(null);
@@ -853,6 +867,9 @@ export function AdminPage() {
           <label>Motif administratif<input value={userForm.reason} onChange={(event) => setUserForm((current) => ({ ...current, reason: event.target.value }))} /></label>
           <button type="submit">Creer le compte</button>
         </form>
+        <div className="reset-password-strip">
+          <label>Mot de passe de reset<input type="password" value={passwordResetValue} onChange={(event) => setPasswordResetValue(event.target.value)} /></label>
+        </div>
         <div className="table-shell">
           <table>
             <thead><tr><th>Compte</th><th>Nom</th><th>Role</th><th>Statut</th><th>Creation</th><th>Decision</th></tr></thead>
@@ -871,6 +888,7 @@ export function AdminPage() {
                       <button onClick={() => handleUserStatus(user.id, !user.is_active, user.is_active ? 'Suspension administrative temporaire' : 'Reactivation administrative du compte')}>
                         {user.is_active ? 'Suspendre' : 'Reactiver'}
                       </button>
+                      <button onClick={() => handleUserPasswordReset(user.id)}>Reset MDP</button>
                     </div>
                   </td>
                 </tr>

@@ -130,6 +130,35 @@ def test_super_admin_can_update_role_and_status_with_audit_log() -> None:
     assert "user.status_updated" in actions
 
 
+def test_super_admin_can_reset_user_password() -> None:
+    with TestClient(app) as client:
+        super_admin = register_user(client, "super_admin")
+        candidate = register_user(client, "candidate")
+        token = login_token(client, super_admin["email"])
+
+        response = client.post(
+            f"/api/v1/users/{candidate['id']}/reset-password",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"new_password": "ResetStrongPass123", "reason": "Reinitialisation administrative controlee"},
+        )
+        old_login = client.post("/api/v1/auth/login", data={"username": candidate["email"], "password": "StrongPass123"})
+        new_login = client.post("/api/v1/auth/login", data={"username": candidate["email"], "password": "ResetStrongPass123"})
+
+    assert response.status_code == 200
+    assert old_login.status_code == 401
+    assert new_login.status_code == 200
+
+    db = SessionLocal()
+    try:
+        action = db.scalar(
+            select(AuditLog.action).where(AuditLog.entity == "user", AuditLog.entity_id == candidate["id"], AuditLog.action == "user.password_reset")
+        )
+    finally:
+        db.close()
+
+    assert action == "user.password_reset"
+
+
 def test_admin_cannot_update_user_role() -> None:
     with TestClient(app) as client:
         admin = register_user(client, "admin")

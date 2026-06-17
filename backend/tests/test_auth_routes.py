@@ -40,6 +40,37 @@ def test_register_login_and_me() -> None:
         assert me_response.json()["email"] == email
 
 
+def test_user_can_change_own_password() -> None:
+    auth.login_rate_limiter.clear()
+    with TestClient(app) as client:
+        suffix = str(uuid4())[:8]
+        email = f"password-{suffix}@coderoute.gn"
+        old_password = "StrongPass123"
+        new_password = "NewStrongPass123"
+        client.post(
+            "/api/v1/auth/register",
+            json={
+                "email": email,
+                "full_name": "Password User",
+                "password": old_password,
+                "role": "admin",
+            },
+        )
+        token = client.post("/api/v1/auth/login", data={"username": email, "password": old_password}).json()["access_token"]
+
+        change_response = client.post(
+            "/api/v1/auth/change-password",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"current_password": old_password, "new_password": new_password},
+        )
+        old_login = client.post("/api/v1/auth/login", data={"username": email, "password": old_password})
+        new_login = client.post("/api/v1/auth/login", data={"username": email, "password": new_password})
+
+    assert change_response.status_code == 204
+    assert old_login.status_code == 401
+    assert new_login.status_code == 200
+
+
 def test_login_failures_are_rate_limited_and_audited() -> None:
     auth.login_rate_limiter.clear()
     previous_attempts = auth.login_rate_limiter.max_attempts

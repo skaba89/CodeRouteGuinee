@@ -6,7 +6,7 @@ from app.db.session import get_db
 from app.deps import require_roles
 from app.models_audit import AuditLog
 from app.models_user import User
-from app.schemas import InstitutionalUserCreate, UserRead, UserRoleUpdate, UserStatusUpdate
+from app.schemas import InstitutionalUserCreate, UserPasswordReset, UserRead, UserRoleUpdate, UserStatusUpdate
 from app.security import get_password_hash
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -131,6 +131,24 @@ def update_user_status(
     previous_status = target_user.is_active
     target_user.is_active = payload.is_active
     audit_user_decision(db, current_user, target_user, "user.status_updated", payload.reason, previous_status, payload.is_active)
+    db.commit()
+    db.refresh(target_user)
+    return target_user
+
+
+@router.post("/{user_id}/reset-password", response_model=UserRead)
+def reset_user_password(
+    user_id: str,
+    payload: UserPasswordReset,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("super_admin")),
+) -> User:
+    target_user = db.get(User, user_id)
+    if not target_user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    target_user.password_hash = get_password_hash(payload.new_password)
+    audit_user_decision(db, current_user, target_user, "user.password_reset", payload.reason, "set", "reset")
     db.commit()
     db.refresh(target_user)
     return target_user

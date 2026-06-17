@@ -57,6 +57,7 @@ Les comptes sont consultables par les roles `admin` et `super_admin` via `/api/v
 Seul le role `super_admin` peut:
 
 - creer un compte institutionnel avec mot de passe initial controle;
+- reinitialiser le mot de passe d'un compte existant;
 - changer le role d'un compte;
 - activer ou suspendre un compte;
 - reaffecter un compte vers `admin`, `center` ou `candidate`.
@@ -64,10 +65,16 @@ Seul le role `super_admin` peut:
 Les decisions sont historisees dans `audit_logs`:
 
 - `user.created`
+- `user.password_reset`
 - `user.role_updated`
 - `user.status_updated`
 
 Un `super_admin` ne peut pas suspendre son propre compte ni se retrograder lui-meme.
+
+Chaque utilisateur connecte peut changer son propre mot de passe via `/api/v1/auth/change-password`. Les changements et echecs sont historises avec:
+
+- `auth.password_changed`
+- `auth.password_change_failed`
 
 ## Controle avant presentation
 
