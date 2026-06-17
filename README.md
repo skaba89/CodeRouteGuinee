@@ -58,6 +58,14 @@ docker compose exec backend python -m app.seed_demo
 
 Le script prepare un jeu de donnees utilisable pour une demonstration : admin, centre agree, candidat, session, reservation, paiement, convocation, questions et resultat d'examen.
 
+Pour un environnement institutionnel, utilisez plutot le bootstrap administrateur controle par variables d'environnement :
+
+```bash
+docker compose run --rm backend python -m app.bootstrap_admin
+```
+
+Consultez `docs/production_readiness.md` pour le demarrage PostgreSQL, les migrations Alembic et les variables critiques.
+
 ## Verification E2E locale rapide
 
 ```bash

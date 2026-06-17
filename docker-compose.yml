@@ -3,9 +3,9 @@ services:
     image: postgres:16-alpine
     container_name: coderoute-postgres
     environment:
-      POSTGRES_DB: coderoute
-      POSTGRES_USER: coderoute
-      POSTGRES_PASSWORD: coderoute
+      POSTGRES_DB: ${POSTGRES_DB:-coderoute}
+      POSTGRES_USER: ${POSTGRES_USER:-coderoute}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-coderoute}
     ports:
       - "5435:5432"
     volumes:
@@ -31,7 +31,7 @@ services:
       API_V1_PREFIX: ${API_V1_PREFIX:-/api/v1}
       SECRET_KEY: ${SECRET_KEY:-change-me-in-production}
       ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-120}
-      DATABASE_URL: postgresql+psycopg://coderoute:coderoute@postgres:5432/coderoute
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-coderoute}:${POSTGRES_PASSWORD:-coderoute}@postgres:5432/${POSTGRES_DB:-coderoute}
       AUTO_CREATE_TABLES: "false"
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}
     command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
