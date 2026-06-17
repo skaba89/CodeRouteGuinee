@@ -835,6 +835,7 @@ export function AdminPage() {
     { href: '#identites', label: 'Identites' },
     { href: '#questions', label: 'Questions' },
     { href: '#habilitations', label: 'Habilitations' },
+    { href: '#dossier-etat', label: 'Dossier Etat' },
     { href: '#roadmap', label: 'Roadmap' },
     { href: '#rapport', label: 'Rapport' },
     { href: '#finance', label: 'Finance' },
@@ -917,6 +918,18 @@ export function AdminPage() {
       status: 'Planifie',
       items: ['Formation agents', 'Tableaux de bord regionaux', 'Support et exploitation'],
     },
+  ];
+  const statePresentationPillars = [
+    ['Objectif public', 'Digitaliser le parcours code de la route avec un controle national, mesurable et auditable.'],
+    ['Impact attendu', 'Reduire les files, limiter les fraudes, harmoniser les centres et fiabiliser les resultats.'],
+    ['Preuves disponibles', 'Exports CSV, journaux d audit, certificats, controles centre, suivi paiements et readiness.'],
+    ['Cadre de pilotage', 'Roles institutionnels, habilitations, decisions tracees et tableau de bord national.'],
+  ];
+  const pilotCalendar = [
+    ['Semaine 1-2', 'Validation ministerielle du perimetre pilote et des centres retenus.'],
+    ['Semaine 3-4', 'Import des donnees officielles, formation agents et tests en centre.'],
+    ['Mois 2', 'Pilote controle avec candidats reels, supervision nationale et rapport hebdomadaire.'],
+    ['Mois 3', 'Bilan, corrections, extension progressive vers les regions prioritaires.'],
   ];
 
   return (
@@ -1187,6 +1200,32 @@ export function AdminPage() {
               <p>{item.evidence}</p>
               <small>{item.next_step}</small>
             </article>
+          ))}
+        </div>
+      </div>
+      <div id="dossier-etat" className="state-dossier-panel admin-section">
+        <div className="state-dossier-intro">
+          <div>
+            <h3>Dossier de presentation Etat</h3>
+            <p>Synthese executive pour presenter CodeRoute Guinee comme solution institutionnelle pilote.</p>
+          </div>
+          <strong>{institutionalReport.readiness_score}%</strong>
+        </div>
+        <div className="state-dossier-grid">
+          {statePresentationPillars.map(([label, detail]) => (
+            <article key={label}>
+              <span>{label}</span>
+              <p>{detail}</p>
+            </article>
+          ))}
+        </div>
+        <div className="pilot-calendar">
+          <strong>Calendrier pilote propose</strong>
+          {pilotCalendar.map(([period, detail]) => (
+            <div key={period}>
+              <span>{period}</span>
+              <p>{detail}</p>
+            </div>
           ))}
         </div>
       </div>
