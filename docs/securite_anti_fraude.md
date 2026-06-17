@@ -9,6 +9,7 @@ Garantir que chaque examen est passe par le bon candidat, dans un centre agree, 
 - Convocation avec reference unique.
 - Verification du candidat a l'entree du centre.
 - Journalisation du demarrage et de la soumission de l'examen.
+- Export CSV protege du journal d'audit national.
 - Questions tirees aleatoirement.
 - Ordre des reponses melange dans une version future.
 - Resultat reference et historise.

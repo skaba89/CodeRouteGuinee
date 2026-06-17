@@ -353,6 +353,10 @@ export function getAdminPaymentsCsvUrl(filters: PaymentFilters = {}): string {
   return `${API_BASE_URL}/api/v1/payments/admin/export.csv${buildPaymentQuery(filters)}`;
 }
 
+export function getAuditLogsCsvUrl(): string {
+  return `${API_BASE_URL}/api/v1/supervision/audit-logs/export.csv`;
+}
+
 export function getAuditLogs(): Promise<AuditLogEntry[]> {
   return getPrivateJson<AuditLogEntry[]>('/api/v1/supervision/audit-logs?limit=25');
 }
@@ -445,6 +449,10 @@ export function downloadExamAttemptsCsv(): Promise<void> {
 
 export function downloadAdminPaymentsCsv(filters: PaymentFilters = {}): Promise<void> {
   return downloadProtectedCsv(getAdminPaymentsCsvUrl(filters), 'coderoute-payments.csv');
+}
+
+export function downloadAuditLogsCsv(): Promise<void> {
+  return downloadProtectedCsv(getAuditLogsCsvUrl(), 'coderoute-audit-logs.csv');
 }
 
 export function getEntrySummary(): Promise<EntrySummary> {

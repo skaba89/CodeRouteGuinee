@@ -91,4 +91,5 @@ Puis verifier:
 - connexion administrateur
 - dashboard national
 - exports institutionnels
+- export CSV du journal d'audit national
 - parcours candidat jusqu'a convocation

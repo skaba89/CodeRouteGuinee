@@ -28,6 +28,7 @@ import {
   createPayment,
   decideCandidateIdentity,
   decideQuestionGovernance,
+  downloadAuditLogsCsv,
   downloadAdminPaymentsCsv,
   downloadDashboardCsv,
   downloadExamAttemptsCsv,
@@ -503,10 +504,12 @@ export function AdminPage() {
   const [csvExportStatus, setCsvExportStatus] = useState<string | null>(null);
   const [examCsvExportStatus, setExamCsvExportStatus] = useState<string | null>(null);
   const [paymentCsvExportStatus, setPaymentCsvExportStatus] = useState<string | null>(null);
+  const [auditCsvExportStatus, setAuditCsvExportStatus] = useState<string | null>(null);
   const [isExportingInstitutionalReport, setIsExportingInstitutionalReport] = useState(false);
   const [isExportingCsv, setIsExportingCsv] = useState(false);
   const [isExportingExamCsv, setIsExportingExamCsv] = useState(false);
   const [isExportingPaymentCsv, setIsExportingPaymentCsv] = useState(false);
+  const [isExportingAuditCsv, setIsExportingAuditCsv] = useState(false);
 
   async function loadPaymentSummary(filters: PaymentFilters) {
     try {
@@ -742,6 +745,20 @@ export function AdminPage() {
     }
   }
 
+  async function handleAuditCsvExport() {
+    setIsExportingAuditCsv(true);
+    setAuditCsvExportStatus(null);
+    try {
+      await downloadAuditLogsCsv();
+      setAuditCsvExportStatus('Export audit CSV telecharge avec succes.');
+      await refreshAuditLogs();
+    } catch {
+      setAuditCsvExportStatus('Export audit impossible : connectez-vous avec un role admin ou super admin.');
+    } finally {
+      setIsExportingAuditCsv(false);
+    }
+  }
+
   async function handleInstitutionalReportCsvExport() {
     setIsExportingInstitutionalReport(true);
     setInstitutionalReportStatus(null);
@@ -826,10 +843,12 @@ export function AdminPage() {
         <button onClick={handleInstitutionalReportCsvExport} disabled={isExportingInstitutionalReport}>{isExportingInstitutionalReport ? 'Export...' : 'Exporter le rapport institutionnel'}</button>
         <button onClick={handleExamAttemptsCsvExport} disabled={isExportingExamCsv}>{isExportingExamCsv ? 'Export...' : 'Exporter les examens CSV'}</button>
         <button onClick={handlePaymentCsvExport} disabled={isExportingPaymentCsv}>{isExportingPaymentCsv ? 'Export...' : 'Exporter les paiements CSV'}</button>
+        <button onClick={handleAuditCsvExport} disabled={isExportingAuditCsv}>{isExportingAuditCsv ? 'Export...' : 'Exporter audit CSV'}</button>
       </div>
       {csvExportStatus && <p className="login-status">{csvExportStatus}</p>}
       {examCsvExportStatus && <p className="login-status">{examCsvExportStatus}</p>}
       {paymentCsvExportStatus && <p className="login-status">{paymentCsvExportStatus}</p>}
+      {auditCsvExportStatus && <p className="login-status">{auditCsvExportStatus}</p>}
       {institutionalReportStatus && <p className={institutionalReportStatus.includes('impossible') || institutionalReportStatus.includes('Mode demo') ? 'form-error' : 'login-status'}>{institutionalReportStatus}</p>}
       {financeStatus && <p className="form-error">{financeStatus}</p>}
       <div className="action-center-panel">
