@@ -13,24 +13,9 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
 def init_db() -> None:
-    from app import (  # noqa: F401
-        models_audit,
-        models_booking,
-        models_candidate,
-        models_candidate_identity,
-        models_center,
-        models_center_incident,
-        models_device_session,
-        models_exam_attempt,
-        models_exam_monitoring,
-        models_exam_review,
-        models_institutional_authorization,
-        models_payment,
-        models_question,
-        models_question_governance,
-        models_session,
-        models_user,
-    )
+    if not settings.auto_create_tables:
+        return
+    from app import models  # noqa: F401
 
     Base.metadata.create_all(bind=engine)
 

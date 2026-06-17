@@ -330,7 +330,7 @@ def export_institutional_report_csv(
 
 @router.get("/anti-fraud", response_model=AntiFraudDashboardRead)
 def anti_fraud_dashboard(
-    limit: int = 10,
+    limit: int = 50,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("admin", "super_admin")),
 ) -> AntiFraudDashboardRead:
