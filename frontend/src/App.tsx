@@ -1,18 +1,18 @@
 import { FormEvent, useEffect, useState } from 'react';
 
 import { canAccessRoute, demoRoles, navigationItems, type UserRole } from './auth';
-import { type AuthUser, getAccessToken, getCurrentUser, loginUser, logoutUser } from './authClient';
+import { type AuthUser, changePassword, getAccessToken, getCurrentUser, loginUser, logoutUser } from './authClient';
 import { AdminPage, CandidatePage, CenterPage, ExamPage, HomePage, InstitutionalDossierPage, ResultsPage } from './pages';
 import './role.css';
 
-type AppRoute = 'home' | 'candidate' | 'center' | 'admin' | 'exam' | 'results' | 'dossier' | 'login';
+type AppRoute = 'home' | 'candidate' | 'center' | 'admin' | 'exam' | 'results' | 'dossier' | 'login' | 'account';
 
 const ROLE_STORAGE_KEY = 'coderoute-demo-role';
 const PRESENTATION_MODE_STORAGE_KEY = 'coderoute-presentation-mode';
 
 function getRouteFromHash(): AppRoute {
   const route = window.location.hash.replace('#/', '');
-  if (route === 'candidate' || route === 'center' || route === 'admin' || route === 'exam' || route === 'results' || route === 'dossier' || route === 'login') {
+  if (route === 'candidate' || route === 'center' || route === 'admin' || route === 'exam' || route === 'results' || route === 'dossier' || route === 'login' || route === 'account') {
     return route;
   }
   return 'home';
@@ -57,6 +57,65 @@ function LoadingSession() {
       <p className="eyebrow dark">Session securisee</p>
       <h2>Verification de la session</h2>
       <p>Controle du token et recuperation du profil utilisateur en cours.</p>
+    </section>
+  );
+}
+
+function AccountPage({ currentUser }: { currentUser: AuthUser | null }) {
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [status, setStatus] = useState<string | null>(null);
+
+  async function handlePasswordChange(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setStatus(null);
+
+    if (newPassword.length < 12) {
+      setStatus('Le nouveau mot de passe doit contenir au moins 12 caracteres.');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setStatus('La confirmation ne correspond pas au nouveau mot de passe.');
+      return;
+    }
+
+    try {
+      await changePassword(currentPassword, newPassword);
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setStatus('Mot de passe mis a jour. La modification est journalisee dans l audit.');
+    } catch {
+      setStatus('Changement impossible : verifiez le mot de passe actuel et la session.');
+    }
+  }
+
+  return (
+    <section className="screen account-screen">
+      <p className="eyebrow dark">Compte institutionnel</p>
+      <h2>Mon compte</h2>
+      <p>Gestion du profil connecte et rotation du mot de passe pour les agents habilites.</p>
+      <div className="account-profile-grid">
+        <article>
+          <span>Agent</span>
+          <strong>{currentUser?.full_name ?? 'Utilisateur connecte'}</strong>
+          <small>{currentUser?.email ?? 'Email indisponible'}</small>
+        </article>
+        <article>
+          <span>Role</span>
+          <strong>{currentUser?.role ?? 'session'}</strong>
+          <small>{currentUser?.is_active === false ? 'Compte inactif' : 'Compte actif'}</small>
+        </article>
+      </div>
+      <form className="account-password-form" onSubmit={handlePasswordChange}>
+        <label>Mot de passe actuel<input type="password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} /></label>
+        <label>Nouveau mot de passe<input type="password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} /></label>
+        <label>Confirmer<input type="password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} /></label>
+        <button type="submit" disabled={currentPassword.length < 8 || newPassword.length < 12 || confirmPassword.length < 12}>Changer le mot de passe</button>
+      </form>
+      {status && <p className={status.includes('impossible') || status.includes('doit') || status.includes('confirmation') ? 'form-error' : 'login-status'}>{status}</p>}
     </section>
   );
 }
@@ -199,6 +258,7 @@ export default function App() {
     exam: <ExamPage />,
     results: <ResultsPage />,
     dossier: <InstitutionalDossierPage />,
+    account: isPresentationMode ? <AccessDenied role={role} isPresentationMode={isPresentationMode} /> : <AccountPage currentUser={currentUser} />,
     login: loginPage,
   }[route] : <AccessDenied role={role} isPresentationMode={isPresentationMode} />;
 
@@ -218,6 +278,7 @@ export default function App() {
             const itemRoute = item.href.replace('#/', '') || 'home';
             return <a key={item.href} href={item.href} className={route === itemRoute ? 'active' : ''}>{item.label}</a>;
           })}
+          {!isPresentationMode && <a href="#/account" className={route === 'account' ? 'active' : ''}>Mon compte</a>}
           <a href="#/login" className={route === 'login' ? 'active' : ''}>Connexion</a>
         </div>
 
