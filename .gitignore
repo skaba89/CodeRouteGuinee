@@ -1,5 +1,6 @@
 __pycache__/
 *.py[cod]
+*.db
 .env
 .venv/
 node_modules/
