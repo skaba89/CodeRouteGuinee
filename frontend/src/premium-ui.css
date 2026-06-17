@@ -132,6 +132,7 @@ body {
 .audit-panel,
 .finance-panel,
 .center-governance-panel,
+.identity-panel,
 .institutional-panel {
   border: 1px solid rgba(255, 255, 255, 0.76);
   background:
@@ -139,14 +140,17 @@ body {
   box-shadow: var(--premium-shadow-soft);
 }
 
-.center-governance-panel {
+.center-governance-panel,
+.identity-panel {
   display: grid;
   gap: 14px;
   padding: 22px;
 }
 
 .center-governance-panel h3,
-.center-governance-panel p {
+.center-governance-panel p,
+.identity-panel h3,
+.identity-panel p {
   margin: 0;
 }
 

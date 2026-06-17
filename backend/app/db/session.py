@@ -17,6 +17,7 @@ def init_db() -> None:
         models_audit,
         models_booking,
         models_candidate,
+        models_candidate_identity,
         models_center,
         models_center_incident,
         models_device_session,

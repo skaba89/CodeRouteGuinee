@@ -43,6 +43,33 @@ class CandidateRead(CandidateCreate):
     model_config = {"from_attributes": True}
 
 
+class CandidateIdentityCreate(BaseModel):
+    candidate_id: str
+    document_type: Literal["national_id", "passport", "driver_file"] = "national_id"
+    document_reference: str = Field(min_length=3)
+    photo_reference: str | None = None
+
+
+class CandidateIdentityDecision(BaseModel):
+    status: Literal["verified", "rejected", "needs_review"]
+    reason: str = Field(min_length=5)
+
+
+class CandidateIdentityRead(BaseModel):
+    id: str
+    candidate_id: str
+    document_type: str
+    document_reference: str
+    photo_reference: str | None = None
+    status: str
+    verified_by_id: str | None = None
+    decision_reason: str | None = None
+    created_at: datetime
+    decided_at: datetime | None = None
+
+    model_config = {"from_attributes": True}
+
+
 class CenterCreate(BaseModel):
     code: str
     name: str

@@ -3,6 +3,7 @@ import { type FormEvent, useEffect, useState } from 'react';
 import {
   type Center,
   type AuditLogEntry,
+  type CandidateIdentityCheck,
   type DashboardData,
   type EntrySummary,
   type EntryValidationResult,
@@ -15,11 +16,13 @@ import {
   type PaymentResult,
   type PaymentSummary,
   createPayment,
+  decideCandidateIdentity,
   downloadAdminPaymentsCsv,
   downloadDashboardCsv,
   downloadExamAttemptsCsv,
   getAdminPaymentSummary,
   getAuditLogs,
+  getCandidateIdentityChecks,
   getCenters,
   getConvocationPdfUrl,
   getDashboard,
@@ -104,6 +107,27 @@ const fallbackInstitutionalReadiness: InstitutionalReadiness = {
     },
   ],
 };
+
+const fallbackIdentityChecks: CandidateIdentityCheck[] = [
+  {
+    id: 'demo-identity-1',
+    candidate_id: 'GN-CODE-2026-000001',
+    document_type: 'national_id',
+    document_reference: 'NINA-DEMO-001',
+    photo_reference: 'photo-controle-centre',
+    status: 'pending',
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: 'demo-identity-2',
+    candidate_id: 'GN-CODE-2026-000002',
+    document_type: 'passport',
+    document_reference: 'P-GN-DEMO-44',
+    status: 'needs_review',
+    decision_reason: 'Controle manuel requis avant convocation',
+    created_at: new Date().toISOString(),
+  },
+];
 
 const modules = [
   'Inscription candidat',
@@ -323,6 +347,8 @@ export function AdminPage() {
   const [paymentSummary, setPaymentSummary] = useState<PaymentSummary>(fallbackPaymentSummary);
   const [paymentItems, setPaymentItems] = useState<PaymentReconciliationItem[]>([]);
   const [paymentAlerts, setPaymentAlerts] = useState<PaymentAlert[]>([]);
+  const [identityChecks, setIdentityChecks] = useState<CandidateIdentityCheck[]>(fallbackIdentityChecks);
+  const [identityStatus, setIdentityStatus] = useState<string | null>(null);
   const [institutionalReadiness, setInstitutionalReadiness] = useState<InstitutionalReadiness>(fallbackInstitutionalReadiness);
   const [readinessStatus, setReadinessStatus] = useState<string | null>(null);
   const [paymentFilters, setPaymentFilters] = useState<PaymentFilters>({});
@@ -365,6 +391,12 @@ export function AdminPage() {
         setReadinessStatus(null);
       })
       .catch(() => setReadinessStatus('Mode demo : connectez-vous avec un token admin pour charger le score institutionnel API.'));
+    getCandidateIdentityChecks()
+      .then((checks) => {
+        setIdentityChecks(checks.length > 0 ? checks : fallbackIdentityChecks);
+        setIdentityStatus(null);
+      })
+      .catch(() => setIdentityStatus('Mode demo : connectez-vous avec un role admin pour traiter les identites API.'));
     getAuditLogs()
       .then((logs) => {
         setAuditLogs(logs);
@@ -391,6 +423,18 @@ export function AdminPage() {
       getDashboard().then(setDashboard).catch(() => undefined);
     } catch {
       setCenterStatus('Mise a jour du centre impossible : connectez-vous avec un role admin ou super admin.');
+    }
+  }
+
+  async function handleIdentityDecision(checkId: string, status: string, reason: string) {
+    setIdentityStatus(null);
+    try {
+      const updatedCheck = await decideCandidateIdentity(checkId, status, reason);
+      setIdentityChecks((current) => current.map((check) => (check.id === checkId ? updatedCheck : check)));
+      setIdentityStatus(`Verification identite ${updatedCheck.document_reference} : ${updatedCheck.status}.`);
+      await refreshAuditLogs();
+    } catch {
+      setIdentityStatus('Decision identite impossible : connectez-vous avec un role admin ou super admin.');
     }
   }
 
@@ -511,6 +555,32 @@ export function AdminPage() {
                     <button onClick={() => handleCenterStatus(center.id, 'accredited', 'Accreditation institutionnelle validee')}>Accrediter</button>
                     <button onClick={() => handleCenterStatus(center.id, 'suspended', 'Suspension administrative pour controle')}>Suspendre</button>
                     <button onClick={() => handleCenterStatus(center.id, 'pending_audit', 'Retour en audit administratif')}>Audit</button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="identity-panel">
+        <h3>Verification identite candidat</h3>
+        <p>Controle administratif des pieces avant convocation, entree en centre et emission des attestations.</p>
+        {identityStatus && <p className={identityStatus.includes('impossible') || identityStatus.includes('Mode demo') ? 'form-error' : 'login-status'}>{identityStatus}</p>}
+        <table>
+          <thead><tr><th>Candidat</th><th>Document</th><th>Reference</th><th>Statut</th><th>Date</th><th>Decision</th></tr></thead>
+          <tbody>
+            {identityChecks.slice(0, 8).map((check) => (
+              <tr key={check.id}>
+                <td>{check.candidate_id}</td>
+                <td>{check.document_type}</td>
+                <td>{check.document_reference}</td>
+                <td><span className={check.status === 'verified' ? 'badge ok' : 'badge'}>{check.status}</span></td>
+                <td>{new Date(check.created_at).toLocaleString('fr-FR')}</td>
+                <td>
+                  <div className="table-actions">
+                    <button onClick={() => handleIdentityDecision(check.id, 'verified', 'Piece conforme au controle administratif')}>Valider</button>
+                    <button onClick={() => handleIdentityDecision(check.id, 'needs_review', 'Controle manuel complementaire requis')}>Revue</button>
+                    <button onClick={() => handleIdentityDecision(check.id, 'rejected', 'Piece non conforme ou illisible')}>Rejeter</button>
                   </div>
                 </td>
               </tr>

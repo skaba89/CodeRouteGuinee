@@ -93,6 +93,19 @@ export type InstitutionalReadiness = {
   items: InstitutionalReadinessItem[];
 };
 
+export type CandidateIdentityCheck = {
+  id: string;
+  candidate_id: string;
+  document_type: string;
+  document_reference: string;
+  photo_reference?: string | null;
+  status: string;
+  verified_by_id?: string | null;
+  decision_reason?: string | null;
+  created_at: string;
+  decided_at?: string | null;
+};
+
 export type ExamCertificateVerification = {
   valid: boolean;
   attempt_id: string;
@@ -189,6 +202,18 @@ async function postJson<T>(path: string, body: unknown): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+async function postPrivateJson<T>(path: string, body: unknown): Promise<T> {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    throw new Error(`API error ${response.status}`);
+  }
+  return response.json() as Promise<T>;
+}
+
 async function patchPrivateJson<T>(path: string, body: unknown): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     method: 'PATCH',
@@ -251,6 +276,14 @@ export function getAdminPaymentSummary(filters: PaymentFilters = {}): Promise<Pa
 
 export function getInstitutionalReadiness(): Promise<InstitutionalReadiness> {
   return getPrivateJson<InstitutionalReadiness>('/api/v1/dashboard/institutional-readiness');
+}
+
+export function getCandidateIdentityChecks(): Promise<CandidateIdentityCheck[]> {
+  return getPrivateJson<CandidateIdentityCheck[]>('/api/v1/candidate-identity?limit=25');
+}
+
+export function decideCandidateIdentity(checkId: string, status: string, reason: string): Promise<CandidateIdentityCheck> {
+  return postPrivateJson<CandidateIdentityCheck>(`/api/v1/candidate-identity/${encodeURIComponent(checkId)}/decision`, { status, reason });
 }
 
 export function getPaymentReconciliationItems(filters: PaymentFilters = {}): Promise<PaymentReconciliationItem[]> {
