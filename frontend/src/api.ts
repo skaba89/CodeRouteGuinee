@@ -93,6 +93,19 @@ export type InstitutionalReadiness = {
   items: InstitutionalReadinessItem[];
 };
 
+export type InstitutionalReport = {
+  generated_for: string;
+  readiness_score: number;
+  readiness_label: string;
+  candidates: number;
+  centers_by_status: Record<string, number>;
+  questions_by_status: Record<string, number>;
+  identity_checks_by_status: Record<string, number>;
+  authorizations_by_status: Record<string, number>;
+  audit_events: number;
+  recommendations: string[];
+};
+
 export type CandidateIdentityCheck = {
   id: string;
   candidate_id: string;
@@ -311,6 +324,10 @@ export function getInstitutionalReadiness(): Promise<InstitutionalReadiness> {
   return getPrivateJson<InstitutionalReadiness>('/api/v1/dashboard/institutional-readiness');
 }
 
+export function getInstitutionalReport(): Promise<InstitutionalReport> {
+  return getPrivateJson<InstitutionalReport>('/api/v1/dashboard/institutional-report');
+}
+
 export function getCandidateIdentityChecks(): Promise<CandidateIdentityCheck[]> {
   return getPrivateJson<CandidateIdentityCheck[]>('/api/v1/candidate-identity?limit=25');
 }
@@ -351,6 +368,10 @@ export function getPaymentAlerts(filters: PaymentFilters = {}): Promise<PaymentA
 
 export function downloadDashboardCsv(): Promise<void> {
   return downloadProtectedCsv(getDashboardCsvUrl(), 'coderoute-dashboard-export.csv');
+}
+
+export function downloadInstitutionalReportCsv(): Promise<void> {
+  return downloadProtectedCsv(`${API_BASE_URL}/api/v1/dashboard/institutional-report.csv`, 'coderoute-institutional-report.csv');
 }
 
 export function downloadExamAttemptsCsv(): Promise<void> {

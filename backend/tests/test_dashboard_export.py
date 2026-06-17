@@ -23,6 +23,13 @@ def test_institutional_readiness_requires_authentication() -> None:
     assert response.status_code == 401
 
 
+def test_institutional_report_requires_authentication() -> None:
+    with TestClient(app) as client:
+        response = client.get("/api/v1/dashboard/institutional-report")
+
+    assert response.status_code == 401
+
+
 def test_institutional_readiness_returns_executive_summary_for_admin() -> None:
     admin_user = SimpleNamespace(id="test-readiness-admin", role="admin", is_active=True)
     app.dependency_overrides[get_current_user] = lambda: admin_user
@@ -50,6 +57,35 @@ def test_institutional_readiness_returns_executive_summary_for_admin() -> None:
         app.dependency_overrides.clear()
 
 
+def test_institutional_report_returns_national_summary_for_admin() -> None:
+    admin_user = SimpleNamespace(id="test-report-admin", role="admin", is_active=True)
+    app.dependency_overrides[get_current_user] = lambda: admin_user
+
+    try:
+        with TestClient(app) as client:
+            response = client.get("/api/v1/dashboard/institutional-report")
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["generated_for"] == "Etat guineen - dossier CodeRoute Guinee"
+        assert 0 <= payload["readiness_score"] <= 100
+        assert isinstance(payload["centers_by_status"], dict)
+        assert isinstance(payload["questions_by_status"], dict)
+        assert isinstance(payload["identity_checks_by_status"], dict)
+        assert isinstance(payload["authorizations_by_status"], dict)
+        assert payload["recommendations"]
+
+        with SessionLocal() as db:
+            audit_log = db.scalar(
+                select(AuditLog)
+                .where(AuditLog.actor_id == "test-report-admin")
+                .where(AuditLog.action == "dashboard.institutional_report_viewed")
+            )
+            assert audit_log is not None
+    finally:
+        app.dependency_overrides.clear()
+
+
 def test_dashboard_export_csv_writes_audit_log_for_admin() -> None:
     admin_user = SimpleNamespace(id="test-admin-user", role="admin", is_active=True)
     app.dependency_overrides[get_current_user] = lambda: admin_user
@@ -70,5 +106,30 @@ def test_dashboard_export_csv_writes_audit_log_for_admin() -> None:
             assert audit_log is not None
             assert audit_log.entity == "dashboard"
             assert audit_log.details["format"] == "csv"
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_institutional_report_csv_writes_audit_log_for_admin() -> None:
+    admin_user = SimpleNamespace(id="test-report-csv-admin", role="admin", is_active=True)
+    app.dependency_overrides[get_current_user] = lambda: admin_user
+
+    try:
+        with TestClient(app) as client:
+            response = client.get("/api/v1/dashboard/institutional-report.csv")
+
+        assert response.status_code == 200
+        assert response.headers["content-type"].startswith("text/csv")
+        assert "section;key;value" in response.text
+        assert "summary;generated_for;Etat guineen - dossier CodeRoute Guinee" in response.text
+
+        with SessionLocal() as db:
+            audit_log = db.scalar(
+                select(AuditLog)
+                .where(AuditLog.actor_id == "test-report-csv-admin")
+                .where(AuditLog.action == "dashboard.institutional_report_export_csv")
+            )
+            assert audit_log is not None
+            assert audit_log.entity == "dashboard"
     finally:
         app.dependency_overrides.clear()

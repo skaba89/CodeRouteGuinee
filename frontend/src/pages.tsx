@@ -11,6 +11,7 @@ import {
   type ExamSummary,
   type InstitutionalAuthorization,
   type InstitutionalAuthorizationPayload,
+  type InstitutionalReport,
   type InstitutionalReadiness,
   type PaymentAlert,
   type PaymentFilters,
@@ -25,6 +26,7 @@ import {
   downloadAdminPaymentsCsv,
   downloadDashboardCsv,
   downloadExamAttemptsCsv,
+  downloadInstitutionalReportCsv,
   getAdminPaymentSummary,
   getAuditLogs,
   getCandidateIdentityChecks,
@@ -34,6 +36,7 @@ import {
   getEntrySummary,
   getExamCertificatePdfUrl,
   getExamSummary,
+  getInstitutionalReport,
   getInstitutionalReadiness,
   getInstitutionalAuthorizations,
   getPaymentAlerts,
@@ -113,6 +116,22 @@ const fallbackInstitutionalReadiness: InstitutionalReadiness = {
       evidence: 'Controle entree, monitoring examen et alertes sont presents.',
       next_step: 'Ajouter verification photo et supervision physique renforcee.',
     },
+  ],
+};
+
+const fallbackInstitutionalReport: InstitutionalReport = {
+  generated_for: 'Etat guineen - dossier CodeRoute Guinee',
+  readiness_score: 70,
+  readiness_label: 'Mode demonstration - pilote a renforcer',
+  candidates: 1250,
+  centers_by_status: { accredited: 18, pending_audit: 3 },
+  questions_by_status: { active: 40, needs_revision: 2 },
+  identity_checks_by_status: { verified: 420, pending: 18 },
+  authorizations_by_status: { approved: 1, pending_signature: 1 },
+  audit_events: 96,
+  recommendations: [
+    'Valider la nomenclature officielle des centres agrees avec l administration.',
+    'Importer la banque officielle de questions par categorie de permis.',
   ],
 };
 
@@ -412,6 +431,8 @@ export function AdminPage() {
     scope: 'Autorisation pilote pour la digitalisation des examens du code de la route.',
   });
   const [institutionalReadiness, setInstitutionalReadiness] = useState<InstitutionalReadiness>(fallbackInstitutionalReadiness);
+  const [institutionalReport, setInstitutionalReport] = useState<InstitutionalReport>(fallbackInstitutionalReport);
+  const [institutionalReportStatus, setInstitutionalReportStatus] = useState<string | null>(null);
   const [readinessStatus, setReadinessStatus] = useState<string | null>(null);
   const [paymentFilters, setPaymentFilters] = useState<PaymentFilters>({});
   const [activePaymentFilters, setActivePaymentFilters] = useState<PaymentFilters>({});
@@ -421,6 +442,7 @@ export function AdminPage() {
   const [csvExportStatus, setCsvExportStatus] = useState<string | null>(null);
   const [examCsvExportStatus, setExamCsvExportStatus] = useState<string | null>(null);
   const [paymentCsvExportStatus, setPaymentCsvExportStatus] = useState<string | null>(null);
+  const [isExportingInstitutionalReport, setIsExportingInstitutionalReport] = useState(false);
   const [isExportingCsv, setIsExportingCsv] = useState(false);
   const [isExportingExamCsv, setIsExportingExamCsv] = useState(false);
   const [isExportingPaymentCsv, setIsExportingPaymentCsv] = useState(false);
@@ -453,6 +475,12 @@ export function AdminPage() {
         setReadinessStatus(null);
       })
       .catch(() => setReadinessStatus('Mode demo : connectez-vous avec un token admin pour charger le score institutionnel API.'));
+    getInstitutionalReport()
+      .then((report) => {
+        setInstitutionalReport(report);
+        setInstitutionalReportStatus(null);
+      })
+      .catch(() => setInstitutionalReportStatus('Mode demo : connectez-vous avec un token admin pour charger le rapport institutionnel API.'));
     getCandidateIdentityChecks()
       .then((checks) => {
         setIdentityChecks(checks.length > 0 ? checks : fallbackIdentityChecks);
@@ -592,6 +620,20 @@ export function AdminPage() {
     }
   }
 
+  async function handleInstitutionalReportCsvExport() {
+    setIsExportingInstitutionalReport(true);
+    setInstitutionalReportStatus(null);
+    try {
+      await downloadInstitutionalReportCsv();
+      setInstitutionalReportStatus('Rapport institutionnel CSV telecharge avec succes.');
+      await refreshAuditLogs();
+    } catch {
+      setInstitutionalReportStatus('Export rapport institutionnel impossible : connectez-vous avec un role admin ou super admin.');
+    } finally {
+      setIsExportingInstitutionalReport(false);
+    }
+  }
+
   async function handlePaymentFiltersSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     await loadPaymentSummary(paymentFilters);
@@ -622,6 +664,12 @@ export function AdminPage() {
     String(values.count),
     formatCurrency(values.amount_gnf),
   ]);
+  const reportRows = [
+    ['Centres', Object.values(institutionalReport.centers_by_status).reduce((sum, value) => sum + value, 0)],
+    ['Questions', Object.values(institutionalReport.questions_by_status).reduce((sum, value) => sum + value, 0)],
+    ['Identites', Object.values(institutionalReport.identity_checks_by_status).reduce((sum, value) => sum + value, 0)],
+    ['Habilitations', Object.values(institutionalReport.authorizations_by_status).reduce((sum, value) => sum + value, 0)],
+  ];
 
   return (
     <section className="panel admin-panel">
@@ -629,12 +677,14 @@ export function AdminPage() {
       <h2>Supervision centres, entrees, examens et finances</h2>
       <div className="actions result-actions admin-actions">
         <button onClick={handleDashboardCsvExport} disabled={isExportingCsv}>{isExportingCsv ? 'Export...' : 'Exporter le dashboard CSV'}</button>
+        <button onClick={handleInstitutionalReportCsvExport} disabled={isExportingInstitutionalReport}>{isExportingInstitutionalReport ? 'Export...' : 'Exporter le rapport institutionnel'}</button>
         <button onClick={handleExamAttemptsCsvExport} disabled={isExportingExamCsv}>{isExportingExamCsv ? 'Export...' : 'Exporter les examens CSV'}</button>
         <button onClick={handlePaymentCsvExport} disabled={isExportingPaymentCsv}>{isExportingPaymentCsv ? 'Export...' : 'Exporter les paiements CSV'}</button>
       </div>
       {csvExportStatus && <p className="login-status">{csvExportStatus}</p>}
       {examCsvExportStatus && <p className="login-status">{examCsvExportStatus}</p>}
       {paymentCsvExportStatus && <p className="login-status">{paymentCsvExportStatus}</p>}
+      {institutionalReportStatus && <p className={institutionalReportStatus.includes('impossible') || institutionalReportStatus.includes('Mode demo') ? 'form-error' : 'login-status'}>{institutionalReportStatus}</p>}
       {financeStatus && <p className="form-error">{financeStatus}</p>}
       <div className="metrics compact">
         <article><strong>{formatNumber(allowedEntries)}</strong><span>Entrees validees</span></article>
@@ -776,6 +826,28 @@ export function AdminPage() {
               <p>{item.evidence}</p>
               <small>{item.next_step}</small>
             </article>
+          ))}
+        </div>
+      </div>
+      <div className="institutional-report-panel">
+        <h3>Rapport institutionnel exportable</h3>
+        <p>{institutionalReport.generated_for}</p>
+        <div className="metrics compact">
+          <article><strong>{institutionalReport.readiness_score}%</strong><span>{institutionalReport.readiness_label}</span></article>
+          <article><strong>{formatNumber(institutionalReport.candidates)}</strong><span>Candidats references</span></article>
+          <article><strong>{formatNumber(institutionalReport.audit_events)}</strong><span>Evenements d audit</span></article>
+          <article><strong>{formatNumber(institutionalReport.recommendations.length)}</strong><span>Actions recommandees</span></article>
+        </div>
+        <table>
+          <tbody>
+            {reportRows.map(([label, value]) => (
+              <tr key={label}><th>{label}</th><td>{formatNumber(Number(value))}</td></tr>
+            ))}
+          </tbody>
+        </table>
+        <div className="recommendation-list">
+          {institutionalReport.recommendations.slice(0, 3).map((recommendation) => (
+            <p key={recommendation}>{recommendation}</p>
           ))}
         </div>
       </div>
