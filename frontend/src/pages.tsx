@@ -3,6 +3,7 @@ import { type FormEvent, useEffect, useState } from 'react';
 import {
   type Center,
   type AuditLogEntry,
+  type AuditLogFilters,
   type CandidateIdentityCheck,
   type DashboardData,
   type EntrySummary,
@@ -498,6 +499,8 @@ export function AdminPage() {
   const [readinessStatus, setReadinessStatus] = useState<string | null>(null);
   const [paymentFilters, setPaymentFilters] = useState<PaymentFilters>({});
   const [activePaymentFilters, setActivePaymentFilters] = useState<PaymentFilters>({});
+  const [auditFilters, setAuditFilters] = useState<AuditLogFilters>({});
+  const [activeAuditFilters, setActiveAuditFilters] = useState<AuditLogFilters>({});
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
   const [auditStatus, setAuditStatus] = useState<string | null>(null);
   const [financeStatus, setFinanceStatus] = useState<string | null>(null);
@@ -583,9 +586,16 @@ export function AdminPage() {
       .catch(() => setAuditStatus('Logs indisponibles : connectez-vous avec un role admin ou super admin.'));
   }, []);
 
-  async function refreshAuditLogs() {
+  async function refreshAuditLogs(filters: AuditLogFilters = activeAuditFilters) {
     try {
-      setAuditLogs(await getAuditLogs());
+      const cleanFilters = {
+        action: filters.action || undefined,
+        entity: filters.entity || undefined,
+        limit: filters.limit ?? 25,
+      };
+      setAuditLogs(await getAuditLogs(cleanFilters));
+      setActiveAuditFilters(cleanFilters);
+      setAuditStatus(null);
     } catch {
       setAuditStatus('Logs indisponibles : connectez-vous avec un role admin ou super admin.');
     }
@@ -749,7 +759,7 @@ export function AdminPage() {
     setIsExportingAuditCsv(true);
     setAuditCsvExportStatus(null);
     try {
-      await downloadAuditLogsCsv();
+      await downloadAuditLogsCsv(activeAuditFilters);
       setAuditCsvExportStatus('Export audit CSV telecharge avec succes.');
       await refreshAuditLogs();
     } catch {
@@ -777,6 +787,16 @@ export function AdminPage() {
     event.preventDefault();
     await loadPaymentSummary(paymentFilters);
     await refreshAuditLogs();
+  }
+
+  async function handleAuditFiltersSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await refreshAuditLogs(auditFilters);
+  }
+
+  async function resetAuditFilters() {
+    setAuditFilters({});
+    await refreshAuditLogs({});
   }
 
   async function resetPaymentFilters() {
@@ -1181,6 +1201,19 @@ export function AdminPage() {
       <div id="audit" className="audit-panel admin-section">
         <h3>Journal d'audit national</h3>
         {auditStatus && <p className="form-error">{auditStatus}</p>}
+        <form className="finance-filters" onSubmit={handleAuditFiltersSubmit}>
+          <label>Action
+            <input value={auditFilters.action ?? ''} onChange={(event) => setAuditFilters((current) => ({ ...current, action: event.target.value || undefined }))} placeholder="user.created" />
+          </label>
+          <label>Entite
+            <input value={auditFilters.entity ?? ''} onChange={(event) => setAuditFilters((current) => ({ ...current, entity: event.target.value || undefined }))} placeholder="user" />
+          </label>
+          <label>Limite
+            <input type="number" min="1" max="200" value={auditFilters.limit ?? 25} onChange={(event) => setAuditFilters((current) => ({ ...current, limit: Number(event.target.value) || undefined }))} />
+          </label>
+          <button type="submit">Filtrer</button>
+          <button type="button" className="secondary-button" onClick={resetAuditFilters}>Reinitialiser</button>
+        </form>
         <table>
           <thead><tr><th>Date</th><th>Action</th><th>Entite</th><th>Details</th></tr></thead>
           <tbody>

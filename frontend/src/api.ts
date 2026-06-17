@@ -85,6 +85,12 @@ export type PaymentAlert = PaymentReconciliationItem & {
   message: string;
 };
 
+export type AuditLogFilters = {
+  action?: string;
+  entity?: string;
+  limit?: number;
+};
+
 export type InstitutionalUser = {
   id: string;
   email: string;
@@ -285,6 +291,15 @@ async function postJson<T>(path: string, body: unknown): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+function buildAuditQuery(filters: AuditLogFilters = {}): string {
+  const query = new URLSearchParams();
+  if (filters.action) query.set('action', filters.action);
+  if (filters.entity) query.set('entity', filters.entity);
+  if (filters.limit) query.set('limit', String(filters.limit));
+  const queryString = query.toString();
+  return queryString ? `?${queryString}` : '';
+}
+
 async function postPrivateJson<T>(path: string, body: unknown): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     method: 'POST',
@@ -353,12 +368,12 @@ export function getAdminPaymentsCsvUrl(filters: PaymentFilters = {}): string {
   return `${API_BASE_URL}/api/v1/payments/admin/export.csv${buildPaymentQuery(filters)}`;
 }
 
-export function getAuditLogsCsvUrl(): string {
-  return `${API_BASE_URL}/api/v1/supervision/audit-logs/export.csv`;
+export function getAuditLogsCsvUrl(filters: AuditLogFilters = {}): string {
+  return `${API_BASE_URL}/api/v1/supervision/audit-logs/export.csv${buildAuditQuery(filters)}`;
 }
 
-export function getAuditLogs(): Promise<AuditLogEntry[]> {
-  return getPrivateJson<AuditLogEntry[]>('/api/v1/supervision/audit-logs?limit=25');
+export function getAuditLogs(filters: AuditLogFilters = {}): Promise<AuditLogEntry[]> {
+  return getPrivateJson<AuditLogEntry[]>(`/api/v1/supervision/audit-logs${buildAuditQuery({ ...filters, limit: filters.limit ?? 25 })}`);
 }
 
 export function getInstitutionalUsers(): Promise<InstitutionalUser[]> {
@@ -451,8 +466,8 @@ export function downloadAdminPaymentsCsv(filters: PaymentFilters = {}): Promise<
   return downloadProtectedCsv(getAdminPaymentsCsvUrl(filters), 'coderoute-payments.csv');
 }
 
-export function downloadAuditLogsCsv(): Promise<void> {
-  return downloadProtectedCsv(getAuditLogsCsvUrl(), 'coderoute-audit-logs.csv');
+export function downloadAuditLogsCsv(filters: AuditLogFilters = {}): Promise<void> {
+  return downloadProtectedCsv(getAuditLogsCsvUrl(filters), 'coderoute-audit-logs.csv');
 }
 
 export function getEntrySummary(): Promise<EntrySummary> {
