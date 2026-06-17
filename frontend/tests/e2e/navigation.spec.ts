@@ -19,7 +19,8 @@ test.describe('CodeRoute Guinee UI smoke tests', () => {
     await expect(page.locator('input[value="CRG-BOOK-DEMO-001"]')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Valider entree' })).toBeEnabled();
     await expect(page.getByRole('heading', { name: 'Declaration incident' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Declarer incident' })).toBeEnabled();
+    await expect(page.getByText(/Mode presentation : declaration officielle reservee/)).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Declarer incident' })).toBeDisabled();
 
     await page.getByRole('link', { name: 'Admin' }).click();
     await expect(page.getByRole('heading', { name: 'Supervision centres, entrees, examens et finances' })).toBeVisible();
@@ -27,7 +28,7 @@ test.describe('CodeRoute Guinee UI smoke tests', () => {
     await expect(page.getByText('Actions ouvertes')).toBeVisible();
     await expect(page.getByRole('link', { name: 'Incidents' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Incidents centres et reprises' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Actualiser' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Actualiser' })).toBeDisabled();
     await expect(page.getByRole('heading', { name: 'Dossier de presentation Etat' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Securite et conformite' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Feuille de route institutionnelle' })).toBeVisible();

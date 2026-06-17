@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useState } from 'react';
 
 import { canAccessRoute, demoRoles, navigationItems, type UserRole } from './auth';
 import { type AuthUser, changePassword, getAccessToken, getCurrentUser, loginUser, logoutUser } from './authClient';
+import { AuthSessionProvider } from './authSession';
 import { AdminPage, CandidatePage, CenterPage, ExamPage, HomePage, InstitutionalDossierPage, ResultsPage } from './pages';
 import './role.css';
 
@@ -296,7 +297,9 @@ export default function App() {
           </label>
         )}
       </nav>
-      {page}
+      <AuthSessionProvider currentUser={currentUser} isPresentationMode={isPresentationMode} role={role}>
+        {page}
+      </AuthSessionProvider>
     </main>
   );
 }

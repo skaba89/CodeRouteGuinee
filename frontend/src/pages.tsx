@@ -69,6 +69,7 @@ import {
   updateInstitutionalUserStatus,
   verifyExamCertificate,
 } from './api';
+import { canUseProtectedActions, useAuthSession } from './authSession';
 
 const fallbackDashboard: DashboardData = {
   candidates: 1250,
@@ -541,6 +542,8 @@ export function CandidatePage() {
 }
 
 export function CenterPage() {
+  const { currentUser, isPresentationMode } = useAuthSession();
+  const canReportCenterIncident = canUseProtectedActions(currentUser, isPresentationMode, ['center', 'admin', 'super_admin']);
   const [entryReference, setEntryReference] = useState('CRG-BOOK-DEMO-001');
   const [verificationCode, setVerificationCode] = useState('CRG-VERIFY-DEMO-001');
   const [centerCode, setCenterCode] = useState('CRG-CONAKRY-001');
@@ -576,6 +579,10 @@ export function CenterPage() {
   async function handleIncidentSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setIncidentStatus(null);
+    if (!canReportCenterIncident) {
+      setIncidentStatus('Action protegee : connectez-vous avec un compte centre, admin ou super admin pour declarer un incident officiel.');
+      return;
+    }
     const center = centers.find((item) => item.code === centerCode);
     if (!center) {
       setIncidentStatus('Centre introuvable : verifiez le code centre ou chargez les donnees API.');
@@ -611,6 +618,7 @@ export function CenterPage() {
         <form className="scanner-card incident-form" onSubmit={handleIncidentSubmit}>
           <h2>Declaration incident</h2>
           <p>Tracer un incident centre pour audit, supervision et reprise de session.</p>
+          {!canReportCenterIncident && <p className="protected-action-note">Mode presentation : declaration officielle reservee aux sessions centre ou admin connectees.</p>}
           <label>Type
             <select value={incidentType} onChange={(event) => setIncidentType(event.target.value)}>
               <option value="technical_issue">Probleme technique</option>
@@ -628,7 +636,7 @@ export function CenterPage() {
             </select>
           </label>
           <label>Description<textarea value={incidentDescription} onChange={(event) => setIncidentDescription(event.target.value)} /></label>
-          <button disabled={isReportingIncident || incidentDescription.length < 5}>{isReportingIncident ? 'Declaration...' : 'Declarer incident'}</button>
+          <button disabled={!canReportCenterIncident || isReportingIncident || incidentDescription.length < 5}>{isReportingIncident ? 'Declaration...' : 'Declarer incident'}</button>
         </form>
       </div>
       <div>
@@ -649,6 +657,9 @@ export function CenterPage() {
 }
 
 export function AdminPage() {
+  const { currentUser, isPresentationMode } = useAuthSession();
+  const canAdminAct = canUseProtectedActions(currentUser, isPresentationMode, ['admin', 'super_admin']);
+  const canSuperAdminAct = canUseProtectedActions(currentUser, isPresentationMode, ['super_admin']);
   const [dashboard, setDashboard] = useState<DashboardData>(fallbackDashboard);
   const [centers, setCenters] = useState<Center[]>([]);
   const [centerStatus, setCenterStatus] = useState<string | null>(null);
@@ -706,7 +717,18 @@ export function AdminPage() {
   const [isExportingPaymentCsv, setIsExportingPaymentCsv] = useState(false);
   const [isExportingAuditCsv, setIsExportingAuditCsv] = useState(false);
 
+  function blockProtectedAction(setStatus: (value: string) => void, superAdminOnly = false): boolean {
+    if (superAdminOnly ? canSuperAdminAct : canAdminAct) {
+      return false;
+    }
+    setStatus(superAdminOnly
+      ? 'Action protegee : connectez-vous avec un compte super admin reel.'
+      : 'Action protegee : connectez-vous avec un compte admin ou super admin reel.');
+    return true;
+  }
+
   async function refreshCenterIncidents() {
+    if (blockProtectedAction(setIncidentAdminStatus)) return;
     try {
       const incidents = await getCenterIncidents('open', 25);
       setCenterIncidents(incidents);
@@ -791,6 +813,7 @@ export function AdminPage() {
 
   async function handleResolveIncident(incidentId: string) {
     setIncidentAdminStatus(null);
+    if (blockProtectedAction(setIncidentAdminStatus)) return;
     try {
       const resolved = await resolveCenterIncident(incidentId, incidentResolutionNotes, allowIncidentRetake);
       setCenterIncidents((current) => current.filter((incident) => incident.id !== resolved.id));
@@ -802,6 +825,10 @@ export function AdminPage() {
   }
 
   async function refreshAuditLogs(filters: AuditLogFilters = activeAuditFilters) {
+    if (!canAdminAct) {
+      setAuditStatus('Logs indisponibles : connectez-vous avec un compte admin ou super admin reel.');
+      return;
+    }
     try {
       const cleanFilters = {
         action: filters.action || undefined,
@@ -818,6 +845,7 @@ export function AdminPage() {
 
   async function handleCenterStatus(centerId: string, status: string, reason: string) {
     setCenterStatus(null);
+    if (blockProtectedAction(setCenterStatus)) return;
     try {
       const updatedCenter = await updateCenterStatus(centerId, status, reason);
       setCenters((current) => current.map((center) => (center.id === centerId ? updatedCenter : center)));
@@ -831,6 +859,7 @@ export function AdminPage() {
 
   async function handleIdentityDecision(checkId: string, status: string, reason: string) {
     setIdentityStatus(null);
+    if (blockProtectedAction(setIdentityStatus)) return;
     try {
       const updatedCheck = await decideCandidateIdentity(checkId, status, reason);
       setIdentityChecks((current) => current.map((check) => (check.id === checkId ? updatedCheck : check)));
@@ -843,6 +872,7 @@ export function AdminPage() {
 
   async function handleQuestionDecision(questionId: string, status: string, reason: string) {
     setQuestionGovernanceStatus(null);
+    if (blockProtectedAction(setQuestionGovernanceStatus)) return;
     try {
       const updatedItem = await decideQuestionGovernance(questionId, status, reason);
       setQuestionGovernance((current) => current.map((item) => (item.question_id === questionId ? updatedItem : item)));
@@ -857,6 +887,7 @@ export function AdminPage() {
   async function handleAuthorizationSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setAuthorizationStatus(null);
+    if (blockProtectedAction(setAuthorizationStatus)) return;
     try {
       const created = await createInstitutionalAuthorization(authorizationForm);
       setInstitutionalAuthorizations((current) => [created, ...current]);
@@ -869,6 +900,7 @@ export function AdminPage() {
 
   async function handleAuthorizationStatus(authorizationId: string, status: string, reason: string) {
     setAuthorizationStatus(null);
+    if (blockProtectedAction(setAuthorizationStatus)) return;
     try {
       const updated = await updateInstitutionalAuthorizationStatus(authorizationId, status, reason);
       setInstitutionalAuthorizations((current) => current.map((item) => (item.id === authorizationId ? updated : item)));
@@ -881,6 +913,7 @@ export function AdminPage() {
 
   async function handleUserRole(userId: string, role: string, reason: string) {
     setUserGovernanceStatus(null);
+    if (blockProtectedAction(setUserGovernanceStatus, true)) return;
     try {
       const updated = await updateInstitutionalUserRole(userId, role, reason);
       setInstitutionalUsers((current) => current.map((user) => (user.id === userId ? updated : user)));
@@ -894,6 +927,7 @@ export function AdminPage() {
   async function handleUserSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setUserGovernanceStatus(null);
+    if (blockProtectedAction(setUserGovernanceStatus, true)) return;
     try {
       const created = await createInstitutionalUser(userForm);
       setInstitutionalUsers((current) => [created, ...current]);
@@ -906,6 +940,7 @@ export function AdminPage() {
 
   async function handleUserStatus(userId: string, isActive: boolean, reason: string) {
     setUserGovernanceStatus(null);
+    if (blockProtectedAction(setUserGovernanceStatus, true)) return;
     try {
       const updated = await updateInstitutionalUserStatus(userId, isActive, reason);
       setInstitutionalUsers((current) => current.map((user) => (user.id === userId ? updated : user)));
@@ -918,6 +953,7 @@ export function AdminPage() {
 
   async function handleUserPasswordReset(userId: string) {
     setUserGovernanceStatus(null);
+    if (blockProtectedAction(setUserGovernanceStatus, true)) return;
     try {
       const updated = await resetInstitutionalUserPassword(userId, passwordResetValue, 'Reinitialisation administrative controlee');
       setInstitutionalUsers((current) => current.map((user) => (user.id === userId ? updated : user)));
@@ -929,6 +965,7 @@ export function AdminPage() {
   }
 
   async function handleDashboardCsvExport() {
+    if (blockProtectedAction(setCsvExportStatus)) return;
     setIsExportingCsv(true);
     setCsvExportStatus(null);
     try {
@@ -943,6 +980,7 @@ export function AdminPage() {
   }
 
   async function handleExamAttemptsCsvExport() {
+    if (blockProtectedAction(setExamCsvExportStatus)) return;
     setIsExportingExamCsv(true);
     setExamCsvExportStatus(null);
     try {
@@ -957,6 +995,7 @@ export function AdminPage() {
   }
 
   async function handlePaymentCsvExport() {
+    if (blockProtectedAction(setPaymentCsvExportStatus)) return;
     setIsExportingPaymentCsv(true);
     setPaymentCsvExportStatus(null);
     try {
@@ -971,6 +1010,7 @@ export function AdminPage() {
   }
 
   async function handleAuditCsvExport() {
+    if (blockProtectedAction(setAuditCsvExportStatus)) return;
     setIsExportingAuditCsv(true);
     setAuditCsvExportStatus(null);
     try {
@@ -985,6 +1025,7 @@ export function AdminPage() {
   }
 
   async function handleInstitutionalReportCsvExport() {
+    if (blockProtectedAction(setInstitutionalReportStatus)) return;
     setIsExportingInstitutionalReport(true);
     setInstitutionalReportStatus(null);
     try {
@@ -1194,12 +1235,13 @@ export function AdminPage() {
         {adminSections.map((section) => <a key={section.href} href={section.href}>{section.label}</a>)}
       </div>
       <div className="actions result-actions admin-actions">
-        <button onClick={handleDashboardCsvExport} disabled={isExportingCsv}>{isExportingCsv ? 'Export...' : 'Exporter le dashboard CSV'}</button>
-        <button onClick={handleInstitutionalReportCsvExport} disabled={isExportingInstitutionalReport}>{isExportingInstitutionalReport ? 'Export...' : 'Exporter le rapport institutionnel'}</button>
-        <button onClick={handleExamAttemptsCsvExport} disabled={isExportingExamCsv}>{isExportingExamCsv ? 'Export...' : 'Exporter les examens CSV'}</button>
-        <button onClick={handlePaymentCsvExport} disabled={isExportingPaymentCsv}>{isExportingPaymentCsv ? 'Export...' : 'Exporter les paiements CSV'}</button>
-        <button onClick={handleAuditCsvExport} disabled={isExportingAuditCsv}>{isExportingAuditCsv ? 'Export...' : 'Exporter audit CSV'}</button>
+        <button onClick={handleDashboardCsvExport} disabled={!canAdminAct || isExportingCsv}>{isExportingCsv ? 'Export...' : 'Exporter le dashboard CSV'}</button>
+        <button onClick={handleInstitutionalReportCsvExport} disabled={!canAdminAct || isExportingInstitutionalReport}>{isExportingInstitutionalReport ? 'Export...' : 'Exporter le rapport institutionnel'}</button>
+        <button onClick={handleExamAttemptsCsvExport} disabled={!canAdminAct || isExportingExamCsv}>{isExportingExamCsv ? 'Export...' : 'Exporter les examens CSV'}</button>
+        <button onClick={handlePaymentCsvExport} disabled={!canAdminAct || isExportingPaymentCsv}>{isExportingPaymentCsv ? 'Export...' : 'Exporter les paiements CSV'}</button>
+        <button onClick={handleAuditCsvExport} disabled={!canAdminAct || isExportingAuditCsv}>{isExportingAuditCsv ? 'Export...' : 'Exporter audit CSV'}</button>
       </div>
+      {!canAdminAct && <p className="protected-action-note">Mode presentation : les actions officielles admin sont verrouillees jusqu a connexion avec un compte admin reel.</p>}
       {csvExportStatus && <p className="login-status">{csvExportStatus}</p>}
       {examCsvExportStatus && <p className="login-status">{examCsvExportStatus}</p>}
       {paymentCsvExportStatus && <p className="login-status">{paymentCsvExportStatus}</p>}
@@ -1275,7 +1317,7 @@ export function AdminPage() {
           </label>
           <label>Mot de passe initial<input type="password" value={userForm.initial_password} onChange={(event) => setUserForm((current) => ({ ...current, initial_password: event.target.value }))} /></label>
           <label>Motif administratif<input value={userForm.reason} onChange={(event) => setUserForm((current) => ({ ...current, reason: event.target.value }))} /></label>
-          <button type="submit">Creer le compte</button>
+          <button type="submit" disabled={!canSuperAdminAct}>Creer le compte</button>
         </form>
         <div className="reset-password-strip">
           <label>Mot de passe de reset<input type="password" value={passwordResetValue} onChange={(event) => setPasswordResetValue(event.target.value)} /></label>
@@ -1293,12 +1335,12 @@ export function AdminPage() {
                   <td>{new Date(user.created_at).toLocaleDateString('fr-FR')}</td>
                   <td>
                     <div className="table-actions">
-                      <button onClick={() => handleUserRole(user.id, 'admin', 'Affectation officielle a la supervision nationale')}>Admin</button>
-                      <button onClick={() => handleUserRole(user.id, 'center', 'Affectation officielle a un centre agree')}>Centre</button>
-                      <button onClick={() => handleUserStatus(user.id, !user.is_active, user.is_active ? 'Suspension administrative temporaire' : 'Reactivation administrative du compte')}>
+                      <button disabled={!canSuperAdminAct} onClick={() => handleUserRole(user.id, 'admin', 'Affectation officielle a la supervision nationale')}>Admin</button>
+                      <button disabled={!canSuperAdminAct} onClick={() => handleUserRole(user.id, 'center', 'Affectation officielle a un centre agree')}>Centre</button>
+                      <button disabled={!canSuperAdminAct} onClick={() => handleUserStatus(user.id, !user.is_active, user.is_active ? 'Suspension administrative temporaire' : 'Reactivation administrative du compte')}>
                         {user.is_active ? 'Suspendre' : 'Reactiver'}
                       </button>
-                      <button onClick={() => handleUserPasswordReset(user.id)}>Reset MDP</button>
+                      <button disabled={!canSuperAdminAct} onClick={() => handleUserPasswordReset(user.id)}>Reset MDP</button>
                     </div>
                   </td>
                 </tr>
@@ -1324,9 +1366,9 @@ export function AdminPage() {
                   <td><span className="badge">{center.status}</span></td>
                   <td>
                     <div className="table-actions">
-                      <button onClick={() => handleCenterStatus(center.id, 'accredited', 'Accreditation institutionnelle validee')}>Accrediter</button>
-                      <button onClick={() => handleCenterStatus(center.id, 'suspended', 'Suspension administrative pour controle')}>Suspendre</button>
-                      <button onClick={() => handleCenterStatus(center.id, 'pending_audit', 'Retour en audit administratif')}>Audit</button>
+                      <button disabled={!canAdminAct} onClick={() => handleCenterStatus(center.id, 'accredited', 'Accreditation institutionnelle validee')}>Accrediter</button>
+                      <button disabled={!canAdminAct} onClick={() => handleCenterStatus(center.id, 'suspended', 'Suspension administrative pour controle')}>Suspendre</button>
+                      <button disabled={!canAdminAct} onClick={() => handleCenterStatus(center.id, 'pending_audit', 'Retour en audit administratif')}>Audit</button>
                     </div>
                   </td>
                 </tr>
@@ -1341,7 +1383,7 @@ export function AdminPage() {
             <h3>Incidents centres et reprises</h3>
             <p>Suivi des incidents declares par les centres, decision de resolution et creation eventuelle d une nouvelle tentative.</p>
           </div>
-          <button className="secondary-button" onClick={refreshCenterIncidents}>Actualiser</button>
+          <button className="secondary-button" onClick={refreshCenterIncidents} disabled={!canAdminAct}>Actualiser</button>
         </div>
         {incidentAdminStatus && <p className={incidentAdminStatus.includes('impossible') || incidentAdminStatus.includes('indisponibles') ? 'form-error' : 'login-status'}>{incidentAdminStatus}</p>}
         <div className="incident-resolution-controls">
@@ -1363,7 +1405,7 @@ export function AdminPage() {
                   <td>{incident.incident_type}</td>
                   <td><span className="badge">{incident.severity}</span></td>
                   <td>{incident.description}</td>
-                  <td><button onClick={() => handleResolveIncident(incident.id)} disabled={incidentResolutionNotes.length < 5}>Resoudre</button></td>
+                  <td><button onClick={() => handleResolveIncident(incident.id)} disabled={!canAdminAct || incidentResolutionNotes.length < 5}>Resoudre</button></td>
                 </tr>
               ))}
             </tbody>
@@ -1387,9 +1429,9 @@ export function AdminPage() {
                 <td>{new Date(check.created_at).toLocaleString('fr-FR')}</td>
                 <td>
                   <div className="table-actions">
-                    <button onClick={() => handleIdentityDecision(check.id, 'verified', 'Piece conforme au controle administratif')}>Valider</button>
-                    <button onClick={() => handleIdentityDecision(check.id, 'needs_review', 'Controle manuel complementaire requis')}>Revue</button>
-                    <button onClick={() => handleIdentityDecision(check.id, 'rejected', 'Piece non conforme ou illisible')}>Rejeter</button>
+                    <button disabled={!canAdminAct} onClick={() => handleIdentityDecision(check.id, 'verified', 'Piece conforme au controle administratif')}>Valider</button>
+                    <button disabled={!canAdminAct} onClick={() => handleIdentityDecision(check.id, 'needs_review', 'Controle manuel complementaire requis')}>Revue</button>
+                    <button disabled={!canAdminAct} onClick={() => handleIdentityDecision(check.id, 'rejected', 'Piece non conforme ou illisible')}>Rejeter</button>
                   </div>
                 </td>
               </tr>
@@ -1414,9 +1456,9 @@ export function AdminPage() {
                 <td>{item.is_active ? 'Oui' : 'Non'}</td>
                 <td>
                   <div className="table-actions">
-                    <button onClick={() => handleQuestionDecision(item.question_id, 'published', 'Question validee pour publication officielle')}>Publier</button>
-                    <button onClick={() => handleQuestionDecision(item.question_id, 'needs_revision', 'Relecture pedagogique ou juridique requise')}>Relecture</button>
-                    <button onClick={() => handleQuestionDecision(item.question_id, 'suspended', 'Question suspendue par decision administrative')}>Suspendre</button>
+                    <button disabled={!canAdminAct} onClick={() => handleQuestionDecision(item.question_id, 'published', 'Question validee pour publication officielle')}>Publier</button>
+                    <button disabled={!canAdminAct} onClick={() => handleQuestionDecision(item.question_id, 'needs_revision', 'Relecture pedagogique ou juridique requise')}>Relecture</button>
+                    <button disabled={!canAdminAct} onClick={() => handleQuestionDecision(item.question_id, 'suspended', 'Question suspendue par decision administrative')}>Suspendre</button>
                   </div>
                 </td>
               </tr>
@@ -1434,7 +1476,7 @@ export function AdminPage() {
           <label>Reference<input value={authorizationForm.reference} onChange={(event) => setAuthorizationForm((current) => ({ ...current, reference: event.target.value }))} /></label>
           <label>Titre<input value={authorizationForm.title} onChange={(event) => setAuthorizationForm((current) => ({ ...current, title: event.target.value }))} /></label>
           <label>Perimetre<input value={authorizationForm.scope} onChange={(event) => setAuthorizationForm((current) => ({ ...current, scope: event.target.value }))} /></label>
-          <button type="submit">Enregistrer habilitation</button>
+          <button type="submit" disabled={!canAdminAct}>Enregistrer habilitation</button>
         </form>
         <div className="table-shell">
         <table>
@@ -1449,9 +1491,9 @@ export function AdminPage() {
                 <td>{item.valid_until ? new Date(item.valid_until).toLocaleDateString('fr-FR') : 'A definir'}</td>
                 <td>
                   <div className="table-actions">
-                    <button onClick={() => handleAuthorizationStatus(item.id, 'approved', 'Habilitation approuvee par l autorite competente')}>Approuver</button>
-                    <button onClick={() => handleAuthorizationStatus(item.id, 'pending_signature', 'Signature institutionnelle en attente')}>Signature</button>
-                    <button onClick={() => handleAuthorizationStatus(item.id, 'revoked', 'Habilitation revoquee par decision administrative')}>Revoquer</button>
+                    <button disabled={!canAdminAct} onClick={() => handleAuthorizationStatus(item.id, 'approved', 'Habilitation approuvee par l autorite competente')}>Approuver</button>
+                    <button disabled={!canAdminAct} onClick={() => handleAuthorizationStatus(item.id, 'pending_signature', 'Signature institutionnelle en attente')}>Signature</button>
+                    <button disabled={!canAdminAct} onClick={() => handleAuthorizationStatus(item.id, 'revoked', 'Habilitation revoquee par decision administrative')}>Revoquer</button>
                   </div>
                 </td>
               </tr>
