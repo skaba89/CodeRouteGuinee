@@ -15,6 +15,8 @@ class Settings(BaseSettings):
     bootstrap_admin_email: str | None = None
     bootstrap_admin_password: str | None = None
     bootstrap_admin_full_name: str = "Administrateur National CodeRoute"
+    login_rate_limit_attempts: int = 5
+    login_rate_limit_window_seconds: int = 300
 
     @property
     def cors_origin_list(self) -> list[str]:

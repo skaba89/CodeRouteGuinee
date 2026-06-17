@@ -8,6 +8,7 @@ Ce document liste le minimum a verrouiller avant une presentation ou un pilote i
 2. Remplacer `SECRET_KEY`, `ADMIN_REGISTRATION_TOKEN`, `POSTGRES_PASSWORD` et `BOOTSTRAP_ADMIN_PASSWORD`.
 3. Configurer `CORS_ORIGINS` avec les domaines officiels uniquement.
 4. Garder `AUTO_CREATE_TABLES=false` en production: les tables doivent etre gerees par Alembic.
+5. Ajuster `LOGIN_RATE_LIMIT_ATTEMPTS` et `LOGIN_RATE_LIMIT_WINDOW_SECONDS` selon la politique de securite.
 
 ## Base de donnees
 
@@ -33,6 +34,21 @@ Le script lit:
 - `BOOTSTRAP_ADMIN_FULL_NAME`
 
 Si l'utilisateur existe deja, le script le reactive et force son role `super_admin` sans changer son mot de passe.
+
+## Securite HTTP et authentification
+
+L'API ajoute des headers de securite par defaut:
+
+- `X-Content-Type-Options: nosniff`
+- `X-Frame-Options: DENY`
+- `Referrer-Policy: same-origin`
+- `Permissions-Policy` pour bloquer camera, micro et geolocalisation par defaut
+
+Les tentatives de connexion echouees sont limitees par couple email/IP. Les evenements suivants sont historises dans `audit_logs`:
+
+- `auth.login_success`
+- `auth.login_failed`
+- `auth.login_blocked`
 
 ## Controle avant presentation
 

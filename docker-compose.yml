@@ -31,6 +31,8 @@ services:
       API_V1_PREFIX: ${API_V1_PREFIX:-/api/v1}
       SECRET_KEY: ${SECRET_KEY:-change-me-in-production}
       ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-120}
+      LOGIN_RATE_LIMIT_ATTEMPTS: ${LOGIN_RATE_LIMIT_ATTEMPTS:-5}
+      LOGIN_RATE_LIMIT_WINDOW_SECONDS: ${LOGIN_RATE_LIMIT_WINDOW_SECONDS:-300}
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-coderoute}:${POSTGRES_PASSWORD:-coderoute}@postgres:5432/${POSTGRES_DB:-coderoute}
       AUTO_CREATE_TABLES: "false"
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}
