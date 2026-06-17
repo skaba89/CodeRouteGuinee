@@ -2,16 +2,16 @@ import { FormEvent, useEffect, useState } from 'react';
 
 import { canAccessRoute, demoRoles, navigationItems, type UserRole } from './auth';
 import { getCurrentUser, loginUser, logoutUser } from './authClient';
-import { AdminPage, CandidatePage, CenterPage, ExamPage, HomePage, ResultsPage } from './pages';
+import { AdminPage, CandidatePage, CenterPage, ExamPage, HomePage, InstitutionalDossierPage, ResultsPage } from './pages';
 import './role.css';
 
-type AppRoute = 'home' | 'candidate' | 'center' | 'admin' | 'exam' | 'results' | 'login';
+type AppRoute = 'home' | 'candidate' | 'center' | 'admin' | 'exam' | 'results' | 'dossier' | 'login';
 
 const ROLE_STORAGE_KEY = 'coderoute-demo-role';
 
 function getRouteFromHash(): AppRoute {
   const route = window.location.hash.replace('#/', '');
-  if (route === 'candidate' || route === 'center' || route === 'admin' || route === 'exam' || route === 'results' || route === 'login') {
+  if (route === 'candidate' || route === 'center' || route === 'admin' || route === 'exam' || route === 'results' || route === 'dossier' || route === 'login') {
     return route;
   }
   return 'home';
@@ -123,6 +123,7 @@ export default function App() {
     admin: <AdminPage />,
     exam: <ExamPage />,
     results: <ResultsPage />,
+    dossier: <InstitutionalDossierPage />,
     login: <LoginPage role={role} onRoleChange={setRole} onLogin={handleLogin} />,
   }[route] : <AccessDenied role={role} />;
 

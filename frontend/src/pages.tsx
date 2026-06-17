@@ -259,6 +259,26 @@ const modules = [
   'Dashboard national',
 ];
 
+const dossierHighlights = [
+  ['Objectif public', 'Digitaliser et harmoniser les examens du code de la route sous pilotage national.'],
+  ['Benefices attendus', 'Reduire les files, fiabiliser les resultats, limiter les fraudes et produire du reporting.'],
+  ['Preuves disponibles', 'Audit, exports CSV, certificats, controle centre, paiements, habilitations et readiness.'],
+  ['Decision attendue', 'Valider un pilote institutionnel encadre avant extension progressive.'],
+];
+
+const dossierWorkstreams = [
+  ['Gouvernance', 'Ministere, direction nationale, centres agrees, roles et habilitations.'],
+  ['Parcours candidat', 'Dossier, reservation, paiement, convocation, examen, resultats et attestation.'],
+  ['Controle centre', 'Validation entree, session, poste, supervision et incidents.'],
+  ['Reporting national', 'Indicateurs, audit, finances, exports et maturite institutionnelle.'],
+];
+
+const dossierRisks = [
+  ['Donnees officielles', 'Registres candidats, pieces identite et centres agrees doivent etre branches.'],
+  ['Antifraude', 'Photo candidat, surveillance centre et detection anomalies restent a renforcer.'],
+  ['Production', 'CI/CD, sauvegardes, monitoring, secrets et procedures exploitation sont requis.'],
+];
+
 function formatNumber(value: number): string {
   return new Intl.NumberFormat('fr-FR').format(value);
 }
@@ -347,6 +367,64 @@ export function HomePage() {
         </div>
       </section>
     </>
+  );
+}
+
+export function InstitutionalDossierPage() {
+  return (
+    <section className="screen dossier-page">
+      <div className="dossier-hero">
+        <div>
+          <p className="eyebrow dark">Dossier institutionnel</p>
+          <h2>Presentation Etat - CodeRoute Guinee</h2>
+          <p>Support executive pour presenter le pilote, les preuves disponibles, les risques restants et la decision attendue.</p>
+        </div>
+        <div className="dossier-score">
+          <span>Maturite pilote</span>
+          <strong>{fallbackInstitutionalReport.readiness_score}%</strong>
+          <small>{fallbackInstitutionalReport.readiness_label}</small>
+        </div>
+      </div>
+
+      <div className="dossier-highlight-grid">
+        {dossierHighlights.map(([label, detail]) => (
+          <article key={label}>
+            <span>{label}</span>
+            <p>{detail}</p>
+          </article>
+        ))}
+      </div>
+
+      <div className="dossier-two-columns">
+        <section>
+          <h3>Perimetre pilote</h3>
+          {dossierWorkstreams.map(([label, detail]) => (
+            <div className="dossier-line" key={label}>
+              <strong>{label}</strong>
+              <p>{detail}</p>
+            </div>
+          ))}
+        </section>
+        <section>
+          <h3>Risques a lever avant production</h3>
+          {dossierRisks.map(([label, detail]) => (
+            <div className="dossier-line risk" key={label}>
+              <strong>{label}</strong>
+              <p>{detail}</p>
+            </div>
+          ))}
+        </section>
+      </div>
+
+      <div className="dossier-decision">
+        <strong>Decision proposee</strong>
+        <p>Valider un pilote institutionnel de trois mois avec centres retenus, donnees officielles limitees, supervision nationale et rapport hebdomadaire d avancement.</p>
+        <div className="actions result-actions">
+          <a href="#/admin">Retour cockpit admin</a>
+          <a href="#/admin" className="secondary">Voir roadmap et securite</a>
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -1254,6 +1332,9 @@ export function AdminPage() {
               <p>{detail}</p>
             </div>
           ))}
+        </div>
+        <div className="actions result-actions">
+          <a href="#/dossier">Ouvrir le dossier complet</a>
         </div>
       </div>
       <div id="securite" className="security-matrix-panel admin-section">

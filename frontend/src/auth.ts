@@ -18,6 +18,7 @@ export const navigationItems: NavigationItem[] = [
   { label: 'Candidat', href: '#/candidate', roles: ['candidate', 'admin', 'super_admin'] },
   { label: 'Centre', href: '#/center', roles: ['center', 'admin', 'super_admin'] },
   { label: 'Admin', href: '#/admin', roles: ['admin', 'super_admin'] },
+  { label: 'Dossier Etat', href: '#/dossier', roles: ['admin', 'super_admin'] },
   { label: 'Examen', href: '#/exam', roles: ['candidate', 'center', 'admin', 'super_admin'] },
   { label: 'Résultats', href: '#/results', roles: ['candidate', 'admin', 'super_admin'] },
 ];
