@@ -16,7 +16,8 @@ test.describe('CodeRoute Guinee UI smoke tests', () => {
 
     await page.getByRole('link', { name: 'Centre' }).click();
     await expect(page.getByRole('heading', { name: 'Controle entree centre' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Valider entree' })).toBeDisabled();
+    await expect(page.locator('input[value="CRG-BOOK-DEMO-001"]')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Valider entree' })).toBeEnabled();
 
     await page.getByRole('link', { name: 'Admin' }).click();
     await expect(page.getByRole('heading', { name: 'Supervision centres, entrees, examens et finances' })).toBeVisible();

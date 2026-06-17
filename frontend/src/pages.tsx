@@ -429,7 +429,7 @@ export function InstitutionalDossierPage() {
 }
 
 export function CandidatePage() {
-  const [bookingReference, setBookingReference] = useState('GN-BOOK-2026-000001');
+  const [bookingReference, setBookingReference] = useState('CRG-BOOK-DEMO-001');
   const [amount, setAmount] = useState(250000);
   const [provider, setProvider] = useState('orange_money');
   const [phone, setPhone] = useState('+224622000000');
@@ -528,9 +528,9 @@ export function CandidatePage() {
 }
 
 export function CenterPage() {
-  const [entryReference, setEntryReference] = useState('GN-CONV-2026-000001');
-  const [verificationCode, setVerificationCode] = useState('');
-  const [centerCode, setCenterCode] = useState('CTR-KALOUM');
+  const [entryReference, setEntryReference] = useState('CRG-BOOK-DEMO-001');
+  const [verificationCode, setVerificationCode] = useState('CRG-VERIFY-DEMO-001');
+  const [centerCode, setCenterCode] = useState('CRG-CONAKRY-001');
   const [entryResult, setEntryResult] = useState<EntryValidationResult | null>(null);
   const [entryError, setEntryError] = useState<string | null>(null);
   const [isSubmittingEntry, setIsSubmittingEntry] = useState(false);
