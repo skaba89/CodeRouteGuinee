@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta
+
 from pydantic import BaseModel
 from fastapi import APIRouter, Depends, Response
 from sqlalchemy import func, select
@@ -70,6 +72,20 @@ class InstitutionalReportRead(BaseModel):
     recommendations: list[str]
 
 
+class InstitutionalActionItem(BaseModel):
+    code: str
+    label: str
+    count: int
+    severity: str
+    target: str
+
+
+class InstitutionalActionCenterRead(BaseModel):
+    total_actions: int
+    critical_actions: int
+    items: list[InstitutionalActionItem]
+
+
 def _build_dashboard(db: Session) -> DashboardRead:
     fraud_alerts = db.query(CenterIncident).filter(CenterIncident.status == "open").count()
     fraud_alerts += db.query(DeviceSession).filter(DeviceSession.status == "suspicious").count()
@@ -81,6 +97,11 @@ def _build_dashboard(db: Session) -> DashboardRead:
         questions=db.query(Question).count(),
         fraud_alerts=fraud_alerts,
     )
+
+
+def _build_action_item(code: str, label: str, count: int, target: str, warning: int, critical: int) -> InstitutionalActionItem:
+    severity = "critical" if count >= critical else "warning" if count >= warning else "normal"
+    return InstitutionalActionItem(code=code, label=label, count=count, severity=severity, target=target)
 
 
 def _count_by_status(db: Session, model: object, status_column: object) -> dict[str, int]:
@@ -101,6 +122,35 @@ def _risk_status(score: int) -> str:
 @router.get("", response_model=DashboardRead)
 def dashboard(db: Session = Depends(get_db)) -> DashboardRead:
     return _build_dashboard(db)
+
+
+def _build_action_center(db: Session) -> InstitutionalActionCenterRead:
+    soon = datetime.utcnow() + timedelta(days=30)
+    pending_identities = db.query(CandidateIdentityCheck).filter(CandidateIdentityCheck.status.in_(["pending", "needs_review"])).count()
+    centers_to_review = db.query(Center).filter(Center.status.in_(["pending_audit", "suspended"])).count()
+    authorizations_to_sign = db.query(InstitutionalAuthorization).filter(InstitutionalAuthorization.status.in_(["draft", "pending_signature"])).count()
+    expiring_authorizations = db.query(InstitutionalAuthorization).filter(
+        InstitutionalAuthorization.valid_until.is_not(None),
+        InstitutionalAuthorization.valid_until <= soon,
+        InstitutionalAuthorization.status.in_(["approved", "pending_signature"]),
+    ).count()
+    questions_to_review = db.query(QuestionGovernanceDecision).filter(QuestionGovernanceDecision.status == "needs_revision").count()
+    open_incidents = db.query(CenterIncident).filter(CenterIncident.status == "open").count()
+
+    items = [
+        _build_action_item("identity_checks", "Identites candidates a traiter", pending_identities, "#identites", warning=1, critical=10),
+        _build_action_item("center_governance", "Centres a auditer ou suspendus", centers_to_review, "#centres", warning=1, critical=5),
+        _build_action_item("authorizations_signature", "Habilitations en attente de signature", authorizations_to_sign, "#habilitations", warning=1, critical=3),
+        _build_action_item("authorizations_expiry", "Habilitations proches de l'expiration", expiring_authorizations, "#habilitations", warning=1, critical=3),
+        _build_action_item("question_revision", "Questions officielles a relire", questions_to_review, "#questions", warning=1, critical=5),
+        _build_action_item("open_incidents", "Incidents centres ouverts", open_incidents, "#audit", warning=1, critical=5),
+    ]
+    active_items = [item for item in items if item.count > 0]
+    return InstitutionalActionCenterRead(
+        total_actions=sum(item.count for item in active_items),
+        critical_actions=sum(item.count for item in active_items if item.severity == "critical"),
+        items=active_items,
+    )
 
 
 def _build_institutional_readiness(db: Session) -> InstitutionalReadinessRead:
@@ -198,6 +248,25 @@ def institutional_readiness(
     )
     db.commit()
     return readiness
+
+
+@router.get("/institutional-action-center", response_model=InstitutionalActionCenterRead)
+def institutional_action_center(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "super_admin")),
+) -> InstitutionalActionCenterRead:
+    action_center = _build_action_center(db)
+    db.add(
+        AuditLog(
+            actor_id=current_user.id,
+            action="dashboard.institutional_action_center_viewed",
+            entity="dashboard",
+            entity_id="institutional-action-center",
+            details={"total_actions": action_center.total_actions, "critical_actions": action_center.critical_actions},
+        )
+    )
+    db.commit()
+    return action_center
 
 
 @router.get("/institutional-report", response_model=InstitutionalReportRead)

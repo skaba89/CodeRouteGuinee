@@ -106,6 +106,20 @@ export type InstitutionalReport = {
   recommendations: string[];
 };
 
+export type InstitutionalActionItem = {
+  code: string;
+  label: string;
+  count: number;
+  severity: 'normal' | 'warning' | 'critical' | string;
+  target: string;
+};
+
+export type InstitutionalActionCenter = {
+  total_actions: number;
+  critical_actions: number;
+  items: InstitutionalActionItem[];
+};
+
 export type CandidateIdentityCheck = {
   id: string;
   candidate_id: string;
@@ -326,6 +340,10 @@ export function getInstitutionalReadiness(): Promise<InstitutionalReadiness> {
 
 export function getInstitutionalReport(): Promise<InstitutionalReport> {
   return getPrivateJson<InstitutionalReport>('/api/v1/dashboard/institutional-report');
+}
+
+export function getInstitutionalActionCenter(): Promise<InstitutionalActionCenter> {
+  return getPrivateJson<InstitutionalActionCenter>('/api/v1/dashboard/institutional-action-center');
 }
 
 export function getCandidateIdentityChecks(): Promise<CandidateIdentityCheck[]> {

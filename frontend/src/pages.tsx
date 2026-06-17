@@ -11,6 +11,7 @@ import {
   type ExamSummary,
   type InstitutionalAuthorization,
   type InstitutionalAuthorizationPayload,
+  type InstitutionalActionCenter,
   type InstitutionalReport,
   type InstitutionalReadiness,
   type PaymentAlert,
@@ -36,6 +37,7 @@ import {
   getEntrySummary,
   getExamCertificatePdfUrl,
   getExamSummary,
+  getInstitutionalActionCenter,
   getInstitutionalReport,
   getInstitutionalReadiness,
   getInstitutionalAuthorizations,
@@ -132,6 +134,16 @@ const fallbackInstitutionalReport: InstitutionalReport = {
   recommendations: [
     'Valider la nomenclature officielle des centres agrees avec l administration.',
     'Importer la banque officielle de questions par categorie de permis.',
+  ],
+};
+
+const fallbackInstitutionalActionCenter: InstitutionalActionCenter = {
+  total_actions: 8,
+  critical_actions: 0,
+  items: [
+    { code: 'identity_checks', label: 'Identites candidates a traiter', count: 3, severity: 'warning', target: '#identites' },
+    { code: 'authorizations_signature', label: 'Habilitations en attente de signature', count: 2, severity: 'warning', target: '#habilitations' },
+    { code: 'question_revision', label: 'Questions officielles a relire', count: 3, severity: 'warning', target: '#questions' },
   ],
 };
 
@@ -431,6 +443,8 @@ export function AdminPage() {
     scope: 'Autorisation pilote pour la digitalisation des examens du code de la route.',
   });
   const [institutionalReadiness, setInstitutionalReadiness] = useState<InstitutionalReadiness>(fallbackInstitutionalReadiness);
+  const [institutionalActionCenter, setInstitutionalActionCenter] = useState<InstitutionalActionCenter>(fallbackInstitutionalActionCenter);
+  const [actionCenterStatus, setActionCenterStatus] = useState<string | null>(null);
   const [institutionalReport, setInstitutionalReport] = useState<InstitutionalReport>(fallbackInstitutionalReport);
   const [institutionalReportStatus, setInstitutionalReportStatus] = useState<string | null>(null);
   const [readinessStatus, setReadinessStatus] = useState<string | null>(null);
@@ -481,6 +495,12 @@ export function AdminPage() {
         setInstitutionalReportStatus(null);
       })
       .catch(() => setInstitutionalReportStatus('Mode demo : connectez-vous avec un token admin pour charger le rapport institutionnel API.'));
+    getInstitutionalActionCenter()
+      .then((actionCenter) => {
+        setInstitutionalActionCenter(actionCenter.items.length > 0 ? actionCenter : fallbackInstitutionalActionCenter);
+        setActionCenterStatus(null);
+      })
+      .catch(() => setActionCenterStatus('Mode demo : connectez-vous avec un role admin pour charger le centre d action API.'));
     getCandidateIdentityChecks()
       .then((checks) => {
         setIdentityChecks(checks.length > 0 ? checks : fallbackIdentityChecks);
@@ -709,6 +729,22 @@ export function AdminPage() {
       {paymentCsvExportStatus && <p className="login-status">{paymentCsvExportStatus}</p>}
       {institutionalReportStatus && <p className={institutionalReportStatus.includes('impossible') || institutionalReportStatus.includes('Mode demo') ? 'form-error' : 'login-status'}>{institutionalReportStatus}</p>}
       {financeStatus && <p className="form-error">{financeStatus}</p>}
+      <div className="action-center-panel">
+        <div>
+          <h3>Centre d'action institutionnel</h3>
+          <p>{formatNumber(institutionalActionCenter.total_actions)} action(s) prioritaire(s), dont {formatNumber(institutionalActionCenter.critical_actions)} critique(s).</p>
+        </div>
+        {actionCenterStatus && <p className="form-error">{actionCenterStatus}</p>}
+        <div className="action-center-grid">
+          {institutionalActionCenter.items.map((item) => (
+            <a href={item.target} className={`action-item severity-${item.severity}`} key={item.code}>
+              <span>{item.severity}</span>
+              <strong>{formatNumber(item.count)}</strong>
+              <small>{item.label}</small>
+            </a>
+          ))}
+        </div>
+      </div>
       <div className="metrics compact">
         <article><strong>{formatNumber(allowedEntries)}</strong><span>Entrees validees</span></article>
         <article><strong>{formatNumber(deniedEntries)}</strong><span>Entrees refusees</span></article>
