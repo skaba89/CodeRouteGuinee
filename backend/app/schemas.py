@@ -123,6 +123,29 @@ class QuestionGovernanceRead(BaseModel):
     decided_at: datetime | None = None
 
 
+class InstitutionalAuthorizationCreate(BaseModel):
+    authority: str = Field(min_length=3)
+    reference: str = Field(min_length=3)
+    title: str = Field(min_length=3)
+    scope: str = Field(min_length=5)
+    valid_from: datetime | None = None
+    valid_until: datetime | None = None
+
+
+class InstitutionalAuthorizationStatusUpdate(BaseModel):
+    status: Literal["draft", "pending_signature", "approved", "expired", "revoked"]
+    reason: str = Field(min_length=5)
+
+
+class InstitutionalAuthorizationRead(InstitutionalAuthorizationCreate):
+    id: str
+    status: str
+    created_at: datetime
+    updated_at: datetime | None = None
+
+    model_config = {"from_attributes": True}
+
+
 class ExamSessionCreate(BaseModel):
     center_id: str
     starts_at: datetime

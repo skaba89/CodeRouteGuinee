@@ -24,6 +24,7 @@ def init_db() -> None:
         models_exam_attempt,
         models_exam_monitoring,
         models_exam_review,
+        models_institutional_authorization,
         models_payment,
         models_question,
         models_question_governance,

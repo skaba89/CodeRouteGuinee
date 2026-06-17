@@ -117,6 +117,28 @@ export type QuestionGovernanceItem = {
   decided_at?: string | null;
 };
 
+export type InstitutionalAuthorization = {
+  id: string;
+  authority: string;
+  reference: string;
+  title: string;
+  scope: string;
+  status: string;
+  valid_from?: string | null;
+  valid_until?: string | null;
+  created_at: string;
+  updated_at?: string | null;
+};
+
+export type InstitutionalAuthorizationPayload = {
+  authority: string;
+  reference: string;
+  title: string;
+  scope: string;
+  valid_from?: string;
+  valid_until?: string;
+};
+
 export type ExamCertificateVerification = {
   valid: boolean;
   attempt_id: string;
@@ -303,6 +325,18 @@ export function getQuestionGovernanceItems(): Promise<QuestionGovernanceItem[]> 
 
 export function decideQuestionGovernance(questionId: string, status: string, reason: string): Promise<QuestionGovernanceItem> {
   return postPrivateJson<QuestionGovernanceItem>(`/api/v1/question-governance/${encodeURIComponent(questionId)}/decision`, { status, reason });
+}
+
+export function getInstitutionalAuthorizations(): Promise<InstitutionalAuthorization[]> {
+  return getPrivateJson<InstitutionalAuthorization[]>('/api/v1/institutional-authorizations?limit=25');
+}
+
+export function createInstitutionalAuthorization(payload: InstitutionalAuthorizationPayload): Promise<InstitutionalAuthorization> {
+  return postPrivateJson<InstitutionalAuthorization>('/api/v1/institutional-authorizations', payload);
+}
+
+export function updateInstitutionalAuthorizationStatus(authorizationId: string, status: string, reason: string): Promise<InstitutionalAuthorization> {
+  return patchPrivateJson<InstitutionalAuthorization>(`/api/v1/institutional-authorizations/${encodeURIComponent(authorizationId)}/status`, { status, reason });
 }
 
 export function getPaymentReconciliationItems(filters: PaymentFilters = {}): Promise<PaymentReconciliationItem[]> {

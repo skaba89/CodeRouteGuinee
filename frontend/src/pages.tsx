@@ -9,6 +9,8 @@ import {
   type EntryValidationResult,
   type ExamCertificateVerification,
   type ExamSummary,
+  type InstitutionalAuthorization,
+  type InstitutionalAuthorizationPayload,
   type InstitutionalReadiness,
   type PaymentAlert,
   type PaymentFilters,
@@ -16,6 +18,7 @@ import {
   type PaymentResult,
   type PaymentSummary,
   type QuestionGovernanceItem,
+  createInstitutionalAuthorization,
   createPayment,
   decideCandidateIdentity,
   decideQuestionGovernance,
@@ -32,11 +35,13 @@ import {
   getExamCertificatePdfUrl,
   getExamSummary,
   getInstitutionalReadiness,
+  getInstitutionalAuthorizations,
   getPaymentAlerts,
   getPaymentReconciliationItems,
   getQuestionGovernanceItems,
   validateEntry,
   updateCenterStatus,
+  updateInstitutionalAuthorizationStatus,
   verifyExamCertificate,
 } from './api';
 
@@ -150,6 +155,29 @@ const fallbackQuestionGovernance: QuestionGovernanceItem[] = [
     latest_status: 'needs_revision',
     latest_reason: 'Relecture pedagogique requise',
     decided_at: new Date().toISOString(),
+  },
+];
+
+const fallbackInstitutionalAuthorizations: InstitutionalAuthorization[] = [
+  {
+    id: 'demo-authz-1',
+    authority: 'Ministere des Transports',
+    reference: 'MT-CODE-DEMO-001',
+    title: 'Convention pilote CodeRoute Guinee',
+    scope: 'Digitalisation pilote des examens du code de la route en centre agree.',
+    status: 'approved',
+    valid_from: new Date().toISOString(),
+    valid_until: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: 'demo-authz-2',
+    authority: 'Direction Nationale des Transports Terrestres',
+    reference: 'DNTT-AUDIT-DEMO',
+    title: 'Cadre de supervision des centres agrees',
+    scope: 'Habilitation pour le suivi audit, suspension et accreditation des centres.',
+    status: 'pending_signature',
+    created_at: new Date().toISOString(),
   },
 ];
 
@@ -375,6 +403,14 @@ export function AdminPage() {
   const [identityStatus, setIdentityStatus] = useState<string | null>(null);
   const [questionGovernance, setQuestionGovernance] = useState<QuestionGovernanceItem[]>(fallbackQuestionGovernance);
   const [questionGovernanceStatus, setQuestionGovernanceStatus] = useState<string | null>(null);
+  const [institutionalAuthorizations, setInstitutionalAuthorizations] = useState<InstitutionalAuthorization[]>(fallbackInstitutionalAuthorizations);
+  const [authorizationStatus, setAuthorizationStatus] = useState<string | null>(null);
+  const [authorizationForm, setAuthorizationForm] = useState<InstitutionalAuthorizationPayload>({
+    authority: 'Ministere des Transports',
+    reference: 'MT-CODE-2026-001',
+    title: 'Convention pilote CodeRoute Guinee',
+    scope: 'Autorisation pilote pour la digitalisation des examens du code de la route.',
+  });
   const [institutionalReadiness, setInstitutionalReadiness] = useState<InstitutionalReadiness>(fallbackInstitutionalReadiness);
   const [readinessStatus, setReadinessStatus] = useState<string | null>(null);
   const [paymentFilters, setPaymentFilters] = useState<PaymentFilters>({});
@@ -429,6 +465,12 @@ export function AdminPage() {
         setQuestionGovernanceStatus(null);
       })
       .catch(() => setQuestionGovernanceStatus('Mode demo : connectez-vous avec un role admin pour gouverner la banque de questions API.'));
+    getInstitutionalAuthorizations()
+      .then((items) => {
+        setInstitutionalAuthorizations(items.length > 0 ? items : fallbackInstitutionalAuthorizations);
+        setAuthorizationStatus(null);
+      })
+      .catch(() => setAuthorizationStatus('Mode demo : connectez-vous avec un role admin pour charger les habilitations API.'));
     getAuditLogs()
       .then((logs) => {
         setAuditLogs(logs);
@@ -480,6 +522,31 @@ export function AdminPage() {
       getDashboard().then(setDashboard).catch(() => undefined);
     } catch {
       setQuestionGovernanceStatus('Decision question impossible : connectez-vous avec un role admin ou super admin.');
+    }
+  }
+
+  async function handleAuthorizationSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setAuthorizationStatus(null);
+    try {
+      const created = await createInstitutionalAuthorization(authorizationForm);
+      setInstitutionalAuthorizations((current) => [created, ...current]);
+      setAuthorizationStatus(`Habilitation ${created.reference} creee en statut ${created.status}.`);
+      await refreshAuditLogs();
+    } catch {
+      setAuthorizationStatus('Creation habilitation impossible : verifiez la reference et le role admin.');
+    }
+  }
+
+  async function handleAuthorizationStatus(authorizationId: string, status: string, reason: string) {
+    setAuthorizationStatus(null);
+    try {
+      const updated = await updateInstitutionalAuthorizationStatus(authorizationId, status, reason);
+      setInstitutionalAuthorizations((current) => current.map((item) => (item.id === authorizationId ? updated : item)));
+      setAuthorizationStatus(`Habilitation ${updated.reference} : ${updated.status}.`);
+      await refreshAuditLogs();
+    } catch {
+      setAuthorizationStatus('Decision habilitation impossible : connectez-vous avec un role admin ou super admin.');
     }
   }
 
@@ -651,6 +718,39 @@ export function AdminPage() {
                     <button onClick={() => handleQuestionDecision(item.question_id, 'published', 'Question validee pour publication officielle')}>Publier</button>
                     <button onClick={() => handleQuestionDecision(item.question_id, 'needs_revision', 'Relecture pedagogique ou juridique requise')}>Relecture</button>
                     <button onClick={() => handleQuestionDecision(item.question_id, 'suspended', 'Question suspendue par decision administrative')}>Suspendre</button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="authorization-panel">
+        <h3>Habilitations institutionnelles</h3>
+        <p>Registre des conventions, autorisations ministerielles et cadres de validite du dispositif.</p>
+        {authorizationStatus && <p className={authorizationStatus.includes('impossible') || authorizationStatus.includes('Mode demo') ? 'form-error' : 'login-status'}>{authorizationStatus}</p>}
+        <form className="authorization-form" onSubmit={handleAuthorizationSubmit}>
+          <label>Autorite<input value={authorizationForm.authority} onChange={(event) => setAuthorizationForm((current) => ({ ...current, authority: event.target.value }))} /></label>
+          <label>Reference<input value={authorizationForm.reference} onChange={(event) => setAuthorizationForm((current) => ({ ...current, reference: event.target.value }))} /></label>
+          <label>Titre<input value={authorizationForm.title} onChange={(event) => setAuthorizationForm((current) => ({ ...current, title: event.target.value }))} /></label>
+          <label>Perimetre<input value={authorizationForm.scope} onChange={(event) => setAuthorizationForm((current) => ({ ...current, scope: event.target.value }))} /></label>
+          <button type="submit">Enregistrer habilitation</button>
+        </form>
+        <table>
+          <thead><tr><th>Reference</th><th>Autorite</th><th>Titre</th><th>Statut</th><th>Validite</th><th>Decision</th></tr></thead>
+          <tbody>
+            {institutionalAuthorizations.slice(0, 8).map((item) => (
+              <tr key={item.id}>
+                <td>{item.reference}</td>
+                <td>{item.authority}</td>
+                <td>{item.title}</td>
+                <td><span className={item.status === 'approved' ? 'badge ok' : 'badge'}>{item.status}</span></td>
+                <td>{item.valid_until ? new Date(item.valid_until).toLocaleDateString('fr-FR') : 'A definir'}</td>
+                <td>
+                  <div className="table-actions">
+                    <button onClick={() => handleAuthorizationStatus(item.id, 'approved', 'Habilitation approuvee par l autorite competente')}>Approuver</button>
+                    <button onClick={() => handleAuthorizationStatus(item.id, 'pending_signature', 'Signature institutionnelle en attente')}>Signature</button>
+                    <button onClick={() => handleAuthorizationStatus(item.id, 'revoked', 'Habilitation revoquee par decision administrative')}>Revoquer</button>
                   </div>
                 </td>
               </tr>
