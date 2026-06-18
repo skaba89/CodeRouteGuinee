@@ -5,7 +5,9 @@ Ce runbook sert de procedure courte pour une mise en recette, staging ou product
 ## 1. Avant de deployer
 
 - Branche ou tag valide par CI.
+- Checklist release pilote validee: `docs/release_pilote_checklist.md`.
 - Variables d'environnement preparees hors depot.
+- `ALLOWED_HOSTS`, `CORS_ORIGINS` et `ENABLE_API_DOCS=false` verifies pour la production.
 - Sauvegarde de la base existante disponible.
 - Responsable technique et responsable metier identifies.
 - Fenetre de deploiement communiquee aux centres pilotes.
@@ -44,6 +46,7 @@ Go uniquement si:
 
 - `/health` retourne `ok`;
 - `/health/readiness` ne contient aucune erreur de configuration;
+- `/api/v1/operations/summary` ne retourne pas de statut `critical`;
 - migrations appliquees;
 - super administrateur disponible;
 - export PDF dossier Etat telechargeable;
@@ -71,7 +74,25 @@ docker compose down
 
 Restaurer la derniere image valide et, si necessaire, la sauvegarde PostgreSQL validee avant deploiement.
 
-## 6. Apres deploiement
+## 6. Sauvegarde et restauration
+
+Avant chaque deploiement sensible:
+
+```bash
+python scripts/postgres_backup.py --env-file .env backup
+```
+
+Pour tester une restauration en recette:
+
+```bash
+python scripts/postgres_backup.py --env-file .env.recette restore backups/postgres/coderoute-guinee-YYYYMMDDTHHMMSSZ.backup --clean --confirm-restore
+docker compose run --rm backend alembic upgrade head
+python scripts/preflight_deploy.py --env-file .env.recette --target staging --api-url https://recette-api.coderoute.gov.gn
+```
+
+Ne jamais lancer une restauration sur production sans validation explicite du responsable technique et du responsable metier.
+
+## 7. Apres deploiement
 
 - Exporter le rapport institutionnel PDF.
 - Exporter le journal d'audit CSV.

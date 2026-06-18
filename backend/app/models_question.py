@@ -20,5 +20,8 @@ class Question(Base):
     options: Mapped[list[str]] = mapped_column(JSON, nullable=False)
     correct_answer: Mapped[str] = mapped_column(String(255), nullable=False)
     explanation: Mapped[str | None] = mapped_column(Text, nullable=True)
+    media_type: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    media_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    media_alt: Mapped[str | None] = mapped_column(String(255), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)

@@ -4,10 +4,11 @@ from collections.abc import AsyncIterator
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app.core.config import get_settings
 from app.db.session import init_db
-from app.routers import auth, bookings, candidates, candidate_identity, candidate_submissions, center_incidents, center_stations, centers, dashboard, device_sessions, documents, entries, exam_monitoring, exam_question_traces, exam_reviews, exams, health, institutional_authorizations, payment_reconciliation, payments, question_governance, questions, sessions, supervision, users
+from app.routers import auth, bookings, candidates, candidate_identity, candidate_submissions, center_incidents, center_stations, centers, dashboard, device_sessions, documents, entries, exam_monitoring, exam_question_traces, exam_reviews, exams, health, institutional_authorizations, operations, payment_reconciliation, payments, question_governance, questions, sessions, supervision, users
 
 settings = get_settings()
 
@@ -23,6 +24,14 @@ app = FastAPI(
     description="Plateforme nationale d'examen du code de la route en Guinee",
     version="0.14.0",
     lifespan=lifespan,
+    docs_url="/docs" if settings.enable_api_docs else None,
+    redoc_url="/redoc" if settings.enable_api_docs else None,
+    openapi_url="/openapi.json" if settings.enable_api_docs else None,
+)
+
+app.add_middleware(
+    TrustedHostMiddleware,
+    allowed_hosts=settings.allowed_host_list,
 )
 
 app.add_middleware(
@@ -41,6 +50,8 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers.setdefault("X-Frame-Options", "DENY")
         response.headers.setdefault("Referrer-Policy", "same-origin")
         response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+        if settings.environment.lower() == "production":
+            response.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
         return response
 
 
@@ -61,6 +72,7 @@ app.include_router(bookings.router, prefix=settings.api_v1_prefix)
 app.include_router(documents.router, prefix=settings.api_v1_prefix)
 app.include_router(payments.router, prefix=settings.api_v1_prefix)
 app.include_router(payment_reconciliation.router, prefix=settings.api_v1_prefix)
+app.include_router(operations.router, prefix=settings.api_v1_prefix)
 app.include_router(entries.router, prefix=settings.api_v1_prefix)
 app.include_router(center_incidents.router, prefix=settings.api_v1_prefix)
 app.include_router(center_stations.router, prefix=settings.api_v1_prefix)

@@ -71,8 +71,36 @@ def validate_env(values: dict[str, str], target: str) -> tuple[list[str], list[s
         )
         add_issue(errors, any(not origin.startswith("https://") for origin in cors_origins), "CORS_ORIGINS must use HTTPS in production")
 
+    allowed_hosts = [host.strip() for host in values.get("ALLOWED_HOSTS", "").split(",") if host.strip()]
+    add_issue(errors, not allowed_hosts, "ALLOWED_HOSTS must contain official API hosts")
+    add_issue(errors, "*" in allowed_hosts, "ALLOWED_HOSTS must not contain wildcard host")
+    if is_production:
+        add_issue(
+            errors,
+            any(host in {"localhost", "127.0.0.1", "testserver"} for host in allowed_hosts),
+            "ALLOWED_HOSTS must not contain local hosts in production",
+        )
+
+    enable_api_docs = is_truthy(values.get("ENABLE_API_DOCS"))
+    add_issue(errors, is_production and enable_api_docs, "ENABLE_API_DOCS must be false in production")
+
     postgres_password = values.get("POSTGRES_PASSWORD", "")
     add_issue(errors, not postgres_password or postgres_password in PLACEHOLDER_VALUES, "POSTGRES_PASSWORD must be replaced")
+
+    retention_days = values.get("BACKUP_RETENTION_DAYS", "")
+    add_issue(errors, not retention_days, "BACKUP_RETENTION_DAYS is required")
+    if retention_days:
+        try:
+            retention_value = int(retention_days)
+        except ValueError:
+            retention_value = 0
+        add_issue(errors, retention_value < 7, "BACKUP_RETENTION_DAYS must be at least 7")
+
+    add_issue(
+        errors if is_production else warnings,
+        not is_truthy(values.get("BACKUP_ENCRYPTION_REQUIRED")),
+        "BACKUP_ENCRYPTION_REQUIRED must be true in production",
+    )
 
     bootstrap_password = values.get("BOOTSTRAP_ADMIN_PASSWORD", "")
     add_issue(errors, not bootstrap_password or bootstrap_password in PLACEHOLDER_VALUES, "BOOTSTRAP_ADMIN_PASSWORD must be replaced")

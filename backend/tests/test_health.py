@@ -32,6 +32,8 @@ def test_production_configuration_check_rejects_unsafe_defaults() -> None:
         database_url="sqlite:///./coderoute.db",
         auto_create_tables=True,
         cors_origin_list=["http://localhost:5173", "*"],
+        allowed_host_list=["localhost", "*"],
+        enable_api_docs=True,
         admin_registration_token=None,
         bootstrap_admin_email=None,
     )
@@ -43,6 +45,9 @@ def test_production_configuration_check_rejects_unsafe_defaults() -> None:
     assert "DATABASE_URL should use PostgreSQL outside local development" in check["errors"]
     assert "AUTO_CREATE_TABLES must be false outside local development" in check["errors"]
     assert "CORS_ORIGINS must not contain wildcard origin" in check["errors"]
+    assert "ALLOWED_HOSTS must not contain wildcard host in production" in check["errors"]
+    assert "ALLOWED_HOSTS must not contain local hosts in production" in check["errors"]
+    assert "ENABLE_API_DOCS must be false in production" in check["errors"]
     assert "ADMIN_REGISTRATION_TOKEN is required in production" in check["errors"]
 
 
@@ -53,6 +58,8 @@ def test_production_configuration_check_accepts_hardened_settings() -> None:
         database_url="postgresql+psycopg://coderoute:secret@postgres:5432/coderoute",
         auto_create_tables=False,
         cors_origin_list=["https://coderoute.gov.gn", "https://admin.coderoute.gov.gn"],
+        allowed_host_list=["api.coderoute.gov.gn"],
+        enable_api_docs=False,
         admin_registration_token="private-admin-bootstrap-token",
         bootstrap_admin_email="admin@coderoute.gov.gn",
     )

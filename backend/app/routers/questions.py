@@ -85,6 +85,9 @@ def import_official_questions(
         question.options = [option.strip() for option in row.options]
         question.correct_answer = row.correct_answer.strip()
         question.explanation = row.explanation.strip() if row.explanation else None
+        question.media_type = row.media_type
+        question.media_url = row.media_url.strip() if row.media_url else None
+        question.media_alt = row.media_alt.strip() if row.media_alt else None
         question.is_active = row.is_active
         db.add(question)
         db.flush()

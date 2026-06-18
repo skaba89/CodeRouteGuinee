@@ -8,8 +8,10 @@ Ce document liste le minimum a verrouiller avant une presentation ou un pilote i
 2. Definir `ENVIRONMENT=production`.
 3. Remplacer `SECRET_KEY`, `ADMIN_REGISTRATION_TOKEN`, `POSTGRES_PASSWORD` et `BOOTSTRAP_ADMIN_PASSWORD`.
 4. Configurer `CORS_ORIGINS` avec les domaines officiels uniquement.
-5. Garder `AUTO_CREATE_TABLES=false` en production: les tables doivent etre gerees par Alembic.
-6. Ajuster `LOGIN_RATE_LIMIT_ATTEMPTS` et `LOGIN_RATE_LIMIT_WINDOW_SECONDS` selon la politique de securite.
+5. Configurer `ALLOWED_HOSTS` avec le ou les hotes API officiels uniquement.
+6. Garder `ENABLE_API_DOCS=false` en production; activer `/docs` uniquement en local ou recette fermee.
+7. Garder `AUTO_CREATE_TABLES=false` en production: les tables doivent etre gerees par Alembic.
+8. Ajuster `LOGIN_RATE_LIMIT_ATTEMPTS` et `LOGIN_RATE_LIMIT_WINDOW_SECONDS` selon la politique de securite.
 
 ## Base de donnees
 
@@ -58,15 +60,23 @@ Plan minimum recommande:
 Exemple de sauvegarde:
 
 ```bash
-pg_dump "$DATABASE_URL" --format=custom --file=coderoute-guinee.backup
+python scripts/postgres_backup.py --env-file .env backup
 ```
 
 Exemple de restauration en recette:
 
 ```bash
-pg_restore --clean --if-exists --dbname="$DATABASE_URL_RECETTE" coderoute-guinee.backup
+python scripts/postgres_backup.py --env-file .env.recette restore backups/postgres/coderoute-guinee-YYYYMMDDTHHMMSSZ.backup --clean --confirm-restore
 docker compose run --rm backend alembic upgrade head
 ```
+
+Avant une restauration, valider que la sauvegarde cible correspond au bon environnement, noter le commit deploye et prevenir les responsables metier. L'option `--confirm-restore` est obligatoire pour eviter une restauration accidentelle.
+
+Le preflight production exige:
+
+- `BACKUP_RETENTION_DAYS` defini a 7 jours minimum;
+- `BACKUP_ENCRYPTION_REQUIRED=true`;
+- stockage des fichiers de sauvegarde hors depot Git.
 
 ## Premier administrateur
 
@@ -99,6 +109,12 @@ Les tentatives de connexion echouees sont limitees par couple email/IP. Les even
 - `auth.login_failed`
 - `auth.login_blocked`
 
+En production, l'API doit egalement verifier:
+
+- `ALLOWED_HOSTS` limite aux domaines API officiels, sans `localhost`, `127.0.0.1`, `testserver` ni wildcard;
+- `ENABLE_API_DOCS=false` pour ne pas exposer Swagger/ReDoc publiquement;
+- HTTPS termine au reverse proxy, avec header `Strict-Transport-Security` ajoute par l'API en mode production.
+
 ## Gouvernance des comptes
 
 Les comptes sont consultables par les roles `admin` et `super_admin` via `/api/v1/users`.
@@ -130,6 +146,7 @@ Chaque utilisateur connecte peut changer son propre mot de passe via `/api/v1/au
 Avant un pilote avec candidats reels, superviser au minimum:
 
 - disponibilite `/health` et `/health/readiness`;
+- statut `/api/v1/operations/summary` et alertes critiques;
 - erreurs backend et erreurs frontend;
 - saturation disque, CPU, memoire et connexions PostgreSQL;
 - connexions echouees, `auth.login_blocked` et changements de roles;
@@ -151,7 +168,8 @@ Puis verifier:
 - `/health`
 - `/health/readiness`
 - statut `configuration` dans `/health/readiness`
-- `/docs`
+- `/api/v1/operations/summary`
+- `/docs` uniquement hors production publique
 - connexion administrateur
 - dashboard national
 - exports institutionnels
@@ -163,10 +181,13 @@ Puis verifier:
 - `python scripts/preflight_deploy.py --env-file .env --target production --api-url ...` sans erreur.
 - Domaine officiel et HTTPS valides.
 - `CORS_ORIGINS` limite aux domaines autorises.
+- `ALLOWED_HOSTS` limite aux hotes API officiels.
+- `ENABLE_API_DOCS=false` en production publique.
 - `AUTO_CREATE_TABLES=false` confirme.
 - Migrations appliquees sans erreur.
 - Super administrateur cree avec mot de passe non partage.
 - Sauvegarde et restauration testees.
 - Tests backend, build frontend et tests E2E verts.
+- Section admin `Exploitation` sans alerte critique non acceptee.
 - Procedure support centre documentee.
 - Donnees de demonstration retirees des environnements officiels.
