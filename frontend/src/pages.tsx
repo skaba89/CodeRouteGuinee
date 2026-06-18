@@ -2008,6 +2008,8 @@ export function AdminPage() {
 }
 
 export function ExamPage() {
+  const { currentUser, isPresentationMode } = useAuthSession();
+  const canUseExamApi = canUseProtectedActions(currentUser, isPresentationMode, ['candidate', 'center', 'admin', 'super_admin']);
   const fallbackExamQuestions: ExamQuestion[] = [
     {
       id: 'demo-question-red-light',
@@ -2040,6 +2042,13 @@ export function ExamPage() {
   const [examQuestions, setExamQuestions] = useState<ExamQuestion[]>(fallbackExamQuestions);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedAnswers, setSelectedAnswers] = useState<Record<number, number>>({ 0: 0 });
+  const [examBookingReference, setExamBookingReference] = useState('CRG-BOOK-DEMO-001');
+  const [examStationCode, setExamStationCode] = useState('CTR-KALOUM-POSTE-12');
+  const [deviceFingerprint] = useState(() => {
+    const userAgent = window.navigator.userAgent.slice(0, 28);
+    const language = window.navigator.language || 'fr-GN';
+    return `${language}-${userAgent.length}-${window.screen.width}x${window.screen.height}`;
+  });
   const [examAttempt, setExamAttempt] = useState<ExamAttempt | null>(null);
   const [examStatus, setExamStatus] = useState<string | null>(null);
   const [isStartingExam, setIsStartingExam] = useState(false);
@@ -2063,10 +2072,14 @@ export function ExamPage() {
   }, []);
 
   async function handleStartExam() {
+    if (!canUseExamApi) {
+      setExamStatus('Action protegee : connectez-vous avec une session candidat, centre ou admin reelle pour demarrer une tentative API.');
+      return;
+    }
     setIsStartingExam(true);
     setExamStatus(null);
     try {
-      const attempt = await startExamFromBooking('CRG-BOOK-DEMO-001');
+      const attempt = await startExamFromBooking(examBookingReference);
       setExamAttempt(attempt);
       setExamStatus(`Tentative API demarree : ${attempt.id}`);
     } catch (error) {
@@ -2077,6 +2090,10 @@ export function ExamPage() {
   }
 
   async function handleSubmitExam() {
+    if (!canUseExamApi) {
+      setExamStatus('Action protegee : connectez-vous avec une session reelle pour soumettre les reponses.');
+      return;
+    }
     if (!examAttempt) {
       setExamStatus('Demarrez une tentative API avant de soumettre.');
       return;
@@ -2102,10 +2119,10 @@ export function ExamPage() {
     }
   }
   const examChecks = [
-    ['Identite', 'Verifiee'],
-    ['Poste', 'CTR-KALOUM-12'],
-    ['Session', 'GN-SESSION-2026-000014'],
-    ['Reseau', 'Stable'],
+    ['Identite', currentUser?.full_name ?? 'Presentation'],
+    ['Poste', examStationCode],
+    ['Reservation', examBookingReference],
+    ['Trace appareil', deviceFingerprint],
   ];
   const monitoringEvents = [
     ['08:42', 'Connexion poste autorisee', 'ok'],
@@ -2122,7 +2139,13 @@ export function ExamPage() {
             <h2>Question {displayQuestionNumber} / 40</h2>
             <p>Mode centre agree avec surveillance, minuterie et trace d'audit de la tentative.</p>
           </div>
-          <span className="badge ok">Tentative active</span>
+          <span className={canUseExamApi ? 'badge ok' : 'badge'}>{canUseExamApi ? 'Session API autorisee' : 'Mode presentation'}</span>
+        </div>
+        {!canUseExamApi && <p className="protected-action-note">Mode presentation : les questions restent navigables, mais le demarrage et la soumission API sont reserves aux sessions reelles.</p>}
+        <div className="exam-trace-controls">
+          <label>Reference reservation<input value={examBookingReference} onChange={(event) => setExamBookingReference(event.target.value)} /></label>
+          <label>Poste centre<input value={examStationCode} onChange={(event) => setExamStationCode(event.target.value)} /></label>
+          <label>Trace appareil<input value={deviceFingerprint} readOnly /></label>
         </div>
         <div className="exam-progress" aria-label="Progression examen"><span style={{ width: `${progress}%` }} /></div>
         <article className="question-card">
@@ -2145,8 +2168,8 @@ export function ExamPage() {
           <button disabled={currentQuestionIndex === examQuestions.length - 1} onClick={() => setCurrentQuestionIndex((index) => Math.min(examQuestions.length - 1, index + 1))}>Question suivante</button>
         </div>
         <div className="exam-api-actions">
-          <button onClick={handleStartExam} disabled={isStartingExam || examAttempt?.status === 'started'}>{isStartingExam ? 'Demarrage...' : 'Demarrer tentative API'}</button>
-          <button className="secondary-button" onClick={handleSubmitExam} disabled={isSubmittingExam || !examAttempt || examAttempt.status !== 'started'}>
+          <button onClick={handleStartExam} disabled={!canUseExamApi || isStartingExam || !examBookingReference || examAttempt?.status === 'started'}>{isStartingExam ? 'Demarrage...' : 'Demarrer tentative API'}</button>
+          <button className="secondary-button" onClick={handleSubmitExam} disabled={!canUseExamApi || isSubmittingExam || !examAttempt || examAttempt.status !== 'started'}>
             {isSubmittingExam ? 'Soumission...' : 'Soumettre les reponses'}
           </button>
         </div>

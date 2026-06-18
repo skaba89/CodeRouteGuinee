@@ -1506,6 +1506,31 @@ tr:last-child td {
   color: var(--premium-green);
 }
 
+.exam-trace-controls {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.exam-trace-controls label {
+  display: grid;
+  gap: 8px;
+  color: var(--premium-navy);
+  font-size: 12px;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.exam-trace-controls input {
+  min-height: 44px;
+  border: 1px solid rgba(6, 43, 82, 0.12);
+  border-radius: 14px;
+  padding: 10px 12px;
+  color: var(--premium-ink);
+  background: #ffffff;
+  font: inherit;
+}
+
 .exam-navigation {
   display: flex;
   justify-content: space-between;
@@ -1837,6 +1862,7 @@ tr:last-child td {
   .hero,
   .two-columns,
   .exam-screen,
+  .exam-trace-controls,
   .admin-hero,
   .action-center-panel,
   .action-center-grid,
