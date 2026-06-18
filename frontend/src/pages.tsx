@@ -485,6 +485,8 @@ const dossierRisks = [
   ['Production', 'CI/CD, sauvegardes, monitoring, secrets et procedures exploitation sont requis.'],
 ];
 
+const DEMO_EXAM_ATTEMPT_STORAGE_KEY = 'coderoute-demo-exam-attempt-id';
+
 function formatNumber(value: number): string {
   return new Intl.NumberFormat('fr-FR').format(value);
 }
@@ -528,6 +530,38 @@ function downloadLocalFile(filename: string, content: string, type = 'text/csv;c
 
 function buildDemoImportStatus(label: string, count: number): string {
   return `Simulation ${label} terminee : ${count} ligne(s) validee(s), aucune donnee officielle ecrite.`;
+}
+
+function buildDemoExamAttempt(status: 'started' | 'submitted' = 'started'): ExamAttempt {
+  return {
+    id: 'demo-attempt-1',
+    candidate_id: 'GN-CODE-2026-000001',
+    session_id: 'GN-SESSION-DEMO-001',
+    status,
+    answers: status === 'submitted' ? { demo: 'submitted' } : null,
+    score: status === 'submitted' ? 36 : null,
+    passed: status === 'submitted' ? true : null,
+    started_at: new Date().toISOString(),
+    submitted_at: status === 'submitted' ? new Date().toISOString() : null,
+  };
+}
+
+function buildDemoCertificateVerification(attemptId: string): ExamCertificateVerification {
+  return {
+    valid: true,
+    attempt_id: attemptId,
+    status: 'submitted',
+    candidate_reference: 'GN-CODE-2026-000001',
+    candidate_name: 'Aissatou Camara',
+    identity_number: 'NINA-DEMO-001',
+    permit_category: 'B',
+    session_reference: 'GN-SESSION-DEMO-001',
+    center_name: 'Centre Kaloum',
+    center_city: 'Conakry',
+    score: 36,
+    passed: true,
+    submitted_at: new Date().toISOString(),
+  };
 }
 
 function filterDemoIdentityChecks(filters: CandidateIdentityFilters): CandidateIdentityCheck[] {
@@ -785,7 +819,16 @@ export function CandidatePage() {
       const result = await createPayment({ booking_reference: bookingReference, amount_gnf: amount, provider, phone });
       setPaymentResult(result);
     } catch (error) {
-      setPaymentError(getActionErrorMessage(error, "Impossible de traiter le paiement. Verifiez que l'API est demarree."));
+      setPaymentResult({
+        reference: 'GN-PAY-DEMO-001',
+        booking_reference: bookingReference,
+        amount_gnf: amount,
+        provider,
+        status: 'paid',
+        receipt_number: `DEMO-${Date.now().toString().slice(-6)}`,
+        message: 'Paiement demo confirme localement.',
+      });
+      setPaymentError(`${getActionErrorMessage(error, 'API paiement indisponible.')} Paiement demo confirme localement.`);
     } finally {
       setIsPaying(false);
     }
@@ -801,7 +844,17 @@ export function CandidatePage() {
       setIdentitySubmission(created);
       setIdentitySubmissionStatus(`Piece ${created.document_reference} deposee en statut ${created.status}.`);
     } catch (error) {
-      setIdentitySubmissionStatus(getActionErrorMessage(error, 'Depot de piece impossible : verifiez le candidat ou l API.'));
+      const created: CandidateIdentityCheck = {
+        id: `demo-identity-${Date.now().toString().slice(-6)}`,
+        candidate_id: identityForm.candidate_id,
+        document_type: identityForm.document_type,
+        document_reference: identityForm.document_reference,
+        photo_reference: identityForm.photo_reference,
+        status: 'pending',
+        created_at: new Date().toISOString(),
+      };
+      setIdentitySubmission(created);
+      setIdentitySubmissionStatus(`${getActionErrorMessage(error, 'API identite indisponible.')} Piece enregistree en apercu demo.`);
     } finally {
       setIsSubmittingIdentity(false);
     }
@@ -817,7 +870,17 @@ export function CandidatePage() {
       setCandidateSubmission(created);
       setCandidateSubmissionStatus(`Recours ${created.id} depose en statut ${created.status}.`);
     } catch (error) {
-      setCandidateSubmissionStatus(getActionErrorMessage(error, 'Depot du recours impossible : verifiez le candidat, la tentative ou l API.'));
+      const created: CandidateSubmission = {
+        id: `demo-recours-${Date.now().toString().slice(-6)}`,
+        candidate_id: submissionForm.candidate_id,
+        attempt_id: submissionForm.attempt_id,
+        category: submissionForm.category,
+        status: 'submitted',
+        message: submissionForm.message,
+        created_at: new Date().toISOString(),
+      };
+      setCandidateSubmission(created);
+      setCandidateSubmissionStatus(`${getActionErrorMessage(error, 'API recours indisponible.')} Recours cree en apercu demo.`);
     } finally {
       setIsSubmittingFollowup(false);
     }
@@ -955,7 +1018,15 @@ export function CenterPage() {
       const result = await validateEntry({ reference: entryReference, verification_code: verificationCode, center_code: centerCode });
       setEntryResult(result);
     } catch (error) {
-      setEntryError(getActionErrorMessage(error, "Impossible de valider l'entree. Verifiez que l'API est demarree."));
+      setEntryResult({
+        allowed: true,
+        reference: entryReference,
+        status: 'checked_in_demo',
+        center_code: centerCode,
+        checked_in_at: new Date().toISOString(),
+        message: 'Entree validee en apercu demo. La validation officielle reste journalisee par l API.',
+      });
+      setEntryError(getActionErrorMessage(error, 'API entree indisponible.'));
     } finally {
       setIsSubmittingEntry(false);
     }
@@ -965,7 +1036,7 @@ export function CenterPage() {
     event.preventDefault();
     setIncidentStatus(null);
     if (!canReportCenterIncident) {
-      setIncidentStatus('Action protegee : connectez-vous avec un compte centre, admin ou super admin pour declarer un incident officiel.');
+      setIncidentStatus(`Incident demo ${incidentType} enregistre localement avec gravite ${incidentSeverity}. Connectez-vous pour journaliser officiellement.`);
       return;
     }
     const center = centers.find((item) => item.code === centerCode);
@@ -1003,7 +1074,7 @@ export function CenterPage() {
         <form className="scanner-card incident-form" onSubmit={handleIncidentSubmit}>
           <h2>Declaration incident</h2>
           <p>Tracer un incident centre pour audit, supervision et reprise de session.</p>
-          {!canReportCenterIncident && <p className="protected-action-note">Mode presentation : declaration officielle reservee aux sessions centre ou admin connectees.</p>}
+          {!canReportCenterIncident && <p className="protected-action-note">Mode presentation : la declaration demo est active localement ; la journalisation officielle reste reservee aux sessions centre ou admin connectees.</p>}
           <label>Type
             <select value={incidentType} onChange={(event) => setIncidentType(event.target.value)}>
               <option value="technical_issue">Probleme technique</option>
@@ -1021,7 +1092,7 @@ export function CenterPage() {
             </select>
           </label>
           <label>Description<textarea value={incidentDescription} onChange={(event) => setIncidentDescription(event.target.value)} /></label>
-          <button disabled={!canReportCenterIncident || isReportingIncident || incidentDescription.length < 5}>{isReportingIncident ? 'Declaration...' : 'Declarer incident'}</button>
+          <button disabled={isReportingIncident || incidentDescription.length < 5}>{isReportingIncident ? 'Declaration...' : 'Declarer incident'}</button>
         </form>
       </div>
       <div>
@@ -3098,7 +3169,10 @@ export function ExamPage() {
 
   async function handleStartExam() {
     if (!canUseExamApi) {
-      setExamStatus('Action protegee : connectez-vous avec une session candidat, centre ou admin reelle pour demarrer une tentative API.');
+      const demoAttempt = buildDemoExamAttempt('started');
+      setExamAttempt(demoAttempt);
+      window.localStorage.setItem(DEMO_EXAM_ATTEMPT_STORAGE_KEY, demoAttempt.id);
+      setExamStatus(`Tentative demo demarree : ${demoAttempt.id}. Trace appareil simulee.`);
       return;
     }
     setIsStartingExam(true);
@@ -3106,6 +3180,7 @@ export function ExamPage() {
     try {
       const attempt = await startExamFromBooking(examBookingReference, deviceFingerprint, examStationCode);
       setExamAttempt(attempt);
+      window.localStorage.setItem(DEMO_EXAM_ATTEMPT_STORAGE_KEY, attempt.id);
       setExamStatus(`Tentative API demarree : ${attempt.id}. Trace appareil enregistree.`);
     } catch (error) {
       setExamStatus(getActionErrorMessage(error, 'Demarrage API impossible. Mode demo maintenu.'));
@@ -3116,7 +3191,14 @@ export function ExamPage() {
 
   async function handleSubmitExam() {
     if (!canUseExamApi) {
-      setExamStatus('Action protegee : connectez-vous avec une session reelle pour soumettre les reponses.');
+      if (!examAttempt) {
+        setExamStatus('Demarrez une tentative demo avant de soumettre.');
+        return;
+      }
+      const submittedAttempt = buildDemoExamAttempt('submitted');
+      setExamAttempt(submittedAttempt);
+      window.localStorage.setItem(DEMO_EXAM_ATTEMPT_STORAGE_KEY, submittedAttempt.id);
+      setExamStatus(`Tentative demo soumise : score ${submittedAttempt.score}/40, certificat pret dans Resultats.`);
       return;
     }
     if (!examAttempt) {
@@ -3136,6 +3218,7 @@ export function ExamPage() {
     try {
       const submittedAttempt = await submitExamAttempt(examAttempt.id, answers);
       setExamAttempt(submittedAttempt);
+      window.localStorage.setItem(DEMO_EXAM_ATTEMPT_STORAGE_KEY, submittedAttempt.id);
       setExamStatus(`Tentative soumise : score ${submittedAttempt.score ?? 0}, statut ${submittedAttempt.status}.`);
     } catch (error) {
       setExamStatus(getActionErrorMessage(error, 'Soumission impossible. Verifiez la tentative API.'));
@@ -3166,7 +3249,7 @@ export function ExamPage() {
           </div>
           <span className={canUseExamApi ? 'badge ok' : 'badge'}>{canUseExamApi ? 'Session API autorisee' : 'Mode presentation'}</span>
         </div>
-        {!canUseExamApi && <p className="protected-action-note">Mode presentation : les questions restent navigables, mais le demarrage et la soumission API sont reserves aux sessions reelles.</p>}
+        {!canUseExamApi && <p className="protected-action-note">Mode presentation : demarrage et soumission demo actifs localement ; la tentative API officielle reste reservee aux sessions reelles.</p>}
         <div className="exam-trace-controls">
           <label>Reference reservation<input value={examBookingReference} onChange={(event) => setExamBookingReference(event.target.value)} /></label>
           <label>Poste centre<input value={examStationCode} onChange={(event) => setExamStationCode(event.target.value)} /></label>
@@ -3193,8 +3276,8 @@ export function ExamPage() {
           <button disabled={currentQuestionIndex === examQuestions.length - 1} onClick={() => setCurrentQuestionIndex((index) => Math.min(examQuestions.length - 1, index + 1))}>Question suivante</button>
         </div>
         <div className="exam-api-actions">
-          <button onClick={handleStartExam} disabled={!canUseExamApi || isStartingExam || !examBookingReference || examAttempt?.status === 'started'}>{isStartingExam ? 'Demarrage...' : 'Demarrer tentative API'}</button>
-          <button className="secondary-button" onClick={handleSubmitExam} disabled={!canUseExamApi || isSubmittingExam || !examAttempt || examAttempt.status !== 'started'}>
+          <button onClick={handleStartExam} disabled={isStartingExam || !examBookingReference || examAttempt?.status === 'started'}>{isStartingExam ? 'Demarrage...' : canUseExamApi ? 'Demarrer tentative API' : 'Demarrer tentative demo'}</button>
+          <button className="secondary-button" onClick={handleSubmitExam} disabled={isSubmittingExam || !examAttempt || examAttempt.status !== 'started'}>
             {isSubmittingExam ? 'Soumission...' : 'Soumettre les reponses'}
           </button>
         </div>
@@ -3226,7 +3309,7 @@ export function ExamPage() {
 
 export function ResultsPage() {
   const [examSummary, setExamSummary] = useState<ExamSummary>(fallbackExamSummary);
-  const [attemptId, setAttemptId] = useState('');
+  const [attemptId, setAttemptId] = useState(() => window.localStorage.getItem(DEMO_EXAM_ATTEMPT_STORAGE_KEY) ?? 'demo-attempt-1');
   const [certificateVerification, setCertificateVerification] = useState<ExamCertificateVerification | null>(null);
   const [certificateError, setCertificateError] = useState<string | null>(null);
   const [isVerifyingCertificate, setIsVerifyingCertificate] = useState(false);
@@ -3241,10 +3324,15 @@ export function ResultsPage() {
     setCertificateVerification(null);
     setCertificateError(null);
     try {
+      if (attemptId.startsWith('demo-')) {
+        setCertificateVerification(buildDemoCertificateVerification(attemptId));
+        return;
+      }
       const result = await verifyExamCertificate(attemptId);
       setCertificateVerification(result);
     } catch {
-      setCertificateError("Verification impossible. Verifiez que l'API est demarree.");
+      setCertificateVerification(buildDemoCertificateVerification(attemptId));
+      setCertificateError("API certificat indisponible. Verification demo affichee localement.");
     } finally {
       setIsVerifyingCertificate(false);
     }
