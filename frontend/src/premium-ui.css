@@ -592,6 +592,35 @@ body {
   font-weight: 900;
 }
 
+.candidate-submissions-panel {
+  display: grid;
+  gap: 14px;
+  padding: 22px;
+}
+
+.candidate-submissions-panel h3,
+.candidate-submissions-panel p {
+  margin: 0;
+}
+
+.submission-response-field {
+  display: grid;
+  gap: 8px;
+  color: var(--premium-navy);
+  font-weight: 900;
+}
+
+.submission-response-field textarea {
+  min-height: 86px;
+  resize: vertical;
+  border: 1px solid rgba(6, 43, 82, 0.12);
+  border-radius: 16px;
+  padding: 12px 14px;
+  color: var(--premium-ink);
+  background: #ffffff;
+  font: inherit;
+}
+
 .reset-password-strip {
   margin: 14px 0 6px;
   max-width: 360px;
@@ -1187,7 +1216,8 @@ tr:last-child td {
   line-height: 1.45;
 }
 
-.candidate-document-form {
+.candidate-document-form,
+.candidate-submission-form {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr)) auto;
   gap: 12px;
@@ -1200,17 +1230,21 @@ tr:last-child td {
 }
 
 .candidate-document-form h2,
-.candidate-document-form p {
+.candidate-document-form p,
+.candidate-submission-form h2,
+.candidate-submission-form p {
   grid-column: 1 / -1;
   margin: 0;
 }
 
-.candidate-document-form p {
+.candidate-document-form p,
+.candidate-submission-form p {
   color: var(--premium-muted);
   font-weight: 760;
 }
 
-.candidate-document-form label {
+.candidate-document-form label,
+.candidate-submission-form label {
   display: grid;
   gap: 8px;
   color: var(--premium-navy);
@@ -1218,7 +1252,10 @@ tr:last-child td {
 }
 
 .candidate-document-form input,
-.candidate-document-form select {
+.candidate-document-form select,
+.candidate-submission-form input,
+.candidate-submission-form select,
+.candidate-submission-form textarea {
   min-height: 44px;
   border: 1px solid rgba(6, 43, 82, 0.12);
   border-radius: 14px;
@@ -1228,7 +1265,13 @@ tr:last-child td {
   font: inherit;
 }
 
-.candidate-document-form button {
+.candidate-submission-form textarea {
+  min-height: 88px;
+  resize: vertical;
+}
+
+.candidate-document-form button,
+.candidate-submission-form button {
   min-height: 44px;
 }
 
@@ -1753,7 +1796,8 @@ tr:last-child td {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .candidate-document-form {
+  .candidate-document-form,
+  .candidate-submission-form {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -1816,6 +1860,7 @@ tr:last-child td {
   .candidate-step-grid,
   .candidate-document-grid,
   .candidate-document-form,
+  .candidate-submission-form,
   .dossier-hero,
   .dossier-highlight-grid,
   .dossier-two-columns,

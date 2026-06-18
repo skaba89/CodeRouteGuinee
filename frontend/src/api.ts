@@ -198,6 +198,33 @@ export type CandidateIdentityFilters = {
   limit?: number;
 };
 
+export type CandidateSubmission = {
+  id: string;
+  candidate_id: string;
+  attempt_id: string;
+  category: string;
+  status: string;
+  message: string;
+  admin_response?: string | null;
+  handled_by_id?: string | null;
+  created_at: string;
+  handled_at?: string | null;
+};
+
+export type CandidateSubmissionPayload = {
+  candidate_id: string;
+  attempt_id: string;
+  category: string;
+  message: string;
+};
+
+export type CandidateSubmissionFilters = {
+  candidate_id?: string;
+  attempt_id?: string;
+  status_filter?: string;
+  limit?: number;
+};
+
 export type QuestionGovernanceItem = {
   question_id: string;
   category: string;
@@ -505,6 +532,26 @@ export function submitCandidateIdentity(payload: CandidateIdentityPayload): Prom
 
 export function decideCandidateIdentity(checkId: string, status: string, reason: string): Promise<CandidateIdentityCheck> {
   return postPrivateJson<CandidateIdentityCheck>(`/api/v1/candidate-identity/${encodeURIComponent(checkId)}/decision`, { status, reason });
+}
+
+export function submitCandidateSubmission(payload: CandidateSubmissionPayload): Promise<CandidateSubmission> {
+  return postJson<CandidateSubmission>('/api/v1/candidate-submissions', payload);
+}
+
+export function getCandidateSubmissions(filters: CandidateSubmissionFilters = {}): Promise<CandidateSubmission[]> {
+  const query = new URLSearchParams();
+  if (filters.candidate_id) query.set('candidate_id', filters.candidate_id);
+  if (filters.attempt_id) query.set('attempt_id', filters.attempt_id);
+  if (filters.status_filter) query.set('status_filter', filters.status_filter);
+  query.set('limit', String(filters.limit ?? 25));
+  return getPrivateJson<CandidateSubmission[]>(`/api/v1/candidate-submissions?${query.toString()}`);
+}
+
+export function handleCandidateSubmission(submissionId: string, status: string, adminResponse: string): Promise<CandidateSubmission> {
+  return postPrivateJson<CandidateSubmission>(`/api/v1/candidate-submissions/${encodeURIComponent(submissionId)}/handle`, {
+    status,
+    admin_response: adminResponse,
+  });
 }
 
 export function getQuestionGovernanceItems(): Promise<QuestionGovernanceItem[]> {

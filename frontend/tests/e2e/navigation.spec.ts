@@ -14,6 +14,8 @@ test.describe('CodeRoute Guinee UI smoke tests', () => {
     await expect(page.getByText('Avant la session', { exact: true })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Pieces justificatives' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Deposer la piece' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Recours et reclamations' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Deposer le recours' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Payer maintenant' })).toBeVisible();
 
     await page.getByRole('link', { name: 'Centre' }).click();
@@ -33,6 +35,7 @@ test.describe('CodeRoute Guinee UI smoke tests', () => {
     await expect(page.getByRole('button', { name: 'Actualiser' })).toBeDisabled();
     await expect(page.getByRole('heading', { name: 'Verification identite candidat' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Filtrer les pieces' })).toBeDisabled();
+    await expect(page.getByRole('heading', { name: 'Recours et reclamations candidats' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Dossier de presentation Etat' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Securite et conformite' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Feuille de route institutionnelle' })).toBeVisible();

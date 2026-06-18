@@ -8,6 +8,9 @@ import {
   type CandidateIdentityCheck,
   type CandidateIdentityFilters,
   type CandidateIdentityPayload,
+  type CandidateSubmission,
+  type CandidateSubmissionFilters,
+  type CandidateSubmissionPayload,
   type DashboardData,
   type EntrySummary,
   type EntryValidationResult,
@@ -42,6 +45,7 @@ import {
   getAdminPaymentSummary,
   getAuditLogs,
   getCandidateIdentityChecks,
+  getCandidateSubmissions,
   getCenters,
   getCenterIncidents,
   getConvocationPdfUrl,
@@ -59,11 +63,13 @@ import {
   getPaymentAlerts,
   getPaymentReconciliationItems,
   getQuestionGovernanceItems,
+  handleCandidateSubmission,
   resetInstitutionalUserPassword,
   reportCenterIncident,
   resolveCenterIncident,
   startExamFromBooking,
   submitCandidateIdentity,
+  submitCandidateSubmission,
   submitExamAttempt,
   validateEntry,
   updateCenterStatus,
@@ -456,6 +462,15 @@ export function CandidatePage() {
   const [identitySubmission, setIdentitySubmission] = useState<CandidateIdentityCheck | null>(null);
   const [identitySubmissionStatus, setIdentitySubmissionStatus] = useState<string | null>(null);
   const [isSubmittingIdentity, setIsSubmittingIdentity] = useState(false);
+  const [submissionForm, setSubmissionForm] = useState<CandidateSubmissionPayload>({
+    candidate_id: 'demo-candidate-1',
+    attempt_id: 'demo-attempt-1',
+    category: 'review',
+    message: 'Je souhaite que mon dossier soit examine par l administration.',
+  });
+  const [candidateSubmission, setCandidateSubmission] = useState<CandidateSubmission | null>(null);
+  const [candidateSubmissionStatus, setCandidateSubmissionStatus] = useState<string | null>(null);
+  const [isSubmittingFollowup, setIsSubmittingFollowup] = useState(false);
   const [amount, setAmount] = useState(250000);
   const [provider, setProvider] = useState('orange_money');
   const [phone, setPhone] = useState('+224622000000');
@@ -513,6 +528,22 @@ export function CandidatePage() {
     }
   }
 
+  async function handleCandidateSubmissionSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setCandidateSubmissionStatus(null);
+    setCandidateSubmission(null);
+    setIsSubmittingFollowup(true);
+    try {
+      const created = await submitCandidateSubmission(submissionForm);
+      setCandidateSubmission(created);
+      setCandidateSubmissionStatus(`Recours ${created.id} depose en statut ${created.status}.`);
+    } catch (error) {
+      setCandidateSubmissionStatus(getActionErrorMessage(error, 'Depot du recours impossible : verifiez le candidat, la tentative ou l API.'));
+    } finally {
+      setIsSubmittingFollowup(false);
+    }
+  }
+
   return (
     <section className="screen candidate-workspace">
       <div className="candidate-main">
@@ -559,6 +590,30 @@ export function CandidatePage() {
             <strong>Controle cree : {identitySubmission.id}</strong>
             <span>Statut : {identitySubmission.status}</span>
             <span>Reference : {identitySubmission.document_reference}</span>
+          </div>
+        )}
+        <form className="candidate-submission-form" onSubmit={handleCandidateSubmissionSubmit}>
+          <h2>Recours et reclamations</h2>
+          <p>Demande officielle de revue apres examen, incident ou contestation de dossier.</p>
+          <label>ID candidat<input value={submissionForm.candidate_id} onChange={(event) => setSubmissionForm((current) => ({ ...current, candidate_id: event.target.value }))} /></label>
+          <label>ID tentative<input value={submissionForm.attempt_id} onChange={(event) => setSubmissionForm((current) => ({ ...current, attempt_id: event.target.value }))} /></label>
+          <label>Categorie
+            <select value={submissionForm.category} onChange={(event) => setSubmissionForm((current) => ({ ...current, category: event.target.value }))}>
+              <option value="review">Revue de dossier</option>
+              <option value="appeal">Recours resultat</option>
+              <option value="incident">Incident centre</option>
+              <option value="correction">Correction administrative</option>
+            </select>
+          </label>
+          <label>Message<textarea value={submissionForm.message} onChange={(event) => setSubmissionForm((current) => ({ ...current, message: event.target.value }))} /></label>
+          <button disabled={isSubmittingFollowup || submissionForm.candidate_id.length < 3 || submissionForm.attempt_id.length < 3 || submissionForm.message.length < 10}>{isSubmittingFollowup ? 'Depot...' : 'Deposer le recours'}</button>
+        </form>
+        {candidateSubmissionStatus && <p className={candidateSubmissionStatus.includes('impossible') ? 'form-error' : 'login-status'}>{candidateSubmissionStatus}</p>}
+        {candidateSubmission && (
+          <div className="candidate-identity-receipt">
+            <strong>Recours cree : {candidateSubmission.id}</strong>
+            <span>Statut : {candidateSubmission.status}</span>
+            <span>Categorie : {candidateSubmission.category}</span>
           </div>
         )}
         <form className="payment-form" onSubmit={handlePaymentSubmit}>
@@ -727,6 +782,11 @@ export function AdminPage() {
   const [identityStatus, setIdentityStatus] = useState<string | null>(null);
   const [identityFilters, setIdentityFilters] = useState<CandidateIdentityFilters>({ status_filter: 'pending', limit: 25 });
   const [activeIdentityFilters, setActiveIdentityFilters] = useState<CandidateIdentityFilters>({ status_filter: 'pending', limit: 25 });
+  const [candidateSubmissions, setCandidateSubmissions] = useState<CandidateSubmission[]>([]);
+  const [submissionFilters, setSubmissionFilters] = useState<CandidateSubmissionFilters>({ status_filter: 'submitted', limit: 25 });
+  const [activeSubmissionFilters, setActiveSubmissionFilters] = useState<CandidateSubmissionFilters>({ status_filter: 'submitted', limit: 25 });
+  const [submissionAdminResponse, setSubmissionAdminResponse] = useState('Votre demande est prise en charge par la supervision nationale.');
+  const [submissionAdminStatus, setSubmissionAdminStatus] = useState<string | null>(null);
   const [questionGovernance, setQuestionGovernance] = useState<QuestionGovernanceItem[]>(fallbackQuestionGovernance);
   const [questionGovernanceStatus, setQuestionGovernanceStatus] = useState<string | null>(null);
   const [institutionalAuthorizations, setInstitutionalAuthorizations] = useState<InstitutionalAuthorization[]>(fallbackInstitutionalAuthorizations);
@@ -827,6 +887,27 @@ export function AdminPage() {
     }
   }
 
+  async function refreshCandidateSubmissions(filters: CandidateSubmissionFilters = activeSubmissionFilters) {
+    if (!canAdminAct) {
+      setSubmissionAdminStatus('Mode demo : connectez-vous avec un compte admin ou super admin reel pour traiter les recours.');
+      return;
+    }
+    try {
+      const cleanFilters = {
+        candidate_id: filters.candidate_id || undefined,
+        attempt_id: filters.attempt_id || undefined,
+        status_filter: filters.status_filter || undefined,
+        limit: filters.limit ?? 25,
+      };
+      const items = await getCandidateSubmissions(cleanFilters);
+      setCandidateSubmissions(items);
+      setActiveSubmissionFilters(cleanFilters);
+      setSubmissionAdminStatus(null);
+    } catch {
+      setSubmissionAdminStatus('Recours indisponibles : connectez-vous avec un role admin ou super admin.');
+    }
+  }
+
   useEffect(() => {
     getDashboard().then(setDashboard).catch(() => undefined);
     getCenters().then(setCenters).catch(() => undefined);
@@ -858,6 +939,12 @@ export function AdminPage() {
         setIdentityStatus(null);
       })
       .catch(() => setIdentityStatus('Mode demo : connectez-vous avec un role admin pour traiter les identites API.'));
+    getCandidateSubmissions({ status_filter: 'submitted', limit: 25 })
+      .then((items) => {
+        setCandidateSubmissions(items);
+        setSubmissionAdminStatus(null);
+      })
+      .catch(() => setSubmissionAdminStatus('Mode demo : connectez-vous avec un role admin pour traiter les recours API.'));
     getQuestionGovernanceItems()
       .then((items) => {
         setQuestionGovernance(items.length > 0 ? items : fallbackQuestionGovernance);
@@ -941,6 +1028,20 @@ export function AdminPage() {
       await refreshAuditLogs();
     } catch {
       setIdentityStatus('Decision identite impossible : connectez-vous avec un role admin ou super admin.');
+    }
+  }
+
+  async function handleSubmissionDecision(submissionId: string, status: string) {
+    setSubmissionAdminStatus(null);
+    if (blockProtectedAction(setSubmissionAdminStatus)) return;
+    try {
+      const updated = await handleCandidateSubmission(submissionId, status, submissionAdminResponse);
+      setCandidateSubmissions((current) => current.map((item) => (item.id === submissionId ? updated : item)));
+      setSubmissionAdminStatus(`Recours ${updated.id} : ${updated.status}.`);
+      await refreshCandidateSubmissions();
+      await refreshAuditLogs();
+    } catch {
+      setSubmissionAdminStatus('Decision recours impossible : verifiez la reponse admin et le role.');
     }
   }
 
@@ -1130,6 +1231,17 @@ export function AdminPage() {
     await refreshIdentityChecks(defaults);
   }
 
+  async function handleSubmissionFiltersSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await refreshCandidateSubmissions(submissionFilters);
+  }
+
+  async function resetSubmissionFilters() {
+    const defaults = { status_filter: 'submitted', limit: 25 };
+    setSubmissionFilters(defaults);
+    await refreshCandidateSubmissions(defaults);
+  }
+
   async function handleAuditFiltersSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     await refreshAuditLogs(auditFilters);
@@ -1175,6 +1287,7 @@ export function AdminPage() {
     { href: '#centres', label: 'Centres' },
     { href: '#incidents', label: 'Incidents' },
     { href: '#identites', label: 'Identites' },
+    { href: '#recours', label: 'Recours' },
     { href: '#questions', label: 'Questions' },
     { href: '#habilitations', label: 'Habilitations' },
     { href: '#dossier-etat', label: 'Dossier Etat' },
@@ -1539,6 +1652,56 @@ export function AdminPage() {
             ))}
           </tbody>
         </table>
+        </div>
+      </div>
+      <div id="recours" className="candidate-submissions-panel admin-section">
+        <h3>Recours et reclamations candidats</h3>
+        <p>Traitement des demandes de revue, contestations de resultat et suites administratives apres incident.</p>
+        {submissionAdminStatus && <p className={submissionAdminStatus.includes('impossible') || submissionAdminStatus.includes('Mode demo') || submissionAdminStatus.includes('indisponibles') ? 'form-error' : 'login-status'}>{submissionAdminStatus}</p>}
+        <form className="identity-filters" onSubmit={handleSubmissionFiltersSubmit}>
+          <label>Statut
+            <select value={submissionFilters.status_filter ?? ''} onChange={(event) => setSubmissionFilters((current) => ({ ...current, status_filter: event.target.value || undefined }))}>
+              <option value="">Tous</option>
+              <option value="submitted">Depose</option>
+              <option value="under_review">En revue</option>
+              <option value="accepted">Accepte</option>
+              <option value="rejected">Rejete</option>
+              <option value="retake_planned">Reprise prevue</option>
+            </select>
+          </label>
+          <label>ID candidat<input value={submissionFilters.candidate_id ?? ''} onChange={(event) => setSubmissionFilters((current) => ({ ...current, candidate_id: event.target.value || undefined }))} placeholder="Candidat" /></label>
+          <label>ID tentative<input value={submissionFilters.attempt_id ?? ''} onChange={(event) => setSubmissionFilters((current) => ({ ...current, attempt_id: event.target.value || undefined }))} placeholder="Tentative" /></label>
+          <button type="submit" disabled={!canAdminAct}>Filtrer</button>
+          <button type="button" className="secondary-button" onClick={resetSubmissionFilters} disabled={!canAdminAct}>Reinitialiser</button>
+        </form>
+        <label className="submission-response-field">Reponse officielle<textarea value={submissionAdminResponse} onChange={(event) => setSubmissionAdminResponse(event.target.value)} /></label>
+        <p className="identity-filter-summary">Filtre actif : {activeSubmissionFilters.status_filter ?? 'tous'} - {candidateSubmissions.length} recours affiche(s).</p>
+        <div className="table-shell">
+          <table>
+            <thead><tr><th>Recours</th><th>Candidat</th><th>Tentative</th><th>Categorie</th><th>Statut</th><th>Message</th><th>Decision</th></tr></thead>
+            <tbody>
+              {candidateSubmissions.length === 0 ? (
+                <tr><td colSpan={7}>Aucun recours charge.</td></tr>
+              ) : candidateSubmissions.map((item) => (
+                <tr key={item.id}>
+                  <td>{item.id}</td>
+                  <td>{item.candidate_id}</td>
+                  <td>{item.attempt_id}</td>
+                  <td>{item.category}</td>
+                  <td><span className={item.status === 'accepted' ? 'badge ok' : 'badge'}>{item.status}</span></td>
+                  <td>{item.admin_response ? `${item.message} / Reponse: ${item.admin_response}` : item.message}</td>
+                  <td>
+                    <div className="table-actions">
+                      <button disabled={!canAdminAct || submissionAdminResponse.length < 5} onClick={() => handleSubmissionDecision(item.id, 'under_review')}>Revue</button>
+                      <button disabled={!canAdminAct || submissionAdminResponse.length < 5} onClick={() => handleSubmissionDecision(item.id, 'accepted')}>Accepter</button>
+                      <button disabled={!canAdminAct || submissionAdminResponse.length < 5} onClick={() => handleSubmissionDecision(item.id, 'retake_planned')}>Reprise</button>
+                      <button disabled={!canAdminAct || submissionAdminResponse.length < 5} onClick={() => handleSubmissionDecision(item.id, 'rejected')}>Rejeter</button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
       <div id="questions" className="question-governance-panel admin-section">
