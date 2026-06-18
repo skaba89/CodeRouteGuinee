@@ -66,6 +66,26 @@ export type CenterOfficialImportResult = {
   codes: string[];
 };
 
+export type CenterStation = {
+  id: string;
+  center_id: string;
+  device_key: string;
+  label: string;
+  status: string;
+  room?: string | null;
+  created_by_id?: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CenterStationPayload = {
+  center_id: string;
+  device_key: string;
+  label: string;
+  room?: string;
+  status: 'active' | 'disabled' | 'maintenance';
+};
+
 export type OperationalReadiness = {
   status: 'ready' | 'degraded' | string;
   service: string;
@@ -603,6 +623,22 @@ export function importOfficialCandidates(source: string, reason: string, candida
 
 export function importOfficialCenters(source: string, reason: string, centers: CenterOfficialImportRow[]): Promise<CenterOfficialImportResult> {
   return postPrivateJson<CenterOfficialImportResult>('/api/v1/centers/import-official', { source, reason, centers });
+}
+
+export function getCenterStations(filters: { center_id?: string; status_filter?: string; limit?: number } = {}): Promise<CenterStation[]> {
+  const query = new URLSearchParams();
+  if (filters.center_id) query.set('center_id', filters.center_id);
+  if (filters.status_filter) query.set('status_filter', filters.status_filter);
+  query.set('limit', String(filters.limit ?? 50));
+  return getPrivateJson<CenterStation[]>(`/api/v1/center-stations?${query.toString()}`);
+}
+
+export function createCenterStation(payload: CenterStationPayload): Promise<CenterStation> {
+  return postPrivateJson<CenterStation>('/api/v1/center-stations', payload);
+}
+
+export function updateCenterStation(stationId: string, payload: Partial<Pick<CenterStationPayload, 'label' | 'room' | 'status'>>): Promise<CenterStation> {
+  return patchPrivateJson<CenterStation>(`/api/v1/center-stations/${encodeURIComponent(stationId)}`, payload);
 }
 
 export function getDashboardCsvUrl(): string {

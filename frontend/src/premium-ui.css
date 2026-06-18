@@ -557,7 +557,7 @@ body {
 
 .official-import-form {
   display: grid;
-  grid-template-columns: minmax(180px, 0.8fr) minmax(220px, 1fr) minmax(280px, 1.4fr) auto;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 12px;
   align-items: end;
   padding: 14px;
@@ -576,6 +576,7 @@ body {
 }
 
 .official-import-form input,
+.official-import-form select,
 .official-import-form textarea {
   min-height: 44px;
   border: 1px solid rgba(6, 43, 82, 0.12);
@@ -595,6 +596,24 @@ body {
   grid-column: 1 / -1;
   color: var(--premium-muted);
   font-weight: 800;
+}
+
+.station-registry-panel {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid rgba(6, 43, 82, 0.08);
+  border-radius: 20px;
+  background: linear-gradient(180deg, #ffffff, #f8fafc);
+}
+
+.station-registry-panel h4,
+.station-registry-panel p {
+  margin: 0;
+}
+
+.station-registry-panel h4 {
+  color: var(--premium-navy);
 }
 
 .identity-filters {

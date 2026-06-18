@@ -4,6 +4,8 @@ import {
   type Center,
   type CenterIncident,
   type CenterOfficialImportRow,
+  type CenterStation,
+  type CenterStationPayload,
   type AuditLogEntry,
   type AuditLogFilters,
   type Candidate,
@@ -43,6 +45,7 @@ import {
   type QuestionOfficialImportRow,
   createInstitutionalAuthorization,
   createInstitutionalUser,
+  createCenterStation,
   createPayment,
   decideCandidateIdentity,
   decideQuestionGovernance,
@@ -58,6 +61,7 @@ import {
   getCandidateSubmissions,
   getCandidates,
   getCenters,
+  getCenterStations,
   getCenterIncidents,
   getConvocationPdfUrl,
   getDashboard,
@@ -91,6 +95,7 @@ import {
   submitExamAttempt,
   validateEntry,
   updateCenterStatus,
+  updateCenterStation,
   updateInstitutionalAuthorizationStatus,
   updateInstitutionalUserRole,
   updateInstitutionalUserStatus,
@@ -890,6 +895,15 @@ export function AdminPage() {
   const [centerImportSource, setCenterImportSource] = useState('Liste officielle DNTT');
   const [centerImportReason, setCenterImportReason] = useState('Chargement officiel des centres pilotes');
   const [centerImportCsv, setCenterImportCsv] = useState('CRG-CONAKRY-002;Centre officiel Conakry 2;Conakry;Matoto;30;pending_audit');
+  const [centerStations, setCenterStations] = useState<CenterStation[]>([]);
+  const [centerStationStatus, setCenterStationStatus] = useState<string | null>(null);
+  const [centerStationForm, setCenterStationForm] = useState<CenterStationPayload>({
+    center_id: '',
+    device_key: 'CTR-KALOUM-POSTE-12',
+    label: 'Poste examen 12',
+    room: 'Salle A',
+    status: 'active',
+  });
   const [entrySummary, setEntrySummary] = useState<EntrySummary>(fallbackEntrySummary);
   const [examSummary, setExamSummary] = useState<ExamSummary>(fallbackExamSummary);
   const [paymentSummary, setPaymentSummary] = useState<PaymentSummary>(fallbackPaymentSummary);
@@ -1073,6 +1087,7 @@ export function AdminPage() {
     getDashboard().then(setDashboard).catch(() => undefined);
     getCandidates().then(setCandidates).catch(() => undefined);
     getCenters().then(setCenters).catch(() => undefined);
+    getCenterStations({ limit: 25 }).then(setCenterStations).catch(() => undefined);
     getEntrySummary().then(setEntrySummary).catch(() => undefined);
     getExamSummary().then(setExamSummary).catch(() => undefined);
     loadPaymentSummary({});
@@ -1200,6 +1215,33 @@ export function AdminPage() {
       await refreshAuditLogs();
     } catch (error) {
       setCenterStatus(error instanceof Error ? `Import impossible : ${error.message}` : 'Import officiel impossible.');
+    }
+  }
+
+  async function handleCenterStationSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setCenterStationStatus(null);
+    if (blockProtectedAction(setCenterStationStatus)) return;
+    try {
+      const created = await createCenterStation(centerStationForm);
+      setCenterStations((current) => [created, ...current]);
+      setCenterStationStatus(`Poste ${created.label} enregistre (${created.status}).`);
+      await refreshAuditLogs();
+    } catch {
+      setCenterStationStatus('Creation poste impossible : verifiez le centre, la cle appareil et le role admin.');
+    }
+  }
+
+  async function handleCenterStationStatus(stationId: string, status: 'active' | 'disabled' | 'maintenance') {
+    setCenterStationStatus(null);
+    if (blockProtectedAction(setCenterStationStatus)) return;
+    try {
+      const updated = await updateCenterStation(stationId, { status });
+      setCenterStations((current) => current.map((station) => (station.id === stationId ? updated : station)));
+      setCenterStationStatus(`Poste ${updated.label} : ${updated.status}.`);
+      await refreshAuditLogs();
+    } catch {
+      setCenterStationStatus('Mise a jour poste impossible : connectez-vous avec un role admin ou super admin.');
     }
   }
 
@@ -1894,6 +1936,57 @@ export function AdminPage() {
           <small>Format : code;nom;ville;adresse;capacite;statut. Statuts : pending_audit, active, accredited, suspended.</small>
           <button type="submit" disabled={!canAdminAct}>Importer centres officiels</button>
         </form>
+        <div className="station-registry-panel">
+          <div>
+            <h4>Registre des postes d'examen</h4>
+            <p>Autoriser les appareils connus du centre et identifier les postes inconnus dans le monitoring.</p>
+          </div>
+          {centerStationStatus && <p className={centerStationStatus.includes('impossible') ? 'form-error' : 'login-status'}>{centerStationStatus}</p>}
+          <form className="official-import-form" onSubmit={handleCenterStationSubmit}>
+            <label>Centre
+              <select value={centerStationForm.center_id} onChange={(event) => setCenterStationForm((current) => ({ ...current, center_id: event.target.value }))}>
+                <option value="">Choisir un centre</option>
+                {centers.slice(0, 30).map((center) => <option key={center.id} value={center.id}>{center.code} - {center.name}</option>)}
+              </select>
+            </label>
+            <label>Cle appareil<input value={centerStationForm.device_key} onChange={(event) => setCenterStationForm((current) => ({ ...current, device_key: event.target.value }))} /></label>
+            <label>Libelle<input value={centerStationForm.label} onChange={(event) => setCenterStationForm((current) => ({ ...current, label: event.target.value }))} /></label>
+            <label>Salle<input value={centerStationForm.room ?? ''} onChange={(event) => setCenterStationForm((current) => ({ ...current, room: event.target.value }))} /></label>
+            <label>Statut
+              <select value={centerStationForm.status} onChange={(event) => setCenterStationForm((current) => ({ ...current, status: event.target.value as CenterStationPayload['status'] }))}>
+                <option value="active">Actif</option>
+                <option value="maintenance">Maintenance</option>
+                <option value="disabled">Desactive</option>
+              </select>
+            </label>
+            <button type="submit" disabled={!canAdminAct || !centerStationForm.center_id}>Enregistrer poste</button>
+          </form>
+          <div className="table-shell compact-table">
+            <table>
+              <thead><tr><th>Poste</th><th>Cle appareil</th><th>Centre</th><th>Salle</th><th>Statut</th><th>Decision</th></tr></thead>
+              <tbody>
+                {centerStations.length === 0 ? (
+                  <tr><td colSpan={6}>Aucun poste enregistre.</td></tr>
+                ) : centerStations.slice(0, 8).map((station) => (
+                  <tr key={station.id}>
+                    <td>{station.label}</td>
+                    <td>{station.device_key}</td>
+                    <td>{centers.find((center) => center.id === station.center_id)?.code ?? station.center_id}</td>
+                    <td>{station.room ?? '-'}</td>
+                    <td><span className={station.status === 'active' ? 'badge ok' : 'badge'}>{station.status}</span></td>
+                    <td>
+                      <div className="table-actions">
+                        <button disabled={!canAdminAct} onClick={() => handleCenterStationStatus(station.id, 'active')}>Actif</button>
+                        <button disabled={!canAdminAct} onClick={() => handleCenterStationStatus(station.id, 'maintenance')}>Maintenance</button>
+                        <button disabled={!canAdminAct} onClick={() => handleCenterStationStatus(station.id, 'disabled')}>Desactiver</button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
         <div className="table-shell">
           <table>
             <thead><tr><th>Code</th><th>Centre</th><th>Ville</th><th>Capacite</th><th>Statut</th><th>Decision</th></tr></thead>
