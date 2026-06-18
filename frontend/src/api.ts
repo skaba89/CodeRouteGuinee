@@ -185,6 +185,13 @@ export type CandidateIdentityCheck = {
   decided_at?: string | null;
 };
 
+export type CandidateIdentityPayload = {
+  candidate_id: string;
+  document_type: 'national_id' | 'passport' | 'driver_file' | string;
+  document_reference: string;
+  photo_reference?: string;
+};
+
 export type QuestionGovernanceItem = {
   question_id: string;
   category: string;
@@ -480,6 +487,10 @@ export function getInstitutionalActionCenter(): Promise<InstitutionalActionCente
 
 export function getCandidateIdentityChecks(): Promise<CandidateIdentityCheck[]> {
   return getPrivateJson<CandidateIdentityCheck[]>('/api/v1/candidate-identity?limit=25');
+}
+
+export function submitCandidateIdentity(payload: CandidateIdentityPayload): Promise<CandidateIdentityCheck> {
+  return postJson<CandidateIdentityCheck>('/api/v1/candidate-identity', payload);
 }
 
 export function decideCandidateIdentity(checkId: string, status: string, reason: string): Promise<CandidateIdentityCheck> {

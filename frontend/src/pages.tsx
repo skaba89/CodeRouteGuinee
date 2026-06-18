@@ -6,6 +6,7 @@ import {
   type AuditLogEntry,
   type AuditLogFilters,
   type CandidateIdentityCheck,
+  type CandidateIdentityPayload,
   type DashboardData,
   type EntrySummary,
   type EntryValidationResult,
@@ -61,6 +62,7 @@ import {
   reportCenterIncident,
   resolveCenterIncident,
   startExamFromBooking,
+  submitCandidateIdentity,
   submitExamAttempt,
   validateEntry,
   updateCenterStatus,
@@ -444,6 +446,15 @@ export function InstitutionalDossierPage() {
 
 export function CandidatePage() {
   const [bookingReference, setBookingReference] = useState('CRG-BOOK-DEMO-001');
+  const [identityForm, setIdentityForm] = useState<CandidateIdentityPayload>({
+    candidate_id: 'demo-candidate-1',
+    document_type: 'national_id',
+    document_reference: 'NINA-DEMO-001',
+    photo_reference: 'photo-candidat-demo',
+  });
+  const [identitySubmission, setIdentitySubmission] = useState<CandidateIdentityCheck | null>(null);
+  const [identitySubmissionStatus, setIdentitySubmissionStatus] = useState<string | null>(null);
+  const [isSubmittingIdentity, setIsSubmittingIdentity] = useState(false);
   const [amount, setAmount] = useState(250000);
   const [provider, setProvider] = useState('orange_money');
   const [phone, setPhone] = useState('+224622000000');
@@ -485,6 +496,22 @@ export function CandidatePage() {
     }
   }
 
+  async function handleIdentitySubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setIdentitySubmissionStatus(null);
+    setIdentitySubmission(null);
+    setIsSubmittingIdentity(true);
+    try {
+      const created = await submitCandidateIdentity(identityForm);
+      setIdentitySubmission(created);
+      setIdentitySubmissionStatus(`Piece ${created.document_reference} deposee en statut ${created.status}.`);
+    } catch (error) {
+      setIdentitySubmissionStatus(getActionErrorMessage(error, 'Depot de piece impossible : verifiez le candidat ou l API.'));
+    } finally {
+      setIsSubmittingIdentity(false);
+    }
+  }
+
   return (
     <section className="screen candidate-workspace">
       <div className="candidate-main">
@@ -510,6 +537,29 @@ export function CandidatePage() {
             <div className="mini-card" key={label}>{label} : <strong>{value}</strong></div>
           ))}
         </div>
+        <form className="candidate-document-form" onSubmit={handleIdentitySubmit}>
+          <h2>Pieces justificatives</h2>
+          <p>Depot d une piece pour controle administratif avant convocation et passage en centre.</p>
+          <label>ID candidat<input value={identityForm.candidate_id} onChange={(event) => setIdentityForm((current) => ({ ...current, candidate_id: event.target.value }))} /></label>
+          <label>Type de piece
+            <select value={identityForm.document_type} onChange={(event) => setIdentityForm((current) => ({ ...current, document_type: event.target.value }))}>
+              <option value="national_id">Carte nationale</option>
+              <option value="passport">Passeport</option>
+              <option value="driver_file">Dossier auto-ecole</option>
+            </select>
+          </label>
+          <label>Reference piece<input value={identityForm.document_reference} onChange={(event) => setIdentityForm((current) => ({ ...current, document_reference: event.target.value }))} /></label>
+          <label>Reference photo<input value={identityForm.photo_reference ?? ''} onChange={(event) => setIdentityForm((current) => ({ ...current, photo_reference: event.target.value }))} /></label>
+          <button disabled={isSubmittingIdentity || identityForm.candidate_id.length < 3 || identityForm.document_reference.length < 3}>{isSubmittingIdentity ? 'Depot...' : 'Deposer la piece'}</button>
+        </form>
+        {identitySubmissionStatus && <p className={identitySubmissionStatus.includes('impossible') ? 'form-error' : 'login-status'}>{identitySubmissionStatus}</p>}
+        {identitySubmission && (
+          <div className="candidate-identity-receipt">
+            <strong>Controle cree : {identitySubmission.id}</strong>
+            <span>Statut : {identitySubmission.status}</span>
+            <span>Reference : {identitySubmission.document_reference}</span>
+          </div>
+        )}
         <form className="payment-form" onSubmit={handlePaymentSubmit}>
           <h2>Paiement Mobile Money</h2>
           <label>Reference reservation<input value={bookingReference} onChange={(event) => setBookingReference(event.target.value)} /></label>

@@ -1150,6 +1150,64 @@ tr:last-child td {
   line-height: 1.45;
 }
 
+.candidate-document-form {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) auto;
+  gap: 12px;
+  align-items: end;
+  border: 1px solid rgba(6, 43, 82, 0.08);
+  border-radius: 20px;
+  background: #ffffff;
+  padding: 18px;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.06);
+}
+
+.candidate-document-form h2,
+.candidate-document-form p {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+.candidate-document-form p {
+  color: var(--premium-muted);
+  font-weight: 760;
+}
+
+.candidate-document-form label {
+  display: grid;
+  gap: 8px;
+  color: var(--premium-navy);
+  font-weight: 900;
+}
+
+.candidate-document-form input,
+.candidate-document-form select {
+  min-height: 44px;
+  border: 1px solid rgba(6, 43, 82, 0.12);
+  border-radius: 14px;
+  padding: 10px 12px;
+  color: var(--premium-ink);
+  background: #ffffff;
+  font: inherit;
+}
+
+.candidate-document-form button {
+  min-height: 44px;
+}
+
+.candidate-identity-receipt {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  border: 1px solid rgba(0, 148, 96, 0.18);
+  border-radius: 18px;
+  background: rgba(236, 253, 245, 0.82);
+  color: #166534;
+  padding: 12px 14px;
+  font-weight: 850;
+}
+
 .candidate-side-card {
   display: grid;
   gap: 16px;
@@ -1658,6 +1716,10 @@ tr:last-child td {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .candidate-document-form {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .dossier-hero,
   .dossier-highlight-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1715,6 +1777,7 @@ tr:last-child td {
   .operational-flow-grid,
   .candidate-step-grid,
   .candidate-document-grid,
+  .candidate-document-form,
   .dossier-hero,
   .dossier-highlight-grid,
   .dossier-two-columns,
