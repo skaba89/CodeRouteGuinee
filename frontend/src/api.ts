@@ -19,6 +19,23 @@ export type Center = {
   created_at: string;
 };
 
+export type CenterOfficialImportRow = {
+  code: string;
+  name: string;
+  city: string;
+  address: string;
+  capacity: number;
+  status: 'pending_audit' | 'active' | 'accredited' | 'suspended';
+};
+
+export type CenterOfficialImportResult = {
+  imported: number;
+  created: number;
+  updated: number;
+  skipped: number;
+  codes: string[];
+};
+
 export type OperationalReadiness = {
   status: 'ready' | 'degraded' | string;
   service: string;
@@ -494,6 +511,10 @@ export function getCenters(): Promise<Center[]> {
 
 export function updateCenterStatus(centerId: string, status: string, reason: string): Promise<Center> {
   return patchPrivateJson<Center>(`/api/v1/centers/${encodeURIComponent(centerId)}/status`, { status, reason });
+}
+
+export function importOfficialCenters(source: string, reason: string, centers: CenterOfficialImportRow[]): Promise<CenterOfficialImportResult> {
+  return postPrivateJson<CenterOfficialImportResult>('/api/v1/centers/import-official', { source, reason, centers });
 }
 
 export function getDashboardCsvUrl(): string {

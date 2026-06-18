@@ -120,6 +120,29 @@ class CenterStatusUpdate(BaseModel):
     reason: str = Field(min_length=5)
 
 
+class CenterOfficialImportRow(BaseModel):
+    code: str = Field(min_length=2, max_length=50)
+    name: str = Field(min_length=3, max_length=255)
+    city: str = Field(min_length=2, max_length=120)
+    address: str = Field(min_length=3, max_length=255)
+    capacity: int = Field(default=20, ge=1, le=500)
+    status: Literal["pending_audit", "active", "accredited", "suspended"] = "pending_audit"
+
+
+class CenterOfficialImportRequest(BaseModel):
+    source: str = Field(min_length=3, max_length=120)
+    reason: str = Field(min_length=5, max_length=255)
+    centers: list[CenterOfficialImportRow] = Field(min_length=1, max_length=500)
+
+
+class CenterOfficialImportResult(BaseModel):
+    imported: int
+    created: int
+    updated: int
+    skipped: int
+    codes: list[str]
+
+
 class QuestionCreate(BaseModel):
     category: str
     text: str

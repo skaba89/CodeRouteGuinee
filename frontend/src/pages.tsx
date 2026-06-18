@@ -3,6 +3,7 @@ import { type FormEvent, useEffect, useState } from 'react';
 import {
   type Center,
   type CenterIncident,
+  type CenterOfficialImportRow,
   type AuditLogEntry,
   type AuditLogFilters,
   type CandidateIdentityCheck,
@@ -70,6 +71,7 @@ import {
   getPaymentReconciliationItems,
   getQuestionGovernanceItems,
   handleCandidateSubmission,
+  importOfficialCenters,
   resetInstitutionalUserPassword,
   reportCenterIncident,
   resolveCenterIncident,
@@ -768,6 +770,27 @@ export function CenterPage() {
   );
 }
 
+const centerImportStatuses = new Set(['pending_audit', 'active', 'accredited', 'suspended']);
+
+function parseCenterImportCsv(value: string): CenterOfficialImportRow[] {
+  return value
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith('#'))
+    .map((line, index) => {
+      const [code, name, city, address, capacityValue = '20', statusValue = 'pending_audit'] = line.split(';').map((item) => item.trim());
+      const status = centerImportStatuses.has(statusValue) ? statusValue as CenterOfficialImportRow['status'] : 'pending_audit';
+      const capacity = Number(capacityValue);
+      if (!code || !name || !city || !address) {
+        throw new Error(`Ligne ${index + 1} incomplete`);
+      }
+      if (!Number.isFinite(capacity) || capacity < 1) {
+        throw new Error(`Capacite invalide ligne ${index + 1}`);
+      }
+      return { code, name, city, address, capacity, status };
+    });
+}
+
 export function AdminPage() {
   const { currentUser, isPresentationMode } = useAuthSession();
   const canAdminAct = canUseProtectedActions(currentUser, isPresentationMode, ['admin', 'super_admin']);
@@ -775,6 +798,9 @@ export function AdminPage() {
   const [dashboard, setDashboard] = useState<DashboardData>(fallbackDashboard);
   const [centers, setCenters] = useState<Center[]>([]);
   const [centerStatus, setCenterStatus] = useState<string | null>(null);
+  const [centerImportSource, setCenterImportSource] = useState('Liste officielle DNTT');
+  const [centerImportReason, setCenterImportReason] = useState('Chargement officiel des centres pilotes');
+  const [centerImportCsv, setCenterImportCsv] = useState('CRG-CONAKRY-002;Centre officiel Conakry 2;Conakry;Matoto;30;pending_audit');
   const [entrySummary, setEntrySummary] = useState<EntrySummary>(fallbackEntrySummary);
   const [examSummary, setExamSummary] = useState<ExamSummary>(fallbackExamSummary);
   const [paymentSummary, setPaymentSummary] = useState<PaymentSummary>(fallbackPaymentSummary);
@@ -1056,6 +1082,21 @@ export function AdminPage() {
       getDashboard().then(setDashboard).catch(() => undefined);
     } catch {
       setCenterStatus('Mise a jour du centre impossible : connectez-vous avec un role admin ou super admin.');
+    }
+  }
+
+  async function handleOfficialCenterImport(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (blockProtectedAction(setCenterStatus)) return;
+    try {
+      const rows = parseCenterImportCsv(centerImportCsv);
+      const result = await importOfficialCenters(centerImportSource, centerImportReason, rows);
+      setCenterStatus(`Import officiel termine : ${result.imported} centre(s), ${result.created} cree(s), ${result.updated} mis a jour.`);
+      const refreshedCenters = await getCenters();
+      setCenters(refreshedCenters);
+      await refreshAuditLogs();
+    } catch (error) {
+      setCenterStatus(error instanceof Error ? `Import impossible : ${error.message}` : 'Import officiel impossible.');
     }
   }
 
@@ -1660,6 +1701,15 @@ export function AdminPage() {
         <h3>Gouvernance des centres agrees</h3>
         <p>Suivi administratif des centres : audit initial, activation, accreditation et suspension.</p>
         {centerStatus && <p className={centerStatus.includes('impossible') ? 'form-error' : 'login-status'}>{centerStatus}</p>}
+        <form className="official-import-form" onSubmit={handleOfficialCenterImport}>
+          <label>Source officielle<input value={centerImportSource} onChange={(event) => setCenterImportSource(event.target.value)} /></label>
+          <label>Motif<input value={centerImportReason} onChange={(event) => setCenterImportReason(event.target.value)} /></label>
+          <label>Centres a importer
+            <textarea value={centerImportCsv} onChange={(event) => setCenterImportCsv(event.target.value)} />
+          </label>
+          <small>Format : code;nom;ville;adresse;capacite;statut. Statuts : pending_audit, active, accredited, suspended.</small>
+          <button type="submit" disabled={!canAdminAct}>Importer centres officiels</button>
+        </form>
         <div className="table-shell">
           <table>
             <thead><tr><th>Code</th><th>Centre</th><th>Ville</th><th>Capacite</th><th>Statut</th><th>Decision</th></tr></thead>

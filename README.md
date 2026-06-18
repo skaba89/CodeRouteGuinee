@@ -66,6 +66,7 @@ docker compose run --rm backend python -m app.bootstrap_admin
 
 Consultez `docs/production_readiness.md` pour le demarrage PostgreSQL, les migrations Alembic et les variables critiques.
 Consultez aussi `docs/deployment_runbook.md` pour la procedure staging/production.
+Le format des imports institutionnels est documente dans `docs/official_data_imports.md`.
 
 ## Verification E2E locale rapide
 

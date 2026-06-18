@@ -555,6 +555,48 @@ body {
   align-self: end;
 }
 
+.official-import-form {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.8fr) minmax(220px, 1fr) minmax(280px, 1.4fr) auto;
+  gap: 12px;
+  align-items: end;
+  padding: 14px;
+  border: 1px solid rgba(6, 43, 82, 0.08);
+  border-radius: 18px;
+  background: #f8fafc;
+}
+
+.official-import-form label {
+  display: grid;
+  gap: 8px;
+  color: var(--premium-navy);
+  font-size: 12px;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.official-import-form input,
+.official-import-form textarea {
+  min-height: 44px;
+  border: 1px solid rgba(6, 43, 82, 0.12);
+  border-radius: 14px;
+  padding: 10px 12px;
+  color: var(--premium-ink);
+  background: #ffffff;
+  font: inherit;
+}
+
+.official-import-form textarea {
+  min-height: 82px;
+  resize: vertical;
+}
+
+.official-import-form small {
+  grid-column: 1 / -1;
+  color: var(--premium-muted);
+  font-weight: 800;
+}
+
 .identity-filters {
   display: grid;
   grid-template-columns: 160px minmax(180px, 1fr) 110px auto auto;
@@ -2010,6 +2052,7 @@ tr:last-child td {
   .action-center-panel,
   .action-center-grid,
   .authorization-form,
+  .official-import-form,
   .identity-filters,
   .monitoring-summary-grid,
   .metrics,
