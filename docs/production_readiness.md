@@ -5,10 +5,11 @@ Ce document liste le minimum a verrouiller avant une presentation ou un pilote i
 ## Configuration
 
 1. Copier `.env.example` vers `.env`.
-2. Remplacer `SECRET_KEY`, `ADMIN_REGISTRATION_TOKEN`, `POSTGRES_PASSWORD` et `BOOTSTRAP_ADMIN_PASSWORD`.
-3. Configurer `CORS_ORIGINS` avec les domaines officiels uniquement.
-4. Garder `AUTO_CREATE_TABLES=false` en production: les tables doivent etre gerees par Alembic.
-5. Ajuster `LOGIN_RATE_LIMIT_ATTEMPTS` et `LOGIN_RATE_LIMIT_WINDOW_SECONDS` selon la politique de securite.
+2. Definir `ENVIRONMENT=production`.
+3. Remplacer `SECRET_KEY`, `ADMIN_REGISTRATION_TOKEN`, `POSTGRES_PASSWORD` et `BOOTSTRAP_ADMIN_PASSWORD`.
+4. Configurer `CORS_ORIGINS` avec les domaines officiels uniquement.
+5. Garder `AUTO_CREATE_TABLES=false` en production: les tables doivent etre gerees par Alembic.
+6. Ajuster `LOGIN_RATE_LIMIT_ATTEMPTS` et `LOGIN_RATE_LIMIT_WINDOW_SECONDS` selon la politique de securite.
 
 ## Base de donnees
 
@@ -141,6 +142,7 @@ Puis verifier:
 
 - `/health`
 - `/health/readiness`
+- statut `configuration` dans `/health/readiness`
 - `/docs`
 - connexion administrateur
 - dashboard national

@@ -41,6 +41,8 @@ jobs:
             test_file: tests/test_dashboard_export.py
           - name: pdf-service
             test_file: tests/test_pdf_service.py
+          - name: health-readiness
+            test_file: tests/test_health.py
     name: backend-tests (${{ matrix.name }})
     steps:
       - uses: actions/checkout@v4
