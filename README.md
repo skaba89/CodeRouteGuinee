@@ -72,7 +72,12 @@ Consultez `docs/production_readiness.md` pour le demarrage PostgreSQL, les migra
 python scripts/smoke_local.py
 ```
 
-Ce script verifie les endpoints principaux : health, dashboard, convocation, paiement sandbox, validation entree centre et resume examen.
+Ce script verifie les endpoints principaux : health, readiness, dashboard, convocation JSON/PDF, paiement sandbox, validation entree centre et resume examen.
+Pour inclure la preview frontend dans le controle :
+
+```bash
+CODEROUTE_API_URL=http://127.0.0.1:8000 CODEROUTE_FRONTEND_URL=http://127.0.0.1:4173 python scripts/smoke_local.py
+```
 
 Pour le scenario complet de presentation, consulter :
 
