@@ -1,6 +1,11 @@
 from pathlib import Path
 
+from alembic import command
+from alembic.config import Config
+from sqlalchemy import create_engine, inspect
+
 from app import models  # noqa: F401
+from app.core.config import get_settings
 from app.db.base import Base
 
 
@@ -41,3 +46,30 @@ def test_alembic_initial_migration_is_available() -> None:
 def test_question_metadata_includes_multimedia_fields() -> None:
     question_columns = set(Base.metadata.tables["questions"].columns.keys())
     assert {"media_type", "media_url", "media_alt"}.issubset(question_columns)
+
+
+def test_alembic_upgrade_head_from_empty_sqlite_database(tmp_path, monkeypatch) -> None:
+    backend_root = Path(__file__).resolve().parents[1]
+    database_path = tmp_path / "coderoute-empty.db"
+    database_url = f"sqlite:///{database_path.as_posix()}"
+    monkeypatch.setenv("DATABASE_URL", database_url)
+    get_settings.cache_clear()
+
+    config = Config(str(backend_root / "alembic.ini"))
+    config.set_main_option("script_location", str(backend_root / "alembic"))
+
+    command.upgrade(config, "head")
+
+    engine = create_engine(database_url)
+    inspector = inspect(engine)
+    try:
+        tables = set(inspector.get_table_names())
+        assert set(Base.metadata.tables).issubset(tables)
+        question_columns = {column["name"] for column in inspector.get_columns("questions")}
+        assert {"media_type", "media_url", "media_alt"}.issubset(question_columns)
+        with engine.connect() as connection:
+            version_rows = connection.exec_driver_sql("SELECT version_num FROM alembic_version").fetchall()
+        assert version_rows == [("20260618_0002",)]
+    finally:
+        engine.dispose()
+        get_settings.cache_clear()

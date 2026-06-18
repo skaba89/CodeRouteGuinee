@@ -51,6 +51,13 @@ pytest backend/tests/test_e2e_institutional_pilot_recipe.py
 pytest backend/tests/test_e2e_candidate_center_multimedia_exam.py
 ```
 
+- Audit migrations Alembic depuis une base vide execute:
+
+```bash
+cd backend
+python ../scripts/verify_migrations.py
+```
+
 - Connexion super admin reelle validee.
 - Parcours candidat pilote valide: dossier, paiement, convocation, examen, resultat.
 - Exports PDF/CSV institutionnels telecharges.
