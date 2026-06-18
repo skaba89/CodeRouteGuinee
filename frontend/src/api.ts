@@ -395,6 +395,21 @@ export type ExamMonitoringEvent = {
   created_at: string;
 };
 
+export type DeviceSession = {
+  id: string;
+  center_id: string;
+  session_id: string;
+  attempt_id?: string | null;
+  device_key: string;
+  device_label?: string | null;
+  ip_address?: string | null;
+  user_agent?: string | null;
+  status: string;
+  risk_reason?: string | null;
+  created_at: string;
+  last_seen_at: string;
+};
+
 export type ExamMonitoringFilters = {
   attempt_id?: string;
   session_id?: string;
@@ -783,6 +798,14 @@ export function getExamMonitoringEvents(filters: ExamMonitoringFilters = {}): Pr
   if (filters.severity) query.set('severity', filters.severity);
   query.set('limit', String(filters.limit ?? 25));
   return getPrivateJson<ExamMonitoringEvent[]>(`/api/v1/exam-monitoring/events?${query.toString()}`);
+}
+
+export function getDeviceSessionAlerts(filters: { session_id?: string; center_id?: string; limit?: number } = {}): Promise<DeviceSession[]> {
+  const query = new URLSearchParams();
+  if (filters.session_id) query.set('session_id', filters.session_id);
+  if (filters.center_id) query.set('center_id', filters.center_id);
+  query.set('limit', String(filters.limit ?? 25));
+  return getPrivateJson<DeviceSession[]>(`/api/v1/device-sessions/alerts?${query.toString()}`);
 }
 
 export function validateEntry(payload: EntryValidationPayload): Promise<EntryValidationResult> {

@@ -15,6 +15,7 @@ import {
   type CandidateSubmissionFilters,
   type CandidateSubmissionPayload,
   type DashboardData,
+  type DeviceSession,
   type EntrySummary,
   type EntryValidationResult,
   type ExamAttempt,
@@ -60,6 +61,7 @@ import {
   getCenterIncidents,
   getConvocationPdfUrl,
   getDashboard,
+  getDeviceSessionAlerts,
   getEntrySummary,
   getExamCertificatePdfUrl,
   getExamMonitoringEvents,
@@ -947,6 +949,7 @@ export function AdminPage() {
   const [activeMonitoringFilters, setActiveMonitoringFilters] = useState<ExamMonitoringFilters>({ min_risk_score: 1, limit: 25 });
   const [monitoringSummaries, setMonitoringSummaries] = useState<ExamMonitoringSummary[]>([]);
   const [monitoringEvents, setMonitoringEvents] = useState<ExamMonitoringEvent[]>([]);
+  const [deviceSessionAlerts, setDeviceSessionAlerts] = useState<DeviceSession[]>([]);
   const [monitoringStatus, setMonitoringStatus] = useState<string | null>(null);
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
   const [auditStatus, setAuditStatus] = useState<string | null>(null);
@@ -1055,8 +1058,10 @@ export function AdminPage() {
       };
       const summaries = await getExamMonitoringSummaries(cleanFilters);
       const events = await getExamMonitoringEvents(cleanFilters);
+      const deviceAlerts = await getDeviceSessionAlerts({ session_id: cleanFilters.session_id, limit: 25 });
       setMonitoringSummaries(summaries);
       setMonitoringEvents(events);
+      setDeviceSessionAlerts(deviceAlerts);
       setActiveMonitoringFilters(cleanFilters);
       setMonitoringStatus(null);
     } catch {
@@ -1107,6 +1112,9 @@ export function AdminPage() {
       .catch(() => setMonitoringStatus('Mode demo : connectez-vous avec un role admin pour charger le monitoring examen API.'));
     getExamMonitoringEvents({ limit: 25 })
       .then(setMonitoringEvents)
+      .catch(() => undefined);
+    getDeviceSessionAlerts({ limit: 25 })
+      .then(setDeviceSessionAlerts)
       .catch(() => undefined);
     getQuestionGovernanceItems()
       .then((items) => {
@@ -2382,6 +2390,7 @@ export function AdminPage() {
         <div className="monitoring-summary-grid">
           <article><strong>{formatNumber(monitoringSummaries.length)}</strong><span>Tentatives a risque</span></article>
           <article><strong>{formatNumber(monitoringEvents.length)}</strong><span>Evenements charges</span></article>
+          <article><strong>{formatNumber(deviceSessionAlerts.length)}</strong><span>Alertes appareil</span></article>
           <article><strong>{formatNumber(monitoringSummaries.reduce((sum, item) => sum + item.total_risk_score, 0))}</strong><span>Score risque cumule</span></article>
         </div>
         <div className="grid modules-grid">
@@ -2421,6 +2430,25 @@ export function AdminPage() {
               </tbody>
             </table>
           </div>
+        </div>
+        <div className="table-shell device-alert-table">
+          <strong>Alertes appareil et postes examen</strong>
+          <table>
+            <thead><tr><th>Derniere trace</th><th>Poste</th><th>Tentative</th><th>Session</th><th>Risque</th></tr></thead>
+            <tbody>
+              {deviceSessionAlerts.length === 0 ? (
+                <tr><td colSpan={5}>Aucune alerte appareil chargee.</td></tr>
+              ) : deviceSessionAlerts.slice(0, 8).map((alert) => (
+                <tr key={alert.id}>
+                  <td>{new Date(alert.last_seen_at).toLocaleString('fr-FR')}</td>
+                  <td>{alert.device_label ?? alert.device_key}</td>
+                  <td>{alert.attempt_id ?? '-'}</td>
+                  <td>{alert.session_id}</td>
+                  <td><span className="badge">{alert.risk_reason ?? alert.status}</span></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
         <p className="identity-filter-summary">Filtre actif : risque min {activeMonitoringFilters.min_risk_score ?? 1} - {activeMonitoringFilters.severity ?? 'toutes gravites'}.</p>
       </div>
