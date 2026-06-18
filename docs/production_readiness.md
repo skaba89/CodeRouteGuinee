@@ -146,6 +146,7 @@ Chaque utilisateur connecte peut changer son propre mot de passe via `/api/v1/au
 Avant un pilote avec candidats reels, superviser au minimum:
 
 - disponibilite `/health` et `/health/readiness`;
+- statut `/api/v1/operations/summary` et alertes critiques;
 - erreurs backend et erreurs frontend;
 - saturation disque, CPU, memoire et connexions PostgreSQL;
 - connexions echouees, `auth.login_blocked` et changements de roles;
@@ -167,6 +168,7 @@ Puis verifier:
 - `/health`
 - `/health/readiness`
 - statut `configuration` dans `/health/readiness`
+- `/api/v1/operations/summary`
 - `/docs` uniquement hors production publique
 - connexion administrateur
 - dashboard national
@@ -186,5 +188,6 @@ Puis verifier:
 - Super administrateur cree avec mot de passe non partage.
 - Sauvegarde et restauration testees.
 - Tests backend, build frontend et tests E2E verts.
+- Section admin `Exploitation` sans alerte critique non acceptee.
 - Procedure support centre documentee.
 - Donnees de demonstration retirees des environnements officiels.

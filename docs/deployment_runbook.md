@@ -45,6 +45,7 @@ Go uniquement si:
 
 - `/health` retourne `ok`;
 - `/health/readiness` ne contient aucune erreur de configuration;
+- `/api/v1/operations/summary` ne retourne pas de statut `critical`;
 - migrations appliquees;
 - super administrateur disponible;
 - export PDF dossier Etat telechargeable;

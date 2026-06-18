@@ -35,6 +35,7 @@ import {
   type InstitutionalUser,
   type InstitutionalUserCreatePayload,
   type OperationalReadiness,
+  type OperationsSummary,
   type PaymentAlert,
   type PaymentFilters,
   type PaymentOfficialImportRow,
@@ -78,6 +79,7 @@ import {
   getInstitutionalAuthorizations,
   getInstitutionalUsers,
   getOperationalReadiness,
+  getOperationsSummary,
   getPaymentAlerts,
   getPaymentReconciliationItems,
   getQuestionGovernanceItems,
@@ -203,6 +205,26 @@ const fallbackInstitutionalActionCenter: InstitutionalActionCenter = {
     { code: 'identity_checks', label: 'Identites candidates a traiter', count: 3, severity: 'warning', target: '#identites' },
     { code: 'authorizations_signature', label: 'Habilitations en attente de signature', count: 2, severity: 'warning', target: '#habilitations' },
     { code: 'question_revision', label: 'Questions officielles a relire', count: 3, severity: 'warning', target: '#questions' },
+  ],
+};
+
+const fallbackOperationsSummary: OperationsSummary = {
+  status: 'warning',
+  generated_at: new Date().toISOString(),
+  critical_alerts: 0,
+  warning_alerts: 3,
+  open_incidents: 2,
+  critical_incidents: 0,
+  high_risk_exam_events: 4,
+  critical_exam_events: 0,
+  suspicious_devices: 1,
+  payment_alerts: 2,
+  audit_events_24h: 12,
+  last_audit_at: new Date().toISOString(),
+  alerts: [
+    { code: 'open_incidents', label: 'Incidents centre ouverts', severity: 'warning', count: 2, target: '#incidents' },
+    { code: 'high_risk_exam_events', label: 'Evenements examen a risque eleve', severity: 'warning', count: 4, target: '#monitoring-examen' },
+    { code: 'payment_alerts', label: 'Alertes financieres a traiter', severity: 'warning', count: 2, target: '#finance' },
   ],
 };
 
@@ -951,6 +973,8 @@ export function AdminPage() {
   const [passwordResetValue, setPasswordResetValue] = useState('ResetStrongPass123');
   const [institutionalActionCenter, setInstitutionalActionCenter] = useState<InstitutionalActionCenter>(fallbackInstitutionalActionCenter);
   const [actionCenterStatus, setActionCenterStatus] = useState<string | null>(null);
+  const [operationsSummary, setOperationsSummary] = useState<OperationsSummary>(fallbackOperationsSummary);
+  const [operationsStatus, setOperationsStatus] = useState<string | null>(null);
   const [institutionalReport, setInstitutionalReport] = useState<InstitutionalReport>(fallbackInstitutionalReport);
   const [institutionalReportStatus, setInstitutionalReportStatus] = useState<string | null>(null);
   const [readinessStatus, setReadinessStatus] = useState<string | null>(null);
@@ -1114,6 +1138,12 @@ export function AdminPage() {
         setActionCenterStatus(null);
       })
       .catch(() => setActionCenterStatus('Mode demo : connectez-vous avec un role admin pour charger le centre d action API.'));
+    getOperationsSummary()
+      .then((summary) => {
+        setOperationsSummary(summary);
+        setOperationsStatus(null);
+      })
+      .catch(() => setOperationsStatus('Mode demo : connectez-vous avec un role admin pour charger le resume exploitation API.'));
     getCandidateIdentityChecks({ status_filter: 'pending', limit: 25 })
       .then((checks) => {
         setIdentityChecks(checks.length > 0 ? checks : fallbackIdentityChecks);
@@ -1608,6 +1638,7 @@ export function AdminPage() {
     { href: '#habilitations', label: 'Habilitations' },
     { href: '#dossier-etat', label: 'Dossier Etat' },
     { href: '#securite', label: 'Securite' },
+    { href: '#exploitation', label: 'Exploitation' },
     { href: '#production', label: 'Production' },
     { href: '#roadmap', label: 'Roadmap' },
     { href: '#rapport', label: 'Rapport' },
@@ -1768,6 +1799,15 @@ export function AdminPage() {
       evidence: 'Workflow CI present pour tests backend critiques.',
       action: 'Ajouter build frontend, tests E2E et deploiement staging automatise.',
     },
+  ];
+  const operationsMetrics = [
+    ['Incidents ouverts', operationsSummary.open_incidents],
+    ['Incidents critiques', operationsSummary.critical_incidents],
+    ['Evenements examen high', operationsSummary.high_risk_exam_events],
+    ['Evenements examen critical', operationsSummary.critical_exam_events],
+    ['Appareils suspects', operationsSummary.suspicious_devices],
+    ['Alertes finance', operationsSummary.payment_alerts],
+    ['Audit 24h', operationsSummary.audit_events_24h],
   ];
 
   return (
@@ -2305,6 +2345,37 @@ export function AdminPage() {
             </article>
           ))}
         </div>
+      </div>
+      <div id="exploitation" className="operations-summary-panel admin-section">
+        <div className="operations-summary-header">
+          <div>
+            <h3>Exploitation nationale</h3>
+            <p>Vue de supervision pour la DSI et les responsables metier : incidents, risques examen, appareils, paiements et audit recent.</p>
+          </div>
+          <span className={`operations-status status-${operationsSummary.status}`}>{operationsSummary.status}</span>
+        </div>
+        {operationsStatus && <p className="form-error">{operationsStatus}</p>}
+        <div className="operations-summary-grid">
+          {operationsMetrics.map(([label, value]) => (
+            <article key={label}>
+              <strong>{formatNumber(Number(value))}</strong>
+              <span>{label}</span>
+            </article>
+          ))}
+        </div>
+        <div className="operations-alert-list">
+          <strong>Alertes a traiter</strong>
+          {operationsSummary.alerts.length === 0 ? (
+            <p>Aucune alerte operationnelle critique ou warning.</p>
+          ) : operationsSummary.alerts.map((alert) => (
+            <button key={alert.code} type="button" className={`operations-alert severity-${alert.severity}`} onClick={() => { window.location.hash = alert.target; }} aria-label={`Ouvrir alerte exploitation ${alert.code}`}>
+              <span>{alert.severity}</span>
+              <strong>{alert.label}</strong>
+              <small>{formatNumber(alert.count)} element(s)</small>
+            </button>
+          ))}
+        </div>
+        <p className="operations-timestamp">Dernier audit : {operationsSummary.last_audit_at ? new Date(operationsSummary.last_audit_at).toLocaleString('fr-FR') : 'aucun'} - generation : {new Date(operationsSummary.generated_at).toLocaleString('fr-FR')}</p>
       </div>
       <div id="production" className="production-readiness-panel admin-section">
         <div className="production-readiness-header">

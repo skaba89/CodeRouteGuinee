@@ -260,6 +260,30 @@ export type InstitutionalActionCenter = {
   items: InstitutionalActionItem[];
 };
 
+export type OperationAlert = {
+  code: string;
+  label: string;
+  severity: 'warning' | 'critical' | string;
+  count: number;
+  target: string;
+};
+
+export type OperationsSummary = {
+  status: 'ok' | 'warning' | 'critical' | string;
+  generated_at: string;
+  critical_alerts: number;
+  warning_alerts: number;
+  open_incidents: number;
+  critical_incidents: number;
+  high_risk_exam_events: number;
+  critical_exam_events: number;
+  suspicious_devices: number;
+  payment_alerts: number;
+  audit_events_24h: number;
+  last_audit_at?: string | null;
+  alerts: OperationAlert[];
+};
+
 export type CandidateIdentityCheck = {
   id: string;
   candidate_id: string;
@@ -699,6 +723,10 @@ export function getInstitutionalReport(): Promise<InstitutionalReport> {
 
 export function getInstitutionalActionCenter(): Promise<InstitutionalActionCenter> {
   return getPrivateJson<InstitutionalActionCenter>('/api/v1/dashboard/institutional-action-center');
+}
+
+export function getOperationsSummary(): Promise<OperationsSummary> {
+  return getPrivateJson<OperationsSummary>('/api/v1/operations/summary');
 }
 
 export function getCandidateIdentityChecks(filters: CandidateIdentityFilters = {}): Promise<CandidateIdentityCheck[]> {
