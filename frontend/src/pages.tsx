@@ -312,6 +312,148 @@ const fallbackInstitutionalUsers: InstitutionalUser[] = [
   },
 ];
 
+const fallbackCandidateSubmissions: CandidateSubmission[] = [
+  {
+    id: 'demo-submission-1',
+    candidate_id: 'GN-CODE-2026-000001',
+    attempt_id: 'demo-attempt-1',
+    category: 'review',
+    status: 'submitted',
+    message: 'Demande de revue apres incident de poste en centre.',
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: 'demo-submission-2',
+    candidate_id: 'GN-CODE-2026-000002',
+    attempt_id: 'demo-attempt-2',
+    category: 'complaint',
+    status: 'under_review',
+    message: 'Contestations des conditions de passage.',
+    admin_response: 'Analyse en cours par la supervision nationale.',
+    created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+  },
+];
+
+const fallbackCenterIncidents: CenterIncident[] = [
+  {
+    id: 'demo-incident-1',
+    center_id: 'CTR-KALOUM',
+    session_id: 'GN-SESSION-DEMO-001',
+    attempt_id: 'demo-attempt-1',
+    incident_type: 'device_failure',
+    severity: 'high',
+    description: 'Poste indisponible pendant la tentative, reprise a arbitrer.',
+    status: 'open',
+    created_at: new Date().toISOString(),
+  },
+];
+
+const fallbackPaymentItems: PaymentReconciliationItem[] = [
+  {
+    reference: 'GN-PAY-DEMO-001',
+    booking_reference: 'GN-BOOK-2026-000001',
+    amount_gnf: 250000,
+    provider: 'orange_money',
+    status: 'paid',
+    receipt_number: 'OM-DEMO-001',
+    created_at: new Date().toISOString(),
+  },
+  {
+    reference: 'GN-PAY-DEMO-002',
+    booking_reference: 'GN-BOOK-2026-000002',
+    amount_gnf: 250000,
+    provider: 'mtn_money',
+    status: 'pending',
+    receipt_number: 'MTN-DEMO-002',
+    created_at: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
+  },
+];
+
+const fallbackPaymentAlerts: PaymentAlert[] = [
+  {
+    ...fallbackPaymentItems[1],
+    type: 'pending_reconciliation',
+    severity: 'medium',
+    message: 'Paiement en attente de rapprochement operateur.',
+  },
+];
+
+const fallbackMonitoringSummaries: ExamMonitoringSummary[] = [
+  {
+    attempt_id: 'demo-attempt-1',
+    total_events: 3,
+    total_risk_score: 7,
+    max_severity: 'high',
+    status: 'review_required',
+  },
+];
+
+const fallbackMonitoringEvents: ExamMonitoringEvent[] = [
+  {
+    id: 'demo-monitoring-event-1',
+    center_id: 'CTR-KALOUM',
+    session_id: 'GN-SESSION-DEMO-001',
+    attempt_id: 'demo-attempt-1',
+    event_type: 'window_blur',
+    severity: 'high',
+    risk_score: 4,
+    details: { source: 'presentation' },
+    occurred_at: new Date().toISOString(),
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: 'demo-monitoring-event-2',
+    center_id: 'CTR-KALOUM',
+    session_id: 'GN-SESSION-DEMO-001',
+    attempt_id: 'demo-attempt-1',
+    event_type: 'unknown_device',
+    severity: 'medium',
+    risk_score: 3,
+    details: { source: 'presentation' },
+    occurred_at: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
+    created_at: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
+  },
+];
+
+const fallbackDeviceSessionAlerts: DeviceSession[] = [
+  {
+    id: 'demo-device-alert-1',
+    center_id: 'CTR-KALOUM',
+    session_id: 'GN-SESSION-DEMO-001',
+    attempt_id: 'demo-attempt-1',
+    device_key: 'unknown-device-demo',
+    device_label: 'Poste non enregistre',
+    status: 'suspicious',
+    risk_reason: 'Appareil absent du registre centre',
+    created_at: new Date().toISOString(),
+    last_seen_at: new Date().toISOString(),
+  },
+];
+
+const fallbackAuditLogs: AuditLogEntry[] = [
+  {
+    id: 'demo-audit-1',
+    action: 'dashboard.institutional_report_viewed',
+    entity: 'dashboard',
+    details: { mode: 'presentation' },
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: 'demo-audit-2',
+    action: 'candidate.official_import',
+    entity: 'candidate',
+    details: { dry_run: true, imported: 1 },
+    created_at: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
+  },
+  {
+    id: 'demo-audit-3',
+    action: 'payments.official_import',
+    entity: 'payment',
+    details: { dry_run: true, imported: 1 },
+    created_at: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+  },
+];
+
 const modules = [
   'Inscription candidat',
   'Reservation examen',
@@ -369,6 +511,98 @@ function sanitizePaymentFilters(filters: PaymentFilters): PaymentFilters {
     status: filters.status || undefined,
     date_from: filters.date_from || undefined,
     date_to: filters.date_to || undefined,
+  };
+}
+
+function downloadLocalFile(filename: string, content: string, type = 'text/csv;charset=utf-8'): void {
+  const blob = new Blob([content], { type });
+  const objectUrl = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = objectUrl;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(objectUrl);
+}
+
+function buildDemoImportStatus(label: string, count: number): string {
+  return `Simulation ${label} terminee : ${count} ligne(s) validee(s), aucune donnee officielle ecrite.`;
+}
+
+function filterDemoIdentityChecks(filters: CandidateIdentityFilters): CandidateIdentityCheck[] {
+  return fallbackIdentityChecks.filter((item) => {
+    const statusMatches = !filters.status_filter || item.status === filters.status_filter;
+    const candidateMatches = !filters.candidate_id || item.candidate_id.toLowerCase().includes(filters.candidate_id.toLowerCase());
+    return statusMatches && candidateMatches;
+  }).slice(0, filters.limit ?? 25);
+}
+
+function filterDemoSubmissions(filters: CandidateSubmissionFilters): CandidateSubmission[] {
+  return fallbackCandidateSubmissions.filter((item) => {
+    const statusMatches = !filters.status_filter || item.status === filters.status_filter;
+    const candidateMatches = !filters.candidate_id || item.candidate_id.toLowerCase().includes(filters.candidate_id.toLowerCase());
+    const attemptMatches = !filters.attempt_id || item.attempt_id.toLowerCase().includes(filters.attempt_id.toLowerCase());
+    return statusMatches && candidateMatches && attemptMatches;
+  }).slice(0, filters.limit ?? 25);
+}
+
+function filterDemoAuditLogs(filters: AuditLogFilters): AuditLogEntry[] {
+  return fallbackAuditLogs.filter((item) => {
+    const actionMatches = !filters.action || item.action.toLowerCase().includes(filters.action.toLowerCase());
+    const entityMatches = !filters.entity || item.entity.toLowerCase().includes(filters.entity.toLowerCase());
+    return actionMatches && entityMatches;
+  }).slice(0, filters.limit ?? 25);
+}
+
+function filterDemoMonitoring(filters: ExamMonitoringFilters): {
+  summaries: ExamMonitoringSummary[];
+  events: ExamMonitoringEvent[];
+  deviceAlerts: DeviceSession[];
+} {
+  const events = fallbackMonitoringEvents.filter((item) => {
+    const attemptMatches = !filters.attempt_id || item.attempt_id.toLowerCase().includes(filters.attempt_id.toLowerCase());
+    const sessionMatches = !filters.session_id || item.session_id.toLowerCase().includes(filters.session_id.toLowerCase());
+    const severityMatches = !filters.severity || item.severity === filters.severity;
+    const riskMatches = item.risk_score >= (filters.min_risk_score ?? 1);
+    return attemptMatches && sessionMatches && severityMatches && riskMatches;
+  }).slice(0, filters.limit ?? 25);
+  const attemptIds = new Set(events.map((item) => item.attempt_id));
+  return {
+    summaries: fallbackMonitoringSummaries.filter((item) => attemptIds.has(item.attempt_id)),
+    events,
+    deviceAlerts: fallbackDeviceSessionAlerts.filter((item) => !filters.session_id || item.session_id === filters.session_id),
+  };
+}
+
+function filterDemoPayments(filters: PaymentFilters): {
+  summary: PaymentSummary;
+  items: PaymentReconciliationItem[];
+  alerts: PaymentAlert[];
+} {
+  const items = fallbackPaymentItems.filter((item) => {
+    const providerMatches = !filters.provider || item.provider === filters.provider;
+    const statusMatches = !filters.status || item.status === filters.status;
+    return providerMatches && statusMatches;
+  }).slice(0, filters.limit ?? 25);
+  const summary: PaymentSummary = {
+    total_count: items.length,
+    total_amount_gnf: items.reduce((sum, item) => sum + item.amount_gnf, 0),
+    by_status: {},
+    by_provider: {},
+  };
+  items.forEach((item) => {
+    summary.by_status[item.status] = summary.by_status[item.status] ?? { count: 0, amount_gnf: 0 };
+    summary.by_status[item.status].count += 1;
+    summary.by_status[item.status].amount_gnf += item.amount_gnf;
+    summary.by_provider[item.provider] = summary.by_provider[item.provider] ?? { count: 0, amount_gnf: 0 };
+    summary.by_provider[item.provider].count += 1;
+    summary.by_provider[item.provider].amount_gnf += item.amount_gnf;
+  });
+  return {
+    summary,
+    items,
+    alerts: fallbackPaymentAlerts.filter((alert) => items.some((item) => item.reference === alert.reference)),
   };
 }
 
@@ -931,9 +1165,9 @@ export function AdminPage() {
   const [entrySummary, setEntrySummary] = useState<EntrySummary>(fallbackEntrySummary);
   const [examSummary, setExamSummary] = useState<ExamSummary>(fallbackExamSummary);
   const [paymentSummary, setPaymentSummary] = useState<PaymentSummary>(fallbackPaymentSummary);
-  const [paymentItems, setPaymentItems] = useState<PaymentReconciliationItem[]>([]);
-  const [paymentAlerts, setPaymentAlerts] = useState<PaymentAlert[]>([]);
-  const [centerIncidents, setCenterIncidents] = useState<CenterIncident[]>([]);
+  const [paymentItems, setPaymentItems] = useState<PaymentReconciliationItem[]>(fallbackPaymentItems);
+  const [paymentAlerts, setPaymentAlerts] = useState<PaymentAlert[]>(fallbackPaymentAlerts);
+  const [centerIncidents, setCenterIncidents] = useState<CenterIncident[]>(fallbackCenterIncidents);
   const [incidentResolutionNotes, setIncidentResolutionNotes] = useState('Incident analyse par la supervision nationale. Reprise autorisee si necessaire.');
   const [allowIncidentRetake, setAllowIncidentRetake] = useState(true);
   const [incidentAdminStatus, setIncidentAdminStatus] = useState<string | null>(null);
@@ -941,7 +1175,7 @@ export function AdminPage() {
   const [identityStatus, setIdentityStatus] = useState<string | null>(null);
   const [identityFilters, setIdentityFilters] = useState<CandidateIdentityFilters>({ status_filter: 'pending', limit: 25 });
   const [activeIdentityFilters, setActiveIdentityFilters] = useState<CandidateIdentityFilters>({ status_filter: 'pending', limit: 25 });
-  const [candidateSubmissions, setCandidateSubmissions] = useState<CandidateSubmission[]>([]);
+  const [candidateSubmissions, setCandidateSubmissions] = useState<CandidateSubmission[]>(fallbackCandidateSubmissions);
   const [submissionFilters, setSubmissionFilters] = useState<CandidateSubmissionFilters>({ status_filter: 'submitted', limit: 25 });
   const [activeSubmissionFilters, setActiveSubmissionFilters] = useState<CandidateSubmissionFilters>({ status_filter: 'submitted', limit: 25 });
   const [submissionAdminResponse, setSubmissionAdminResponse] = useState('Votre demande est prise en charge par la supervision nationale.');
@@ -989,11 +1223,11 @@ export function AdminPage() {
   const [activeAuditFilters, setActiveAuditFilters] = useState<AuditLogFilters>({});
   const [monitoringFilters, setMonitoringFilters] = useState<ExamMonitoringFilters>({ min_risk_score: 1, limit: 25 });
   const [activeMonitoringFilters, setActiveMonitoringFilters] = useState<ExamMonitoringFilters>({ min_risk_score: 1, limit: 25 });
-  const [monitoringSummaries, setMonitoringSummaries] = useState<ExamMonitoringSummary[]>([]);
-  const [monitoringEvents, setMonitoringEvents] = useState<ExamMonitoringEvent[]>([]);
-  const [deviceSessionAlerts, setDeviceSessionAlerts] = useState<DeviceSession[]>([]);
+  const [monitoringSummaries, setMonitoringSummaries] = useState<ExamMonitoringSummary[]>(fallbackMonitoringSummaries);
+  const [monitoringEvents, setMonitoringEvents] = useState<ExamMonitoringEvent[]>(fallbackMonitoringEvents);
+  const [deviceSessionAlerts, setDeviceSessionAlerts] = useState<DeviceSession[]>(fallbackDeviceSessionAlerts);
   const [monitoringStatus, setMonitoringStatus] = useState<string | null>(null);
-  const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
+  const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>(fallbackAuditLogs);
   const [auditStatus, setAuditStatus] = useState<string | null>(null);
   const [financeStatus, setFinanceStatus] = useState<string | null>(null);
   const [csvExportStatus, setCsvExportStatus] = useState<string | null>(null);
@@ -1018,7 +1252,11 @@ export function AdminPage() {
   }
 
   async function refreshCenterIncidents() {
-    if (blockProtectedAction(setIncidentAdminStatus)) return;
+    if (!canAdminAct) {
+      setCenterIncidents(fallbackCenterIncidents);
+      setIncidentAdminStatus('Apercu presentation charge : incidents ouverts simulés, sans action officielle.');
+      return;
+    }
     try {
       const incidents = await getCenterIncidents('open', 25);
       setCenterIncidents(incidents);
@@ -1031,6 +1269,15 @@ export function AdminPage() {
   async function loadPaymentSummary(filters: PaymentFilters) {
     try {
       const cleanFilters = sanitizePaymentFilters(filters);
+      if (!canAdminAct) {
+        const demo = filterDemoPayments(cleanFilters);
+        setPaymentSummary(demo.summary);
+        setPaymentItems(demo.items);
+        setPaymentAlerts(demo.alerts);
+        setActivePaymentFilters(cleanFilters);
+        setFinanceStatus('Apercu presentation : filtres financiers appliques sur donnees simulees.');
+        return;
+      }
       const summary = await getAdminPaymentSummary(cleanFilters);
       const items = await getPaymentReconciliationItems({ ...cleanFilters, limit: 25 });
       const alerts = await getPaymentAlerts({ ...cleanFilters, limit: 25 });
@@ -1040,13 +1287,25 @@ export function AdminPage() {
       setActivePaymentFilters(cleanFilters);
       setFinanceStatus(null);
     } catch {
-      setFinanceStatus('Finance indisponible : connectez-vous avec un role admin ou super admin.');
+      const demo = filterDemoPayments(sanitizePaymentFilters(filters));
+      setPaymentSummary(demo.summary);
+      setPaymentItems(demo.items);
+      setPaymentAlerts(demo.alerts);
+      setActivePaymentFilters(sanitizePaymentFilters(filters));
+      setFinanceStatus('Finance API indisponible : apercu presentation charge.');
     }
   }
 
   async function refreshIdentityChecks(filters: CandidateIdentityFilters = activeIdentityFilters) {
     if (!canAdminAct) {
-      setIdentityStatus('Mode demo : connectez-vous avec un compte admin ou super admin reel pour filtrer les pieces.');
+      const cleanFilters = {
+        status_filter: filters.status_filter || undefined,
+        candidate_id: filters.candidate_id || undefined,
+        limit: filters.limit ?? 25,
+      };
+      setIdentityChecks(filterDemoIdentityChecks(cleanFilters));
+      setActiveIdentityFilters(cleanFilters);
+      setIdentityStatus('Apercu presentation : filtres appliques aux pieces simulees.');
       return;
     }
     try {
@@ -1066,7 +1325,15 @@ export function AdminPage() {
 
   async function refreshCandidateSubmissions(filters: CandidateSubmissionFilters = activeSubmissionFilters) {
     if (!canAdminAct) {
-      setSubmissionAdminStatus('Mode demo : connectez-vous avec un compte admin ou super admin reel pour traiter les recours.');
+      const cleanFilters = {
+        candidate_id: filters.candidate_id || undefined,
+        attempt_id: filters.attempt_id || undefined,
+        status_filter: filters.status_filter || undefined,
+        limit: filters.limit ?? 25,
+      };
+      setCandidateSubmissions(filterDemoSubmissions(cleanFilters));
+      setActiveSubmissionFilters(cleanFilters);
+      setSubmissionAdminStatus('Apercu presentation : filtres appliques aux recours simules.');
       return;
     }
     try {
@@ -1087,7 +1354,19 @@ export function AdminPage() {
 
   async function refreshExamMonitoring(filters: ExamMonitoringFilters = activeMonitoringFilters) {
     if (!canAdminAct) {
-      setMonitoringStatus('Mode demo : connectez-vous avec un compte admin ou super admin reel pour charger le monitoring examen.');
+      const cleanFilters = {
+        attempt_id: filters.attempt_id || undefined,
+        session_id: filters.session_id || undefined,
+        severity: filters.severity || undefined,
+        min_risk_score: filters.min_risk_score ?? 1,
+        limit: filters.limit ?? 25,
+      };
+      const demo = filterDemoMonitoring(cleanFilters);
+      setMonitoringSummaries(demo.summaries);
+      setMonitoringEvents(demo.events);
+      setDeviceSessionAlerts(demo.deviceAlerts);
+      setActiveMonitoringFilters(cleanFilters);
+      setMonitoringStatus('Apercu presentation : monitoring simule charge selon les filtres.');
       return;
     }
     try {
@@ -1206,7 +1485,14 @@ export function AdminPage() {
 
   async function refreshAuditLogs(filters: AuditLogFilters = activeAuditFilters) {
     if (!canAdminAct) {
-      setAuditStatus('Logs indisponibles : connectez-vous avec un compte admin ou super admin reel.');
+      const cleanFilters = {
+        action: filters.action || undefined,
+        entity: filters.entity || undefined,
+        limit: filters.limit ?? 25,
+      };
+      setAuditLogs(filterDemoAuditLogs(cleanFilters));
+      setActiveAuditFilters(cleanFilters);
+      setAuditStatus('Apercu presentation : logs simules filtres localement.');
       return;
     }
     try {
@@ -1239,6 +1525,15 @@ export function AdminPage() {
 
   async function handleOfficialCenterImport(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!canAdminAct && centerImportDryRun) {
+      try {
+        const rows = parseCenterImportCsv(centerImportCsv);
+        setCenterStatus(buildDemoImportStatus('centres officiels', rows.length));
+      } catch (error) {
+        setCenterStatus(error instanceof Error ? `Simulation centres impossible : ${error.message}` : 'Simulation centres impossible.');
+      }
+      return;
+    }
     if (blockProtectedAction(setCenterStatus)) return;
     try {
       const rows = parseCenterImportCsv(centerImportCsv);
@@ -1284,6 +1579,15 @@ export function AdminPage() {
   async function handleOfficialCandidateImport(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setCandidateImportStatus(null);
+    if (!canAdminAct && candidateImportDryRun) {
+      try {
+        const rows = parseCandidateImportCsv(candidateImportCsv);
+        setCandidateImportStatus(buildDemoImportStatus('candidats officiels', rows.length));
+      } catch (error) {
+        setCandidateImportStatus(error instanceof Error ? `Simulation candidats impossible : ${error.message}` : 'Simulation candidats impossible.');
+      }
+      return;
+    }
     if (blockProtectedAction(setCandidateImportStatus)) return;
     try {
       const rows = parseCandidateImportCsv(candidateImportCsv);
@@ -1345,6 +1649,15 @@ export function AdminPage() {
   async function handleOfficialQuestionImport(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setQuestionGovernanceStatus(null);
+    if (!canAdminAct && questionImportDryRun) {
+      try {
+        const rows = parseQuestionImportCsv(questionImportCsv);
+        setQuestionGovernanceStatus(buildDemoImportStatus('questions officielles', rows.length));
+      } catch (error) {
+        setQuestionGovernanceStatus(error instanceof Error ? `Simulation questions impossible : ${error.message}` : 'Simulation questions impossible.');
+      }
+      return;
+    }
     if (blockProtectedAction(setQuestionGovernanceStatus)) return;
     try {
       const rows = parseQuestionImportCsv(questionImportCsv);
@@ -1442,6 +1755,11 @@ export function AdminPage() {
   }
 
   async function handleDashboardCsvExport() {
+    if (!canAdminAct) {
+      downloadLocalFile('coderoute-dashboard-demo.csv', `indicateur,valeur\ncandidats,${dashboard.candidates}\ncentres_agrees,${dashboard.accredited_centers}\nsessions,${dashboard.exam_sessions}\nalertes,${dashboard.fraud_alerts}\n`);
+      setCsvExportStatus('Export demo genere localement : connectez-vous pour exporter les donnees officielles.');
+      return;
+    }
     if (blockProtectedAction(setCsvExportStatus)) return;
     setIsExportingCsv(true);
     setCsvExportStatus(null);
@@ -1457,6 +1775,11 @@ export function AdminPage() {
   }
 
   async function handleExamAttemptsCsvExport() {
+    if (!canAdminAct) {
+      downloadLocalFile('coderoute-examens-demo.csv', `indicateur,valeur\ntentatives,${examSummary.total_attempts}\nsoumises,${examSummary.submitted_attempts}\nadmis,${examSummary.passed_attempts}\nechecs,${examSummary.failed_attempts}\nscore_moyen,${examSummary.average_score}\n`);
+      setExamCsvExportStatus('Export examens demo genere localement.');
+      return;
+    }
     if (blockProtectedAction(setExamCsvExportStatus)) return;
     setIsExportingExamCsv(true);
     setExamCsvExportStatus(null);
@@ -1472,6 +1795,12 @@ export function AdminPage() {
   }
 
   async function handlePaymentCsvExport() {
+    if (!canAdminAct) {
+      const rows = ['reference,reservation,operateur,statut,montant,recu', ...paymentItems.map((item) => `${item.reference},${item.booking_reference},${item.provider},${item.status},${item.amount_gnf},${item.receipt_number}`)];
+      downloadLocalFile('coderoute-paiements-demo.csv', `${rows.join('\n')}\n`);
+      setPaymentCsvExportStatus('Export paiements demo genere localement.');
+      return;
+    }
     if (blockProtectedAction(setPaymentCsvExportStatus)) return;
     setIsExportingPaymentCsv(true);
     setPaymentCsvExportStatus(null);
@@ -1487,6 +1816,12 @@ export function AdminPage() {
   }
 
   async function handleAuditCsvExport() {
+    if (!canAdminAct) {
+      const rows = ['date,action,entite', ...auditLogs.map((log) => `${log.created_at},${log.action},${log.entity}`)];
+      downloadLocalFile('coderoute-audit-demo.csv', `${rows.join('\n')}\n`);
+      setAuditCsvExportStatus('Export audit demo genere localement.');
+      return;
+    }
     if (blockProtectedAction(setAuditCsvExportStatus)) return;
     setIsExportingAuditCsv(true);
     setAuditCsvExportStatus(null);
@@ -1502,6 +1837,11 @@ export function AdminPage() {
   }
 
   async function handleInstitutionalReportCsvExport() {
+    if (!canAdminAct) {
+      downloadLocalFile('coderoute-rapport-institutionnel-demo.csv', `champ,valeur\nscore,${institutionalReport.readiness_score}\nlabel,${institutionalReport.readiness_label}\ncandidats,${institutionalReport.candidates}\naudit,${institutionalReport.audit_events}\n`);
+      setInstitutionalReportStatus('Rapport institutionnel demo CSV genere localement.');
+      return;
+    }
     if (blockProtectedAction(setInstitutionalReportStatus)) return;
     setIsExportingInstitutionalReport(true);
     setInstitutionalReportStatus(null);
@@ -1517,6 +1857,11 @@ export function AdminPage() {
   }
 
   async function handleInstitutionalReportPdfExport() {
+    if (!canAdminAct) {
+      downloadLocalFile('coderoute-dossier-etat-demo.txt', `CodeRoute Guinee - Dossier Etat\nScore: ${institutionalReport.readiness_score}%\n${institutionalReport.readiness_label}\n\nRecommendations:\n${institutionalReport.recommendations.join('\n')}\n`, 'text/plain;charset=utf-8');
+      setInstitutionalReportStatus('Apercu dossier Etat genere localement en texte. Connectez-vous pour le PDF officiel.');
+      return;
+    }
     if (blockProtectedAction(setInstitutionalReportStatus)) return;
     setIsExportingInstitutionalReportPdf(true);
     setInstitutionalReportStatus(null);
@@ -1540,6 +1885,15 @@ export function AdminPage() {
   async function handleOfficialPaymentImport(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setPaymentImportStatus(null);
+    if (!canAdminAct && paymentImportDryRun) {
+      try {
+        const rows = parsePaymentImportCsv(paymentImportCsv);
+        setPaymentImportStatus(buildDemoImportStatus('paiements operateur', rows.length));
+      } catch (error) {
+        setPaymentImportStatus(error instanceof Error ? `Simulation paiements impossible : ${error.message}` : 'Simulation paiements impossible.');
+      }
+      return;
+    }
     if (blockProtectedAction(setPaymentImportStatus)) return;
     try {
       const rows = parsePaymentImportCsv(paymentImportCsv);
@@ -1829,14 +2183,14 @@ export function AdminPage() {
         {adminSections.map((section) => <a key={section.href} href={section.href}>{section.label}</a>)}
       </div>
       <div className="actions result-actions admin-actions">
-        <button onClick={handleDashboardCsvExport} disabled={!canAdminAct || isExportingCsv}>{isExportingCsv ? 'Export...' : 'Exporter le dashboard CSV'}</button>
-        <button onClick={handleInstitutionalReportCsvExport} disabled={!canAdminAct || isExportingInstitutionalReport}>{isExportingInstitutionalReport ? 'Export...' : 'Exporter le rapport institutionnel'}</button>
-        <button onClick={handleInstitutionalReportPdfExport} disabled={!canAdminAct || isExportingInstitutionalReportPdf}>{isExportingInstitutionalReportPdf ? 'PDF...' : 'Exporter dossier Etat PDF'}</button>
-        <button onClick={handleExamAttemptsCsvExport} disabled={!canAdminAct || isExportingExamCsv}>{isExportingExamCsv ? 'Export...' : 'Exporter les examens CSV'}</button>
-        <button onClick={handlePaymentCsvExport} disabled={!canAdminAct || isExportingPaymentCsv}>{isExportingPaymentCsv ? 'Export...' : 'Exporter les paiements CSV'}</button>
-        <button onClick={handleAuditCsvExport} disabled={!canAdminAct || isExportingAuditCsv}>{isExportingAuditCsv ? 'Export...' : 'Exporter audit CSV'}</button>
+        <button onClick={handleDashboardCsvExport} disabled={isExportingCsv}>{isExportingCsv ? 'Export...' : 'Exporter le dashboard CSV'}</button>
+        <button onClick={handleInstitutionalReportCsvExport} disabled={isExportingInstitutionalReport}>{isExportingInstitutionalReport ? 'Export...' : 'Exporter le rapport institutionnel'}</button>
+        <button onClick={handleInstitutionalReportPdfExport} disabled={isExportingInstitutionalReportPdf}>{isExportingInstitutionalReportPdf ? 'PDF...' : 'Exporter dossier Etat PDF'}</button>
+        <button onClick={handleExamAttemptsCsvExport} disabled={isExportingExamCsv}>{isExportingExamCsv ? 'Export...' : 'Exporter les examens CSV'}</button>
+        <button onClick={handlePaymentCsvExport} disabled={isExportingPaymentCsv}>{isExportingPaymentCsv ? 'Export...' : 'Exporter les paiements CSV'}</button>
+        <button onClick={handleAuditCsvExport} disabled={isExportingAuditCsv}>{isExportingAuditCsv ? 'Export...' : 'Exporter audit CSV'}</button>
       </div>
-      {!canAdminAct && <p className="protected-action-note">Mode presentation : les actions officielles admin sont verrouillees jusqu a connexion avec un compte admin reel.</p>}
+      {!canAdminAct && <p className="protected-action-note">Mode presentation : les exports et simulations sont actifs localement ; les ecritures officielles restent reservees a un compte admin reel.</p>}
       {csvExportStatus && <p className="login-status">{csvExportStatus}</p>}
       {examCsvExportStatus && <p className="login-status">{examCsvExportStatus}</p>}
       {paymentCsvExportStatus && <p className="login-status">{paymentCsvExportStatus}</p>}
@@ -1959,7 +2313,7 @@ export function AdminPage() {
             Simulation sans ecriture
           </label>
           <small>Format : prenom;nom;numero_identite;telephone;categorie_permis;statut. Statuts : registered, verified, suspended.</small>
-          <button type="submit" disabled={!canAdminAct}>Importer candidats officiels</button>
+          <button type="submit" disabled={!canAdminAct && !candidateImportDryRun}>Importer candidats officiels</button>
         </form>
         <div className="table-shell">
           <table>
@@ -1994,7 +2348,7 @@ export function AdminPage() {
             Simulation sans ecriture
           </label>
           <small>Format : code;nom;ville;adresse;capacite;statut. Statuts : pending_audit, active, accredited, suspended.</small>
-          <button type="submit" disabled={!canAdminAct}>Importer centres officiels</button>
+          <button type="submit" disabled={!canAdminAct && !centerImportDryRun}>Importer centres officiels</button>
         </form>
         <div className="station-registry-panel">
           <div>
@@ -2077,7 +2431,7 @@ export function AdminPage() {
             <h3>Incidents centres et reprises</h3>
             <p>Suivi des incidents declares par les centres, decision de resolution et creation eventuelle d une nouvelle tentative.</p>
           </div>
-          <button className="secondary-button" onClick={refreshCenterIncidents} disabled={!canAdminAct}>Actualiser</button>
+          <button className="secondary-button" onClick={refreshCenterIncidents}>Actualiser</button>
         </div>
         {incidentAdminStatus && <p className={incidentAdminStatus.includes('impossible') || incidentAdminStatus.includes('indisponibles') ? 'form-error' : 'login-status'}>{incidentAdminStatus}</p>}
         <div className="incident-resolution-controls">
@@ -2122,8 +2476,8 @@ export function AdminPage() {
           </label>
           <label>ID candidat<input value={identityFilters.candidate_id ?? ''} onChange={(event) => setIdentityFilters((current) => ({ ...current, candidate_id: event.target.value || undefined }))} placeholder="Filtrer par candidat" /></label>
           <label>Limite<input type="number" value={identityFilters.limit ?? 25} onChange={(event) => setIdentityFilters((current) => ({ ...current, limit: Number(event.target.value) || 25 }))} /></label>
-          <button type="submit" disabled={!canAdminAct}>Filtrer les pieces</button>
-          <button type="button" className="secondary-button" onClick={resetIdentityFilters} disabled={!canAdminAct}>Reinitialiser</button>
+          <button type="submit">Filtrer les pieces</button>
+          <button type="button" className="secondary-button" onClick={resetIdentityFilters}>Reinitialiser</button>
         </form>
         <p className="identity-filter-summary">Filtre actif : {activeIdentityFilters.status_filter ?? 'tous'} - {identityChecks.length} piece(s) affichee(s).</p>
         <div className="table-shell">
@@ -2167,8 +2521,8 @@ export function AdminPage() {
           </label>
           <label>ID candidat<input value={submissionFilters.candidate_id ?? ''} onChange={(event) => setSubmissionFilters((current) => ({ ...current, candidate_id: event.target.value || undefined }))} placeholder="Candidat" /></label>
           <label>ID tentative<input value={submissionFilters.attempt_id ?? ''} onChange={(event) => setSubmissionFilters((current) => ({ ...current, attempt_id: event.target.value || undefined }))} placeholder="Tentative" /></label>
-          <button type="submit" disabled={!canAdminAct}>Filtrer</button>
-          <button type="button" className="secondary-button" onClick={resetSubmissionFilters} disabled={!canAdminAct}>Reinitialiser</button>
+          <button type="submit">Filtrer</button>
+          <button type="button" className="secondary-button" onClick={resetSubmissionFilters}>Reinitialiser</button>
         </form>
         <label className="submission-response-field">Reponse officielle<textarea value={submissionAdminResponse} onChange={(event) => setSubmissionAdminResponse(event.target.value)} /></label>
         <p className="identity-filter-summary">Filtre actif : {activeSubmissionFilters.status_filter ?? 'tous'} - {candidateSubmissions.length} recours affiche(s).</p>
@@ -2215,7 +2569,7 @@ export function AdminPage() {
             Simulation sans ecriture
           </label>
           <small>Format : categorie;question;option1|option2|option3;bonne_reponse;explication;active. La bonne reponse doit exister dans les options.</small>
-          <button type="submit" disabled={!canAdminAct}>Importer questions officielles</button>
+          <button type="submit" disabled={!canAdminAct && !questionImportDryRun}>Importer questions officielles</button>
         </form>
         <div className="table-shell">
         <table>
@@ -2467,7 +2821,7 @@ export function AdminPage() {
             Simulation sans ecriture
           </label>
           <small>Format : reference_reservation;montant;operateur;telephone;statut;numero_recu;date_iso_optionnelle.</small>
-          <button type="submit" disabled={!canAdminAct}>Importer paiements operateur</button>
+          <button type="submit" disabled={!canAdminAct && !paymentImportDryRun}>Importer paiements operateur</button>
         </form>
         <form className="finance-filters" onSubmit={handlePaymentFiltersSubmit}>
           <label>Operateur
@@ -2576,8 +2930,8 @@ export function AdminPage() {
             </select>
           </label>
           <label>Risque min<input type="number" value={monitoringFilters.min_risk_score ?? 1} onChange={(event) => setMonitoringFilters((current) => ({ ...current, min_risk_score: Number(event.target.value) || 0 }))} /></label>
-          <button type="submit" disabled={!canAdminAct}>Charger monitoring</button>
-          <button type="button" className="secondary-button" onClick={resetMonitoringFilters} disabled={!canAdminAct}>Reinitialiser</button>
+          <button type="submit">Charger monitoring</button>
+          <button type="button" className="secondary-button" onClick={resetMonitoringFilters}>Reinitialiser</button>
         </form>
         <div className="monitoring-summary-grid">
           <article><strong>{formatNumber(monitoringSummaries.length)}</strong><span>Tentatives a risque</span></article>
