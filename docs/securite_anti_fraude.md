@@ -9,6 +9,8 @@ Garantir que chaque examen est passe par le bon candidat, dans un centre agree, 
 - Convocation avec reference unique.
 - Verification du candidat a l'entree du centre.
 - Journalisation du demarrage et de la soumission de l'examen.
+- Trace appareil au demarrage de tentative depuis reservation.
+- Alerte si un meme appareil est reutilise pour plusieurs tentatives de la meme session.
 - Export CSV protege du journal d'audit national.
 - Questions tirees aleatoirement.
 - Ordre des reponses melange dans une version future.
@@ -25,5 +27,6 @@ Garantir que chaque examen est passe par le bon candidat, dans un centre agree, 
 - Webcam monitoring.
 - Detection de taux de reussite anormaux.
 - Audit des centres.
+- Registre officiel des postes centre et rapprochement avec les traces appareil.
 - Suspension automatique apres incident grave.
 - Signature numerique des resultats.

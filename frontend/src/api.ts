@@ -756,8 +756,12 @@ export function getQuestions(): Promise<ExamQuestion[]> {
   return getJson<ExamQuestion[]>('/api/v1/questions');
 }
 
-export function startExamFromBooking(bookingReference: string): Promise<ExamAttempt> {
-  return postJson<ExamAttempt>('/api/v1/exams/start-from-booking', { booking_reference: bookingReference });
+export function startExamFromBooking(bookingReference: string, deviceKey?: string, deviceLabel?: string): Promise<ExamAttempt> {
+  return postJson<ExamAttempt>('/api/v1/exams/start-from-booking', {
+    booking_reference: bookingReference,
+    device_key: deviceKey,
+    device_label: deviceLabel,
+  });
 }
 
 export function submitExamAttempt(attemptId: string, answers: Record<string, string>): Promise<ExamAttempt> {

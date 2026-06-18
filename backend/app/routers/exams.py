@@ -14,6 +14,7 @@ from app.models_audit import AuditLog
 from app.models_booking import Booking
 from app.models_candidate import Candidate
 from app.models_center import Center
+from app.models_device_session import DeviceSession
 from app.models_exam_attempt import ExamAttempt
 from app.models_exam_question_trace import ExamQuestionTrace
 from app.models_question import Question
@@ -73,6 +74,67 @@ def _create_exam_attempt(db: Session, candidate_id: str, session_id: str) -> Exa
     db.commit()
     db.refresh(attempt)
     return attempt
+
+
+def _register_exam_start_device(
+    db: Session,
+    attempt: ExamAttempt,
+    session: ExamSession,
+    device_key: str | None,
+    device_label: str | None = None,
+) -> None:
+    if not device_key:
+        return
+    normalized_device_key = device_key.strip()
+    now = datetime.utcnow()
+    duplicate = db.scalar(
+        select(DeviceSession).where(
+            DeviceSession.center_id == session.center_id,
+            DeviceSession.session_id == session.id,
+            DeviceSession.device_key == normalized_device_key,
+            DeviceSession.status.in_(["active", "suspicious"]),
+        )
+    )
+    status_label = "active"
+    risk_reason = None
+    if duplicate and duplicate.attempt_id != attempt.id:
+        duplicate.status = "suspicious"
+        duplicate.risk_reason = "same_device_key_used_for_multiple_attempts"
+        duplicate.last_seen_at = now
+        db.add(duplicate)
+        status_label = "suspicious"
+        risk_reason = "same_device_key_used_for_multiple_attempts"
+
+    device_session = DeviceSession(
+        center_id=session.center_id,
+        session_id=session.id,
+        attempt_id=attempt.id,
+        device_key=normalized_device_key,
+        device_label=device_label,
+        status=status_label,
+        risk_reason=risk_reason,
+        last_seen_at=now,
+    )
+    db.add(device_session)
+    db.flush()
+    db.add(
+        AuditLog(
+            actor_id=None,
+            action="exam.device_session_started" if status_label == "active" else "exam.device_session_suspicious",
+            entity="device_session",
+            entity_id=device_session.id,
+            details={
+                "attempt_id": attempt.id,
+                "candidate_id": attempt.candidate_id,
+                "session_id": session.id,
+                "center_id": session.center_id,
+                "device_key": normalized_device_key,
+                "status": status_label,
+                "risk_reason": risk_reason,
+                "duplicate_device_session_id": duplicate.id if duplicate else None,
+            },
+        )
+    )
 
 
 def _write_exam_guard_log(
@@ -145,7 +207,14 @@ def start_exam_from_booking(payload: ExamStartFromBookingRequest, db: Session = 
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Booking not found")
     if booking.status not in {"confirmed", "paid", "checked_in"}:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Booking is not eligible for exam start")
-    return _create_exam_attempt(db, booking.candidate_id, booking.session_id)
+    session = db.get(ExamSession, booking.session_id)
+    if not session:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Incomplete booking session")
+    attempt = _create_exam_attempt(db, booking.candidate_id, booking.session_id)
+    _register_exam_start_device(db, attempt, session, payload.device_key, payload.device_label)
+    db.commit()
+    db.refresh(attempt)
+    return attempt
 
 
 @router.get("/summary")

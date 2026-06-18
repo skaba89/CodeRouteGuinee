@@ -2530,9 +2530,9 @@ export function ExamPage() {
     setIsStartingExam(true);
     setExamStatus(null);
     try {
-      const attempt = await startExamFromBooking(examBookingReference);
+      const attempt = await startExamFromBooking(examBookingReference, deviceFingerprint, examStationCode);
       setExamAttempt(attempt);
-      setExamStatus(`Tentative API demarree : ${attempt.id}`);
+      setExamStatus(`Tentative API demarree : ${attempt.id}. Trace appareil enregistree.`);
     } catch (error) {
       setExamStatus(getActionErrorMessage(error, 'Demarrage API impossible. Mode demo maintenu.'));
     } finally {

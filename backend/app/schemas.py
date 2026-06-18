@@ -270,6 +270,8 @@ class ExamStartRequest(BaseModel):
 
 class ExamStartFromBookingRequest(BaseModel):
     booking_reference: str = Field(min_length=3)
+    device_key: str | None = Field(default=None, min_length=4, max_length=160)
+    device_label: str | None = Field(default=None, max_length=120)
 
 
 class ExamSubmitRequest(BaseModel):
