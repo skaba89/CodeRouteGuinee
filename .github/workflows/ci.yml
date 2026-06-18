@@ -51,6 +51,8 @@ jobs:
             test_file: tests/test_question_governance.py
           - name: candidate-official-import
             test_file: tests/test_candidate_official_import.py
+          - name: payment-official-import
+            test_file: tests/test_payment_official_import.py
     name: backend-tests (${{ matrix.name }})
     steps:
       - uses: actions/checkout@v4

@@ -149,6 +149,24 @@ export type PaymentReconciliationItem = {
   created_at?: string | null;
 };
 
+export type PaymentOfficialImportRow = {
+  booking_reference: string;
+  amount_gnf: number;
+  provider: string;
+  phone: string;
+  status: string;
+  receipt_number: string;
+  created_at?: string | null;
+};
+
+export type PaymentOfficialImportResult = {
+  imported: number;
+  created: number;
+  updated: number;
+  skipped: number;
+  references: string[];
+};
+
 export type PaymentAlert = PaymentReconciliationItem & {
   type: string;
   severity: 'low' | 'medium' | 'high' | string;
@@ -716,6 +734,10 @@ export function downloadExamAttemptsCsv(): Promise<void> {
 
 export function downloadAdminPaymentsCsv(filters: PaymentFilters = {}): Promise<void> {
   return downloadProtectedCsv(getAdminPaymentsCsvUrl(filters), 'coderoute-payments.csv');
+}
+
+export function importOfficialPayments(source: string, reason: string, payments: PaymentOfficialImportRow[]): Promise<PaymentOfficialImportResult> {
+  return postPrivateJson<PaymentOfficialImportResult>('/api/v1/payments/admin/import-official', { source, reason, payments });
 }
 
 export function downloadAuditLogsCsv(filters: AuditLogFilters = {}): Promise<void> {

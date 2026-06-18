@@ -34,6 +34,7 @@ import {
   type OperationalReadiness,
   type PaymentAlert,
   type PaymentFilters,
+  type PaymentOfficialImportRow,
   type PaymentReconciliationItem,
   type PaymentResult,
   type PaymentSummary,
@@ -77,6 +78,7 @@ import {
   handleCandidateSubmission,
   importOfficialCandidates,
   importOfficialCenters,
+  importOfficialPayments,
   importOfficialQuestions,
   resetInstitutionalUserPassword,
   reportCenterIncident,
@@ -845,6 +847,32 @@ function parseQuestionImportCsv(value: string): QuestionOfficialImportRow[] {
     });
 }
 
+function parsePaymentImportCsv(value: string): PaymentOfficialImportRow[] {
+  return value
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith('#'))
+    .map((line, index) => {
+      const [bookingReference, amountValue, provider, phone, status = 'paid', receiptNumber, createdAt = ''] = line.split(';').map((item) => item.trim());
+      const amount = Number(amountValue);
+      if (!bookingReference || !provider || !phone || !receiptNumber) {
+        throw new Error(`Ligne ${index + 1} incomplete`);
+      }
+      if (!Number.isFinite(amount) || amount <= 0) {
+        throw new Error(`Montant invalide ligne ${index + 1}`);
+      }
+      return {
+        booking_reference: bookingReference,
+        amount_gnf: amount,
+        provider,
+        phone,
+        status,
+        receipt_number: receiptNumber,
+        created_at: createdAt || null,
+      };
+    });
+}
+
 export function AdminPage() {
   const { currentUser, isPresentationMode } = useAuthSession();
   const canAdminAct = canUseProtectedActions(currentUser, isPresentationMode, ['admin', 'super_admin']);
@@ -909,6 +937,10 @@ export function AdminPage() {
   const [readinessStatus, setReadinessStatus] = useState<string | null>(null);
   const [paymentFilters, setPaymentFilters] = useState<PaymentFilters>({});
   const [activePaymentFilters, setActivePaymentFilters] = useState<PaymentFilters>({});
+  const [paymentImportSource, setPaymentImportSource] = useState('Orange Money');
+  const [paymentImportReason, setPaymentImportReason] = useState('Rapprochement officiel quotidien');
+  const [paymentImportCsv, setPaymentImportCsv] = useState('GN-BOOK-2026-000001;250000;orange_money;+224620000001;paid;OM-RECU-000001');
+  const [paymentImportStatus, setPaymentImportStatus] = useState<string | null>(null);
   const [auditFilters, setAuditFilters] = useState<AuditLogFilters>({});
   const [activeAuditFilters, setActiveAuditFilters] = useState<AuditLogFilters>({});
   const [monitoringFilters, setMonitoringFilters] = useState<ExamMonitoringFilters>({ min_risk_score: 1, limit: 25 });
@@ -1413,6 +1445,21 @@ export function AdminPage() {
     event.preventDefault();
     await loadPaymentSummary(paymentFilters);
     await refreshAuditLogs();
+  }
+
+  async function handleOfficialPaymentImport(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setPaymentImportStatus(null);
+    if (blockProtectedAction(setPaymentImportStatus)) return;
+    try {
+      const rows = parsePaymentImportCsv(paymentImportCsv);
+      const result = await importOfficialPayments(paymentImportSource, paymentImportReason, rows);
+      setPaymentImportStatus(`Import paiements termine : ${result.imported} paiement(s), ${result.created} cree(s), ${result.updated} mis a jour.`);
+      await loadPaymentSummary(activePaymentFilters);
+      await refreshAuditLogs();
+    } catch (error) {
+      setPaymentImportStatus(error instanceof Error ? `Import paiements impossible : ${error.message}` : 'Import paiements impossible.');
+    }
   }
 
   async function handleIdentityFiltersSubmit(event: FormEvent<HTMLFormElement>) {
@@ -2212,6 +2259,16 @@ export function AdminPage() {
       </div>
       <div id="finance" className="finance-panel admin-section">
         <h3>Supervision financiere</h3>
+        {paymentImportStatus && <p className={paymentImportStatus.includes('impossible') ? 'form-error' : 'login-status'}>{paymentImportStatus}</p>}
+        <form className="official-import-form" onSubmit={handleOfficialPaymentImport}>
+          <label>Source operateur<input value={paymentImportSource} onChange={(event) => setPaymentImportSource(event.target.value)} /></label>
+          <label>Motif<input value={paymentImportReason} onChange={(event) => setPaymentImportReason(event.target.value)} /></label>
+          <label>Paiements a rapprocher
+            <textarea value={paymentImportCsv} onChange={(event) => setPaymentImportCsv(event.target.value)} />
+          </label>
+          <small>Format : reference_reservation;montant;operateur;telephone;statut;numero_recu;date_iso_optionnelle.</small>
+          <button type="submit" disabled={!canAdminAct}>Importer paiements operateur</button>
+        </form>
         <form className="finance-filters" onSubmit={handlePaymentFiltersSubmit}>
           <label>Operateur
             <select value={paymentFilters.provider ?? ''} onChange={(event) => setPaymentFilters((current) => ({ ...current, provider: event.target.value || undefined }))}>

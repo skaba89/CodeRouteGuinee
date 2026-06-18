@@ -120,6 +120,56 @@ Statuts acceptes:
 - Verifier le journal d'audit apres import.
 - Exporter le dashboard et le rapport institutionnel PDF apres validation.
 
+## Paiements operateur
+
+Endpoint protege:
+
+```text
+POST /api/v1/payments/admin/import-official
+```
+
+Roles autorises:
+
+- `admin`
+- `super_admin`
+
+Payload JSON:
+
+```json
+{
+  "source": "Orange Money",
+  "reason": "Rapprochement quotidien",
+  "payments": [
+    {
+      "booking_reference": "GN-BOOK-2026-000001",
+      "amount_gnf": 250000,
+      "provider": "orange_money",
+      "phone": "+224620000001",
+      "status": "paid",
+      "receipt_number": "OM-RECU-000001",
+      "created_at": "2026-06-18T10:30:00"
+    }
+  ]
+}
+```
+
+Regles:
+
+- `receipt_number` est normalise en majuscules et sert de cle d'upsert;
+- la reservation doit exister dans CodeRoute avant import;
+- un recu deja existant met le paiement a jour;
+- un recu nouveau cree un paiement rapproche;
+- un doublon dans le meme lot bloque l'import;
+- le lot est limite a 1000 paiements;
+- chaque import est journalise dans `audit_logs`.
+
+Format CSV accepte dans l'interface admin:
+
+```text
+reference_reservation;montant;operateur;telephone;statut;numero_recu;date_iso_optionnelle
+GN-BOOK-2026-000001;250000;orange_money;+224620000001;paid;OM-RECU-000001;2026-06-18T10:30:00
+```
+
 ## Questions officielles
 
 Endpoint protege:
