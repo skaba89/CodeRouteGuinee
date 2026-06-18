@@ -1,7 +1,9 @@
 from datetime import datetime, timedelta
+import os
 
 from sqlalchemy import select
 
+from app.core.config import get_settings
 from app.db.session import SessionLocal, init_db
 from app.models_booking import Booking
 from app.models_candidate import Candidate
@@ -21,6 +23,22 @@ DEMO_SESSION_REFERENCE = "CRG-SESSION-DEMO-001"
 DEMO_BOOKING_REFERENCE = "CRG-BOOK-DEMO-001"
 DEMO_VERIFICATION_CODE = "CRG-VERIFY-DEMO-001"
 DEMO_PAYMENT_REFERENCE = "CRG-PAY-DEMO-001"
+ALLOW_NON_DEV_SEED_ENV = "ALLOW_DEMO_SEED_NON_DEV"
+
+
+def ensure_demo_seed_allowed() -> None:
+    settings = get_settings()
+    environment = settings.environment.lower()
+    if environment == "development":
+        return
+    if os.getenv(ALLOW_NON_DEV_SEED_ENV) == "true":
+        print(f"WARNING: demo seed explicitly allowed in {settings.environment}. Do not use this on production data.")
+        return
+    raise RuntimeError(
+        "Demo seed is blocked outside development. "
+        f"Current ENVIRONMENT={settings.environment}. "
+        f"Set {ALLOW_NON_DEV_SEED_ENV}=true only for a disposable staging/demo database."
+    )
 
 
 def get_or_create_admin(db) -> User:
@@ -197,6 +215,7 @@ def get_or_create_attempt(db, candidate: Candidate, session: ExamSession, questi
 
 
 def seed_demo() -> None:
+    ensure_demo_seed_allowed()
     init_db()
     db = SessionLocal()
     try:
