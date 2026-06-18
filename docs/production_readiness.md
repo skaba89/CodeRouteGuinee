@@ -8,8 +8,10 @@ Ce document liste le minimum a verrouiller avant une presentation ou un pilote i
 2. Definir `ENVIRONMENT=production`.
 3. Remplacer `SECRET_KEY`, `ADMIN_REGISTRATION_TOKEN`, `POSTGRES_PASSWORD` et `BOOTSTRAP_ADMIN_PASSWORD`.
 4. Configurer `CORS_ORIGINS` avec les domaines officiels uniquement.
-5. Garder `AUTO_CREATE_TABLES=false` en production: les tables doivent etre gerees par Alembic.
-6. Ajuster `LOGIN_RATE_LIMIT_ATTEMPTS` et `LOGIN_RATE_LIMIT_WINDOW_SECONDS` selon la politique de securite.
+5. Configurer `ALLOWED_HOSTS` avec le ou les hotes API officiels uniquement.
+6. Garder `ENABLE_API_DOCS=false` en production; activer `/docs` uniquement en local ou recette fermee.
+7. Garder `AUTO_CREATE_TABLES=false` en production: les tables doivent etre gerees par Alembic.
+8. Ajuster `LOGIN_RATE_LIMIT_ATTEMPTS` et `LOGIN_RATE_LIMIT_WINDOW_SECONDS` selon la politique de securite.
 
 ## Base de donnees
 
@@ -99,6 +101,12 @@ Les tentatives de connexion echouees sont limitees par couple email/IP. Les even
 - `auth.login_failed`
 - `auth.login_blocked`
 
+En production, l'API doit egalement verifier:
+
+- `ALLOWED_HOSTS` limite aux domaines API officiels, sans `localhost`, `127.0.0.1`, `testserver` ni wildcard;
+- `ENABLE_API_DOCS=false` pour ne pas exposer Swagger/ReDoc publiquement;
+- HTTPS termine au reverse proxy, avec header `Strict-Transport-Security` ajoute par l'API en mode production.
+
 ## Gouvernance des comptes
 
 Les comptes sont consultables par les roles `admin` et `super_admin` via `/api/v1/users`.
@@ -151,7 +159,7 @@ Puis verifier:
 - `/health`
 - `/health/readiness`
 - statut `configuration` dans `/health/readiness`
-- `/docs`
+- `/docs` uniquement hors production publique
 - connexion administrateur
 - dashboard national
 - exports institutionnels
@@ -163,6 +171,8 @@ Puis verifier:
 - `python scripts/preflight_deploy.py --env-file .env --target production --api-url ...` sans erreur.
 - Domaine officiel et HTTPS valides.
 - `CORS_ORIGINS` limite aux domaines autorises.
+- `ALLOWED_HOSTS` limite aux hotes API officiels.
+- `ENABLE_API_DOCS=false` en production publique.
 - `AUTO_CREATE_TABLES=false` confirme.
 - Migrations appliquees sans erreur.
 - Super administrateur cree avec mot de passe non partage.

@@ -44,6 +44,17 @@ def _build_configuration_check(current_settings) -> dict:
     if is_production and any("localhost" in origin or "127.0.0.1" in origin for origin in origins):
         errors.append("CORS_ORIGINS must not contain local origins in production")
 
+    allowed_hosts = current_settings.allowed_host_list
+    if not allowed_hosts:
+        errors.append("ALLOWED_HOSTS must contain at least one host")
+    if "*" in allowed_hosts:
+        errors.append("ALLOWED_HOSTS must not contain wildcard host in production")
+    if is_production and any(host in {"localhost", "127.0.0.1", "testserver"} for host in allowed_hosts):
+        errors.append("ALLOWED_HOSTS must not contain local hosts in production")
+
+    if is_production and current_settings.enable_api_docs:
+        errors.append("ENABLE_API_DOCS must be false in production")
+
     if is_production and not current_settings.admin_registration_token:
         errors.append("ADMIN_REGISTRATION_TOKEN is required in production")
 
@@ -57,6 +68,8 @@ def _build_configuration_check(current_settings) -> dict:
         "errors": errors,
         "warnings": warnings,
         "cors_origins_count": len(origins),
+        "allowed_hosts_count": len(allowed_hosts),
+        "api_docs_enabled": current_settings.enable_api_docs,
     }
 
 

@@ -6,6 +6,7 @@ from sqlalchemy import select
 from app.db.session import SessionLocal
 from app.models_audit import AuditLog
 from app.routers import auth
+from app import main
 from app.main import app
 
 
@@ -120,6 +121,25 @@ def test_security_headers_are_returned() -> None:
     assert response.headers["X-Content-Type-Options"] == "nosniff"
     assert response.headers["X-Frame-Options"] == "DENY"
     assert response.headers["Referrer-Policy"] == "same-origin"
+
+
+def test_trusted_host_middleware_blocks_unknown_hosts() -> None:
+    with TestClient(app) as client:
+        response = client.get("/health", headers={"host": "malicious.example"})
+
+    assert response.status_code == 400
+
+
+def test_hsts_header_is_returned_in_production() -> None:
+    previous_environment = main.settings.environment
+    main.settings.environment = "production"
+    try:
+        with TestClient(app) as client:
+            response = client.get("/health")
+    finally:
+        main.settings.environment = previous_environment
+
+    assert response.headers["Strict-Transport-Security"] == "max-age=31536000; includeSubDomains"
 
 
 def test_privileged_registration_can_require_bootstrap_token() -> None:

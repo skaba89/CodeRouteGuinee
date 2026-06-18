@@ -6,6 +6,7 @@ Ce runbook sert de procedure courte pour une mise en recette, staging ou product
 
 - Branche ou tag valide par CI.
 - Variables d'environnement preparees hors depot.
+- `ALLOWED_HOSTS`, `CORS_ORIGINS` et `ENABLE_API_DOCS=false` verifies pour la production.
 - Sauvegarde de la base existante disponible.
 - Responsable technique et responsable metier identifies.
 - Fenetre de deploiement communiquee aux centres pilotes.
