@@ -39,6 +39,12 @@ python scripts/postgres_backup.py --env-file .env backup
 - `/health` retourne `ok`.
 - `/health/readiness` ne contient aucune erreur.
 - `/api/v1/operations/summary` ne retourne pas `critical`.
+- Recette pilote institutionnelle executee:
+
+```bash
+pytest backend/tests/test_e2e_institutional_pilot_recipe.py
+```
+
 - Connexion super admin reelle validee.
 - Parcours candidat pilote valide: dossier, paiement, convocation, examen, resultat.
 - Exports PDF/CSV institutionnels telecharges.

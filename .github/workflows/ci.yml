@@ -35,6 +35,8 @@ jobs:
             test_file: tests/test_e2e_exam_question_trace.py
           - name: manual-review-decisions
             test_file: tests/test_e2e_manual_review_decisions.py
+          - name: institutional-pilot-recipe
+            test_file: tests/test_e2e_institutional_pilot_recipe.py
           - name: next-feature-69
             test_file: tests/test_e2e_candidate_submissions.py
           - name: dashboard-exports
