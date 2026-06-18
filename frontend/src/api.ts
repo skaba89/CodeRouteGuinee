@@ -291,6 +291,36 @@ export type EntryValidationResult = {
   reason?: string;
 };
 
+export type ExamMonitoringSummary = {
+  attempt_id: string;
+  total_events: number;
+  total_risk_score: number;
+  max_severity: string;
+  status: string;
+};
+
+export type ExamMonitoringEvent = {
+  id: string;
+  center_id?: string | null;
+  session_id: string;
+  attempt_id: string;
+  event_type: string;
+  severity: string;
+  risk_score: number;
+  details?: Record<string, unknown> | null;
+  reported_by_id?: string | null;
+  occurred_at: string;
+  created_at: string;
+};
+
+export type ExamMonitoringFilters = {
+  attempt_id?: string;
+  session_id?: string;
+  severity?: string;
+  min_risk_score?: number;
+  limit?: number;
+};
+
 export type CenterIncidentPayload = {
   center_id: string;
   session_id?: string;
@@ -622,6 +652,23 @@ export function startExamFromBooking(bookingReference: string): Promise<ExamAtte
 
 export function submitExamAttempt(attemptId: string, answers: Record<string, string>): Promise<ExamAttempt> {
   return postJson<ExamAttempt>(`/api/v1/exams/${encodeURIComponent(attemptId)}/submit`, { answers });
+}
+
+export function getExamMonitoringSummaries(filters: ExamMonitoringFilters = {}): Promise<ExamMonitoringSummary[]> {
+  const query = new URLSearchParams();
+  if (filters.session_id) query.set('session_id', filters.session_id);
+  if (filters.min_risk_score !== undefined) query.set('min_risk_score', String(filters.min_risk_score));
+  query.set('limit', String(filters.limit ?? 25));
+  return getPrivateJson<ExamMonitoringSummary[]>(`/api/v1/exam-monitoring/summary?${query.toString()}`);
+}
+
+export function getExamMonitoringEvents(filters: ExamMonitoringFilters = {}): Promise<ExamMonitoringEvent[]> {
+  const query = new URLSearchParams();
+  if (filters.attempt_id) query.set('attempt_id', filters.attempt_id);
+  if (filters.session_id) query.set('session_id', filters.session_id);
+  if (filters.severity) query.set('severity', filters.severity);
+  query.set('limit', String(filters.limit ?? 25));
+  return getPrivateJson<ExamMonitoringEvent[]>(`/api/v1/exam-monitoring/events?${query.toString()}`);
 }
 
 export function validateEntry(payload: EntryValidationPayload): Promise<EntryValidationResult> {

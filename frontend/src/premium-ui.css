@@ -598,9 +598,43 @@ body {
   padding: 22px;
 }
 
+.exam-monitoring-panel {
+  display: grid;
+  gap: 14px;
+  padding: 22px;
+}
+
 .candidate-submissions-panel h3,
-.candidate-submissions-panel p {
+.candidate-submissions-panel p,
+.exam-monitoring-panel h3,
+.exam-monitoring-panel p {
   margin: 0;
+}
+
+.monitoring-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.monitoring-summary-grid article {
+  display: grid;
+  gap: 6px;
+  border: 1px solid rgba(6, 43, 82, 0.08);
+  border-radius: 18px;
+  background: #ffffff;
+  padding: 16px;
+}
+
+.monitoring-summary-grid strong {
+  color: var(--premium-navy);
+  font-size: 30px;
+  line-height: 1;
+}
+
+.monitoring-summary-grid span {
+  color: var(--premium-muted);
+  font-weight: 900;
 }
 
 .submission-response-field {
@@ -1868,6 +1902,7 @@ tr:last-child td {
   .action-center-grid,
   .authorization-form,
   .identity-filters,
+  .monitoring-summary-grid,
   .metrics,
   .compact,
   .modules-grid,

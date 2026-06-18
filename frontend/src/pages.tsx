@@ -16,6 +16,9 @@ import {
   type EntryValidationResult,
   type ExamAttempt,
   type ExamCertificateVerification,
+  type ExamMonitoringEvent,
+  type ExamMonitoringFilters,
+  type ExamMonitoringSummary,
   type ExamQuestion,
   type ExamSummary,
   type InstitutionalAuthorization,
@@ -52,6 +55,8 @@ import {
   getDashboard,
   getEntrySummary,
   getExamCertificatePdfUrl,
+  getExamMonitoringEvents,
+  getExamMonitoringSummaries,
   getExamSummary,
   getQuestions,
   getInstitutionalActionCenter,
@@ -817,6 +822,11 @@ export function AdminPage() {
   const [activePaymentFilters, setActivePaymentFilters] = useState<PaymentFilters>({});
   const [auditFilters, setAuditFilters] = useState<AuditLogFilters>({});
   const [activeAuditFilters, setActiveAuditFilters] = useState<AuditLogFilters>({});
+  const [monitoringFilters, setMonitoringFilters] = useState<ExamMonitoringFilters>({ min_risk_score: 1, limit: 25 });
+  const [activeMonitoringFilters, setActiveMonitoringFilters] = useState<ExamMonitoringFilters>({ min_risk_score: 1, limit: 25 });
+  const [monitoringSummaries, setMonitoringSummaries] = useState<ExamMonitoringSummary[]>([]);
+  const [monitoringEvents, setMonitoringEvents] = useState<ExamMonitoringEvent[]>([]);
+  const [monitoringStatus, setMonitoringStatus] = useState<string | null>(null);
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
   const [auditStatus, setAuditStatus] = useState<string | null>(null);
   const [financeStatus, setFinanceStatus] = useState<string | null>(null);
@@ -908,6 +918,30 @@ export function AdminPage() {
     }
   }
 
+  async function refreshExamMonitoring(filters: ExamMonitoringFilters = activeMonitoringFilters) {
+    if (!canAdminAct) {
+      setMonitoringStatus('Mode demo : connectez-vous avec un compte admin ou super admin reel pour charger le monitoring examen.');
+      return;
+    }
+    try {
+      const cleanFilters = {
+        attempt_id: filters.attempt_id || undefined,
+        session_id: filters.session_id || undefined,
+        severity: filters.severity || undefined,
+        min_risk_score: filters.min_risk_score ?? 1,
+        limit: filters.limit ?? 25,
+      };
+      const summaries = await getExamMonitoringSummaries(cleanFilters);
+      const events = await getExamMonitoringEvents(cleanFilters);
+      setMonitoringSummaries(summaries);
+      setMonitoringEvents(events);
+      setActiveMonitoringFilters(cleanFilters);
+      setMonitoringStatus(null);
+    } catch {
+      setMonitoringStatus('Monitoring examen indisponible : connectez-vous avec un role admin ou super admin.');
+    }
+  }
+
   useEffect(() => {
     getDashboard().then(setDashboard).catch(() => undefined);
     getCenters().then(setCenters).catch(() => undefined);
@@ -945,6 +979,12 @@ export function AdminPage() {
         setSubmissionAdminStatus(null);
       })
       .catch(() => setSubmissionAdminStatus('Mode demo : connectez-vous avec un role admin pour traiter les recours API.'));
+    getExamMonitoringSummaries({ min_risk_score: 1, limit: 25 })
+      .then(setMonitoringSummaries)
+      .catch(() => setMonitoringStatus('Mode demo : connectez-vous avec un role admin pour charger le monitoring examen API.'));
+    getExamMonitoringEvents({ limit: 25 })
+      .then(setMonitoringEvents)
+      .catch(() => undefined);
     getQuestionGovernanceItems()
       .then((items) => {
         setQuestionGovernance(items.length > 0 ? items : fallbackQuestionGovernance);
@@ -1247,6 +1287,17 @@ export function AdminPage() {
     await refreshAuditLogs(auditFilters);
   }
 
+  async function handleMonitoringFiltersSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await refreshExamMonitoring(monitoringFilters);
+  }
+
+  async function resetMonitoringFilters() {
+    const defaults = { min_risk_score: 1, limit: 25 };
+    setMonitoringFilters(defaults);
+    await refreshExamMonitoring(defaults);
+  }
+
   async function resetAuditFilters() {
     setAuditFilters({});
     await refreshAuditLogs({});
@@ -1295,6 +1346,7 @@ export function AdminPage() {
     { href: '#roadmap', label: 'Roadmap' },
     { href: '#rapport', label: 'Rapport' },
     { href: '#finance', label: 'Finance' },
+    { href: '#monitoring-examen', label: 'Monitoring' },
     { href: '#audit', label: 'Audit' },
   ];
   const passRate = examSummary.submitted_attempts
@@ -1972,6 +2024,75 @@ export function AdminPage() {
             </tbody>
           </table>
         </div>
+      </div>
+      <div id="monitoring-examen" className="exam-monitoring-panel admin-section">
+        <h3>Monitoring examen et alertes fraude</h3>
+        <p>Suivi des evenements de surveillance, scores de risque et tentatives devant passer en revue.</p>
+        {monitoringStatus && <p className={monitoringStatus.includes('indisponible') || monitoringStatus.includes('Mode demo') ? 'form-error' : 'login-status'}>{monitoringStatus}</p>}
+        <form className="finance-filters" onSubmit={handleMonitoringFiltersSubmit}>
+          <label>Tentative
+            <input value={monitoringFilters.attempt_id ?? ''} onChange={(event) => setMonitoringFilters((current) => ({ ...current, attempt_id: event.target.value || undefined }))} placeholder="attempt_id" />
+          </label>
+          <label>Session
+            <input value={monitoringFilters.session_id ?? ''} onChange={(event) => setMonitoringFilters((current) => ({ ...current, session_id: event.target.value || undefined }))} placeholder="session_id" />
+          </label>
+          <label>Gravite
+            <select value={monitoringFilters.severity ?? ''} onChange={(event) => setMonitoringFilters((current) => ({ ...current, severity: event.target.value || undefined }))}>
+              <option value="">Toutes</option>
+              <option value="low">Faible</option>
+              <option value="medium">Moyenne</option>
+              <option value="high">Haute</option>
+              <option value="critical">Critique</option>
+            </select>
+          </label>
+          <label>Risque min<input type="number" value={monitoringFilters.min_risk_score ?? 1} onChange={(event) => setMonitoringFilters((current) => ({ ...current, min_risk_score: Number(event.target.value) || 0 }))} /></label>
+          <button type="submit" disabled={!canAdminAct}>Charger monitoring</button>
+          <button type="button" className="secondary-button" onClick={resetMonitoringFilters} disabled={!canAdminAct}>Reinitialiser</button>
+        </form>
+        <div className="monitoring-summary-grid">
+          <article><strong>{formatNumber(monitoringSummaries.length)}</strong><span>Tentatives a risque</span></article>
+          <article><strong>{formatNumber(monitoringEvents.length)}</strong><span>Evenements charges</span></article>
+          <article><strong>{formatNumber(monitoringSummaries.reduce((sum, item) => sum + item.total_risk_score, 0))}</strong><span>Score risque cumule</span></article>
+        </div>
+        <div className="grid modules-grid">
+          <div className="table-shell">
+            <table>
+              <thead><tr><th>Tentative</th><th>Evenements</th><th>Risque</th><th>Max</th><th>Statut</th></tr></thead>
+              <tbody>
+                {monitoringSummaries.length === 0 ? (
+                  <tr><td colSpan={5}>Aucune tentative a risque chargee.</td></tr>
+                ) : monitoringSummaries.map((summary) => (
+                  <tr key={summary.attempt_id}>
+                    <td>{summary.attempt_id}</td>
+                    <td>{summary.total_events}</td>
+                    <td>{summary.total_risk_score}</td>
+                    <td><span className="badge">{summary.max_severity}</span></td>
+                    <td><span className={summary.status === 'normal' ? 'badge ok' : 'badge'}>{summary.status}</span></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="table-shell">
+            <table>
+              <thead><tr><th>Heure</th><th>Tentative</th><th>Type</th><th>Gravite</th><th>Risque</th></tr></thead>
+              <tbody>
+                {monitoringEvents.length === 0 ? (
+                  <tr><td colSpan={5}>Aucun evenement charge.</td></tr>
+                ) : monitoringEvents.slice(0, 10).map((event) => (
+                  <tr key={event.id}>
+                    <td>{new Date(event.occurred_at).toLocaleString('fr-FR')}</td>
+                    <td>{event.attempt_id}</td>
+                    <td>{event.event_type}</td>
+                    <td><span className="badge">{event.severity}</span></td>
+                    <td>{event.risk_score}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <p className="identity-filter-summary">Filtre actif : risque min {activeMonitoringFilters.min_risk_score ?? 1} - {activeMonitoringFilters.severity ?? 'toutes gravites'}.</p>
       </div>
       <div id="audit" className="audit-panel admin-section">
         <h3>Journal d'audit national</h3>
