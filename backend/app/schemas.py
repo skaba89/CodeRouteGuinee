@@ -177,6 +177,9 @@ class QuestionCreate(BaseModel):
     options: list[str]
     correct_answer: str
     explanation: str | None = None
+    media_type: Literal["image", "video"] | None = None
+    media_url: str | None = None
+    media_alt: str | None = None
 
 
 class QuestionRead(QuestionCreate):
@@ -193,6 +196,9 @@ class QuestionOfficialImportRow(BaseModel):
     options: list[str] = Field(min_length=2, max_length=6)
     correct_answer: str = Field(min_length=1, max_length=255)
     explanation: str | None = None
+    media_type: Literal["image", "video"] | None = None
+    media_url: str | None = Field(default=None, max_length=2000)
+    media_alt: str | None = Field(default=None, max_length=255)
     is_active: bool = True
 
 

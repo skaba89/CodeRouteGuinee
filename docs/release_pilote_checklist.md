@@ -45,6 +45,12 @@ python scripts/postgres_backup.py --env-file .env backup
 pytest backend/tests/test_e2e_institutional_pilot_recipe.py
 ```
 
+- Recette examen multimedia 40 questions executee:
+
+```bash
+pytest backend/tests/test_e2e_candidate_center_multimedia_exam.py
+```
+
 - Connexion super admin reelle validee.
 - Parcours candidat pilote valide: dossier, paiement, convocation, examen, resultat.
 - Exports PDF/CSV institutionnels telecharges.

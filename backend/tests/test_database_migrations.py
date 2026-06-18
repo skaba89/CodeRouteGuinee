@@ -35,3 +35,9 @@ def test_alembic_initial_migration_is_available() -> None:
     assert (backend_root / "alembic.ini").exists()
     assert (backend_root / "alembic" / "env.py").exists()
     assert (backend_root / "alembic" / "versions" / "20260617_0001_initial_schema.py").exists()
+    assert (backend_root / "alembic" / "versions" / "20260618_0002_question_media_fields.py").exists()
+
+
+def test_question_metadata_includes_multimedia_fields() -> None:
+    question_columns = set(Base.metadata.tables["questions"].columns.keys())
+    assert {"media_type", "media_url", "media_alt"}.issubset(question_columns)

@@ -1849,6 +1849,32 @@ tr:last-child td {
   text-transform: uppercase;
 }
 
+.question-media {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid rgba(6, 43, 82, 0.12);
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.question-media img,
+.question-media video {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  background: #102033;
+}
+
+.question-media figcaption {
+  padding: 0 12px 12px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
 .question-card .answer {
   width: 100%;
   min-height: 54px;

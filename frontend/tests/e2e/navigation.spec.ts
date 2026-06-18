@@ -94,8 +94,10 @@ test.describe('CodeRoute Guinee UI smoke tests', () => {
     await page.getByRole('link', { name: 'Examen' }).click();
     await expect(page.getByRole('heading', { name: /Question 12 \/ 40/ })).toBeVisible();
     await expect(page.getByText(/Examen s.curis./)).toBeVisible();
+    await expect(page.locator('.question-media').first()).toBeVisible();
     await page.getByRole('button', { name: 'Question suivante' }).click();
     await expect(page.getByRole('heading', { name: /Question 13 \/ 40/ })).toBeVisible();
+    await expect(page.locator('.question-media').first()).toBeVisible();
     await page.getByRole('button', { name: /La priorite a droite/ }).click();
     await expect(page.getByText('2 reponse(s) saisie(s)')).toBeVisible();
     await expect(page.getByText(/demarrage et soumission demo actifs localement/)).toBeVisible();

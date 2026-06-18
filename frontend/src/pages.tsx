@@ -564,6 +564,11 @@ function buildDemoCertificateVerification(attemptId: string): ExamCertificateVer
   };
 }
 
+function buildDemoQuestionImage(label: string, color = '#1f7a4d'): string {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540"><rect width="960" height="540" fill="#eef5f1"/><path d="M0 430h960v110H0z" fill="#263238"/><path d="M0 485h960" stroke="#f4d03f" stroke-width="12" stroke-dasharray="48 32"/><circle cx="480" cy="215" r="96" fill="${color}"/><rect x="452" y="112" width="56" height="210" rx="10" fill="#fff"/><rect x="375" y="187" width="210" height="56" rx="10" fill="#fff"/><text x="480" y="72" text-anchor="middle" font-family="Arial" font-size="34" font-weight="700" fill="#18332a">${label}</text></svg>`;
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+}
+
 function filterDemoIdentityChecks(filters: CandidateIdentityFilters): CandidateIdentityCheck[] {
   return fallbackIdentityChecks.filter((item) => {
     const statusMatches = !filters.status_filter || item.status === filters.status_filter;
@@ -1162,7 +1167,7 @@ function parseQuestionImportCsv(value: string): QuestionOfficialImportRow[] {
     .map((line) => line.trim())
     .filter((line) => line && !line.startsWith('#'))
     .map((line, index) => {
-      const [category, text, optionsValue, correctAnswer, explanation = '', activeValue = 'true'] = line.split(';').map((item) => item.trim());
+      const [category, text, optionsValue, correctAnswer, explanation = '', activeValue = 'true', mediaType = '', mediaUrl = '', mediaAlt = ''] = line.split(';').map((item) => item.trim());
       const options = optionsValue ? optionsValue.split('|').map((option) => option.trim()).filter(Boolean) : [];
       if (!category || !text || options.length < 2 || !correctAnswer) {
         throw new Error(`Ligne ${index + 1} incomplete`);
@@ -1176,6 +1181,9 @@ function parseQuestionImportCsv(value: string): QuestionOfficialImportRow[] {
         options,
         correct_answer: correctAnswer,
         explanation: explanation || null,
+        media_type: mediaType === 'image' || mediaType === 'video' ? mediaType : null,
+        media_url: mediaUrl || null,
+        media_alt: mediaAlt || null,
         is_active: activeValue.toLowerCase() !== 'false',
       };
     });
@@ -1255,7 +1263,7 @@ export function AdminPage() {
   const [questionGovernanceStatus, setQuestionGovernanceStatus] = useState<string | null>(null);
   const [questionImportSource, setQuestionImportSource] = useState('Commission nationale du code');
   const [questionImportReason, setQuestionImportReason] = useState('Chargement officiel de la banque pilote');
-  const [questionImportCsv, setQuestionImportCsv] = useState('signalisation;Que signifie un feu rouge fixe ?;S arreter|Passer avec prudence|Accelerer;S arreter;Le feu rouge impose l arret.;true');
+  const [questionImportCsv, setQuestionImportCsv] = useState('signalisation;Que signifie un feu rouge fixe ?;S arreter|Passer avec prudence|Accelerer;S arreter;Le feu rouge impose l arret.;true;image;https://cdn.coderoute.gov.gn/exam/images/feu-rouge.jpg;Illustration feu rouge');
   const [questionImportDryRun, setQuestionImportDryRun] = useState(true);
   const [institutionalAuthorizations, setInstitutionalAuthorizations] = useState<InstitutionalAuthorization[]>(fallbackInstitutionalAuthorizations);
   const [authorizationStatus, setAuthorizationStatus] = useState<string | null>(null);
@@ -2639,7 +2647,7 @@ export function AdminPage() {
             <input type="checkbox" checked={questionImportDryRun} onChange={(event) => setQuestionImportDryRun(event.target.checked)} />
             Simulation sans ecriture
           </label>
-          <small>Format : categorie;question;option1|option2|option3;bonne_reponse;explication;active. La bonne reponse doit exister dans les options.</small>
+          <small>Format : categorie;question;option1|option2|option3;bonne_reponse;explication;active;media_type;media_url;media_alt. Media type : image ou video.</small>
           <button type="submit" disabled={!canAdminAct && !questionImportDryRun}>Importer questions officielles</button>
         </form>
         <div className="table-shell">
@@ -3113,6 +3121,9 @@ export function ExamPage() {
       text: 'Que devez-vous faire face a un feu rouge fixe ?',
       options: ['Marquer l arret obligatoire', 'Passer si la voie est libre', 'Klaxonner puis avancer', 'Continuer a vitesse reduite'],
       correct_answer: 'Marquer l arret obligatoire',
+      media_type: 'image',
+      media_url: buildDemoQuestionImage('Feu rouge fixe', '#c0392b'),
+      media_alt: 'Illustration d un feu rouge avec arret obligatoire.',
       is_active: true,
       created_at: new Date().toISOString(),
     },
@@ -3122,6 +3133,9 @@ export function ExamPage() {
       text: 'A une intersection sans panneau, quelle regle appliquez-vous ?',
       options: ['La priorite a droite', 'Le vehicule le plus rapide passe', 'La priorite au vehicule le plus gros', 'Le premier qui klaxonne passe'],
       correct_answer: 'La priorite a droite',
+      media_type: 'video',
+      media_url: 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4',
+      media_alt: 'Sequence video de demonstration pour illustrer une situation dynamique.',
       is_active: true,
       created_at: new Date().toISOString(),
     },
@@ -3131,6 +3145,9 @@ export function ExamPage() {
       text: 'Quand devez-vous attacher votre ceinture ?',
       options: ['Avant tout demarrage', 'Uniquement sur autoroute', 'Seulement la nuit', 'Apres avoir atteint 50 km/h'],
       correct_answer: 'Avant tout demarrage',
+      media_type: 'image',
+      media_url: buildDemoQuestionImage('Ceinture attachee', '#2471a3'),
+      media_alt: 'Illustration de securite avant demarrage.',
       is_active: true,
       created_at: new Date().toISOString(),
     },
@@ -3159,7 +3176,14 @@ export function ExamPage() {
       .then((questions) => {
         const activeQuestions = questions.filter((question) => question.is_active);
         if (activeQuestions.length > 0) {
-          setExamQuestions(activeQuestions);
+          setExamQuestions(activeQuestions.map((question, index) => question.media_url ? question : {
+            ...question,
+            media_type: index % 2 === 0 ? 'image' : 'video',
+            media_url: index % 2 === 0
+              ? buildDemoQuestionImage(`Scenario ${index + 1}`, index % 4 === 0 ? '#c0392b' : '#1f7a4d')
+              : 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4',
+            media_alt: 'Illustration pedagogique ajoutee pour la presentation.',
+          }));
           setCurrentQuestionIndex(0);
           setSelectedAnswers({});
         }
@@ -3259,6 +3283,18 @@ export function ExamPage() {
         <article className="question-card">
           <span className="question-category">{currentQuestion.category}</span>
           <p className="question">{currentQuestion.text}</p>
+          {currentQuestion.media_url && currentQuestion.media_type === 'image' && (
+            <figure className="question-media">
+              <img src={currentQuestion.media_url} alt={currentQuestion.media_alt ?? 'Illustration de la question'} />
+              {currentQuestion.media_alt && <figcaption>{currentQuestion.media_alt}</figcaption>}
+            </figure>
+          )}
+          {currentQuestion.media_url && currentQuestion.media_type === 'video' && (
+            <figure className="question-media">
+              <video src={currentQuestion.media_url} controls preload="metadata" aria-label={currentQuestion.media_alt ?? 'Video de la question'} />
+              {currentQuestion.media_alt && <figcaption>{currentQuestion.media_alt}</figcaption>}
+            </figure>
+          )}
           {currentQuestion.options.map((answer, index) => (
             <button
               type="button"

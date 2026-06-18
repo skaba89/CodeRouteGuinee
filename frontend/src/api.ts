@@ -115,6 +115,9 @@ export type ExamQuestion = {
   options: string[];
   correct_answer: string;
   explanation?: string | null;
+  media_type?: 'image' | 'video' | null;
+  media_url?: string | null;
+  media_alt?: string | null;
   is_active: boolean;
   created_at: string;
 };
@@ -354,6 +357,9 @@ export type QuestionOfficialImportRow = {
   options: string[];
   correct_answer: string;
   explanation?: string | null;
+  media_type?: 'image' | 'video' | null;
+  media_url?: string | null;
+  media_alt?: string | null;
   is_active: boolean;
 };
 
