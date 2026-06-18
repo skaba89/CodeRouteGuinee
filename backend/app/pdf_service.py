@@ -120,3 +120,39 @@ def build_result_certificate_pdf(candidate: dict, session: dict, center: dict, a
         "Document genere par CodeRoute Guinee pour verification administrative.",
     ]
     return build_simple_pdf("CodeRoute Guinee - Attestation de resultat", lines)
+
+
+def _format_status_counts(label: str, values: dict[str, int]) -> list[str]:
+    if not values:
+        return [f"{label}: aucune donnee consolidee"]
+    return [f"{label} - {status}: {count}" for status, count in sorted(values.items())]
+
+
+def build_institutional_report_pdf(report: dict) -> bytes:
+    recommendations = report.get("recommendations") or []
+    lines = [
+        "Document administratif - Rapport institutionnel",
+        f"Destinataire: {report['generated_for']}",
+        f"Score maturite: {report['readiness_score']}%",
+        f"Statut: {report['readiness_label']}",
+        f"Candidats references: {report['candidates']}",
+        f"Evenements d audit: {report['audit_events']}",
+        "",
+        "1. Synthese nationale",
+        "Plateforme de pilotage du code de la route: candidats, centres, examens, finances, audit et antifraude.",
+        "Objectif: permettre une decision de pilote national avec indicateurs, preuves et actions suivies.",
+        "",
+        "2. Indicateurs consolides",
+        *_format_status_counts("Centres", report.get("centers_by_status", {})),
+        *_format_status_counts("Questions", report.get("questions_by_status", {})),
+        *_format_status_counts("Identites", report.get("identity_checks_by_status", {})),
+        *_format_status_counts("Habilitations", report.get("authorizations_by_status", {})),
+        "",
+        "3. Recommandations prioritaires",
+        *[f"{index}. {recommendation}" for index, recommendation in enumerate(recommendations[:6], start=1)],
+        "",
+        "4. Decision proposee",
+        "Valider un pilote institutionnel encadre avec centres retenus, donnees officielles limitees, supervision nationale et rapport hebdomadaire.",
+        "Document genere par CodeRoute Guinee pour presentation administrative et suivi de mise en production.",
+    ]
+    return build_simple_pdf("CodeRoute Guinee - Rapport institutionnel", lines)

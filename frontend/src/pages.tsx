@@ -45,6 +45,7 @@ import {
   downloadDashboardCsv,
   downloadExamAttemptsCsv,
   downloadInstitutionalReportCsv,
+  downloadInstitutionalReportPdf,
   getAdminPaymentSummary,
   getAuditLogs,
   getCandidateIdentityChecks,
@@ -835,6 +836,7 @@ export function AdminPage() {
   const [paymentCsvExportStatus, setPaymentCsvExportStatus] = useState<string | null>(null);
   const [auditCsvExportStatus, setAuditCsvExportStatus] = useState<string | null>(null);
   const [isExportingInstitutionalReport, setIsExportingInstitutionalReport] = useState(false);
+  const [isExportingInstitutionalReportPdf, setIsExportingInstitutionalReportPdf] = useState(false);
   const [isExportingCsv, setIsExportingCsv] = useState(false);
   const [isExportingExamCsv, setIsExportingExamCsv] = useState(false);
   const [isExportingPaymentCsv, setIsExportingPaymentCsv] = useState(false);
@@ -1254,6 +1256,21 @@ export function AdminPage() {
     }
   }
 
+  async function handleInstitutionalReportPdfExport() {
+    if (blockProtectedAction(setInstitutionalReportStatus)) return;
+    setIsExportingInstitutionalReportPdf(true);
+    setInstitutionalReportStatus(null);
+    try {
+      await downloadInstitutionalReportPdf();
+      setInstitutionalReportStatus('Rapport institutionnel PDF telecharge avec succes.');
+      await refreshAuditLogs();
+    } catch {
+      setInstitutionalReportStatus('Export PDF institutionnel impossible : connectez-vous avec un role admin ou super admin.');
+    } finally {
+      setIsExportingInstitutionalReportPdf(false);
+    }
+  }
+
   async function handlePaymentFiltersSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     await loadPaymentSummary(paymentFilters);
@@ -1526,6 +1543,7 @@ export function AdminPage() {
       <div className="actions result-actions admin-actions">
         <button onClick={handleDashboardCsvExport} disabled={!canAdminAct || isExportingCsv}>{isExportingCsv ? 'Export...' : 'Exporter le dashboard CSV'}</button>
         <button onClick={handleInstitutionalReportCsvExport} disabled={!canAdminAct || isExportingInstitutionalReport}>{isExportingInstitutionalReport ? 'Export...' : 'Exporter le rapport institutionnel'}</button>
+        <button onClick={handleInstitutionalReportPdfExport} disabled={!canAdminAct || isExportingInstitutionalReportPdf}>{isExportingInstitutionalReportPdf ? 'PDF...' : 'Exporter dossier Etat PDF'}</button>
         <button onClick={handleExamAttemptsCsvExport} disabled={!canAdminAct || isExportingExamCsv}>{isExportingExamCsv ? 'Export...' : 'Exporter les examens CSV'}</button>
         <button onClick={handlePaymentCsvExport} disabled={!canAdminAct || isExportingPaymentCsv}>{isExportingPaymentCsv ? 'Export...' : 'Exporter les paiements CSV'}</button>
         <button onClick={handleAuditCsvExport} disabled={!canAdminAct || isExportingAuditCsv}>{isExportingAuditCsv ? 'Export...' : 'Exporter audit CSV'}</button>

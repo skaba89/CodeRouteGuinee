@@ -460,7 +460,7 @@ async function patchPrivateJson<T>(path: string, body: unknown): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-async function downloadProtectedCsv(url: string, filename: string): Promise<void> {
+async function downloadProtectedFile(url: string, filename: string): Promise<void> {
   const response = await fetch(url, { headers: getAuthHeaders() });
   if (!response.ok) {
     throw await buildApiError(response);
@@ -474,6 +474,10 @@ async function downloadProtectedCsv(url: string, filename: string): Promise<void
   link.click();
   link.remove();
   window.URL.revokeObjectURL(objectUrl);
+}
+
+async function downloadProtectedCsv(url: string, filename: string): Promise<void> {
+  return downloadProtectedFile(url, filename);
 }
 
 export function getDashboard(): Promise<DashboardData> {
@@ -620,6 +624,10 @@ export function downloadDashboardCsv(): Promise<void> {
 
 export function downloadInstitutionalReportCsv(): Promise<void> {
   return downloadProtectedCsv(`${API_BASE_URL}/api/v1/dashboard/institutional-report.csv`, 'coderoute-institutional-report.csv');
+}
+
+export function downloadInstitutionalReportPdf(): Promise<void> {
+  return downloadProtectedFile(`${API_BASE_URL}/api/v1/dashboard/institutional-report.pdf`, 'coderoute-institutional-report.pdf');
 }
 
 export function downloadExamAttemptsCsv(): Promise<void> {
