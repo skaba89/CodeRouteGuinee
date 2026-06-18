@@ -889,12 +889,14 @@ export function AdminPage() {
   const [candidateImportSource, setCandidateImportSource] = useState('Registre national pilote');
   const [candidateImportReason, setCandidateImportReason] = useState('Chargement officiel des candidats pilotes');
   const [candidateImportCsv, setCandidateImportCsv] = useState('Mamadou;Diallo;GN-ID-2026-0001;+224620000001;B;registered');
+  const [candidateImportDryRun, setCandidateImportDryRun] = useState(true);
   const [candidateImportStatus, setCandidateImportStatus] = useState<string | null>(null);
   const [centers, setCenters] = useState<Center[]>([]);
   const [centerStatus, setCenterStatus] = useState<string | null>(null);
   const [centerImportSource, setCenterImportSource] = useState('Liste officielle DNTT');
   const [centerImportReason, setCenterImportReason] = useState('Chargement officiel des centres pilotes');
   const [centerImportCsv, setCenterImportCsv] = useState('CRG-CONAKRY-002;Centre officiel Conakry 2;Conakry;Matoto;30;pending_audit');
+  const [centerImportDryRun, setCenterImportDryRun] = useState(true);
   const [centerStations, setCenterStations] = useState<CenterStation[]>([]);
   const [centerStationStatus, setCenterStationStatus] = useState<string | null>(null);
   const [centerStationForm, setCenterStationForm] = useState<CenterStationPayload>({
@@ -927,6 +929,7 @@ export function AdminPage() {
   const [questionImportSource, setQuestionImportSource] = useState('Commission nationale du code');
   const [questionImportReason, setQuestionImportReason] = useState('Chargement officiel de la banque pilote');
   const [questionImportCsv, setQuestionImportCsv] = useState('signalisation;Que signifie un feu rouge fixe ?;S arreter|Passer avec prudence|Accelerer;S arreter;Le feu rouge impose l arret.;true');
+  const [questionImportDryRun, setQuestionImportDryRun] = useState(true);
   const [institutionalAuthorizations, setInstitutionalAuthorizations] = useState<InstitutionalAuthorization[]>(fallbackInstitutionalAuthorizations);
   const [authorizationStatus, setAuthorizationStatus] = useState<string | null>(null);
   const [authorizationForm, setAuthorizationForm] = useState<InstitutionalAuthorizationPayload>({
@@ -956,6 +959,7 @@ export function AdminPage() {
   const [paymentImportSource, setPaymentImportSource] = useState('Orange Money');
   const [paymentImportReason, setPaymentImportReason] = useState('Rapprochement officiel quotidien');
   const [paymentImportCsv, setPaymentImportCsv] = useState('GN-BOOK-2026-000001;250000;orange_money;+224620000001;paid;OM-RECU-000001');
+  const [paymentImportDryRun, setPaymentImportDryRun] = useState(true);
   const [paymentImportStatus, setPaymentImportStatus] = useState<string | null>(null);
   const [auditFilters, setAuditFilters] = useState<AuditLogFilters>({});
   const [activeAuditFilters, setActiveAuditFilters] = useState<AuditLogFilters>({});
@@ -1208,11 +1212,13 @@ export function AdminPage() {
     if (blockProtectedAction(setCenterStatus)) return;
     try {
       const rows = parseCenterImportCsv(centerImportCsv);
-      const result = await importOfficialCenters(centerImportSource, centerImportReason, rows);
-      setCenterStatus(`Import officiel termine : ${result.imported} centre(s), ${result.created} cree(s), ${result.updated} mis a jour.`);
-      const refreshedCenters = await getCenters();
-      setCenters(refreshedCenters);
-      await refreshAuditLogs();
+      const result = await importOfficialCenters(centerImportSource, centerImportReason, rows, centerImportDryRun);
+      setCenterStatus(`${result.dry_run ? 'Simulation officielle terminee' : 'Import officiel termine'} : ${result.imported} centre(s), ${result.created} cree(s), ${result.updated} mis a jour.`);
+      if (!result.dry_run) {
+        const refreshedCenters = await getCenters();
+        setCenters(refreshedCenters);
+        await refreshAuditLogs();
+      }
     } catch (error) {
       setCenterStatus(error instanceof Error ? `Import impossible : ${error.message}` : 'Import officiel impossible.');
     }
@@ -1251,12 +1257,14 @@ export function AdminPage() {
     if (blockProtectedAction(setCandidateImportStatus)) return;
     try {
       const rows = parseCandidateImportCsv(candidateImportCsv);
-      const result = await importOfficialCandidates(candidateImportSource, candidateImportReason, rows);
-      setCandidateImportStatus(`Import candidats termine : ${result.imported} dossier(s), ${result.created} cree(s), ${result.updated} mis a jour.`);
-      const refreshedCandidates = await getCandidates();
-      setCandidates(refreshedCandidates);
-      await refreshAuditLogs();
-      getDashboard().then(setDashboard).catch(() => undefined);
+      const result = await importOfficialCandidates(candidateImportSource, candidateImportReason, rows, candidateImportDryRun);
+      setCandidateImportStatus(`${result.dry_run ? 'Simulation candidats terminee' : 'Import candidats termine'} : ${result.imported} dossier(s), ${result.created} cree(s), ${result.updated} mis a jour.`);
+      if (!result.dry_run) {
+        const refreshedCandidates = await getCandidates();
+        setCandidates(refreshedCandidates);
+        await refreshAuditLogs();
+        getDashboard().then(setDashboard).catch(() => undefined);
+      }
     } catch (error) {
       setCandidateImportStatus(error instanceof Error ? `Import candidats impossible : ${error.message}` : 'Import candidats impossible.');
     }
@@ -1310,12 +1318,14 @@ export function AdminPage() {
     if (blockProtectedAction(setQuestionGovernanceStatus)) return;
     try {
       const rows = parseQuestionImportCsv(questionImportCsv);
-      const result = await importOfficialQuestions(questionImportSource, questionImportReason, rows);
-      setQuestionGovernanceStatus(`Import questions termine : ${result.imported} question(s), ${result.created} creee(s), ${result.updated} mise(s) a jour.`);
-      const refreshedQuestions = await getQuestionGovernanceItems();
-      setQuestionGovernance(refreshedQuestions);
-      await refreshAuditLogs();
-      getDashboard().then(setDashboard).catch(() => undefined);
+      const result = await importOfficialQuestions(questionImportSource, questionImportReason, rows, questionImportDryRun);
+      setQuestionGovernanceStatus(`${result.dry_run ? 'Simulation questions terminee' : 'Import questions termine'} : ${result.imported} question(s), ${result.created} creee(s), ${result.updated} mise(s) a jour.`);
+      if (!result.dry_run) {
+        const refreshedQuestions = await getQuestionGovernanceItems();
+        setQuestionGovernance(refreshedQuestions);
+        await refreshAuditLogs();
+        getDashboard().then(setDashboard).catch(() => undefined);
+      }
     } catch (error) {
       setQuestionGovernanceStatus(error instanceof Error ? `Import questions impossible : ${error.message}` : 'Import questions impossible.');
     }
@@ -1503,10 +1513,12 @@ export function AdminPage() {
     if (blockProtectedAction(setPaymentImportStatus)) return;
     try {
       const rows = parsePaymentImportCsv(paymentImportCsv);
-      const result = await importOfficialPayments(paymentImportSource, paymentImportReason, rows);
-      setPaymentImportStatus(`Import paiements termine : ${result.imported} paiement(s), ${result.created} cree(s), ${result.updated} mis a jour.`);
-      await loadPaymentSummary(activePaymentFilters);
-      await refreshAuditLogs();
+      const result = await importOfficialPayments(paymentImportSource, paymentImportReason, rows, paymentImportDryRun);
+      setPaymentImportStatus(`${result.dry_run ? 'Simulation paiements terminee' : 'Import paiements termine'} : ${result.imported} paiement(s), ${result.created} cree(s), ${result.updated} mis a jour.`);
+      if (!result.dry_run) {
+        await loadPaymentSummary(activePaymentFilters);
+        await refreshAuditLogs();
+      }
     } catch (error) {
       setPaymentImportStatus(error instanceof Error ? `Import paiements impossible : ${error.message}` : 'Import paiements impossible.');
     }
@@ -1902,6 +1914,10 @@ export function AdminPage() {
           <label>Candidats a importer
             <textarea value={candidateImportCsv} onChange={(event) => setCandidateImportCsv(event.target.value)} />
           </label>
+          <label className="checkbox-line">
+            <input type="checkbox" checked={candidateImportDryRun} onChange={(event) => setCandidateImportDryRun(event.target.checked)} />
+            Simulation sans ecriture
+          </label>
           <small>Format : prenom;nom;numero_identite;telephone;categorie_permis;statut. Statuts : registered, verified, suspended.</small>
           <button type="submit" disabled={!canAdminAct}>Importer candidats officiels</button>
         </form>
@@ -1932,6 +1948,10 @@ export function AdminPage() {
           <label>Motif<input value={centerImportReason} onChange={(event) => setCenterImportReason(event.target.value)} /></label>
           <label>Centres a importer
             <textarea value={centerImportCsv} onChange={(event) => setCenterImportCsv(event.target.value)} />
+          </label>
+          <label className="checkbox-line">
+            <input type="checkbox" checked={centerImportDryRun} onChange={(event) => setCenterImportDryRun(event.target.checked)} />
+            Simulation sans ecriture
           </label>
           <small>Format : code;nom;ville;adresse;capacite;statut. Statuts : pending_audit, active, accredited, suspended.</small>
           <button type="submit" disabled={!canAdminAct}>Importer centres officiels</button>
@@ -2150,6 +2170,10 @@ export function AdminPage() {
           <label>Questions a importer
             <textarea value={questionImportCsv} onChange={(event) => setQuestionImportCsv(event.target.value)} />
           </label>
+          <label className="checkbox-line">
+            <input type="checkbox" checked={questionImportDryRun} onChange={(event) => setQuestionImportDryRun(event.target.checked)} />
+            Simulation sans ecriture
+          </label>
           <small>Format : categorie;question;option1|option2|option3;bonne_reponse;explication;active. La bonne reponse doit exister dans les options.</small>
           <button type="submit" disabled={!canAdminAct}>Importer questions officielles</button>
         </form>
@@ -2366,6 +2390,10 @@ export function AdminPage() {
           <label>Motif<input value={paymentImportReason} onChange={(event) => setPaymentImportReason(event.target.value)} /></label>
           <label>Paiements a rapprocher
             <textarea value={paymentImportCsv} onChange={(event) => setPaymentImportCsv(event.target.value)} />
+          </label>
+          <label className="checkbox-line">
+            <input type="checkbox" checked={paymentImportDryRun} onChange={(event) => setPaymentImportDryRun(event.target.checked)} />
+            Simulation sans ecriture
           </label>
           <small>Format : reference_reservation;montant;operateur;telephone;statut;numero_recu;date_iso_optionnelle.</small>
           <button type="submit" disabled={!canAdminAct}>Importer paiements operateur</button>

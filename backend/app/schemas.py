@@ -84,10 +84,12 @@ class CandidateOfficialImportRow(BaseModel):
 class CandidateOfficialImportRequest(BaseModel):
     source: str = Field(min_length=3, max_length=120)
     reason: str = Field(min_length=5, max_length=255)
+    dry_run: bool = False
     candidates: list[CandidateOfficialImportRow] = Field(min_length=1, max_length=1000)
 
 
 class CandidateOfficialImportResult(BaseModel):
+    dry_run: bool = False
     imported: int
     created: int
     updated: int
@@ -156,10 +158,12 @@ class CenterOfficialImportRow(BaseModel):
 class CenterOfficialImportRequest(BaseModel):
     source: str = Field(min_length=3, max_length=120)
     reason: str = Field(min_length=5, max_length=255)
+    dry_run: bool = False
     centers: list[CenterOfficialImportRow] = Field(min_length=1, max_length=500)
 
 
 class CenterOfficialImportResult(BaseModel):
+    dry_run: bool = False
     imported: int
     created: int
     updated: int
@@ -195,10 +199,12 @@ class QuestionOfficialImportRow(BaseModel):
 class QuestionOfficialImportRequest(BaseModel):
     source: str = Field(min_length=3, max_length=120)
     reason: str = Field(min_length=5, max_length=255)
+    dry_run: bool = False
     questions: list[QuestionOfficialImportRow] = Field(min_length=1, max_length=1000)
 
 
 class QuestionOfficialImportResult(BaseModel):
+    dry_run: bool = False
     imported: int
     created: int
     updated: int

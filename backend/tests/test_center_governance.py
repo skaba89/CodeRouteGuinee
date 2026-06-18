@@ -6,6 +6,7 @@ from sqlalchemy import select
 from app.db.session import SessionLocal
 from app.main import app
 from app.models_audit import AuditLog
+from app.models_center import Center
 
 
 def _admin_headers(client: TestClient) -> dict[str, str]:
@@ -129,6 +130,44 @@ def test_admin_can_import_official_centers_with_audit_log() -> None:
             assert audit_log is not None
             assert audit_log.details["source"] == "Liste officielle DNTT"
             assert audit_log.details["imported"] >= 1
+
+
+def test_center_official_import_dry_run_does_not_write() -> None:
+    with TestClient(app) as client:
+        suffix = str(uuid4())[:8].upper()
+        center_code = f"DRY-{suffix}"
+        headers = _admin_headers(client)
+
+        response = client.post(
+            "/api/v1/centers/import-official",
+            headers=headers,
+            json={
+                "source": "Liste officielle DNTT",
+                "reason": "Simulation avant import",
+                "dry_run": True,
+                "centers": [
+                    {
+                        "code": center_code,
+                        "name": "Centre Simulation",
+                        "city": "Conakry",
+                        "address": "Kaloum",
+                        "capacity": 24,
+                        "status": "pending_audit",
+                    }
+                ],
+            },
+        )
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["dry_run"] is True
+        assert payload["created"] == 1
+        assert payload["updated"] == 0
+        assert payload["codes"] == [center_code]
+
+        with SessionLocal() as db:
+            center = db.scalar(select(Center).where(Center.code == center_code))
+            assert center is None
 
 
 def test_center_official_import_rejects_duplicate_codes() -> None:

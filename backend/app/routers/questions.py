@@ -56,6 +56,18 @@ def import_official_questions(
 
     existing_questions = db.scalars(select(Question)).all()
     existing_by_key = {_question_key(question.category, question.text): question for question in existing_questions}
+    ordered_keys = [_question_key(row.category, row.text) for row in payload.questions]
+    if payload.dry_run:
+        existing_keys = [key for key in ordered_keys if key in existing_by_key]
+        return QuestionOfficialImportResult(
+            dry_run=True,
+            imported=len(ordered_keys),
+            created=len(ordered_keys) - len(existing_keys),
+            updated=len(existing_keys),
+            skipped=0,
+            question_ids=[existing_by_key[key].id for key in existing_keys],
+        )
+
     created = 0
     updated = 0
     question_ids: list[str] = []
@@ -96,6 +108,7 @@ def import_official_questions(
     )
     db.commit()
     return QuestionOfficialImportResult(
+        dry_run=False,
         imported=len(question_ids),
         created=created,
         updated=updated,

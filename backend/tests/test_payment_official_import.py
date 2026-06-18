@@ -11,6 +11,7 @@ from app.models_booking import Booking
 from app.models_candidate import Candidate
 from app.models_center import Center
 from app.models_session import ExamSession
+from app.models_payment import Payment
 
 
 def _admin_headers(client: TestClient) -> dict[str, str]:
@@ -165,6 +166,43 @@ def test_admin_can_import_official_payments_with_audit_log() -> None:
             assert audit_log is not None
             assert audit_log.details["source"] == "Orange Money"
             assert audit_log.details["imported"] == 1
+
+
+def test_official_payment_import_dry_run_does_not_write() -> None:
+    booking_reference = _seed_booking()
+    receipt_number = f"OM-DRY-{uuid4().hex[:8].upper()}"
+
+    with TestClient(app) as client:
+        headers = _admin_headers(client)
+        response = client.post(
+            "/api/v1/payments/admin/import-official",
+            headers=headers,
+            json={
+                "source": "Orange Money",
+                "reason": "Simulation rapprochement",
+                "dry_run": True,
+                "payments": [
+                    {
+                        "booking_reference": booking_reference,
+                        "amount_gnf": 250000,
+                        "provider": "orange_money",
+                        "phone": "+224620000010",
+                        "status": "paid",
+                        "receipt_number": receipt_number,
+                    }
+                ],
+            },
+        )
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["dry_run"] is True
+        assert payload["created"] == 1
+        assert payload["updated"] == 0
+
+        with SessionLocal() as db:
+            payment = db.scalar(select(Payment).where(Payment.receipt_number == receipt_number))
+            assert payment is None
 
 
 def test_official_payment_import_rejects_duplicate_receipts_and_unknown_booking() -> None:

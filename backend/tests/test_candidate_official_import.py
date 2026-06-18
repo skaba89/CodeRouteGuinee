@@ -6,6 +6,7 @@ from sqlalchemy import select
 from app.db.session import SessionLocal
 from app.main import app
 from app.models_audit import AuditLog
+from app.models_candidate import Candidate
 
 
 def _admin_headers(client: TestClient) -> dict[str, str]:
@@ -118,6 +119,44 @@ def test_admin_can_import_official_candidates_with_audit_log() -> None:
             assert audit_log is not None
             assert audit_log.details["source"] == "Registre national pilote"
             assert audit_log.details["imported"] == 1
+
+
+def test_candidate_official_import_dry_run_does_not_write() -> None:
+    with TestClient(app) as client:
+        suffix = uuid4().hex[:8].upper()
+        identity_number = f"GN-DRY-CAND-{suffix}"
+        headers = _admin_headers(client)
+
+        response = client.post(
+            "/api/v1/candidates/import-official",
+            headers=headers,
+            json={
+                "source": "Registre national pilote",
+                "reason": "Simulation avant chargement",
+                "dry_run": True,
+                "candidates": [
+                    {
+                        "first_name": "Mamadou",
+                        "last_name": "Barry",
+                        "identity_number": identity_number,
+                        "phone": "+224620000002",
+                        "permit_category": "B",
+                        "status": "registered",
+                    }
+                ],
+            },
+        )
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["dry_run"] is True
+        assert payload["imported"] == 1
+        assert payload["created"] == 1
+        assert payload["updated"] == 0
+
+        with SessionLocal() as db:
+            candidate = db.scalar(select(Candidate).where(Candidate.identity_number == identity_number))
+            assert candidate is None
 
 
 def test_candidate_official_import_rejects_duplicate_identity_numbers() -> None:

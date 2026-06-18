@@ -21,6 +21,7 @@ Payload JSON:
 {
   "source": "Registre national pilote",
   "reason": "Chargement candidats pilotes",
+  "dry_run": true,
   "candidates": [
     {
       "first_name": "Mamadou",
@@ -36,12 +37,13 @@ Payload JSON:
 
 Regles:
 
+- `dry_run: true` valide le fichier et retourne les compteurs sans ecrire en base;
 - `identity_number` est normalise en majuscules et sert de cle d'upsert;
 - un identifiant deja existant met le dossier candidat a jour;
 - un identifiant nouveau cree un dossier avec reference `GN-CODE-...`;
 - un doublon dans le meme lot bloque l'import;
 - le lot est limite a 1000 candidats;
-- chaque import est journalise dans `audit_logs`.
+- chaque import reel est journalise dans `audit_logs`.
 
 Format CSV accepte dans l'interface admin:
 
@@ -75,6 +77,7 @@ Payload JSON:
 {
   "source": "Liste officielle DNTT",
   "reason": "Chargement des centres pilotes",
+  "dry_run": true,
   "centers": [
     {
       "code": "CRG-CONAKRY-001",
@@ -90,12 +93,13 @@ Payload JSON:
 
 Regles:
 
+- `dry_run: true` valide le fichier et retourne les compteurs sans ecrire en base;
 - `code` est normalise en majuscules et sert de cle d'upsert.
 - un code deja existant met le centre a jour;
 - un code nouveau cree le centre;
 - un doublon dans le meme lot bloque l'import;
 - le lot est limite a 500 centres;
-- chaque import est journalise dans `audit_logs` avec source, motif, volumes et codes.
+- chaque import reel est journalise dans `audit_logs` avec source, motif, volumes et codes.
 
 Format CSV accepte dans l'interface admin:
 
@@ -116,9 +120,12 @@ Statuts acceptes:
 
 - Verifier la source officielle du fichier.
 - Conserver une copie du fichier transmis.
-- Importer d'abord en staging.
+- Lancer d'abord une simulation (`dry_run: true`) depuis l'API ou l'interface admin.
+- Importer ensuite en staging avec `dry_run: false`.
 - Verifier le journal d'audit apres import.
 - Exporter le dashboard et le rapport institutionnel PDF apres validation.
+
+Dans l'interface admin, la case `Simulation sans ecriture` est cochee par defaut pour les imports candidats, centres, paiements et questions. Decochez-la uniquement apres validation des compteurs affiches.
 
 ## Paiements operateur
 
@@ -139,6 +146,7 @@ Payload JSON:
 {
   "source": "Orange Money",
   "reason": "Rapprochement quotidien",
+  "dry_run": true,
   "payments": [
     {
       "booking_reference": "GN-BOOK-2026-000001",
@@ -155,13 +163,14 @@ Payload JSON:
 
 Regles:
 
+- `dry_run: true` valide le fichier et retourne les compteurs sans ecrire en base;
 - `receipt_number` est normalise en majuscules et sert de cle d'upsert;
 - la reservation doit exister dans CodeRoute avant import;
 - un recu deja existant met le paiement a jour;
 - un recu nouveau cree un paiement rapproche;
 - un doublon dans le meme lot bloque l'import;
 - le lot est limite a 1000 paiements;
-- chaque import est journalise dans `audit_logs`.
+- chaque import reel est journalise dans `audit_logs`.
 
 Format CSV accepte dans l'interface admin:
 
@@ -189,6 +198,7 @@ Payload JSON:
 {
   "source": "Commission nationale du code",
   "reason": "Chargement banque pilote",
+  "dry_run": true,
   "questions": [
     {
       "category": "signalisation",
@@ -204,11 +214,12 @@ Payload JSON:
 
 Regles:
 
+- `dry_run: true` valide le fichier et retourne les compteurs sans ecrire en base;
 - la cle d'upsert est `category + text` normalisee;
 - la bonne reponse doit etre presente dans `options`;
 - un doublon dans le meme lot bloque l'import;
 - le lot est limite a 1000 questions;
-- chaque import est journalise dans `audit_logs`;
+- chaque import reel est journalise dans `audit_logs`;
 - les questions inactives restent visibles dans la gouvernance admin, mais pas dans l'examen public.
 
 Format CSV accepte dans l'interface admin:

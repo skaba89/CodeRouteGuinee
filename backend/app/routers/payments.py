@@ -40,10 +40,12 @@ class OfficialPaymentImportRow(BaseModel):
 class OfficialPaymentImportRequest(BaseModel):
     source: str = Field(min_length=3, max_length=120)
     reason: str = Field(min_length=5, max_length=255)
+    dry_run: bool = False
     payments: list[OfficialPaymentImportRow] = Field(min_length=1, max_length=1000)
 
 
 class OfficialPaymentImportResult(BaseModel):
+    dry_run: bool = False
     imported: int
     created: int
     updated: int
@@ -238,6 +240,17 @@ def import_official_payments(
         payment.receipt_number.upper(): payment
         for payment in db.scalars(select(Payment).where(Payment.receipt_number.in_(normalized_receipts))).all()
     }
+    if payload.dry_run:
+        existing_receipts = [receipt for receipt in normalized_receipts if receipt in existing_payments]
+        return OfficialPaymentImportResult(
+            dry_run=True,
+            imported=len(normalized_receipts),
+            created=len(normalized_receipts) - len(existing_receipts),
+            updated=len(existing_receipts),
+            skipped=0,
+            references=[existing_payments[receipt].reference for receipt in existing_receipts],
+        )
+
     created = 0
     updated = 0
     references: list[str] = []
@@ -281,7 +294,7 @@ def import_official_payments(
         )
     )
     db.commit()
-    return OfficialPaymentImportResult(imported=len(references), created=created, updated=updated, skipped=0, references=references)
+    return OfficialPaymentImportResult(dry_run=False, imported=len(references), created=created, updated=updated, skipped=0, references=references)
 
 
 @router.get("/{reference}")

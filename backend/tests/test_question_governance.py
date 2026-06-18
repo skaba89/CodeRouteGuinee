@@ -6,6 +6,7 @@ from sqlalchemy import select
 from app.db.session import SessionLocal
 from app.main import app
 from app.models_audit import AuditLog
+from app.models_question import Question
 
 
 def _admin_headers(client: TestClient) -> dict[str, str]:
@@ -137,6 +138,43 @@ def test_admin_can_import_official_questions_with_audit_log() -> None:
             assert audit_log is not None
             assert audit_log.details["source"] == "Commission nationale du code"
             assert audit_log.details["imported"] == 1
+
+
+def test_question_official_import_dry_run_does_not_write() -> None:
+    with TestClient(app) as client:
+        suffix = str(uuid4())[:8]
+        question_text = f"Question simulation import {suffix}"
+        headers = _admin_headers(client)
+
+        response = client.post(
+            "/api/v1/questions/import-official",
+            headers=headers,
+            json={
+                "source": "Commission nationale du code",
+                "reason": "Simulation banque officielle",
+                "dry_run": True,
+                "questions": [
+                    {
+                        "category": "signalisation",
+                        "text": question_text,
+                        "options": ["S'arreter", "Passer avec prudence"],
+                        "correct_answer": "S'arreter",
+                        "explanation": "Le conducteur doit s'arreter.",
+                        "is_active": True,
+                    }
+                ],
+            },
+        )
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["dry_run"] is True
+        assert payload["created"] == 1
+        assert payload["updated"] == 0
+
+        with SessionLocal() as db:
+            question = db.scalar(select(Question).where(Question.text == question_text))
+            assert question is None
 
 
 def test_question_official_import_rejects_invalid_payload() -> None:

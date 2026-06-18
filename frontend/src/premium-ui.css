@@ -575,6 +575,25 @@ body {
   text-transform: uppercase;
 }
 
+.official-import-form .checkbox-line {
+  grid-auto-flow: column;
+  align-items: center;
+  justify-content: start;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid rgba(0, 148, 96, 0.18);
+  border-radius: 14px;
+  background: rgba(236, 253, 245, 0.72);
+  white-space: nowrap;
+}
+
+.official-import-form .checkbox-line input {
+  width: 18px;
+  min-height: 18px;
+  padding: 0;
+  accent-color: var(--premium-green);
+}
+
 .official-import-form input,
 .official-import-form select,
 .official-import-form textarea {

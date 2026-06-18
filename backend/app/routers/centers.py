@@ -44,6 +44,17 @@ def import_official_centers(
         center.code: center
         for center in db.scalars(select(Center).where(Center.code.in_(normalized_codes))).all()
     }
+    if payload.dry_run:
+        existing_codes = [code for code in normalized_codes if code in existing_centers]
+        return CenterOfficialImportResult(
+            dry_run=True,
+            imported=len(normalized_codes),
+            created=len(normalized_codes) - len(existing_codes),
+            updated=len(existing_codes),
+            skipped=0,
+            codes=normalized_codes,
+        )
+
     created = 0
     updated = 0
     imported_codes: list[str] = []
@@ -82,6 +93,7 @@ def import_official_centers(
     )
     db.commit()
     return CenterOfficialImportResult(
+        dry_run=False,
         imported=len(imported_codes),
         created=created,
         updated=updated,

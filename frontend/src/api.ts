@@ -41,6 +41,7 @@ export type CandidateOfficialImportRow = {
 };
 
 export type CandidateOfficialImportResult = {
+  dry_run: boolean;
   imported: number;
   created: number;
   updated: number;
@@ -59,6 +60,7 @@ export type CenterOfficialImportRow = {
 };
 
 export type CenterOfficialImportResult = {
+  dry_run: boolean;
   imported: number;
   created: number;
   updated: number;
@@ -180,6 +182,7 @@ export type PaymentOfficialImportRow = {
 };
 
 export type PaymentOfficialImportResult = {
+  dry_run: boolean;
   imported: number;
   created: number;
   updated: number;
@@ -331,6 +334,7 @@ export type QuestionOfficialImportRow = {
 };
 
 export type QuestionOfficialImportResult = {
+  dry_run: boolean;
   imported: number;
   created: number;
   updated: number;
@@ -617,12 +621,12 @@ export function updateCenterStatus(centerId: string, status: string, reason: str
   return patchPrivateJson<Center>(`/api/v1/centers/${encodeURIComponent(centerId)}/status`, { status, reason });
 }
 
-export function importOfficialCandidates(source: string, reason: string, candidates: CandidateOfficialImportRow[]): Promise<CandidateOfficialImportResult> {
-  return postPrivateJson<CandidateOfficialImportResult>('/api/v1/candidates/import-official', { source, reason, candidates });
+export function importOfficialCandidates(source: string, reason: string, candidates: CandidateOfficialImportRow[], dryRun = false): Promise<CandidateOfficialImportResult> {
+  return postPrivateJson<CandidateOfficialImportResult>('/api/v1/candidates/import-official', { source, reason, dry_run: dryRun, candidates });
 }
 
-export function importOfficialCenters(source: string, reason: string, centers: CenterOfficialImportRow[]): Promise<CenterOfficialImportResult> {
-  return postPrivateJson<CenterOfficialImportResult>('/api/v1/centers/import-official', { source, reason, centers });
+export function importOfficialCenters(source: string, reason: string, centers: CenterOfficialImportRow[], dryRun = false): Promise<CenterOfficialImportResult> {
+  return postPrivateJson<CenterOfficialImportResult>('/api/v1/centers/import-official', { source, reason, dry_run: dryRun, centers });
 }
 
 export function getCenterStations(filters: { center_id?: string; status_filter?: string; limit?: number } = {}): Promise<CenterStation[]> {
@@ -741,8 +745,8 @@ export function decideQuestionGovernance(questionId: string, status: string, rea
   return postPrivateJson<QuestionGovernanceItem>(`/api/v1/question-governance/${encodeURIComponent(questionId)}/decision`, { status, reason });
 }
 
-export function importOfficialQuestions(source: string, reason: string, questions: QuestionOfficialImportRow[]): Promise<QuestionOfficialImportResult> {
-  return postPrivateJson<QuestionOfficialImportResult>('/api/v1/questions/import-official', { source, reason, questions });
+export function importOfficialQuestions(source: string, reason: string, questions: QuestionOfficialImportRow[], dryRun = false): Promise<QuestionOfficialImportResult> {
+  return postPrivateJson<QuestionOfficialImportResult>('/api/v1/questions/import-official', { source, reason, dry_run: dryRun, questions });
 }
 
 export function getInstitutionalAuthorizations(): Promise<InstitutionalAuthorization[]> {
@@ -787,8 +791,8 @@ export function downloadAdminPaymentsCsv(filters: PaymentFilters = {}): Promise<
   return downloadProtectedCsv(getAdminPaymentsCsvUrl(filters), 'coderoute-payments.csv');
 }
 
-export function importOfficialPayments(source: string, reason: string, payments: PaymentOfficialImportRow[]): Promise<PaymentOfficialImportResult> {
-  return postPrivateJson<PaymentOfficialImportResult>('/api/v1/payments/admin/import-official', { source, reason, payments });
+export function importOfficialPayments(source: string, reason: string, payments: PaymentOfficialImportRow[], dryRun = false): Promise<PaymentOfficialImportResult> {
+  return postPrivateJson<PaymentOfficialImportResult>('/api/v1/payments/admin/import-official', { source, reason, dry_run: dryRun, payments });
 }
 
 export function downloadAuditLogsCsv(filters: AuditLogFilters = {}): Promise<void> {

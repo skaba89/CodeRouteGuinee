@@ -51,6 +51,18 @@ def import_official_candidates(
         candidate.identity_number.upper(): candidate
         for candidate in db.scalars(select(Candidate).where(Candidate.identity_number.in_(normalized_identities))).all()
     }
+    if payload.dry_run:
+        existing_ids = [identity for identity in normalized_identities if identity in existing_candidates]
+        return CandidateOfficialImportResult(
+            dry_run=True,
+            imported=len(normalized_identities),
+            created=len(normalized_identities) - len(existing_ids),
+            updated=len(existing_ids),
+            skipped=0,
+            candidate_ids=[existing_candidates[identity].id for identity in existing_ids],
+            references=[existing_candidates[identity].reference for identity in existing_ids],
+        )
+
     created = 0
     updated = 0
     candidate_ids: list[str] = []
@@ -93,6 +105,7 @@ def import_official_candidates(
     )
     db.commit()
     return CandidateOfficialImportResult(
+        dry_run=False,
         imported=len(candidate_ids),
         created=created,
         updated=updated,
