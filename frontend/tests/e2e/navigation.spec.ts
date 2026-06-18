@@ -38,6 +38,7 @@ test.describe('CodeRoute Guinee UI smoke tests', () => {
     await expect(page.getByRole('heading', { name: 'Recours et reclamations candidats' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Dossier de presentation Etat' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Securite et conformite' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Preparation production' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Feuille de route institutionnelle' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Exporter le dashboard CSV' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Monitoring examen et alertes fraude' })).toBeVisible();

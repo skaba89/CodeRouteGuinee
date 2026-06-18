@@ -1343,6 +1343,7 @@ export function AdminPage() {
     { href: '#habilitations', label: 'Habilitations' },
     { href: '#dossier-etat', label: 'Dossier Etat' },
     { href: '#securite', label: 'Securite' },
+    { href: '#production', label: 'Production' },
     { href: '#roadmap', label: 'Roadmap' },
     { href: '#rapport', label: 'Rapport' },
     { href: '#finance', label: 'Finance' },
@@ -1463,6 +1464,44 @@ export function AdminPage() {
       status: 'A cadrer',
       evidence: 'Parcours identite modelise et verification administrative presente.',
       next: 'Formaliser consentement, minimisation, retention et acces aux donnees sensibles.',
+    },
+  ];
+  const productionChecklist = [
+    {
+      domain: 'Environnements',
+      status: 'A preparer',
+      evidence: 'Staging et production doivent utiliser des bases separees, variables dediees et domaines officiels.',
+      action: 'Creer staging/prod, isoler secrets et URL API.',
+    },
+    {
+      domain: 'Secrets',
+      status: 'Critique',
+      evidence: 'SECRET_KEY, ADMIN_REGISTRATION_TOKEN, POSTGRES_PASSWORD et compte bootstrap doivent etre generes hors depot.',
+      action: 'Stocker dans un coffre de secrets ou les variables securisees de la plateforme.',
+    },
+    {
+      domain: 'Base de donnees',
+      status: 'A valider',
+      evidence: 'PostgreSQL via migrations Alembic, AUTO_CREATE_TABLES=false et sauvegardes planifiees.',
+      action: 'Executer un test de restauration sur environnement de recette.',
+    },
+    {
+      domain: 'Securite HTTP',
+      status: 'En place',
+      evidence: 'Headers securite, CORS restreint, rate limit login et audit auth disponibles.',
+      action: 'Ajouter HTTPS, rotation certificats et revue OWASP avant ouverture publique.',
+    },
+    {
+      domain: 'Observabilite',
+      status: 'A renforcer',
+      evidence: 'Health/readiness, audit logs, monitoring examen et exports existent.',
+      action: 'Brancher logs centralises, alertes et metriques infrastructure.',
+    },
+    {
+      domain: 'CI/CD',
+      status: 'Partiel',
+      evidence: 'Workflow CI present pour tests backend critiques.',
+      action: 'Ajouter build frontend, tests E2E et deploiement staging automatise.',
     },
   ];
 
@@ -1887,6 +1926,34 @@ export function AdminPage() {
               <small>{item.next}</small>
             </article>
           ))}
+        </div>
+      </div>
+      <div id="production" className="production-readiness-panel admin-section">
+        <div className="production-readiness-header">
+          <div>
+            <h3>Preparation production</h3>
+            <p>Runbook de mise en ligne : environnements, secrets, base, sauvegardes, monitoring et exploitation.</p>
+          </div>
+          <span>{productionChecklist.filter((item) => item.status === 'En place').length} / {productionChecklist.length} prets</span>
+        </div>
+        <div className="production-readiness-grid">
+          {productionChecklist.map((item) => (
+            <article key={item.domain}>
+              <div>
+                <strong>{item.domain}</strong>
+                <span>{item.status}</span>
+              </div>
+              <p>{item.evidence}</p>
+              <small>{item.action}</small>
+            </article>
+          ))}
+        </div>
+        <div className="production-command-strip">
+          <strong>Commandes de mise en recette</strong>
+          <code>docker compose up -d postgres</code>
+          <code>docker compose run --rm backend alembic upgrade head</code>
+          <code>docker compose run --rm backend python -m app.bootstrap_admin</code>
+          <code>python scripts/smoke_local.py</code>
         </div>
       </div>
       <div id="roadmap" className="roadmap-panel admin-section">
