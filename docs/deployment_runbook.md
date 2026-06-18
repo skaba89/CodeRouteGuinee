@@ -5,6 +5,7 @@ Ce runbook sert de procedure courte pour une mise en recette, staging ou product
 ## 1. Avant de deployer
 
 - Branche ou tag valide par CI.
+- Checklist release pilote validee: `docs/release_pilote_checklist.md`.
 - Variables d'environnement preparees hors depot.
 - `ALLOWED_HOSTS`, `CORS_ORIGINS` et `ENABLE_API_DOCS=false` verifies pour la production.
 - Sauvegarde de la base existante disponible.
