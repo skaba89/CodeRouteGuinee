@@ -555,6 +555,43 @@ body {
   align-self: end;
 }
 
+.identity-filters {
+  display: grid;
+  grid-template-columns: 160px minmax(180px, 1fr) 110px auto auto;
+  gap: 12px;
+  align-items: end;
+}
+
+.identity-filters label {
+  display: grid;
+  gap: 8px;
+  color: var(--premium-navy);
+  font-size: 12px;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.identity-filters input,
+.identity-filters select {
+  min-height: 44px;
+  border: 1px solid rgba(6, 43, 82, 0.12);
+  border-radius: 14px;
+  padding: 10px 12px;
+  color: var(--premium-ink);
+  background: #ffffff;
+  font: inherit;
+}
+
+.identity-filter-summary {
+  width: fit-content;
+  border-radius: 999px;
+  padding: 8px 12px;
+  color: #166534;
+  background: #dcfce7;
+  font-size: 13px;
+  font-weight: 900;
+}
+
 .reset-password-strip {
   margin: 14px 0 6px;
   max-width: 360px;
@@ -1760,6 +1797,7 @@ tr:last-child td {
   .action-center-panel,
   .action-center-grid,
   .authorization-form,
+  .identity-filters,
   .metrics,
   .compact,
   .modules-grid,

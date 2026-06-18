@@ -192,6 +192,12 @@ export type CandidateIdentityPayload = {
   photo_reference?: string;
 };
 
+export type CandidateIdentityFilters = {
+  status_filter?: string;
+  candidate_id?: string;
+  limit?: number;
+};
+
 export type QuestionGovernanceItem = {
   question_id: string;
   category: string;
@@ -485,8 +491,12 @@ export function getInstitutionalActionCenter(): Promise<InstitutionalActionCente
   return getPrivateJson<InstitutionalActionCenter>('/api/v1/dashboard/institutional-action-center');
 }
 
-export function getCandidateIdentityChecks(): Promise<CandidateIdentityCheck[]> {
-  return getPrivateJson<CandidateIdentityCheck[]>('/api/v1/candidate-identity?limit=25');
+export function getCandidateIdentityChecks(filters: CandidateIdentityFilters = {}): Promise<CandidateIdentityCheck[]> {
+  const query = new URLSearchParams();
+  if (filters.status_filter) query.set('status_filter', filters.status_filter);
+  if (filters.candidate_id) query.set('candidate_id', filters.candidate_id);
+  query.set('limit', String(filters.limit ?? 25));
+  return getPrivateJson<CandidateIdentityCheck[]>(`/api/v1/candidate-identity?${query.toString()}`);
 }
 
 export function submitCandidateIdentity(payload: CandidateIdentityPayload): Promise<CandidateIdentityCheck> {

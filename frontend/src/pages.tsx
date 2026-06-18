@@ -6,6 +6,7 @@ import {
   type AuditLogEntry,
   type AuditLogFilters,
   type CandidateIdentityCheck,
+  type CandidateIdentityFilters,
   type CandidateIdentityPayload,
   type DashboardData,
   type EntrySummary,
@@ -724,6 +725,8 @@ export function AdminPage() {
   const [incidentAdminStatus, setIncidentAdminStatus] = useState<string | null>(null);
   const [identityChecks, setIdentityChecks] = useState<CandidateIdentityCheck[]>(fallbackIdentityChecks);
   const [identityStatus, setIdentityStatus] = useState<string | null>(null);
+  const [identityFilters, setIdentityFilters] = useState<CandidateIdentityFilters>({ status_filter: 'pending', limit: 25 });
+  const [activeIdentityFilters, setActiveIdentityFilters] = useState<CandidateIdentityFilters>({ status_filter: 'pending', limit: 25 });
   const [questionGovernance, setQuestionGovernance] = useState<QuestionGovernanceItem[]>(fallbackQuestionGovernance);
   const [questionGovernanceStatus, setQuestionGovernanceStatus] = useState<string | null>(null);
   const [institutionalAuthorizations, setInstitutionalAuthorizations] = useState<InstitutionalAuthorization[]>(fallbackInstitutionalAuthorizations);
@@ -804,6 +807,26 @@ export function AdminPage() {
     }
   }
 
+  async function refreshIdentityChecks(filters: CandidateIdentityFilters = activeIdentityFilters) {
+    if (!canAdminAct) {
+      setIdentityStatus('Mode demo : connectez-vous avec un compte admin ou super admin reel pour filtrer les pieces.');
+      return;
+    }
+    try {
+      const cleanFilters = {
+        status_filter: filters.status_filter || undefined,
+        candidate_id: filters.candidate_id || undefined,
+        limit: filters.limit ?? 25,
+      };
+      const checks = await getCandidateIdentityChecks(cleanFilters);
+      setIdentityChecks(checks);
+      setActiveIdentityFilters(cleanFilters);
+      setIdentityStatus(null);
+    } catch {
+      setIdentityStatus('Pieces indisponibles : connectez-vous avec un role admin ou super admin.');
+    }
+  }
+
   useEffect(() => {
     getDashboard().then(setDashboard).catch(() => undefined);
     getCenters().then(setCenters).catch(() => undefined);
@@ -829,7 +852,7 @@ export function AdminPage() {
         setActionCenterStatus(null);
       })
       .catch(() => setActionCenterStatus('Mode demo : connectez-vous avec un role admin pour charger le centre d action API.'));
-    getCandidateIdentityChecks()
+    getCandidateIdentityChecks({ status_filter: 'pending', limit: 25 })
       .then((checks) => {
         setIdentityChecks(checks.length > 0 ? checks : fallbackIdentityChecks);
         setIdentityStatus(null);
@@ -914,6 +937,7 @@ export function AdminPage() {
       const updatedCheck = await decideCandidateIdentity(checkId, status, reason);
       setIdentityChecks((current) => current.map((check) => (check.id === checkId ? updatedCheck : check)));
       setIdentityStatus(`Verification identite ${updatedCheck.document_reference} : ${updatedCheck.status}.`);
+      await refreshIdentityChecks();
       await refreshAuditLogs();
     } catch {
       setIdentityStatus('Decision identite impossible : connectez-vous avec un role admin ou super admin.');
@@ -1093,6 +1117,17 @@ export function AdminPage() {
     event.preventDefault();
     await loadPaymentSummary(paymentFilters);
     await refreshAuditLogs();
+  }
+
+  async function handleIdentityFiltersSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await refreshIdentityChecks(identityFilters);
+  }
+
+  async function resetIdentityFilters() {
+    const defaults = { status_filter: 'pending', limit: 25 };
+    setIdentityFilters(defaults);
+    await refreshIdentityChecks(defaults);
   }
 
   async function handleAuditFiltersSubmit(event: FormEvent<HTMLFormElement>) {
@@ -1466,6 +1501,22 @@ export function AdminPage() {
         <h3>Verification identite candidat</h3>
         <p>Controle administratif des pieces avant convocation, entree en centre et emission des attestations.</p>
         {identityStatus && <p className={identityStatus.includes('impossible') || identityStatus.includes('Mode demo') ? 'form-error' : 'login-status'}>{identityStatus}</p>}
+        <form className="identity-filters" onSubmit={handleIdentityFiltersSubmit}>
+          <label>Statut
+            <select value={identityFilters.status_filter ?? ''} onChange={(event) => setIdentityFilters((current) => ({ ...current, status_filter: event.target.value || undefined }))}>
+              <option value="">Tous</option>
+              <option value="pending">En attente</option>
+              <option value="verified">Valide</option>
+              <option value="needs_review">A revoir</option>
+              <option value="rejected">Rejete</option>
+            </select>
+          </label>
+          <label>ID candidat<input value={identityFilters.candidate_id ?? ''} onChange={(event) => setIdentityFilters((current) => ({ ...current, candidate_id: event.target.value || undefined }))} placeholder="Filtrer par candidat" /></label>
+          <label>Limite<input type="number" value={identityFilters.limit ?? 25} onChange={(event) => setIdentityFilters((current) => ({ ...current, limit: Number(event.target.value) || 25 }))} /></label>
+          <button type="submit" disabled={!canAdminAct}>Filtrer les pieces</button>
+          <button type="button" className="secondary-button" onClick={resetIdentityFilters} disabled={!canAdminAct}>Reinitialiser</button>
+        </form>
+        <p className="identity-filter-summary">Filtre actif : {activeIdentityFilters.status_filter ?? 'tous'} - {identityChecks.length} piece(s) affichee(s).</p>
         <div className="table-shell">
         <table>
           <thead><tr><th>Candidat</th><th>Document</th><th>Reference</th><th>Statut</th><th>Date</th><th>Decision</th></tr></thead>
