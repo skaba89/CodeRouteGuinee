@@ -2,6 +2,60 @@
 
 Ce document decrit les formats acceptes pour remplacer progressivement les donnees de demonstration par des donnees institutionnelles.
 
+## Candidats officiels
+
+Endpoint protege:
+
+```text
+POST /api/v1/candidates/import-official
+```
+
+Roles autorises:
+
+- `admin`
+- `super_admin`
+
+Payload JSON:
+
+```json
+{
+  "source": "Registre national pilote",
+  "reason": "Chargement candidats pilotes",
+  "candidates": [
+    {
+      "first_name": "Mamadou",
+      "last_name": "Diallo",
+      "identity_number": "GN-ID-2026-0001",
+      "phone": "+224620000001",
+      "permit_category": "B",
+      "status": "registered"
+    }
+  ]
+}
+```
+
+Regles:
+
+- `identity_number` est normalise en majuscules et sert de cle d'upsert;
+- un identifiant deja existant met le dossier candidat a jour;
+- un identifiant nouveau cree un dossier avec reference `GN-CODE-...`;
+- un doublon dans le meme lot bloque l'import;
+- le lot est limite a 1000 candidats;
+- chaque import est journalise dans `audit_logs`.
+
+Format CSV accepte dans l'interface admin:
+
+```text
+prenom;nom;numero_identite;telephone;categorie_permis;statut
+Mamadou;Diallo;GN-ID-2026-0001;+224620000001;B;registered
+```
+
+Statuts acceptes:
+
+- `registered`
+- `verified`
+- `suspended`
+
 ## Centres agrees
 
 Endpoint protege:

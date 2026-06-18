@@ -6,9 +6,11 @@ import {
   type CenterOfficialImportRow,
   type AuditLogEntry,
   type AuditLogFilters,
+  type Candidate,
   type CandidateIdentityCheck,
   type CandidateIdentityFilters,
   type CandidateIdentityPayload,
+  type CandidateOfficialImportRow,
   type CandidateSubmission,
   type CandidateSubmissionFilters,
   type CandidateSubmissionPayload,
@@ -52,6 +54,7 @@ import {
   getAuditLogs,
   getCandidateIdentityChecks,
   getCandidateSubmissions,
+  getCandidates,
   getCenters,
   getCenterIncidents,
   getConvocationPdfUrl,
@@ -72,6 +75,7 @@ import {
   getPaymentReconciliationItems,
   getQuestionGovernanceItems,
   handleCandidateSubmission,
+  importOfficialCandidates,
   importOfficialCenters,
   importOfficialQuestions,
   resetInstitutionalUserPassword,
@@ -773,6 +777,29 @@ export function CenterPage() {
 }
 
 const centerImportStatuses = new Set(['pending_audit', 'active', 'accredited', 'suspended']);
+const candidateImportStatuses = new Set(['registered', 'verified', 'suspended']);
+
+function parseCandidateImportCsv(value: string): CandidateOfficialImportRow[] {
+  return value
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith('#'))
+    .map((line, index) => {
+      const [firstName, lastName, identityNumber, phone, permitCategory = 'B', statusValue = 'registered'] = line.split(';').map((item) => item.trim());
+      const status = candidateImportStatuses.has(statusValue) ? statusValue as CandidateOfficialImportRow['status'] : 'registered';
+      if (!firstName || !lastName || !identityNumber || !phone) {
+        throw new Error(`Ligne ${index + 1} incomplete`);
+      }
+      return {
+        first_name: firstName,
+        last_name: lastName,
+        identity_number: identityNumber,
+        phone,
+        permit_category: permitCategory || 'B',
+        status,
+      };
+    });
+}
 
 function parseCenterImportCsv(value: string): CenterOfficialImportRow[] {
   return value
@@ -823,6 +850,11 @@ export function AdminPage() {
   const canAdminAct = canUseProtectedActions(currentUser, isPresentationMode, ['admin', 'super_admin']);
   const canSuperAdminAct = canUseProtectedActions(currentUser, isPresentationMode, ['super_admin']);
   const [dashboard, setDashboard] = useState<DashboardData>(fallbackDashboard);
+  const [candidates, setCandidates] = useState<Candidate[]>([]);
+  const [candidateImportSource, setCandidateImportSource] = useState('Registre national pilote');
+  const [candidateImportReason, setCandidateImportReason] = useState('Chargement officiel des candidats pilotes');
+  const [candidateImportCsv, setCandidateImportCsv] = useState('Mamadou;Diallo;GN-ID-2026-0001;+224620000001;B;registered');
+  const [candidateImportStatus, setCandidateImportStatus] = useState<string | null>(null);
   const [centers, setCenters] = useState<Center[]>([]);
   const [centerStatus, setCenterStatus] = useState<string | null>(null);
   const [centerImportSource, setCenterImportSource] = useState('Liste officielle DNTT');
@@ -1002,6 +1034,7 @@ export function AdminPage() {
 
   useEffect(() => {
     getDashboard().then(setDashboard).catch(() => undefined);
+    getCandidates().then(setCandidates).catch(() => undefined);
     getCenters().then(setCenters).catch(() => undefined);
     getEntrySummary().then(setEntrySummary).catch(() => undefined);
     getExamSummary().then(setExamSummary).catch(() => undefined);
@@ -1127,6 +1160,23 @@ export function AdminPage() {
       await refreshAuditLogs();
     } catch (error) {
       setCenterStatus(error instanceof Error ? `Import impossible : ${error.message}` : 'Import officiel impossible.');
+    }
+  }
+
+  async function handleOfficialCandidateImport(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setCandidateImportStatus(null);
+    if (blockProtectedAction(setCandidateImportStatus)) return;
+    try {
+      const rows = parseCandidateImportCsv(candidateImportCsv);
+      const result = await importOfficialCandidates(candidateImportSource, candidateImportReason, rows);
+      setCandidateImportStatus(`Import candidats termine : ${result.imported} dossier(s), ${result.created} cree(s), ${result.updated} mis a jour.`);
+      const refreshedCandidates = await getCandidates();
+      setCandidates(refreshedCandidates);
+      await refreshAuditLogs();
+      getDashboard().then(setDashboard).catch(() => undefined);
+    } catch (error) {
+      setCandidateImportStatus(error instanceof Error ? `Import candidats impossible : ${error.message}` : 'Import candidats impossible.');
     }
   }
 
@@ -1440,6 +1490,7 @@ export function AdminPage() {
   ];
   const adminSections = [
     { href: '#comptes', label: 'Comptes' },
+    { href: '#candidats', label: 'Candidats' },
     { href: '#centres', label: 'Centres' },
     { href: '#incidents', label: 'Incidents' },
     { href: '#identites', label: 'Identites' },
@@ -1738,6 +1789,37 @@ export function AdminPage() {
                       <button disabled={!canSuperAdminAct} onClick={() => handleUserPasswordReset(user.id)}>Reset MDP</button>
                     </div>
                   </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div id="candidats" className="candidate-official-panel admin-section">
+        <h3>Import candidats officiels</h3>
+        <p>Chargement controle des dossiers candidats transmis par une source institutionnelle avant reservation, paiement et convocation.</p>
+        {candidateImportStatus && <p className={candidateImportStatus.includes('impossible') ? 'form-error' : 'login-status'}>{candidateImportStatus}</p>}
+        <form className="official-import-form" onSubmit={handleOfficialCandidateImport}>
+          <label>Source officielle<input value={candidateImportSource} onChange={(event) => setCandidateImportSource(event.target.value)} /></label>
+          <label>Motif<input value={candidateImportReason} onChange={(event) => setCandidateImportReason(event.target.value)} /></label>
+          <label>Candidats a importer
+            <textarea value={candidateImportCsv} onChange={(event) => setCandidateImportCsv(event.target.value)} />
+          </label>
+          <small>Format : prenom;nom;numero_identite;telephone;categorie_permis;statut. Statuts : registered, verified, suspended.</small>
+          <button type="submit" disabled={!canAdminAct}>Importer candidats officiels</button>
+        </form>
+        <div className="table-shell">
+          <table>
+            <thead><tr><th>Reference</th><th>Candidat</th><th>Identite</th><th>Telephone</th><th>Permis</th><th>Statut</th></tr></thead>
+            <tbody>
+              {candidates.slice(0, 8).map((candidate) => (
+                <tr key={candidate.id}>
+                  <td>{candidate.reference}</td>
+                  <td>{candidate.first_name} {candidate.last_name}</td>
+                  <td>{candidate.identity_number}</td>
+                  <td>{candidate.phone}</td>
+                  <td>{candidate.permit_category}</td>
+                  <td><span className={candidate.status === 'verified' ? 'badge ok' : 'badge'}>{candidate.status}</span></td>
                 </tr>
               ))}
             </tbody>

@@ -19,6 +19,36 @@ export type Center = {
   created_at: string;
 };
 
+export type Candidate = {
+  id: string;
+  reference: string;
+  first_name: string;
+  last_name: string;
+  identity_number: string;
+  phone: string;
+  permit_category: string;
+  status: string;
+  created_at: string;
+};
+
+export type CandidateOfficialImportRow = {
+  first_name: string;
+  last_name: string;
+  identity_number: string;
+  phone: string;
+  permit_category: string;
+  status: 'registered' | 'verified' | 'suspended';
+};
+
+export type CandidateOfficialImportResult = {
+  imported: number;
+  created: number;
+  updated: number;
+  skipped: number;
+  candidate_ids: string[];
+  references: string[];
+};
+
 export type CenterOfficialImportRow = {
   code: string;
   name: string;
@@ -526,8 +556,16 @@ export function getCenters(): Promise<Center[]> {
   return getJson<Center[]>('/api/v1/centers');
 }
 
+export function getCandidates(): Promise<Candidate[]> {
+  return getJson<Candidate[]>('/api/v1/candidates');
+}
+
 export function updateCenterStatus(centerId: string, status: string, reason: string): Promise<Center> {
   return patchPrivateJson<Center>(`/api/v1/centers/${encodeURIComponent(centerId)}/status`, { status, reason });
+}
+
+export function importOfficialCandidates(source: string, reason: string, candidates: CandidateOfficialImportRow[]): Promise<CandidateOfficialImportResult> {
+  return postPrivateJson<CandidateOfficialImportResult>('/api/v1/candidates/import-official', { source, reason, candidates });
 }
 
 export function importOfficialCenters(source: string, reason: string, centers: CenterOfficialImportRow[]): Promise<CenterOfficialImportResult> {

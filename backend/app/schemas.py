@@ -72,6 +72,30 @@ class CandidateRead(CandidateCreate):
     model_config = {"from_attributes": True}
 
 
+class CandidateOfficialImportRow(BaseModel):
+    first_name: str = Field(min_length=2, max_length=120)
+    last_name: str = Field(min_length=2, max_length=120)
+    identity_number: str = Field(min_length=3, max_length=120)
+    phone: str = Field(min_length=5, max_length=50)
+    permit_category: str = Field(default="B", min_length=1, max_length=10)
+    status: Literal["registered", "verified", "suspended"] = "registered"
+
+
+class CandidateOfficialImportRequest(BaseModel):
+    source: str = Field(min_length=3, max_length=120)
+    reason: str = Field(min_length=5, max_length=255)
+    candidates: list[CandidateOfficialImportRow] = Field(min_length=1, max_length=1000)
+
+
+class CandidateOfficialImportResult(BaseModel):
+    imported: int
+    created: int
+    updated: int
+    skipped: int
+    candidate_ids: list[str]
+    references: list[str]
+
+
 class CandidateIdentityCreate(BaseModel):
     candidate_id: str
     document_type: Literal["national_id", "passport", "driver_file"] = "national_id"
