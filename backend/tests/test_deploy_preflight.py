@@ -25,6 +25,8 @@ def test_preflight_rejects_placeholder_production_values() -> None:
             "ALLOWED_HOSTS": "localhost,*",
             "ENABLE_API_DOCS": "true",
             "POSTGRES_PASSWORD": "coderoute",
+            "BACKUP_RETENTION_DAYS": "3",
+            "BACKUP_ENCRYPTION_REQUIRED": "false",
             "BOOTSTRAP_ADMIN_PASSWORD": "replace-with-a-strong-temporary-password",
             "VITE_API_BASE_URL": "http://localhost:8000",
         },
@@ -43,6 +45,8 @@ def test_preflight_rejects_placeholder_production_values() -> None:
     assert "ALLOWED_HOSTS must not contain local hosts in production" in errors
     assert "ENABLE_API_DOCS must be false in production" in errors
     assert "POSTGRES_PASSWORD must be replaced" in errors
+    assert "BACKUP_RETENTION_DAYS must be at least 7" in errors
+    assert "BACKUP_ENCRYPTION_REQUIRED must be true in production" in errors
     assert "BOOTSTRAP_ADMIN_PASSWORD must be replaced" in errors
     assert "VITE_API_BASE_URL must use HTTPS in production" in errors
 
@@ -60,6 +64,8 @@ def test_preflight_accepts_hardened_production_values() -> None:
             "ALLOWED_HOSTS": "api.coderoute.gov.gn",
             "ENABLE_API_DOCS": "false",
             "POSTGRES_PASSWORD": "strong-postgres-password-not-default",
+            "BACKUP_RETENTION_DAYS": "30",
+            "BACKUP_ENCRYPTION_REQUIRED": "true",
             "BOOTSTRAP_ADMIN_EMAIL": "admin@coderoute.gov.gn",
             "BOOTSTRAP_ADMIN_PASSWORD": "strong-bootstrap-password",
             "VITE_API_BASE_URL": "https://api.coderoute.gov.gn",

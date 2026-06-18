@@ -87,6 +87,21 @@ def validate_env(values: dict[str, str], target: str) -> tuple[list[str], list[s
     postgres_password = values.get("POSTGRES_PASSWORD", "")
     add_issue(errors, not postgres_password or postgres_password in PLACEHOLDER_VALUES, "POSTGRES_PASSWORD must be replaced")
 
+    retention_days = values.get("BACKUP_RETENTION_DAYS", "")
+    add_issue(errors, not retention_days, "BACKUP_RETENTION_DAYS is required")
+    if retention_days:
+        try:
+            retention_value = int(retention_days)
+        except ValueError:
+            retention_value = 0
+        add_issue(errors, retention_value < 7, "BACKUP_RETENTION_DAYS must be at least 7")
+
+    add_issue(
+        errors if is_production else warnings,
+        not is_truthy(values.get("BACKUP_ENCRYPTION_REQUIRED")),
+        "BACKUP_ENCRYPTION_REQUIRED must be true in production",
+    )
+
     bootstrap_password = values.get("BOOTSTRAP_ADMIN_PASSWORD", "")
     add_issue(errors, not bootstrap_password or bootstrap_password in PLACEHOLDER_VALUES, "BOOTSTRAP_ADMIN_PASSWORD must be replaced")
     add_issue(warnings, bool(bootstrap_password) and len(bootstrap_password) < 12, "BOOTSTRAP_ADMIN_PASSWORD should contain at least 12 characters")

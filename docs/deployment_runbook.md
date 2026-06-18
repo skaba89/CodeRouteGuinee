@@ -72,7 +72,25 @@ docker compose down
 
 Restaurer la derniere image valide et, si necessaire, la sauvegarde PostgreSQL validee avant deploiement.
 
-## 6. Apres deploiement
+## 6. Sauvegarde et restauration
+
+Avant chaque deploiement sensible:
+
+```bash
+python scripts/postgres_backup.py --env-file .env backup
+```
+
+Pour tester une restauration en recette:
+
+```bash
+python scripts/postgres_backup.py --env-file .env.recette restore backups/postgres/coderoute-guinee-YYYYMMDDTHHMMSSZ.backup --clean --confirm-restore
+docker compose run --rm backend alembic upgrade head
+python scripts/preflight_deploy.py --env-file .env.recette --target staging --api-url https://recette-api.coderoute.gov.gn
+```
+
+Ne jamais lancer une restauration sur production sans validation explicite du responsable technique et du responsable metier.
+
+## 7. Apres deploiement
 
 - Exporter le rapport institutionnel PDF.
 - Exporter le journal d'audit CSV.

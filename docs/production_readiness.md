@@ -60,15 +60,23 @@ Plan minimum recommande:
 Exemple de sauvegarde:
 
 ```bash
-pg_dump "$DATABASE_URL" --format=custom --file=coderoute-guinee.backup
+python scripts/postgres_backup.py --env-file .env backup
 ```
 
 Exemple de restauration en recette:
 
 ```bash
-pg_restore --clean --if-exists --dbname="$DATABASE_URL_RECETTE" coderoute-guinee.backup
+python scripts/postgres_backup.py --env-file .env.recette restore backups/postgres/coderoute-guinee-YYYYMMDDTHHMMSSZ.backup --clean --confirm-restore
 docker compose run --rm backend alembic upgrade head
 ```
+
+Avant une restauration, valider que la sauvegarde cible correspond au bon environnement, noter le commit deploye et prevenir les responsables metier. L'option `--confirm-restore` est obligatoire pour eviter une restauration accidentelle.
+
+Le preflight production exige:
+
+- `BACKUP_RETENTION_DAYS` defini a 7 jours minimum;
+- `BACKUP_ENCRYPTION_REQUIRED=true`;
+- stockage des fichiers de sauvegarde hors depot Git.
 
 ## Premier administrateur
 
