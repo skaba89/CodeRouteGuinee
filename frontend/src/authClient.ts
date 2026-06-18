@@ -46,6 +46,9 @@ async function readJson<T>(response: Response): Promise<T> {
   if (!response.ok) {
     throw new Error(`API error ${response.status}`);
   }
+  if (response.status === 204) {
+    return undefined as T;
+  }
   return response.json() as Promise<T>;
 }
 
@@ -75,6 +78,17 @@ export async function registerUser(payload: RegisterPayload): Promise<AuthUser> 
 export async function getCurrentUser(): Promise<AuthUser> {
   return readJson<AuthUser>(await fetch(`${API_BASE_URL}/api/v1/auth/me`, {
     headers: getAuthHeaders(),
+  }));
+}
+
+export async function changePassword(currentPassword: string, newPassword: string): Promise<void> {
+  await readJson<void>(await fetch(`${API_BASE_URL}/api/v1/auth/change-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+    body: JSON.stringify({
+      current_password: currentPassword,
+      new_password: newPassword,
+    }),
   }));
 }
 

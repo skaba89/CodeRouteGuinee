@@ -36,3 +36,22 @@ def test_exam_attempt_can_be_started_and_submitted() -> None:
         submit_response = client.post(f"/api/v1/exams/{attempt['id']}/submit", json={"answers": {question["id"]: "Stop"}})
         assert submit_response.status_code == 200
         assert submit_response.json()["status"] == "submitted"
+
+
+def test_exam_attempt_can_start_from_booking_reference() -> None:
+    with TestClient(app) as client:
+        suffix = str(uuid4())[:8]
+        headers = _admin_headers(client)
+        center = client.post("/api/v1/centers", headers=headers, json={"code": f"CTR-BKG-{suffix}", "name": "Centre booking", "city": "Conakry", "address": "Kaloum", "capacity": 20, "status": "active"}).json()
+        candidate = client.post("/api/v1/candidates", json={"first_name": "Mamadou", "last_name": "Camara", "identity_number": f"NINA-{suffix}", "phone": "+224222222222", "permit_category": "B"}).json()
+        session = client.post("/api/v1/sessions", headers=headers, json={"center_id": center["id"], "starts_at": (datetime.utcnow() + timedelta(days=1)).isoformat(), "capacity": 20}).json()
+        client.post("/api/v1/questions", headers=headers, json={"category": "priorite", "text": "Priorite a droite ?", "options": ["Oui", "Non"], "correct_answer": "Oui"})
+        booking = client.post("/api/v1/bookings", json={"candidate_id": candidate["id"], "session_id": session["id"]}).json()
+
+        attempt_response = client.post("/api/v1/exams/start-from-booking", json={"booking_reference": booking["reference"]})
+
+        assert attempt_response.status_code == 201
+        attempt = attempt_response.json()
+        assert attempt["candidate_id"] == candidate["id"]
+        assert attempt["session_id"] == session["id"]
+        assert attempt["status"] == "started"

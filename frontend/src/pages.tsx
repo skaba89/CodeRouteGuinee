@@ -2,13 +2,30 @@ import { type FormEvent, useEffect, useState } from 'react';
 
 import {
   type Center,
+  type CenterIncident,
+  type CenterOfficialImportRow,
+  type CenterStation,
+  type CenterStationPayload,
   type AuditLogEntry,
   type AuditLogFilters,
+  type Candidate,
   type CandidateIdentityCheck,
+  type CandidateIdentityFilters,
+  type CandidateIdentityPayload,
+  type CandidateOfficialImportRow,
+  type CandidateSubmission,
+  type CandidateSubmissionFilters,
+  type CandidateSubmissionPayload,
   type DashboardData,
+  type DeviceSession,
   type EntrySummary,
   type EntryValidationResult,
+  type ExamAttempt,
   type ExamCertificateVerification,
+  type ExamMonitoringEvent,
+  type ExamMonitoringFilters,
+  type ExamMonitoringSummary,
+  type ExamQuestion,
   type ExamSummary,
   type InstitutionalAuthorization,
   type InstitutionalAuthorizationPayload,
@@ -20,12 +37,15 @@ import {
   type OperationalReadiness,
   type PaymentAlert,
   type PaymentFilters,
+  type PaymentOfficialImportRow,
   type PaymentReconciliationItem,
   type PaymentResult,
   type PaymentSummary,
   type QuestionGovernanceItem,
+  type QuestionOfficialImportRow,
   createInstitutionalAuthorization,
   createInstitutionalUser,
+  createCenterStation,
   createPayment,
   decideCandidateIdentity,
   decideQuestionGovernance,
@@ -34,15 +54,24 @@ import {
   downloadDashboardCsv,
   downloadExamAttemptsCsv,
   downloadInstitutionalReportCsv,
+  downloadInstitutionalReportPdf,
   getAdminPaymentSummary,
   getAuditLogs,
   getCandidateIdentityChecks,
+  getCandidateSubmissions,
+  getCandidates,
   getCenters,
+  getCenterStations,
+  getCenterIncidents,
   getConvocationPdfUrl,
   getDashboard,
+  getDeviceSessionAlerts,
   getEntrySummary,
   getExamCertificatePdfUrl,
+  getExamMonitoringEvents,
+  getExamMonitoringSummaries,
   getExamSummary,
+  getQuestions,
   getInstitutionalActionCenter,
   getInstitutionalReport,
   getInstitutionalReadiness,
@@ -52,14 +81,27 @@ import {
   getPaymentAlerts,
   getPaymentReconciliationItems,
   getQuestionGovernanceItems,
+  handleCandidateSubmission,
+  importOfficialCandidates,
+  importOfficialCenters,
+  importOfficialPayments,
+  importOfficialQuestions,
   resetInstitutionalUserPassword,
+  reportCenterIncident,
+  resolveCenterIncident,
+  startExamFromBooking,
+  submitCandidateIdentity,
+  submitCandidateSubmission,
+  submitExamAttempt,
   validateEntry,
   updateCenterStatus,
+  updateCenterStation,
   updateInstitutionalAuthorizationStatus,
   updateInstitutionalUserRole,
   updateInstitutionalUserStatus,
   verifyExamCertificate,
 } from './api';
+import { canUseProtectedActions, useAuthSession } from './authSession';
 
 const fallbackDashboard: DashboardData = {
   candidates: 1250,
@@ -308,6 +350,10 @@ function sanitizePaymentFilters(filters: PaymentFilters): PaymentFilters {
   };
 }
 
+function getActionErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message ? error.message : fallback;
+}
+
 export function HomePage() {
   const [dashboard, setDashboard] = useState<DashboardData>(fallbackDashboard);
   const [readiness, setReadiness] = useState<OperationalReadiness>(fallbackOperationalReadiness);
@@ -429,7 +475,25 @@ export function InstitutionalDossierPage() {
 }
 
 export function CandidatePage() {
-  const [bookingReference, setBookingReference] = useState('GN-BOOK-2026-000001');
+  const [bookingReference, setBookingReference] = useState('CRG-BOOK-DEMO-001');
+  const [identityForm, setIdentityForm] = useState<CandidateIdentityPayload>({
+    candidate_id: 'demo-candidate-1',
+    document_type: 'national_id',
+    document_reference: 'NINA-DEMO-001',
+    photo_reference: 'photo-candidat-demo',
+  });
+  const [identitySubmission, setIdentitySubmission] = useState<CandidateIdentityCheck | null>(null);
+  const [identitySubmissionStatus, setIdentitySubmissionStatus] = useState<string | null>(null);
+  const [isSubmittingIdentity, setIsSubmittingIdentity] = useState(false);
+  const [submissionForm, setSubmissionForm] = useState<CandidateSubmissionPayload>({
+    candidate_id: 'demo-candidate-1',
+    attempt_id: 'demo-attempt-1',
+    category: 'review',
+    message: 'Je souhaite que mon dossier soit examine par l administration.',
+  });
+  const [candidateSubmission, setCandidateSubmission] = useState<CandidateSubmission | null>(null);
+  const [candidateSubmissionStatus, setCandidateSubmissionStatus] = useState<string | null>(null);
+  const [isSubmittingFollowup, setIsSubmittingFollowup] = useState(false);
   const [amount, setAmount] = useState(250000);
   const [provider, setProvider] = useState('orange_money');
   const [phone, setPhone] = useState('+224622000000');
@@ -465,9 +529,41 @@ export function CandidatePage() {
       const result = await createPayment({ booking_reference: bookingReference, amount_gnf: amount, provider, phone });
       setPaymentResult(result);
     } catch (error) {
-      setPaymentError("Impossible de traiter le paiement. Verifiez que l'API est demarree.");
+      setPaymentError(getActionErrorMessage(error, "Impossible de traiter le paiement. Verifiez que l'API est demarree."));
     } finally {
       setIsPaying(false);
+    }
+  }
+
+  async function handleIdentitySubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setIdentitySubmissionStatus(null);
+    setIdentitySubmission(null);
+    setIsSubmittingIdentity(true);
+    try {
+      const created = await submitCandidateIdentity(identityForm);
+      setIdentitySubmission(created);
+      setIdentitySubmissionStatus(`Piece ${created.document_reference} deposee en statut ${created.status}.`);
+    } catch (error) {
+      setIdentitySubmissionStatus(getActionErrorMessage(error, 'Depot de piece impossible : verifiez le candidat ou l API.'));
+    } finally {
+      setIsSubmittingIdentity(false);
+    }
+  }
+
+  async function handleCandidateSubmissionSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setCandidateSubmissionStatus(null);
+    setCandidateSubmission(null);
+    setIsSubmittingFollowup(true);
+    try {
+      const created = await submitCandidateSubmission(submissionForm);
+      setCandidateSubmission(created);
+      setCandidateSubmissionStatus(`Recours ${created.id} depose en statut ${created.status}.`);
+    } catch (error) {
+      setCandidateSubmissionStatus(getActionErrorMessage(error, 'Depot du recours impossible : verifiez le candidat, la tentative ou l API.'));
+    } finally {
+      setIsSubmittingFollowup(false);
     }
   }
 
@@ -496,6 +592,53 @@ export function CandidatePage() {
             <div className="mini-card" key={label}>{label} : <strong>{value}</strong></div>
           ))}
         </div>
+        <form className="candidate-document-form" onSubmit={handleIdentitySubmit}>
+          <h2>Pieces justificatives</h2>
+          <p>Depot d une piece pour controle administratif avant convocation et passage en centre.</p>
+          <label>ID candidat<input value={identityForm.candidate_id} onChange={(event) => setIdentityForm((current) => ({ ...current, candidate_id: event.target.value }))} /></label>
+          <label>Type de piece
+            <select value={identityForm.document_type} onChange={(event) => setIdentityForm((current) => ({ ...current, document_type: event.target.value }))}>
+              <option value="national_id">Carte nationale</option>
+              <option value="passport">Passeport</option>
+              <option value="driver_file">Dossier auto-ecole</option>
+            </select>
+          </label>
+          <label>Reference piece<input value={identityForm.document_reference} onChange={(event) => setIdentityForm((current) => ({ ...current, document_reference: event.target.value }))} /></label>
+          <label>Reference photo<input value={identityForm.photo_reference ?? ''} onChange={(event) => setIdentityForm((current) => ({ ...current, photo_reference: event.target.value }))} /></label>
+          <button disabled={isSubmittingIdentity || identityForm.candidate_id.length < 3 || identityForm.document_reference.length < 3}>{isSubmittingIdentity ? 'Depot...' : 'Deposer la piece'}</button>
+        </form>
+        {identitySubmissionStatus && <p className={identitySubmissionStatus.includes('impossible') ? 'form-error' : 'login-status'}>{identitySubmissionStatus}</p>}
+        {identitySubmission && (
+          <div className="candidate-identity-receipt">
+            <strong>Controle cree : {identitySubmission.id}</strong>
+            <span>Statut : {identitySubmission.status}</span>
+            <span>Reference : {identitySubmission.document_reference}</span>
+          </div>
+        )}
+        <form className="candidate-submission-form" onSubmit={handleCandidateSubmissionSubmit}>
+          <h2>Recours et reclamations</h2>
+          <p>Demande officielle de revue apres examen, incident ou contestation de dossier.</p>
+          <label>ID candidat<input value={submissionForm.candidate_id} onChange={(event) => setSubmissionForm((current) => ({ ...current, candidate_id: event.target.value }))} /></label>
+          <label>ID tentative<input value={submissionForm.attempt_id} onChange={(event) => setSubmissionForm((current) => ({ ...current, attempt_id: event.target.value }))} /></label>
+          <label>Categorie
+            <select value={submissionForm.category} onChange={(event) => setSubmissionForm((current) => ({ ...current, category: event.target.value }))}>
+              <option value="review">Revue de dossier</option>
+              <option value="appeal">Recours resultat</option>
+              <option value="incident">Incident centre</option>
+              <option value="correction">Correction administrative</option>
+            </select>
+          </label>
+          <label>Message<textarea value={submissionForm.message} onChange={(event) => setSubmissionForm((current) => ({ ...current, message: event.target.value }))} /></label>
+          <button disabled={isSubmittingFollowup || submissionForm.candidate_id.length < 3 || submissionForm.attempt_id.length < 3 || submissionForm.message.length < 10}>{isSubmittingFollowup ? 'Depot...' : 'Deposer le recours'}</button>
+        </form>
+        {candidateSubmissionStatus && <p className={candidateSubmissionStatus.includes('impossible') ? 'form-error' : 'login-status'}>{candidateSubmissionStatus}</p>}
+        {candidateSubmission && (
+          <div className="candidate-identity-receipt">
+            <strong>Recours cree : {candidateSubmission.id}</strong>
+            <span>Statut : {candidateSubmission.status}</span>
+            <span>Categorie : {candidateSubmission.category}</span>
+          </div>
+        )}
         <form className="payment-form" onSubmit={handlePaymentSubmit}>
           <h2>Paiement Mobile Money</h2>
           <label>Reference reservation<input value={bookingReference} onChange={(event) => setBookingReference(event.target.value)} /></label>
@@ -528,12 +671,24 @@ export function CandidatePage() {
 }
 
 export function CenterPage() {
-  const [entryReference, setEntryReference] = useState('GN-CONV-2026-000001');
-  const [verificationCode, setVerificationCode] = useState('');
-  const [centerCode, setCenterCode] = useState('CTR-KALOUM');
+  const { currentUser, isPresentationMode } = useAuthSession();
+  const canReportCenterIncident = canUseProtectedActions(currentUser, isPresentationMode, ['center', 'admin', 'super_admin']);
+  const [entryReference, setEntryReference] = useState('CRG-BOOK-DEMO-001');
+  const [verificationCode, setVerificationCode] = useState('CRG-VERIFY-DEMO-001');
+  const [centerCode, setCenterCode] = useState('CRG-CONAKRY-001');
   const [entryResult, setEntryResult] = useState<EntryValidationResult | null>(null);
   const [entryError, setEntryError] = useState<string | null>(null);
   const [isSubmittingEntry, setIsSubmittingEntry] = useState(false);
+  const [centers, setCenters] = useState<Center[]>([]);
+  const [incidentType, setIncidentType] = useState('technical_issue');
+  const [incidentSeverity, setIncidentSeverity] = useState('medium');
+  const [incidentDescription, setIncidentDescription] = useState('Poste candidat indisponible pendant le controle.');
+  const [incidentStatus, setIncidentStatus] = useState<string | null>(null);
+  const [isReportingIncident, setIsReportingIncident] = useState(false);
+
+  useEffect(() => {
+    getCenters().then(setCenters).catch(() => undefined);
+  }, []);
 
   async function handleEntrySubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -544,22 +699,75 @@ export function CenterPage() {
       const result = await validateEntry({ reference: entryReference, verification_code: verificationCode, center_code: centerCode });
       setEntryResult(result);
     } catch (error) {
-      setEntryError("Impossible de valider l'entree. Verifiez que l'API est demarree.");
+      setEntryError(getActionErrorMessage(error, "Impossible de valider l'entree. Verifiez que l'API est demarree."));
     } finally {
       setIsSubmittingEntry(false);
     }
   }
 
+  async function handleIncidentSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setIncidentStatus(null);
+    if (!canReportCenterIncident) {
+      setIncidentStatus('Action protegee : connectez-vous avec un compte centre, admin ou super admin pour declarer un incident officiel.');
+      return;
+    }
+    const center = centers.find((item) => item.code === centerCode);
+    if (!center) {
+      setIncidentStatus('Centre introuvable : verifiez le code centre ou chargez les donnees API.');
+      return;
+    }
+    setIsReportingIncident(true);
+    try {
+      const incident = await reportCenterIncident({
+        center_id: center.id,
+        incident_type: incidentType,
+        severity: incidentSeverity,
+        description: incidentDescription,
+      });
+      setIncidentStatus(`Incident ${incident.id} enregistre en statut ${incident.status}.`);
+    } catch (error) {
+      setIncidentStatus(getActionErrorMessage(error, 'Declaration incident impossible.'));
+    } finally {
+      setIsReportingIncident(false);
+    }
+  }
+
   return (
     <section className="screen two-columns inverted">
-      <form className="scanner-card" onSubmit={handleEntrySubmit}>
-        <h2>Controle entree centre</h2>
-        <p>Scan QR, verification du code et passage automatique du statut en checked_in.</p>
-        <label>Reference convocation<input value={entryReference} onChange={(event) => setEntryReference(event.target.value)} /></label>
-        <label>Code verification<input value={verificationCode} onChange={(event) => setVerificationCode(event.target.value)} placeholder="Code de la convocation" /></label>
-        <label>Code centre<input value={centerCode} onChange={(event) => setCenterCode(event.target.value)} /></label>
-        <button disabled={isSubmittingEntry || !entryReference || !verificationCode}>{isSubmittingEntry ? 'Validation...' : 'Valider entree'}</button>
-      </form>
+      <div className="center-action-stack">
+        <form className="scanner-card" onSubmit={handleEntrySubmit}>
+          <h2>Controle entree centre</h2>
+          <p>Scan QR, verification du code et passage automatique du statut en checked_in.</p>
+          <label>Reference convocation<input value={entryReference} onChange={(event) => setEntryReference(event.target.value)} /></label>
+          <label>Code verification<input value={verificationCode} onChange={(event) => setVerificationCode(event.target.value)} placeholder="Code de la convocation" /></label>
+          <label>Code centre<input value={centerCode} onChange={(event) => setCenterCode(event.target.value)} /></label>
+          <button disabled={isSubmittingEntry || !entryReference || !verificationCode}>{isSubmittingEntry ? 'Validation...' : 'Valider entree'}</button>
+        </form>
+        <form className="scanner-card incident-form" onSubmit={handleIncidentSubmit}>
+          <h2>Declaration incident</h2>
+          <p>Tracer un incident centre pour audit, supervision et reprise de session.</p>
+          {!canReportCenterIncident && <p className="protected-action-note">Mode presentation : declaration officielle reservee aux sessions centre ou admin connectees.</p>}
+          <label>Type
+            <select value={incidentType} onChange={(event) => setIncidentType(event.target.value)}>
+              <option value="technical_issue">Probleme technique</option>
+              <option value="identity_dispute">Litige identite</option>
+              <option value="network_outage">Coupure reseau</option>
+              <option value="fraud_suspicion">Suspicion fraude</option>
+            </select>
+          </label>
+          <label>Gravite
+            <select value={incidentSeverity} onChange={(event) => setIncidentSeverity(event.target.value)}>
+              <option value="low">Faible</option>
+              <option value="medium">Moyenne</option>
+              <option value="high">Haute</option>
+              <option value="critical">Critique</option>
+            </select>
+          </label>
+          <label>Description<textarea value={incidentDescription} onChange={(event) => setIncidentDescription(event.target.value)} /></label>
+          <button disabled={!canReportCenterIncident || isReportingIncident || incidentDescription.length < 5}>{isReportingIncident ? 'Declaration...' : 'Declarer incident'}</button>
+        </form>
+      </div>
       <div>
         <p className="eyebrow dark">Centre agree</p>
         <h2>Validation en temps reel</h2>
@@ -571,24 +779,157 @@ export function CenterPage() {
             <tr><th>Message</th><td>{entryResult?.message ?? entryResult?.reason ?? entryError ?? 'Aucune validation lancee'}</td></tr>
           </tbody>
         </table>
+        {incidentStatus && <p className={incidentStatus.includes('impossible') || incidentStatus.includes('introuvable') ? 'form-error' : 'login-status'}>{incidentStatus}</p>}
       </div>
     </section>
   );
 }
 
+const centerImportStatuses = new Set(['pending_audit', 'active', 'accredited', 'suspended']);
+const candidateImportStatuses = new Set(['registered', 'verified', 'suspended']);
+
+function parseCandidateImportCsv(value: string): CandidateOfficialImportRow[] {
+  return value
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith('#'))
+    .map((line, index) => {
+      const [firstName, lastName, identityNumber, phone, permitCategory = 'B', statusValue = 'registered'] = line.split(';').map((item) => item.trim());
+      const status = candidateImportStatuses.has(statusValue) ? statusValue as CandidateOfficialImportRow['status'] : 'registered';
+      if (!firstName || !lastName || !identityNumber || !phone) {
+        throw new Error(`Ligne ${index + 1} incomplete`);
+      }
+      return {
+        first_name: firstName,
+        last_name: lastName,
+        identity_number: identityNumber,
+        phone,
+        permit_category: permitCategory || 'B',
+        status,
+      };
+    });
+}
+
+function parseCenterImportCsv(value: string): CenterOfficialImportRow[] {
+  return value
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith('#'))
+    .map((line, index) => {
+      const [code, name, city, address, capacityValue = '20', statusValue = 'pending_audit'] = line.split(';').map((item) => item.trim());
+      const status = centerImportStatuses.has(statusValue) ? statusValue as CenterOfficialImportRow['status'] : 'pending_audit';
+      const capacity = Number(capacityValue);
+      if (!code || !name || !city || !address) {
+        throw new Error(`Ligne ${index + 1} incomplete`);
+      }
+      if (!Number.isFinite(capacity) || capacity < 1) {
+        throw new Error(`Capacite invalide ligne ${index + 1}`);
+      }
+      return { code, name, city, address, capacity, status };
+    });
+}
+
+function parseQuestionImportCsv(value: string): QuestionOfficialImportRow[] {
+  return value
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith('#'))
+    .map((line, index) => {
+      const [category, text, optionsValue, correctAnswer, explanation = '', activeValue = 'true'] = line.split(';').map((item) => item.trim());
+      const options = optionsValue ? optionsValue.split('|').map((option) => option.trim()).filter(Boolean) : [];
+      if (!category || !text || options.length < 2 || !correctAnswer) {
+        throw new Error(`Ligne ${index + 1} incomplete`);
+      }
+      if (!options.includes(correctAnswer)) {
+        throw new Error(`Bonne reponse absente des options ligne ${index + 1}`);
+      }
+      return {
+        category,
+        text,
+        options,
+        correct_answer: correctAnswer,
+        explanation: explanation || null,
+        is_active: activeValue.toLowerCase() !== 'false',
+      };
+    });
+}
+
+function parsePaymentImportCsv(value: string): PaymentOfficialImportRow[] {
+  return value
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith('#'))
+    .map((line, index) => {
+      const [bookingReference, amountValue, provider, phone, status = 'paid', receiptNumber, createdAt = ''] = line.split(';').map((item) => item.trim());
+      const amount = Number(amountValue);
+      if (!bookingReference || !provider || !phone || !receiptNumber) {
+        throw new Error(`Ligne ${index + 1} incomplete`);
+      }
+      if (!Number.isFinite(amount) || amount <= 0) {
+        throw new Error(`Montant invalide ligne ${index + 1}`);
+      }
+      return {
+        booking_reference: bookingReference,
+        amount_gnf: amount,
+        provider,
+        phone,
+        status,
+        receipt_number: receiptNumber,
+        created_at: createdAt || null,
+      };
+    });
+}
+
 export function AdminPage() {
+  const { currentUser, isPresentationMode } = useAuthSession();
+  const canAdminAct = canUseProtectedActions(currentUser, isPresentationMode, ['admin', 'super_admin']);
+  const canSuperAdminAct = canUseProtectedActions(currentUser, isPresentationMode, ['super_admin']);
   const [dashboard, setDashboard] = useState<DashboardData>(fallbackDashboard);
+  const [candidates, setCandidates] = useState<Candidate[]>([]);
+  const [candidateImportSource, setCandidateImportSource] = useState('Registre national pilote');
+  const [candidateImportReason, setCandidateImportReason] = useState('Chargement officiel des candidats pilotes');
+  const [candidateImportCsv, setCandidateImportCsv] = useState('Mamadou;Diallo;GN-ID-2026-0001;+224620000001;B;registered');
+  const [candidateImportDryRun, setCandidateImportDryRun] = useState(true);
+  const [candidateImportStatus, setCandidateImportStatus] = useState<string | null>(null);
   const [centers, setCenters] = useState<Center[]>([]);
   const [centerStatus, setCenterStatus] = useState<string | null>(null);
+  const [centerImportSource, setCenterImportSource] = useState('Liste officielle DNTT');
+  const [centerImportReason, setCenterImportReason] = useState('Chargement officiel des centres pilotes');
+  const [centerImportCsv, setCenterImportCsv] = useState('CRG-CONAKRY-002;Centre officiel Conakry 2;Conakry;Matoto;30;pending_audit');
+  const [centerImportDryRun, setCenterImportDryRun] = useState(true);
+  const [centerStations, setCenterStations] = useState<CenterStation[]>([]);
+  const [centerStationStatus, setCenterStationStatus] = useState<string | null>(null);
+  const [centerStationForm, setCenterStationForm] = useState<CenterStationPayload>({
+    center_id: '',
+    device_key: 'CTR-KALOUM-POSTE-12',
+    label: 'Poste examen 12',
+    room: 'Salle A',
+    status: 'active',
+  });
   const [entrySummary, setEntrySummary] = useState<EntrySummary>(fallbackEntrySummary);
   const [examSummary, setExamSummary] = useState<ExamSummary>(fallbackExamSummary);
   const [paymentSummary, setPaymentSummary] = useState<PaymentSummary>(fallbackPaymentSummary);
   const [paymentItems, setPaymentItems] = useState<PaymentReconciliationItem[]>([]);
   const [paymentAlerts, setPaymentAlerts] = useState<PaymentAlert[]>([]);
+  const [centerIncidents, setCenterIncidents] = useState<CenterIncident[]>([]);
+  const [incidentResolutionNotes, setIncidentResolutionNotes] = useState('Incident analyse par la supervision nationale. Reprise autorisee si necessaire.');
+  const [allowIncidentRetake, setAllowIncidentRetake] = useState(true);
+  const [incidentAdminStatus, setIncidentAdminStatus] = useState<string | null>(null);
   const [identityChecks, setIdentityChecks] = useState<CandidateIdentityCheck[]>(fallbackIdentityChecks);
   const [identityStatus, setIdentityStatus] = useState<string | null>(null);
+  const [identityFilters, setIdentityFilters] = useState<CandidateIdentityFilters>({ status_filter: 'pending', limit: 25 });
+  const [activeIdentityFilters, setActiveIdentityFilters] = useState<CandidateIdentityFilters>({ status_filter: 'pending', limit: 25 });
+  const [candidateSubmissions, setCandidateSubmissions] = useState<CandidateSubmission[]>([]);
+  const [submissionFilters, setSubmissionFilters] = useState<CandidateSubmissionFilters>({ status_filter: 'submitted', limit: 25 });
+  const [activeSubmissionFilters, setActiveSubmissionFilters] = useState<CandidateSubmissionFilters>({ status_filter: 'submitted', limit: 25 });
+  const [submissionAdminResponse, setSubmissionAdminResponse] = useState('Votre demande est prise en charge par la supervision nationale.');
+  const [submissionAdminStatus, setSubmissionAdminStatus] = useState<string | null>(null);
   const [questionGovernance, setQuestionGovernance] = useState<QuestionGovernanceItem[]>(fallbackQuestionGovernance);
   const [questionGovernanceStatus, setQuestionGovernanceStatus] = useState<string | null>(null);
+  const [questionImportSource, setQuestionImportSource] = useState('Commission nationale du code');
+  const [questionImportReason, setQuestionImportReason] = useState('Chargement officiel de la banque pilote');
+  const [questionImportCsv, setQuestionImportCsv] = useState('signalisation;Que signifie un feu rouge fixe ?;S arreter|Passer avec prudence|Accelerer;S arreter;Le feu rouge impose l arret.;true');
+  const [questionImportDryRun, setQuestionImportDryRun] = useState(true);
   const [institutionalAuthorizations, setInstitutionalAuthorizations] = useState<InstitutionalAuthorization[]>(fallbackInstitutionalAuthorizations);
   const [authorizationStatus, setAuthorizationStatus] = useState<string | null>(null);
   const [authorizationForm, setAuthorizationForm] = useState<InstitutionalAuthorizationPayload>({
@@ -615,8 +956,19 @@ export function AdminPage() {
   const [readinessStatus, setReadinessStatus] = useState<string | null>(null);
   const [paymentFilters, setPaymentFilters] = useState<PaymentFilters>({});
   const [activePaymentFilters, setActivePaymentFilters] = useState<PaymentFilters>({});
+  const [paymentImportSource, setPaymentImportSource] = useState('Orange Money');
+  const [paymentImportReason, setPaymentImportReason] = useState('Rapprochement officiel quotidien');
+  const [paymentImportCsv, setPaymentImportCsv] = useState('GN-BOOK-2026-000001;250000;orange_money;+224620000001;paid;OM-RECU-000001');
+  const [paymentImportDryRun, setPaymentImportDryRun] = useState(true);
+  const [paymentImportStatus, setPaymentImportStatus] = useState<string | null>(null);
   const [auditFilters, setAuditFilters] = useState<AuditLogFilters>({});
   const [activeAuditFilters, setActiveAuditFilters] = useState<AuditLogFilters>({});
+  const [monitoringFilters, setMonitoringFilters] = useState<ExamMonitoringFilters>({ min_risk_score: 1, limit: 25 });
+  const [activeMonitoringFilters, setActiveMonitoringFilters] = useState<ExamMonitoringFilters>({ min_risk_score: 1, limit: 25 });
+  const [monitoringSummaries, setMonitoringSummaries] = useState<ExamMonitoringSummary[]>([]);
+  const [monitoringEvents, setMonitoringEvents] = useState<ExamMonitoringEvent[]>([]);
+  const [deviceSessionAlerts, setDeviceSessionAlerts] = useState<DeviceSession[]>([]);
+  const [monitoringStatus, setMonitoringStatus] = useState<string | null>(null);
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
   const [auditStatus, setAuditStatus] = useState<string | null>(null);
   const [financeStatus, setFinanceStatus] = useState<string | null>(null);
@@ -625,10 +977,32 @@ export function AdminPage() {
   const [paymentCsvExportStatus, setPaymentCsvExportStatus] = useState<string | null>(null);
   const [auditCsvExportStatus, setAuditCsvExportStatus] = useState<string | null>(null);
   const [isExportingInstitutionalReport, setIsExportingInstitutionalReport] = useState(false);
+  const [isExportingInstitutionalReportPdf, setIsExportingInstitutionalReportPdf] = useState(false);
   const [isExportingCsv, setIsExportingCsv] = useState(false);
   const [isExportingExamCsv, setIsExportingExamCsv] = useState(false);
   const [isExportingPaymentCsv, setIsExportingPaymentCsv] = useState(false);
   const [isExportingAuditCsv, setIsExportingAuditCsv] = useState(false);
+
+  function blockProtectedAction(setStatus: (value: string) => void, superAdminOnly = false): boolean {
+    if (superAdminOnly ? canSuperAdminAct : canAdminAct) {
+      return false;
+    }
+    setStatus(superAdminOnly
+      ? 'Action protegee : connectez-vous avec un compte super admin reel.'
+      : 'Action protegee : connectez-vous avec un compte admin ou super admin reel.');
+    return true;
+  }
+
+  async function refreshCenterIncidents() {
+    if (blockProtectedAction(setIncidentAdminStatus)) return;
+    try {
+      const incidents = await getCenterIncidents('open', 25);
+      setCenterIncidents(incidents);
+      setIncidentAdminStatus(null);
+    } catch {
+      setIncidentAdminStatus('Incidents indisponibles : connectez-vous avec un role admin ou super admin.');
+    }
+  }
 
   async function loadPaymentSummary(filters: PaymentFilters) {
     try {
@@ -646,12 +1020,82 @@ export function AdminPage() {
     }
   }
 
+  async function refreshIdentityChecks(filters: CandidateIdentityFilters = activeIdentityFilters) {
+    if (!canAdminAct) {
+      setIdentityStatus('Mode demo : connectez-vous avec un compte admin ou super admin reel pour filtrer les pieces.');
+      return;
+    }
+    try {
+      const cleanFilters = {
+        status_filter: filters.status_filter || undefined,
+        candidate_id: filters.candidate_id || undefined,
+        limit: filters.limit ?? 25,
+      };
+      const checks = await getCandidateIdentityChecks(cleanFilters);
+      setIdentityChecks(checks);
+      setActiveIdentityFilters(cleanFilters);
+      setIdentityStatus(null);
+    } catch {
+      setIdentityStatus('Pieces indisponibles : connectez-vous avec un role admin ou super admin.');
+    }
+  }
+
+  async function refreshCandidateSubmissions(filters: CandidateSubmissionFilters = activeSubmissionFilters) {
+    if (!canAdminAct) {
+      setSubmissionAdminStatus('Mode demo : connectez-vous avec un compte admin ou super admin reel pour traiter les recours.');
+      return;
+    }
+    try {
+      const cleanFilters = {
+        candidate_id: filters.candidate_id || undefined,
+        attempt_id: filters.attempt_id || undefined,
+        status_filter: filters.status_filter || undefined,
+        limit: filters.limit ?? 25,
+      };
+      const items = await getCandidateSubmissions(cleanFilters);
+      setCandidateSubmissions(items);
+      setActiveSubmissionFilters(cleanFilters);
+      setSubmissionAdminStatus(null);
+    } catch {
+      setSubmissionAdminStatus('Recours indisponibles : connectez-vous avec un role admin ou super admin.');
+    }
+  }
+
+  async function refreshExamMonitoring(filters: ExamMonitoringFilters = activeMonitoringFilters) {
+    if (!canAdminAct) {
+      setMonitoringStatus('Mode demo : connectez-vous avec un compte admin ou super admin reel pour charger le monitoring examen.');
+      return;
+    }
+    try {
+      const cleanFilters = {
+        attempt_id: filters.attempt_id || undefined,
+        session_id: filters.session_id || undefined,
+        severity: filters.severity || undefined,
+        min_risk_score: filters.min_risk_score ?? 1,
+        limit: filters.limit ?? 25,
+      };
+      const summaries = await getExamMonitoringSummaries(cleanFilters);
+      const events = await getExamMonitoringEvents(cleanFilters);
+      const deviceAlerts = await getDeviceSessionAlerts({ session_id: cleanFilters.session_id, limit: 25 });
+      setMonitoringSummaries(summaries);
+      setMonitoringEvents(events);
+      setDeviceSessionAlerts(deviceAlerts);
+      setActiveMonitoringFilters(cleanFilters);
+      setMonitoringStatus(null);
+    } catch {
+      setMonitoringStatus('Monitoring examen indisponible : connectez-vous avec un role admin ou super admin.');
+    }
+  }
+
   useEffect(() => {
     getDashboard().then(setDashboard).catch(() => undefined);
+    getCandidates().then(setCandidates).catch(() => undefined);
     getCenters().then(setCenters).catch(() => undefined);
+    getCenterStations({ limit: 25 }).then(setCenterStations).catch(() => undefined);
     getEntrySummary().then(setEntrySummary).catch(() => undefined);
     getExamSummary().then(setExamSummary).catch(() => undefined);
     loadPaymentSummary({});
+    refreshCenterIncidents();
     getInstitutionalReadiness()
       .then((readiness) => {
         setInstitutionalReadiness(readiness);
@@ -670,12 +1114,27 @@ export function AdminPage() {
         setActionCenterStatus(null);
       })
       .catch(() => setActionCenterStatus('Mode demo : connectez-vous avec un role admin pour charger le centre d action API.'));
-    getCandidateIdentityChecks()
+    getCandidateIdentityChecks({ status_filter: 'pending', limit: 25 })
       .then((checks) => {
         setIdentityChecks(checks.length > 0 ? checks : fallbackIdentityChecks);
         setIdentityStatus(null);
       })
       .catch(() => setIdentityStatus('Mode demo : connectez-vous avec un role admin pour traiter les identites API.'));
+    getCandidateSubmissions({ status_filter: 'submitted', limit: 25 })
+      .then((items) => {
+        setCandidateSubmissions(items);
+        setSubmissionAdminStatus(null);
+      })
+      .catch(() => setSubmissionAdminStatus('Mode demo : connectez-vous avec un role admin pour traiter les recours API.'));
+    getExamMonitoringSummaries({ min_risk_score: 1, limit: 25 })
+      .then(setMonitoringSummaries)
+      .catch(() => setMonitoringStatus('Mode demo : connectez-vous avec un role admin pour charger le monitoring examen API.'));
+    getExamMonitoringEvents({ limit: 25 })
+      .then(setMonitoringEvents)
+      .catch(() => undefined);
+    getDeviceSessionAlerts({ limit: 25 })
+      .then(setDeviceSessionAlerts)
+      .catch(() => undefined);
     getQuestionGovernanceItems()
       .then((items) => {
         setQuestionGovernance(items.length > 0 ? items : fallbackQuestionGovernance);
@@ -702,7 +1161,24 @@ export function AdminPage() {
       .catch(() => setAuditStatus('Logs indisponibles : connectez-vous avec un role admin ou super admin.'));
   }, []);
 
+  async function handleResolveIncident(incidentId: string) {
+    setIncidentAdminStatus(null);
+    if (blockProtectedAction(setIncidentAdminStatus)) return;
+    try {
+      const resolved = await resolveCenterIncident(incidentId, incidentResolutionNotes, allowIncidentRetake);
+      setCenterIncidents((current) => current.filter((incident) => incident.id !== resolved.id));
+      setIncidentAdminStatus(`Incident ${resolved.id} resolu${resolved.new_attempt_id ? `, nouvelle tentative ${resolved.new_attempt_id}` : ''}.`);
+      await refreshAuditLogs();
+    } catch (error) {
+      setIncidentAdminStatus(getActionErrorMessage(error, 'Resolution incident impossible.'));
+    }
+  }
+
   async function refreshAuditLogs(filters: AuditLogFilters = activeAuditFilters) {
+    if (!canAdminAct) {
+      setAuditStatus('Logs indisponibles : connectez-vous avec un compte admin ou super admin reel.');
+      return;
+    }
     try {
       const cleanFilters = {
         action: filters.action || undefined,
@@ -719,6 +1195,7 @@ export function AdminPage() {
 
   async function handleCenterStatus(centerId: string, status: string, reason: string) {
     setCenterStatus(null);
+    if (blockProtectedAction(setCenterStatus)) return;
     try {
       const updatedCenter = await updateCenterStatus(centerId, status, reason);
       setCenters((current) => current.map((center) => (center.id === centerId ? updatedCenter : center)));
@@ -730,20 +1207,100 @@ export function AdminPage() {
     }
   }
 
+  async function handleOfficialCenterImport(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (blockProtectedAction(setCenterStatus)) return;
+    try {
+      const rows = parseCenterImportCsv(centerImportCsv);
+      const result = await importOfficialCenters(centerImportSource, centerImportReason, rows, centerImportDryRun);
+      setCenterStatus(`${result.dry_run ? 'Simulation officielle terminee' : 'Import officiel termine'} : ${result.imported} centre(s), ${result.created} cree(s), ${result.updated} mis a jour.`);
+      if (!result.dry_run) {
+        const refreshedCenters = await getCenters();
+        setCenters(refreshedCenters);
+        await refreshAuditLogs();
+      }
+    } catch (error) {
+      setCenterStatus(error instanceof Error ? `Import impossible : ${error.message}` : 'Import officiel impossible.');
+    }
+  }
+
+  async function handleCenterStationSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setCenterStationStatus(null);
+    if (blockProtectedAction(setCenterStationStatus)) return;
+    try {
+      const created = await createCenterStation(centerStationForm);
+      setCenterStations((current) => [created, ...current]);
+      setCenterStationStatus(`Poste ${created.label} enregistre (${created.status}).`);
+      await refreshAuditLogs();
+    } catch {
+      setCenterStationStatus('Creation poste impossible : verifiez le centre, la cle appareil et le role admin.');
+    }
+  }
+
+  async function handleCenterStationStatus(stationId: string, status: 'active' | 'disabled' | 'maintenance') {
+    setCenterStationStatus(null);
+    if (blockProtectedAction(setCenterStationStatus)) return;
+    try {
+      const updated = await updateCenterStation(stationId, { status });
+      setCenterStations((current) => current.map((station) => (station.id === stationId ? updated : station)));
+      setCenterStationStatus(`Poste ${updated.label} : ${updated.status}.`);
+      await refreshAuditLogs();
+    } catch {
+      setCenterStationStatus('Mise a jour poste impossible : connectez-vous avec un role admin ou super admin.');
+    }
+  }
+
+  async function handleOfficialCandidateImport(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setCandidateImportStatus(null);
+    if (blockProtectedAction(setCandidateImportStatus)) return;
+    try {
+      const rows = parseCandidateImportCsv(candidateImportCsv);
+      const result = await importOfficialCandidates(candidateImportSource, candidateImportReason, rows, candidateImportDryRun);
+      setCandidateImportStatus(`${result.dry_run ? 'Simulation candidats terminee' : 'Import candidats termine'} : ${result.imported} dossier(s), ${result.created} cree(s), ${result.updated} mis a jour.`);
+      if (!result.dry_run) {
+        const refreshedCandidates = await getCandidates();
+        setCandidates(refreshedCandidates);
+        await refreshAuditLogs();
+        getDashboard().then(setDashboard).catch(() => undefined);
+      }
+    } catch (error) {
+      setCandidateImportStatus(error instanceof Error ? `Import candidats impossible : ${error.message}` : 'Import candidats impossible.');
+    }
+  }
+
   async function handleIdentityDecision(checkId: string, status: string, reason: string) {
     setIdentityStatus(null);
+    if (blockProtectedAction(setIdentityStatus)) return;
     try {
       const updatedCheck = await decideCandidateIdentity(checkId, status, reason);
       setIdentityChecks((current) => current.map((check) => (check.id === checkId ? updatedCheck : check)));
       setIdentityStatus(`Verification identite ${updatedCheck.document_reference} : ${updatedCheck.status}.`);
+      await refreshIdentityChecks();
       await refreshAuditLogs();
     } catch {
       setIdentityStatus('Decision identite impossible : connectez-vous avec un role admin ou super admin.');
     }
   }
 
+  async function handleSubmissionDecision(submissionId: string, status: string) {
+    setSubmissionAdminStatus(null);
+    if (blockProtectedAction(setSubmissionAdminStatus)) return;
+    try {
+      const updated = await handleCandidateSubmission(submissionId, status, submissionAdminResponse);
+      setCandidateSubmissions((current) => current.map((item) => (item.id === submissionId ? updated : item)));
+      setSubmissionAdminStatus(`Recours ${updated.id} : ${updated.status}.`);
+      await refreshCandidateSubmissions();
+      await refreshAuditLogs();
+    } catch {
+      setSubmissionAdminStatus('Decision recours impossible : verifiez la reponse admin et le role.');
+    }
+  }
+
   async function handleQuestionDecision(questionId: string, status: string, reason: string) {
     setQuestionGovernanceStatus(null);
+    if (blockProtectedAction(setQuestionGovernanceStatus)) return;
     try {
       const updatedItem = await decideQuestionGovernance(questionId, status, reason);
       setQuestionGovernance((current) => current.map((item) => (item.question_id === questionId ? updatedItem : item)));
@@ -755,9 +1312,29 @@ export function AdminPage() {
     }
   }
 
+  async function handleOfficialQuestionImport(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setQuestionGovernanceStatus(null);
+    if (blockProtectedAction(setQuestionGovernanceStatus)) return;
+    try {
+      const rows = parseQuestionImportCsv(questionImportCsv);
+      const result = await importOfficialQuestions(questionImportSource, questionImportReason, rows, questionImportDryRun);
+      setQuestionGovernanceStatus(`${result.dry_run ? 'Simulation questions terminee' : 'Import questions termine'} : ${result.imported} question(s), ${result.created} creee(s), ${result.updated} mise(s) a jour.`);
+      if (!result.dry_run) {
+        const refreshedQuestions = await getQuestionGovernanceItems();
+        setQuestionGovernance(refreshedQuestions);
+        await refreshAuditLogs();
+        getDashboard().then(setDashboard).catch(() => undefined);
+      }
+    } catch (error) {
+      setQuestionGovernanceStatus(error instanceof Error ? `Import questions impossible : ${error.message}` : 'Import questions impossible.');
+    }
+  }
+
   async function handleAuthorizationSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setAuthorizationStatus(null);
+    if (blockProtectedAction(setAuthorizationStatus)) return;
     try {
       const created = await createInstitutionalAuthorization(authorizationForm);
       setInstitutionalAuthorizations((current) => [created, ...current]);
@@ -770,6 +1347,7 @@ export function AdminPage() {
 
   async function handleAuthorizationStatus(authorizationId: string, status: string, reason: string) {
     setAuthorizationStatus(null);
+    if (blockProtectedAction(setAuthorizationStatus)) return;
     try {
       const updated = await updateInstitutionalAuthorizationStatus(authorizationId, status, reason);
       setInstitutionalAuthorizations((current) => current.map((item) => (item.id === authorizationId ? updated : item)));
@@ -782,6 +1360,7 @@ export function AdminPage() {
 
   async function handleUserRole(userId: string, role: string, reason: string) {
     setUserGovernanceStatus(null);
+    if (blockProtectedAction(setUserGovernanceStatus, true)) return;
     try {
       const updated = await updateInstitutionalUserRole(userId, role, reason);
       setInstitutionalUsers((current) => current.map((user) => (user.id === userId ? updated : user)));
@@ -795,6 +1374,7 @@ export function AdminPage() {
   async function handleUserSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setUserGovernanceStatus(null);
+    if (blockProtectedAction(setUserGovernanceStatus, true)) return;
     try {
       const created = await createInstitutionalUser(userForm);
       setInstitutionalUsers((current) => [created, ...current]);
@@ -807,6 +1387,7 @@ export function AdminPage() {
 
   async function handleUserStatus(userId: string, isActive: boolean, reason: string) {
     setUserGovernanceStatus(null);
+    if (blockProtectedAction(setUserGovernanceStatus, true)) return;
     try {
       const updated = await updateInstitutionalUserStatus(userId, isActive, reason);
       setInstitutionalUsers((current) => current.map((user) => (user.id === userId ? updated : user)));
@@ -819,6 +1400,7 @@ export function AdminPage() {
 
   async function handleUserPasswordReset(userId: string) {
     setUserGovernanceStatus(null);
+    if (blockProtectedAction(setUserGovernanceStatus, true)) return;
     try {
       const updated = await resetInstitutionalUserPassword(userId, passwordResetValue, 'Reinitialisation administrative controlee');
       setInstitutionalUsers((current) => current.map((user) => (user.id === userId ? updated : user)));
@@ -830,6 +1412,7 @@ export function AdminPage() {
   }
 
   async function handleDashboardCsvExport() {
+    if (blockProtectedAction(setCsvExportStatus)) return;
     setIsExportingCsv(true);
     setCsvExportStatus(null);
     try {
@@ -844,6 +1427,7 @@ export function AdminPage() {
   }
 
   async function handleExamAttemptsCsvExport() {
+    if (blockProtectedAction(setExamCsvExportStatus)) return;
     setIsExportingExamCsv(true);
     setExamCsvExportStatus(null);
     try {
@@ -858,6 +1442,7 @@ export function AdminPage() {
   }
 
   async function handlePaymentCsvExport() {
+    if (blockProtectedAction(setPaymentCsvExportStatus)) return;
     setIsExportingPaymentCsv(true);
     setPaymentCsvExportStatus(null);
     try {
@@ -872,6 +1457,7 @@ export function AdminPage() {
   }
 
   async function handleAuditCsvExport() {
+    if (blockProtectedAction(setAuditCsvExportStatus)) return;
     setIsExportingAuditCsv(true);
     setAuditCsvExportStatus(null);
     try {
@@ -886,6 +1472,7 @@ export function AdminPage() {
   }
 
   async function handleInstitutionalReportCsvExport() {
+    if (blockProtectedAction(setInstitutionalReportStatus)) return;
     setIsExportingInstitutionalReport(true);
     setInstitutionalReportStatus(null);
     try {
@@ -899,15 +1486,80 @@ export function AdminPage() {
     }
   }
 
+  async function handleInstitutionalReportPdfExport() {
+    if (blockProtectedAction(setInstitutionalReportStatus)) return;
+    setIsExportingInstitutionalReportPdf(true);
+    setInstitutionalReportStatus(null);
+    try {
+      await downloadInstitutionalReportPdf();
+      setInstitutionalReportStatus('Rapport institutionnel PDF telecharge avec succes.');
+      await refreshAuditLogs();
+    } catch {
+      setInstitutionalReportStatus('Export PDF institutionnel impossible : connectez-vous avec un role admin ou super admin.');
+    } finally {
+      setIsExportingInstitutionalReportPdf(false);
+    }
+  }
+
   async function handlePaymentFiltersSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     await loadPaymentSummary(paymentFilters);
     await refreshAuditLogs();
   }
 
+  async function handleOfficialPaymentImport(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setPaymentImportStatus(null);
+    if (blockProtectedAction(setPaymentImportStatus)) return;
+    try {
+      const rows = parsePaymentImportCsv(paymentImportCsv);
+      const result = await importOfficialPayments(paymentImportSource, paymentImportReason, rows, paymentImportDryRun);
+      setPaymentImportStatus(`${result.dry_run ? 'Simulation paiements terminee' : 'Import paiements termine'} : ${result.imported} paiement(s), ${result.created} cree(s), ${result.updated} mis a jour.`);
+      if (!result.dry_run) {
+        await loadPaymentSummary(activePaymentFilters);
+        await refreshAuditLogs();
+      }
+    } catch (error) {
+      setPaymentImportStatus(error instanceof Error ? `Import paiements impossible : ${error.message}` : 'Import paiements impossible.');
+    }
+  }
+
+  async function handleIdentityFiltersSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await refreshIdentityChecks(identityFilters);
+  }
+
+  async function resetIdentityFilters() {
+    const defaults = { status_filter: 'pending', limit: 25 };
+    setIdentityFilters(defaults);
+    await refreshIdentityChecks(defaults);
+  }
+
+  async function handleSubmissionFiltersSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await refreshCandidateSubmissions(submissionFilters);
+  }
+
+  async function resetSubmissionFilters() {
+    const defaults = { status_filter: 'submitted', limit: 25 };
+    setSubmissionFilters(defaults);
+    await refreshCandidateSubmissions(defaults);
+  }
+
   async function handleAuditFiltersSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     await refreshAuditLogs(auditFilters);
+  }
+
+  async function handleMonitoringFiltersSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await refreshExamMonitoring(monitoringFilters);
+  }
+
+  async function resetMonitoringFilters() {
+    const defaults = { min_risk_score: 1, limit: 25 };
+    setMonitoringFilters(defaults);
+    await refreshExamMonitoring(defaults);
   }
 
   async function resetAuditFilters() {
@@ -947,15 +1599,20 @@ export function AdminPage() {
   ];
   const adminSections = [
     { href: '#comptes', label: 'Comptes' },
+    { href: '#candidats', label: 'Candidats' },
     { href: '#centres', label: 'Centres' },
+    { href: '#incidents', label: 'Incidents' },
     { href: '#identites', label: 'Identites' },
+    { href: '#recours', label: 'Recours' },
     { href: '#questions', label: 'Questions' },
     { href: '#habilitations', label: 'Habilitations' },
     { href: '#dossier-etat', label: 'Dossier Etat' },
     { href: '#securite', label: 'Securite' },
+    { href: '#production', label: 'Production' },
     { href: '#roadmap', label: 'Roadmap' },
     { href: '#rapport', label: 'Rapport' },
     { href: '#finance', label: 'Finance' },
+    { href: '#monitoring-examen', label: 'Monitoring' },
     { href: '#audit', label: 'Audit' },
   ];
   const passRate = examSummary.submitted_attempts
@@ -1074,6 +1731,44 @@ export function AdminPage() {
       next: 'Formaliser consentement, minimisation, retention et acces aux donnees sensibles.',
     },
   ];
+  const productionChecklist = [
+    {
+      domain: 'Environnements',
+      status: 'A preparer',
+      evidence: 'Staging et production doivent utiliser des bases separees, variables dediees et domaines officiels.',
+      action: 'Creer staging/prod, isoler secrets et URL API.',
+    },
+    {
+      domain: 'Secrets',
+      status: 'Critique',
+      evidence: 'SECRET_KEY, ADMIN_REGISTRATION_TOKEN, POSTGRES_PASSWORD et compte bootstrap doivent etre generes hors depot.',
+      action: 'Stocker dans un coffre de secrets ou les variables securisees de la plateforme.',
+    },
+    {
+      domain: 'Base de donnees',
+      status: 'A valider',
+      evidence: 'PostgreSQL via migrations Alembic, AUTO_CREATE_TABLES=false et sauvegardes planifiees.',
+      action: 'Executer un test de restauration sur environnement de recette.',
+    },
+    {
+      domain: 'Securite HTTP',
+      status: 'En place',
+      evidence: 'Headers securite, CORS restreint, rate limit login et audit auth disponibles.',
+      action: 'Ajouter HTTPS, rotation certificats et revue OWASP avant ouverture publique.',
+    },
+    {
+      domain: 'Observabilite',
+      status: 'A renforcer',
+      evidence: 'Health/readiness, audit logs, monitoring examen et exports existent.',
+      action: 'Brancher logs centralises, alertes et metriques infrastructure.',
+    },
+    {
+      domain: 'CI/CD',
+      status: 'Partiel',
+      evidence: 'Workflow CI present pour tests backend critiques.',
+      action: 'Ajouter build frontend, tests E2E et deploiement staging automatise.',
+    },
+  ];
 
   return (
     <section className="panel admin-panel">
@@ -1094,12 +1789,14 @@ export function AdminPage() {
         {adminSections.map((section) => <a key={section.href} href={section.href}>{section.label}</a>)}
       </div>
       <div className="actions result-actions admin-actions">
-        <button onClick={handleDashboardCsvExport} disabled={isExportingCsv}>{isExportingCsv ? 'Export...' : 'Exporter le dashboard CSV'}</button>
-        <button onClick={handleInstitutionalReportCsvExport} disabled={isExportingInstitutionalReport}>{isExportingInstitutionalReport ? 'Export...' : 'Exporter le rapport institutionnel'}</button>
-        <button onClick={handleExamAttemptsCsvExport} disabled={isExportingExamCsv}>{isExportingExamCsv ? 'Export...' : 'Exporter les examens CSV'}</button>
-        <button onClick={handlePaymentCsvExport} disabled={isExportingPaymentCsv}>{isExportingPaymentCsv ? 'Export...' : 'Exporter les paiements CSV'}</button>
-        <button onClick={handleAuditCsvExport} disabled={isExportingAuditCsv}>{isExportingAuditCsv ? 'Export...' : 'Exporter audit CSV'}</button>
+        <button onClick={handleDashboardCsvExport} disabled={!canAdminAct || isExportingCsv}>{isExportingCsv ? 'Export...' : 'Exporter le dashboard CSV'}</button>
+        <button onClick={handleInstitutionalReportCsvExport} disabled={!canAdminAct || isExportingInstitutionalReport}>{isExportingInstitutionalReport ? 'Export...' : 'Exporter le rapport institutionnel'}</button>
+        <button onClick={handleInstitutionalReportPdfExport} disabled={!canAdminAct || isExportingInstitutionalReportPdf}>{isExportingInstitutionalReportPdf ? 'PDF...' : 'Exporter dossier Etat PDF'}</button>
+        <button onClick={handleExamAttemptsCsvExport} disabled={!canAdminAct || isExportingExamCsv}>{isExportingExamCsv ? 'Export...' : 'Exporter les examens CSV'}</button>
+        <button onClick={handlePaymentCsvExport} disabled={!canAdminAct || isExportingPaymentCsv}>{isExportingPaymentCsv ? 'Export...' : 'Exporter les paiements CSV'}</button>
+        <button onClick={handleAuditCsvExport} disabled={!canAdminAct || isExportingAuditCsv}>{isExportingAuditCsv ? 'Export...' : 'Exporter audit CSV'}</button>
       </div>
+      {!canAdminAct && <p className="protected-action-note">Mode presentation : les actions officielles admin sont verrouillees jusqu a connexion avec un compte admin reel.</p>}
       {csvExportStatus && <p className="login-status">{csvExportStatus}</p>}
       {examCsvExportStatus && <p className="login-status">{examCsvExportStatus}</p>}
       {paymentCsvExportStatus && <p className="login-status">{paymentCsvExportStatus}</p>}
@@ -1175,7 +1872,7 @@ export function AdminPage() {
           </label>
           <label>Mot de passe initial<input type="password" value={userForm.initial_password} onChange={(event) => setUserForm((current) => ({ ...current, initial_password: event.target.value }))} /></label>
           <label>Motif administratif<input value={userForm.reason} onChange={(event) => setUserForm((current) => ({ ...current, reason: event.target.value }))} /></label>
-          <button type="submit">Creer le compte</button>
+          <button type="submit" disabled={!canSuperAdminAct}>Creer le compte</button>
         </form>
         <div className="reset-password-strip">
           <label>Mot de passe de reset<input type="password" value={passwordResetValue} onChange={(event) => setPasswordResetValue(event.target.value)} /></label>
@@ -1193,14 +1890,49 @@ export function AdminPage() {
                   <td>{new Date(user.created_at).toLocaleDateString('fr-FR')}</td>
                   <td>
                     <div className="table-actions">
-                      <button onClick={() => handleUserRole(user.id, 'admin', 'Affectation officielle a la supervision nationale')}>Admin</button>
-                      <button onClick={() => handleUserRole(user.id, 'center', 'Affectation officielle a un centre agree')}>Centre</button>
-                      <button onClick={() => handleUserStatus(user.id, !user.is_active, user.is_active ? 'Suspension administrative temporaire' : 'Reactivation administrative du compte')}>
+                      <button disabled={!canSuperAdminAct} onClick={() => handleUserRole(user.id, 'admin', 'Affectation officielle a la supervision nationale')}>Admin</button>
+                      <button disabled={!canSuperAdminAct} onClick={() => handleUserRole(user.id, 'center', 'Affectation officielle a un centre agree')}>Centre</button>
+                      <button disabled={!canSuperAdminAct} onClick={() => handleUserStatus(user.id, !user.is_active, user.is_active ? 'Suspension administrative temporaire' : 'Reactivation administrative du compte')}>
                         {user.is_active ? 'Suspendre' : 'Reactiver'}
                       </button>
-                      <button onClick={() => handleUserPasswordReset(user.id)}>Reset MDP</button>
+                      <button disabled={!canSuperAdminAct} onClick={() => handleUserPasswordReset(user.id)}>Reset MDP</button>
                     </div>
                   </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div id="candidats" className="candidate-official-panel admin-section">
+        <h3>Import candidats officiels</h3>
+        <p>Chargement controle des dossiers candidats transmis par une source institutionnelle avant reservation, paiement et convocation.</p>
+        {candidateImportStatus && <p className={candidateImportStatus.includes('impossible') ? 'form-error' : 'login-status'}>{candidateImportStatus}</p>}
+        <form className="official-import-form" onSubmit={handleOfficialCandidateImport}>
+          <label>Source officielle<input value={candidateImportSource} onChange={(event) => setCandidateImportSource(event.target.value)} /></label>
+          <label>Motif<input value={candidateImportReason} onChange={(event) => setCandidateImportReason(event.target.value)} /></label>
+          <label>Candidats a importer
+            <textarea value={candidateImportCsv} onChange={(event) => setCandidateImportCsv(event.target.value)} />
+          </label>
+          <label className="checkbox-line">
+            <input type="checkbox" checked={candidateImportDryRun} onChange={(event) => setCandidateImportDryRun(event.target.checked)} />
+            Simulation sans ecriture
+          </label>
+          <small>Format : prenom;nom;numero_identite;telephone;categorie_permis;statut. Statuts : registered, verified, suspended.</small>
+          <button type="submit" disabled={!canAdminAct}>Importer candidats officiels</button>
+        </form>
+        <div className="table-shell">
+          <table>
+            <thead><tr><th>Reference</th><th>Candidat</th><th>Identite</th><th>Telephone</th><th>Permis</th><th>Statut</th></tr></thead>
+            <tbody>
+              {candidates.slice(0, 8).map((candidate) => (
+                <tr key={candidate.id}>
+                  <td>{candidate.reference}</td>
+                  <td>{candidate.first_name} {candidate.last_name}</td>
+                  <td>{candidate.identity_number}</td>
+                  <td>{candidate.phone}</td>
+                  <td>{candidate.permit_category}</td>
+                  <td><span className={candidate.status === 'verified' ? 'badge ok' : 'badge'}>{candidate.status}</span></td>
                 </tr>
               ))}
             </tbody>
@@ -1211,6 +1943,70 @@ export function AdminPage() {
         <h3>Gouvernance des centres agrees</h3>
         <p>Suivi administratif des centres : audit initial, activation, accreditation et suspension.</p>
         {centerStatus && <p className={centerStatus.includes('impossible') ? 'form-error' : 'login-status'}>{centerStatus}</p>}
+        <form className="official-import-form" onSubmit={handleOfficialCenterImport}>
+          <label>Source officielle<input value={centerImportSource} onChange={(event) => setCenterImportSource(event.target.value)} /></label>
+          <label>Motif<input value={centerImportReason} onChange={(event) => setCenterImportReason(event.target.value)} /></label>
+          <label>Centres a importer
+            <textarea value={centerImportCsv} onChange={(event) => setCenterImportCsv(event.target.value)} />
+          </label>
+          <label className="checkbox-line">
+            <input type="checkbox" checked={centerImportDryRun} onChange={(event) => setCenterImportDryRun(event.target.checked)} />
+            Simulation sans ecriture
+          </label>
+          <small>Format : code;nom;ville;adresse;capacite;statut. Statuts : pending_audit, active, accredited, suspended.</small>
+          <button type="submit" disabled={!canAdminAct}>Importer centres officiels</button>
+        </form>
+        <div className="station-registry-panel">
+          <div>
+            <h4>Registre des postes d'examen</h4>
+            <p>Autoriser les appareils connus du centre et identifier les postes inconnus dans le monitoring.</p>
+          </div>
+          {centerStationStatus && <p className={centerStationStatus.includes('impossible') ? 'form-error' : 'login-status'}>{centerStationStatus}</p>}
+          <form className="official-import-form" onSubmit={handleCenterStationSubmit}>
+            <label>Centre
+              <select value={centerStationForm.center_id} onChange={(event) => setCenterStationForm((current) => ({ ...current, center_id: event.target.value }))}>
+                <option value="">Choisir un centre</option>
+                {centers.slice(0, 30).map((center) => <option key={center.id} value={center.id}>{center.code} - {center.name}</option>)}
+              </select>
+            </label>
+            <label>Cle appareil<input value={centerStationForm.device_key} onChange={(event) => setCenterStationForm((current) => ({ ...current, device_key: event.target.value }))} /></label>
+            <label>Libelle<input value={centerStationForm.label} onChange={(event) => setCenterStationForm((current) => ({ ...current, label: event.target.value }))} /></label>
+            <label>Salle<input value={centerStationForm.room ?? ''} onChange={(event) => setCenterStationForm((current) => ({ ...current, room: event.target.value }))} /></label>
+            <label>Statut
+              <select value={centerStationForm.status} onChange={(event) => setCenterStationForm((current) => ({ ...current, status: event.target.value as CenterStationPayload['status'] }))}>
+                <option value="active">Actif</option>
+                <option value="maintenance">Maintenance</option>
+                <option value="disabled">Desactive</option>
+              </select>
+            </label>
+            <button type="submit" disabled={!canAdminAct || !centerStationForm.center_id}>Enregistrer poste</button>
+          </form>
+          <div className="table-shell compact-table">
+            <table>
+              <thead><tr><th>Poste</th><th>Cle appareil</th><th>Centre</th><th>Salle</th><th>Statut</th><th>Decision</th></tr></thead>
+              <tbody>
+                {centerStations.length === 0 ? (
+                  <tr><td colSpan={6}>Aucun poste enregistre.</td></tr>
+                ) : centerStations.slice(0, 8).map((station) => (
+                  <tr key={station.id}>
+                    <td>{station.label}</td>
+                    <td>{station.device_key}</td>
+                    <td>{centers.find((center) => center.id === station.center_id)?.code ?? station.center_id}</td>
+                    <td>{station.room ?? '-'}</td>
+                    <td><span className={station.status === 'active' ? 'badge ok' : 'badge'}>{station.status}</span></td>
+                    <td>
+                      <div className="table-actions">
+                        <button disabled={!canAdminAct} onClick={() => handleCenterStationStatus(station.id, 'active')}>Actif</button>
+                        <button disabled={!canAdminAct} onClick={() => handleCenterStationStatus(station.id, 'maintenance')}>Maintenance</button>
+                        <button disabled={!canAdminAct} onClick={() => handleCenterStationStatus(station.id, 'disabled')}>Desactiver</button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
         <div className="table-shell">
           <table>
             <thead><tr><th>Code</th><th>Centre</th><th>Ville</th><th>Capacite</th><th>Statut</th><th>Decision</th></tr></thead>
@@ -1224,11 +2020,46 @@ export function AdminPage() {
                   <td><span className="badge">{center.status}</span></td>
                   <td>
                     <div className="table-actions">
-                      <button onClick={() => handleCenterStatus(center.id, 'accredited', 'Accreditation institutionnelle validee')}>Accrediter</button>
-                      <button onClick={() => handleCenterStatus(center.id, 'suspended', 'Suspension administrative pour controle')}>Suspendre</button>
-                      <button onClick={() => handleCenterStatus(center.id, 'pending_audit', 'Retour en audit administratif')}>Audit</button>
+                      <button disabled={!canAdminAct} onClick={() => handleCenterStatus(center.id, 'accredited', 'Accreditation institutionnelle validee')}>Accrediter</button>
+                      <button disabled={!canAdminAct} onClick={() => handleCenterStatus(center.id, 'suspended', 'Suspension administrative pour controle')}>Suspendre</button>
+                      <button disabled={!canAdminAct} onClick={() => handleCenterStatus(center.id, 'pending_audit', 'Retour en audit administratif')}>Audit</button>
                     </div>
                   </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div id="incidents" className="center-incident-panel admin-section">
+        <div className="incident-admin-header">
+          <div>
+            <h3>Incidents centres et reprises</h3>
+            <p>Suivi des incidents declares par les centres, decision de resolution et creation eventuelle d une nouvelle tentative.</p>
+          </div>
+          <button className="secondary-button" onClick={refreshCenterIncidents} disabled={!canAdminAct}>Actualiser</button>
+        </div>
+        {incidentAdminStatus && <p className={incidentAdminStatus.includes('impossible') || incidentAdminStatus.includes('indisponibles') ? 'form-error' : 'login-status'}>{incidentAdminStatus}</p>}
+        <div className="incident-resolution-controls">
+          <label>Note de resolution<textarea value={incidentResolutionNotes} onChange={(event) => setIncidentResolutionNotes(event.target.value)} /></label>
+          <label className="checkbox-line"><input type="checkbox" checked={allowIncidentRetake} onChange={(event) => setAllowIncidentRetake(event.target.checked)} /> Autoriser une nouvelle tentative</label>
+        </div>
+        <div className="table-shell">
+          <table>
+            <thead><tr><th>Incident</th><th>Centre</th><th>Session</th><th>Tentative</th><th>Type</th><th>Gravite</th><th>Description</th><th>Decision</th></tr></thead>
+            <tbody>
+              {centerIncidents.length === 0 ? (
+                <tr><td colSpan={8}>Aucun incident ouvert charge.</td></tr>
+              ) : centerIncidents.map((incident) => (
+                <tr key={incident.id}>
+                  <td>{incident.id}</td>
+                  <td>{incident.center_id}</td>
+                  <td>{incident.session_id ?? '-'}</td>
+                  <td>{incident.attempt_id ?? '-'}</td>
+                  <td>{incident.incident_type}</td>
+                  <td><span className="badge">{incident.severity}</span></td>
+                  <td>{incident.description}</td>
+                  <td><button onClick={() => handleResolveIncident(incident.id)} disabled={!canAdminAct || incidentResolutionNotes.length < 5}>Resoudre</button></td>
                 </tr>
               ))}
             </tbody>
@@ -1239,6 +2070,22 @@ export function AdminPage() {
         <h3>Verification identite candidat</h3>
         <p>Controle administratif des pieces avant convocation, entree en centre et emission des attestations.</p>
         {identityStatus && <p className={identityStatus.includes('impossible') || identityStatus.includes('Mode demo') ? 'form-error' : 'login-status'}>{identityStatus}</p>}
+        <form className="identity-filters" onSubmit={handleIdentityFiltersSubmit}>
+          <label>Statut
+            <select value={identityFilters.status_filter ?? ''} onChange={(event) => setIdentityFilters((current) => ({ ...current, status_filter: event.target.value || undefined }))}>
+              <option value="">Tous</option>
+              <option value="pending">En attente</option>
+              <option value="verified">Valide</option>
+              <option value="needs_review">A revoir</option>
+              <option value="rejected">Rejete</option>
+            </select>
+          </label>
+          <label>ID candidat<input value={identityFilters.candidate_id ?? ''} onChange={(event) => setIdentityFilters((current) => ({ ...current, candidate_id: event.target.value || undefined }))} placeholder="Filtrer par candidat" /></label>
+          <label>Limite<input type="number" value={identityFilters.limit ?? 25} onChange={(event) => setIdentityFilters((current) => ({ ...current, limit: Number(event.target.value) || 25 }))} /></label>
+          <button type="submit" disabled={!canAdminAct}>Filtrer les pieces</button>
+          <button type="button" className="secondary-button" onClick={resetIdentityFilters} disabled={!canAdminAct}>Reinitialiser</button>
+        </form>
+        <p className="identity-filter-summary">Filtre actif : {activeIdentityFilters.status_filter ?? 'tous'} - {identityChecks.length} piece(s) affichee(s).</p>
         <div className="table-shell">
         <table>
           <thead><tr><th>Candidat</th><th>Document</th><th>Reference</th><th>Statut</th><th>Date</th><th>Decision</th></tr></thead>
@@ -1252,9 +2099,9 @@ export function AdminPage() {
                 <td>{new Date(check.created_at).toLocaleString('fr-FR')}</td>
                 <td>
                   <div className="table-actions">
-                    <button onClick={() => handleIdentityDecision(check.id, 'verified', 'Piece conforme au controle administratif')}>Valider</button>
-                    <button onClick={() => handleIdentityDecision(check.id, 'needs_review', 'Controle manuel complementaire requis')}>Revue</button>
-                    <button onClick={() => handleIdentityDecision(check.id, 'rejected', 'Piece non conforme ou illisible')}>Rejeter</button>
+                    <button disabled={!canAdminAct} onClick={() => handleIdentityDecision(check.id, 'verified', 'Piece conforme au controle administratif')}>Valider</button>
+                    <button disabled={!canAdminAct} onClick={() => handleIdentityDecision(check.id, 'needs_review', 'Controle manuel complementaire requis')}>Revue</button>
+                    <button disabled={!canAdminAct} onClick={() => handleIdentityDecision(check.id, 'rejected', 'Piece non conforme ou illisible')}>Rejeter</button>
                   </div>
                 </td>
               </tr>
@@ -1263,10 +2110,73 @@ export function AdminPage() {
         </table>
         </div>
       </div>
+      <div id="recours" className="candidate-submissions-panel admin-section">
+        <h3>Recours et reclamations candidats</h3>
+        <p>Traitement des demandes de revue, contestations de resultat et suites administratives apres incident.</p>
+        {submissionAdminStatus && <p className={submissionAdminStatus.includes('impossible') || submissionAdminStatus.includes('Mode demo') || submissionAdminStatus.includes('indisponibles') ? 'form-error' : 'login-status'}>{submissionAdminStatus}</p>}
+        <form className="identity-filters" onSubmit={handleSubmissionFiltersSubmit}>
+          <label>Statut
+            <select value={submissionFilters.status_filter ?? ''} onChange={(event) => setSubmissionFilters((current) => ({ ...current, status_filter: event.target.value || undefined }))}>
+              <option value="">Tous</option>
+              <option value="submitted">Depose</option>
+              <option value="under_review">En revue</option>
+              <option value="accepted">Accepte</option>
+              <option value="rejected">Rejete</option>
+              <option value="retake_planned">Reprise prevue</option>
+            </select>
+          </label>
+          <label>ID candidat<input value={submissionFilters.candidate_id ?? ''} onChange={(event) => setSubmissionFilters((current) => ({ ...current, candidate_id: event.target.value || undefined }))} placeholder="Candidat" /></label>
+          <label>ID tentative<input value={submissionFilters.attempt_id ?? ''} onChange={(event) => setSubmissionFilters((current) => ({ ...current, attempt_id: event.target.value || undefined }))} placeholder="Tentative" /></label>
+          <button type="submit" disabled={!canAdminAct}>Filtrer</button>
+          <button type="button" className="secondary-button" onClick={resetSubmissionFilters} disabled={!canAdminAct}>Reinitialiser</button>
+        </form>
+        <label className="submission-response-field">Reponse officielle<textarea value={submissionAdminResponse} onChange={(event) => setSubmissionAdminResponse(event.target.value)} /></label>
+        <p className="identity-filter-summary">Filtre actif : {activeSubmissionFilters.status_filter ?? 'tous'} - {candidateSubmissions.length} recours affiche(s).</p>
+        <div className="table-shell">
+          <table>
+            <thead><tr><th>Recours</th><th>Candidat</th><th>Tentative</th><th>Categorie</th><th>Statut</th><th>Message</th><th>Decision</th></tr></thead>
+            <tbody>
+              {candidateSubmissions.length === 0 ? (
+                <tr><td colSpan={7}>Aucun recours charge.</td></tr>
+              ) : candidateSubmissions.map((item) => (
+                <tr key={item.id}>
+                  <td>{item.id}</td>
+                  <td>{item.candidate_id}</td>
+                  <td>{item.attempt_id}</td>
+                  <td>{item.category}</td>
+                  <td><span className={item.status === 'accepted' ? 'badge ok' : 'badge'}>{item.status}</span></td>
+                  <td>{item.admin_response ? `${item.message} / Reponse: ${item.admin_response}` : item.message}</td>
+                  <td>
+                    <div className="table-actions">
+                      <button disabled={!canAdminAct || submissionAdminResponse.length < 5} onClick={() => handleSubmissionDecision(item.id, 'under_review')}>Revue</button>
+                      <button disabled={!canAdminAct || submissionAdminResponse.length < 5} onClick={() => handleSubmissionDecision(item.id, 'accepted')}>Accepter</button>
+                      <button disabled={!canAdminAct || submissionAdminResponse.length < 5} onClick={() => handleSubmissionDecision(item.id, 'retake_planned')}>Reprise</button>
+                      <button disabled={!canAdminAct || submissionAdminResponse.length < 5} onClick={() => handleSubmissionDecision(item.id, 'rejected')}>Rejeter</button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
       <div id="questions" className="question-governance-panel admin-section">
         <h3>Banque nationale de questions</h3>
         <p>Publication, suspension et relecture officielle des questions utilisees dans les examens.</p>
         {questionGovernanceStatus && <p className={questionGovernanceStatus.includes('impossible') || questionGovernanceStatus.includes('Mode demo') ? 'form-error' : 'login-status'}>{questionGovernanceStatus}</p>}
+        <form className="official-import-form" onSubmit={handleOfficialQuestionImport}>
+          <label>Source officielle<input value={questionImportSource} onChange={(event) => setQuestionImportSource(event.target.value)} /></label>
+          <label>Motif<input value={questionImportReason} onChange={(event) => setQuestionImportReason(event.target.value)} /></label>
+          <label>Questions a importer
+            <textarea value={questionImportCsv} onChange={(event) => setQuestionImportCsv(event.target.value)} />
+          </label>
+          <label className="checkbox-line">
+            <input type="checkbox" checked={questionImportDryRun} onChange={(event) => setQuestionImportDryRun(event.target.checked)} />
+            Simulation sans ecriture
+          </label>
+          <small>Format : categorie;question;option1|option2|option3;bonne_reponse;explication;active. La bonne reponse doit exister dans les options.</small>
+          <button type="submit" disabled={!canAdminAct}>Importer questions officielles</button>
+        </form>
         <div className="table-shell">
         <table>
           <thead><tr><th>Categorie</th><th>Question</th><th>Statut</th><th>Active</th><th>Decision</th></tr></thead>
@@ -1279,9 +2189,9 @@ export function AdminPage() {
                 <td>{item.is_active ? 'Oui' : 'Non'}</td>
                 <td>
                   <div className="table-actions">
-                    <button onClick={() => handleQuestionDecision(item.question_id, 'published', 'Question validee pour publication officielle')}>Publier</button>
-                    <button onClick={() => handleQuestionDecision(item.question_id, 'needs_revision', 'Relecture pedagogique ou juridique requise')}>Relecture</button>
-                    <button onClick={() => handleQuestionDecision(item.question_id, 'suspended', 'Question suspendue par decision administrative')}>Suspendre</button>
+                    <button disabled={!canAdminAct} onClick={() => handleQuestionDecision(item.question_id, 'published', 'Question validee pour publication officielle')}>Publier</button>
+                    <button disabled={!canAdminAct} onClick={() => handleQuestionDecision(item.question_id, 'needs_revision', 'Relecture pedagogique ou juridique requise')}>Relecture</button>
+                    <button disabled={!canAdminAct} onClick={() => handleQuestionDecision(item.question_id, 'suspended', 'Question suspendue par decision administrative')}>Suspendre</button>
                   </div>
                 </td>
               </tr>
@@ -1299,7 +2209,7 @@ export function AdminPage() {
           <label>Reference<input value={authorizationForm.reference} onChange={(event) => setAuthorizationForm((current) => ({ ...current, reference: event.target.value }))} /></label>
           <label>Titre<input value={authorizationForm.title} onChange={(event) => setAuthorizationForm((current) => ({ ...current, title: event.target.value }))} /></label>
           <label>Perimetre<input value={authorizationForm.scope} onChange={(event) => setAuthorizationForm((current) => ({ ...current, scope: event.target.value }))} /></label>
-          <button type="submit">Enregistrer habilitation</button>
+          <button type="submit" disabled={!canAdminAct}>Enregistrer habilitation</button>
         </form>
         <div className="table-shell">
         <table>
@@ -1314,9 +2224,9 @@ export function AdminPage() {
                 <td>{item.valid_until ? new Date(item.valid_until).toLocaleDateString('fr-FR') : 'A definir'}</td>
                 <td>
                   <div className="table-actions">
-                    <button onClick={() => handleAuthorizationStatus(item.id, 'approved', 'Habilitation approuvee par l autorite competente')}>Approuver</button>
-                    <button onClick={() => handleAuthorizationStatus(item.id, 'pending_signature', 'Signature institutionnelle en attente')}>Signature</button>
-                    <button onClick={() => handleAuthorizationStatus(item.id, 'revoked', 'Habilitation revoquee par decision administrative')}>Revoquer</button>
+                    <button disabled={!canAdminAct} onClick={() => handleAuthorizationStatus(item.id, 'approved', 'Habilitation approuvee par l autorite competente')}>Approuver</button>
+                    <button disabled={!canAdminAct} onClick={() => handleAuthorizationStatus(item.id, 'pending_signature', 'Signature institutionnelle en attente')}>Signature</button>
+                    <button disabled={!canAdminAct} onClick={() => handleAuthorizationStatus(item.id, 'revoked', 'Habilitation revoquee par decision administrative')}>Revoquer</button>
                   </div>
                 </td>
               </tr>
@@ -1396,6 +2306,34 @@ export function AdminPage() {
           ))}
         </div>
       </div>
+      <div id="production" className="production-readiness-panel admin-section">
+        <div className="production-readiness-header">
+          <div>
+            <h3>Preparation production</h3>
+            <p>Runbook de mise en ligne : environnements, secrets, base, sauvegardes, monitoring et exploitation.</p>
+          </div>
+          <span>{productionChecklist.filter((item) => item.status === 'En place').length} / {productionChecklist.length} prets</span>
+        </div>
+        <div className="production-readiness-grid">
+          {productionChecklist.map((item) => (
+            <article key={item.domain}>
+              <div>
+                <strong>{item.domain}</strong>
+                <span>{item.status}</span>
+              </div>
+              <p>{item.evidence}</p>
+              <small>{item.action}</small>
+            </article>
+          ))}
+        </div>
+        <div className="production-command-strip">
+          <strong>Commandes de mise en recette</strong>
+          <code>docker compose up -d postgres</code>
+          <code>docker compose run --rm backend alembic upgrade head</code>
+          <code>docker compose run --rm backend python -m app.bootstrap_admin</code>
+          <code>python scripts/smoke_local.py</code>
+        </div>
+      </div>
       <div id="roadmap" className="roadmap-panel admin-section">
         <div className="roadmap-header">
           <div>
@@ -1446,6 +2384,20 @@ export function AdminPage() {
       </div>
       <div id="finance" className="finance-panel admin-section">
         <h3>Supervision financiere</h3>
+        {paymentImportStatus && <p className={paymentImportStatus.includes('impossible') ? 'form-error' : 'login-status'}>{paymentImportStatus}</p>}
+        <form className="official-import-form" onSubmit={handleOfficialPaymentImport}>
+          <label>Source operateur<input value={paymentImportSource} onChange={(event) => setPaymentImportSource(event.target.value)} /></label>
+          <label>Motif<input value={paymentImportReason} onChange={(event) => setPaymentImportReason(event.target.value)} /></label>
+          <label>Paiements a rapprocher
+            <textarea value={paymentImportCsv} onChange={(event) => setPaymentImportCsv(event.target.value)} />
+          </label>
+          <label className="checkbox-line">
+            <input type="checkbox" checked={paymentImportDryRun} onChange={(event) => setPaymentImportDryRun(event.target.checked)} />
+            Simulation sans ecriture
+          </label>
+          <small>Format : reference_reservation;montant;operateur;telephone;statut;numero_recu;date_iso_optionnelle.</small>
+          <button type="submit" disabled={!canAdminAct}>Importer paiements operateur</button>
+        </form>
         <form className="finance-filters" onSubmit={handlePaymentFiltersSubmit}>
           <label>Operateur
             <select value={paymentFilters.provider ?? ''} onChange={(event) => setPaymentFilters((current) => ({ ...current, provider: event.target.value || undefined }))}>
@@ -1532,6 +2484,95 @@ export function AdminPage() {
           </table>
         </div>
       </div>
+      <div id="monitoring-examen" className="exam-monitoring-panel admin-section">
+        <h3>Monitoring examen et alertes fraude</h3>
+        <p>Suivi des evenements de surveillance, scores de risque et tentatives devant passer en revue.</p>
+        {monitoringStatus && <p className={monitoringStatus.includes('indisponible') || monitoringStatus.includes('Mode demo') ? 'form-error' : 'login-status'}>{monitoringStatus}</p>}
+        <form className="finance-filters" onSubmit={handleMonitoringFiltersSubmit}>
+          <label>Tentative
+            <input value={monitoringFilters.attempt_id ?? ''} onChange={(event) => setMonitoringFilters((current) => ({ ...current, attempt_id: event.target.value || undefined }))} placeholder="attempt_id" />
+          </label>
+          <label>Session
+            <input value={monitoringFilters.session_id ?? ''} onChange={(event) => setMonitoringFilters((current) => ({ ...current, session_id: event.target.value || undefined }))} placeholder="session_id" />
+          </label>
+          <label>Gravite
+            <select value={monitoringFilters.severity ?? ''} onChange={(event) => setMonitoringFilters((current) => ({ ...current, severity: event.target.value || undefined }))}>
+              <option value="">Toutes</option>
+              <option value="low">Faible</option>
+              <option value="medium">Moyenne</option>
+              <option value="high">Haute</option>
+              <option value="critical">Critique</option>
+            </select>
+          </label>
+          <label>Risque min<input type="number" value={monitoringFilters.min_risk_score ?? 1} onChange={(event) => setMonitoringFilters((current) => ({ ...current, min_risk_score: Number(event.target.value) || 0 }))} /></label>
+          <button type="submit" disabled={!canAdminAct}>Charger monitoring</button>
+          <button type="button" className="secondary-button" onClick={resetMonitoringFilters} disabled={!canAdminAct}>Reinitialiser</button>
+        </form>
+        <div className="monitoring-summary-grid">
+          <article><strong>{formatNumber(monitoringSummaries.length)}</strong><span>Tentatives a risque</span></article>
+          <article><strong>{formatNumber(monitoringEvents.length)}</strong><span>Evenements charges</span></article>
+          <article><strong>{formatNumber(deviceSessionAlerts.length)}</strong><span>Alertes appareil</span></article>
+          <article><strong>{formatNumber(monitoringSummaries.reduce((sum, item) => sum + item.total_risk_score, 0))}</strong><span>Score risque cumule</span></article>
+        </div>
+        <div className="grid modules-grid">
+          <div className="table-shell">
+            <table>
+              <thead><tr><th>Tentative</th><th>Evenements</th><th>Risque</th><th>Max</th><th>Statut</th></tr></thead>
+              <tbody>
+                {monitoringSummaries.length === 0 ? (
+                  <tr><td colSpan={5}>Aucune tentative a risque chargee.</td></tr>
+                ) : monitoringSummaries.map((summary) => (
+                  <tr key={summary.attempt_id}>
+                    <td>{summary.attempt_id}</td>
+                    <td>{summary.total_events}</td>
+                    <td>{summary.total_risk_score}</td>
+                    <td><span className="badge">{summary.max_severity}</span></td>
+                    <td><span className={summary.status === 'normal' ? 'badge ok' : 'badge'}>{summary.status}</span></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="table-shell">
+            <table>
+              <thead><tr><th>Heure</th><th>Tentative</th><th>Type</th><th>Gravite</th><th>Risque</th></tr></thead>
+              <tbody>
+                {monitoringEvents.length === 0 ? (
+                  <tr><td colSpan={5}>Aucun evenement charge.</td></tr>
+                ) : monitoringEvents.slice(0, 10).map((event) => (
+                  <tr key={event.id}>
+                    <td>{new Date(event.occurred_at).toLocaleString('fr-FR')}</td>
+                    <td>{event.attempt_id}</td>
+                    <td>{event.event_type}</td>
+                    <td><span className="badge">{event.severity}</span></td>
+                    <td>{event.risk_score}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div className="table-shell device-alert-table">
+          <strong>Alertes appareil et postes examen</strong>
+          <table>
+            <thead><tr><th>Derniere trace</th><th>Poste</th><th>Tentative</th><th>Session</th><th>Risque</th></tr></thead>
+            <tbody>
+              {deviceSessionAlerts.length === 0 ? (
+                <tr><td colSpan={5}>Aucune alerte appareil chargee.</td></tr>
+              ) : deviceSessionAlerts.slice(0, 8).map((alert) => (
+                <tr key={alert.id}>
+                  <td>{new Date(alert.last_seen_at).toLocaleString('fr-FR')}</td>
+                  <td>{alert.device_label ?? alert.device_key}</td>
+                  <td>{alert.attempt_id ?? '-'}</td>
+                  <td>{alert.session_id}</td>
+                  <td><span className="badge">{alert.risk_reason ?? alert.status}</span></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p className="identity-filter-summary">Filtre actif : risque min {activeMonitoringFilters.min_risk_score ?? 1} - {activeMonitoringFilters.severity ?? 'toutes gravites'}.</p>
+      </div>
       <div id="audit" className="audit-panel admin-section">
         <h3>Journal d'audit national</h3>
         {auditStatus && <p className="form-error">{auditStatus}</p>}
@@ -1567,11 +2608,121 @@ export function AdminPage() {
 }
 
 export function ExamPage() {
+  const { currentUser, isPresentationMode } = useAuthSession();
+  const canUseExamApi = canUseProtectedActions(currentUser, isPresentationMode, ['candidate', 'center', 'admin', 'super_admin']);
+  const fallbackExamQuestions: ExamQuestion[] = [
+    {
+      id: 'demo-question-red-light',
+      category: 'Signalisation lumineuse',
+      text: 'Que devez-vous faire face a un feu rouge fixe ?',
+      options: ['Marquer l arret obligatoire', 'Passer si la voie est libre', 'Klaxonner puis avancer', 'Continuer a vitesse reduite'],
+      correct_answer: 'Marquer l arret obligatoire',
+      is_active: true,
+      created_at: new Date().toISOString(),
+    },
+    {
+      id: 'demo-question-priority',
+      category: 'Priorite',
+      text: 'A une intersection sans panneau, quelle regle appliquez-vous ?',
+      options: ['La priorite a droite', 'Le vehicule le plus rapide passe', 'La priorite au vehicule le plus gros', 'Le premier qui klaxonne passe'],
+      correct_answer: 'La priorite a droite',
+      is_active: true,
+      created_at: new Date().toISOString(),
+    },
+    {
+      id: 'demo-question-seatbelt',
+      category: 'Securite routiere',
+      text: 'Quand devez-vous attacher votre ceinture ?',
+      options: ['Avant tout demarrage', 'Uniquement sur autoroute', 'Seulement la nuit', 'Apres avoir atteint 50 km/h'],
+      correct_answer: 'Avant tout demarrage',
+      is_active: true,
+      created_at: new Date().toISOString(),
+    },
+  ];
+  const [examQuestions, setExamQuestions] = useState<ExamQuestion[]>(fallbackExamQuestions);
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [selectedAnswers, setSelectedAnswers] = useState<Record<number, number>>({ 0: 0 });
+  const [examBookingReference, setExamBookingReference] = useState('CRG-BOOK-DEMO-001');
+  const [examStationCode, setExamStationCode] = useState('CTR-KALOUM-POSTE-12');
+  const [deviceFingerprint] = useState(() => {
+    const userAgent = window.navigator.userAgent.slice(0, 28);
+    const language = window.navigator.language || 'fr-GN';
+    return `${language}-${userAgent.length}-${window.screen.width}x${window.screen.height}`;
+  });
+  const [examAttempt, setExamAttempt] = useState<ExamAttempt | null>(null);
+  const [examStatus, setExamStatus] = useState<string | null>(null);
+  const [isStartingExam, setIsStartingExam] = useState(false);
+  const [isSubmittingExam, setIsSubmittingExam] = useState(false);
+  const currentQuestion = examQuestions[currentQuestionIndex];
+  const displayQuestionNumber = currentQuestionIndex + 12;
+  const answeredCount = Object.keys(selectedAnswers).length;
+  const progress = Math.round((displayQuestionNumber / 40) * 100);
+
+  useEffect(() => {
+    getQuestions()
+      .then((questions) => {
+        const activeQuestions = questions.filter((question) => question.is_active);
+        if (activeQuestions.length > 0) {
+          setExamQuestions(activeQuestions);
+          setCurrentQuestionIndex(0);
+          setSelectedAnswers({});
+        }
+      })
+      .catch(() => setExamStatus('Mode demo : banque de questions API indisponible.'));
+  }, []);
+
+  async function handleStartExam() {
+    if (!canUseExamApi) {
+      setExamStatus('Action protegee : connectez-vous avec une session candidat, centre ou admin reelle pour demarrer une tentative API.');
+      return;
+    }
+    setIsStartingExam(true);
+    setExamStatus(null);
+    try {
+      const attempt = await startExamFromBooking(examBookingReference, deviceFingerprint, examStationCode);
+      setExamAttempt(attempt);
+      setExamStatus(`Tentative API demarree : ${attempt.id}. Trace appareil enregistree.`);
+    } catch (error) {
+      setExamStatus(getActionErrorMessage(error, 'Demarrage API impossible. Mode demo maintenu.'));
+    } finally {
+      setIsStartingExam(false);
+    }
+  }
+
+  async function handleSubmitExam() {
+    if (!canUseExamApi) {
+      setExamStatus('Action protegee : connectez-vous avec une session reelle pour soumettre les reponses.');
+      return;
+    }
+    if (!examAttempt) {
+      setExamStatus('Demarrez une tentative API avant de soumettre.');
+      return;
+    }
+    setIsSubmittingExam(true);
+    setExamStatus(null);
+    const answers = Object.fromEntries(
+      Object.entries(selectedAnswers)
+        .map(([questionIndex, answerIndex]) => {
+          const question = examQuestions[Number(questionIndex)];
+          return question ? [question.id, question.options[answerIndex]] : null;
+        })
+        .filter((entry): entry is [string, string] => Boolean(entry)),
+    );
+    try {
+      const submittedAttempt = await submitExamAttempt(examAttempt.id, answers);
+      setExamAttempt(submittedAttempt);
+      setExamStatus(`Tentative soumise : score ${submittedAttempt.score ?? 0}, statut ${submittedAttempt.status}.`);
+    } catch (error) {
+      setExamStatus(getActionErrorMessage(error, 'Soumission impossible. Verifiez la tentative API.'));
+    } finally {
+      setIsSubmittingExam(false);
+    }
+  }
   const examChecks = [
-    ['Identite', 'Verifiee'],
-    ['Poste', 'CTR-KALOUM-12'],
-    ['Session', 'GN-SESSION-2026-000014'],
-    ['Reseau', 'Stable'],
+    ['Identite', currentUser?.full_name ?? 'Presentation'],
+    ['Poste', examStationCode],
+    ['Reservation', examBookingReference],
+    ['Trace appareil', deviceFingerprint],
   ];
   const monitoringEvents = [
     ['08:42', 'Connexion poste autorisee', 'ok'],
@@ -1585,24 +2736,44 @@ export function ExamPage() {
         <p className="eyebrow dark">Examen securise</p>
         <div className="exam-header">
           <div>
-            <h2>Question 12 / 40</h2>
+            <h2>Question {displayQuestionNumber} / 40</h2>
             <p>Mode centre agree avec surveillance, minuterie et trace d'audit de la tentative.</p>
           </div>
-          <span className="badge ok">Tentative active</span>
+          <span className={canUseExamApi ? 'badge ok' : 'badge'}>{canUseExamApi ? 'Session API autorisee' : 'Mode presentation'}</span>
         </div>
-        <div className="exam-progress" aria-label="Progression examen"><span style={{ width: '30%' }} /></div>
+        {!canUseExamApi && <p className="protected-action-note">Mode presentation : les questions restent navigables, mais le demarrage et la soumission API sont reserves aux sessions reelles.</p>}
+        <div className="exam-trace-controls">
+          <label>Reference reservation<input value={examBookingReference} onChange={(event) => setExamBookingReference(event.target.value)} /></label>
+          <label>Poste centre<input value={examStationCode} onChange={(event) => setExamStationCode(event.target.value)} /></label>
+          <label>Trace appareil<input value={deviceFingerprint} readOnly /></label>
+        </div>
+        <div className="exam-progress" aria-label="Progression examen"><span style={{ width: `${progress}%` }} /></div>
         <article className="question-card">
-          <span className="question-category">Signalisation lumineuse</span>
-          <p className="question">Que devez-vous faire face a un feu rouge fixe ?</p>
-          <div className="answer selected"><strong>A.</strong> Marquer l'arret obligatoire</div>
-          <div className="answer"><strong>B.</strong> Passer si la voie est libre</div>
-          <div className="answer"><strong>C.</strong> Klaxonner puis avancer</div>
-          <div className="answer"><strong>D.</strong> Continuer a vitesse reduite</div>
+          <span className="question-category">{currentQuestion.category}</span>
+          <p className="question">{currentQuestion.text}</p>
+          {currentQuestion.options.map((answer, index) => (
+            <button
+              type="button"
+              className={selectedAnswers[currentQuestionIndex] === index ? 'answer selected' : 'answer'}
+              key={answer}
+              onClick={() => setSelectedAnswers((current) => ({ ...current, [currentQuestionIndex]: index }))}
+            >
+              <strong>{String.fromCharCode(65 + index)}.</strong> {answer}
+            </button>
+          ))}
         </article>
         <div className="exam-navigation">
-          <button className="secondary-button">Question precedente</button>
-          <button>Question suivante</button>
+          <button className="secondary-button" disabled={currentQuestionIndex === 0} onClick={() => setCurrentQuestionIndex((index) => Math.max(0, index - 1))}>Question precedente</button>
+          <span>{answeredCount} reponse(s) saisie(s)</span>
+          <button disabled={currentQuestionIndex === examQuestions.length - 1} onClick={() => setCurrentQuestionIndex((index) => Math.min(examQuestions.length - 1, index + 1))}>Question suivante</button>
         </div>
+        <div className="exam-api-actions">
+          <button onClick={handleStartExam} disabled={!canUseExamApi || isStartingExam || !examBookingReference || examAttempt?.status === 'started'}>{isStartingExam ? 'Demarrage...' : 'Demarrer tentative API'}</button>
+          <button className="secondary-button" onClick={handleSubmitExam} disabled={!canUseExamApi || isSubmittingExam || !examAttempt || examAttempt.status !== 'started'}>
+            {isSubmittingExam ? 'Soumission...' : 'Soumettre les reponses'}
+          </button>
+        </div>
+        {examStatus && <p className={examStatus.includes('impossible') || examStatus.includes('indisponible') ? 'form-error' : 'login-status'}>{examStatus}</p>}
       </div>
       <aside className="timer-card exam-control-card">
         <span>Temps restant</span>

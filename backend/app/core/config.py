@@ -4,6 +4,7 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     project_name: str = "CodeRoute Guinee API"
+    environment: str = "development"
     api_v1_prefix: str = "/api/v1"
     secret_key: str = "change-me-in-production"
     admin_registration_token: str | None = None

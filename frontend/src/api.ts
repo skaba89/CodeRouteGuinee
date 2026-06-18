@@ -19,6 +19,75 @@ export type Center = {
   created_at: string;
 };
 
+export type Candidate = {
+  id: string;
+  reference: string;
+  first_name: string;
+  last_name: string;
+  identity_number: string;
+  phone: string;
+  permit_category: string;
+  status: string;
+  created_at: string;
+};
+
+export type CandidateOfficialImportRow = {
+  first_name: string;
+  last_name: string;
+  identity_number: string;
+  phone: string;
+  permit_category: string;
+  status: 'registered' | 'verified' | 'suspended';
+};
+
+export type CandidateOfficialImportResult = {
+  dry_run: boolean;
+  imported: number;
+  created: number;
+  updated: number;
+  skipped: number;
+  candidate_ids: string[];
+  references: string[];
+};
+
+export type CenterOfficialImportRow = {
+  code: string;
+  name: string;
+  city: string;
+  address: string;
+  capacity: number;
+  status: 'pending_audit' | 'active' | 'accredited' | 'suspended';
+};
+
+export type CenterOfficialImportResult = {
+  dry_run: boolean;
+  imported: number;
+  created: number;
+  updated: number;
+  skipped: number;
+  codes: string[];
+};
+
+export type CenterStation = {
+  id: string;
+  center_id: string;
+  device_key: string;
+  label: string;
+  status: string;
+  room?: string | null;
+  created_by_id?: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CenterStationPayload = {
+  center_id: string;
+  device_key: string;
+  label: string;
+  room?: string;
+  status: 'active' | 'disabled' | 'maintenance';
+};
+
 export type OperationalReadiness = {
   status: 'ready' | 'degraded' | string;
   service: string;
@@ -37,6 +106,29 @@ export type ExamSummary = {
   passed_attempts: number;
   failed_attempts: number;
   average_score: number;
+};
+
+export type ExamQuestion = {
+  id: string;
+  category: string;
+  text: string;
+  options: string[];
+  correct_answer: string;
+  explanation?: string | null;
+  is_active: boolean;
+  created_at: string;
+};
+
+export type ExamAttempt = {
+  id: string;
+  candidate_id: string;
+  session_id: string;
+  status: string;
+  answers?: Record<string, string> | null;
+  score?: number | null;
+  passed?: boolean | null;
+  started_at: string;
+  submitted_at?: string | null;
 };
 
 export type AuditLogEntry = {
@@ -77,6 +169,25 @@ export type PaymentReconciliationItem = {
   status: string;
   receipt_number: string;
   created_at?: string | null;
+};
+
+export type PaymentOfficialImportRow = {
+  booking_reference: string;
+  amount_gnf: number;
+  provider: string;
+  phone: string;
+  status: string;
+  receipt_number: string;
+  created_at?: string | null;
+};
+
+export type PaymentOfficialImportResult = {
+  dry_run: boolean;
+  imported: number;
+  created: number;
+  updated: number;
+  skipped: number;
+  references: string[];
 };
 
 export type PaymentAlert = PaymentReconciliationItem & {
@@ -162,6 +273,46 @@ export type CandidateIdentityCheck = {
   decided_at?: string | null;
 };
 
+export type CandidateIdentityPayload = {
+  candidate_id: string;
+  document_type: 'national_id' | 'passport' | 'driver_file' | string;
+  document_reference: string;
+  photo_reference?: string;
+};
+
+export type CandidateIdentityFilters = {
+  status_filter?: string;
+  candidate_id?: string;
+  limit?: number;
+};
+
+export type CandidateSubmission = {
+  id: string;
+  candidate_id: string;
+  attempt_id: string;
+  category: string;
+  status: string;
+  message: string;
+  admin_response?: string | null;
+  handled_by_id?: string | null;
+  created_at: string;
+  handled_at?: string | null;
+};
+
+export type CandidateSubmissionPayload = {
+  candidate_id: string;
+  attempt_id: string;
+  category: string;
+  message: string;
+};
+
+export type CandidateSubmissionFilters = {
+  candidate_id?: string;
+  attempt_id?: string;
+  status_filter?: string;
+  limit?: number;
+};
+
 export type QuestionGovernanceItem = {
   question_id: string;
   category: string;
@@ -171,6 +322,24 @@ export type QuestionGovernanceItem = {
   latest_reason?: string | null;
   decided_by_id?: string | null;
   decided_at?: string | null;
+};
+
+export type QuestionOfficialImportRow = {
+  category: string;
+  text: string;
+  options: string[];
+  correct_answer: string;
+  explanation?: string | null;
+  is_active: boolean;
+};
+
+export type QuestionOfficialImportResult = {
+  dry_run: boolean;
+  imported: number;
+  created: number;
+  updated: number;
+  skipped: number;
+  question_ids: string[];
 };
 
 export type InstitutionalAuthorization = {
@@ -228,6 +397,71 @@ export type EntryValidationResult = {
   reason?: string;
 };
 
+export type ExamMonitoringSummary = {
+  attempt_id: string;
+  total_events: number;
+  total_risk_score: number;
+  max_severity: string;
+  status: string;
+};
+
+export type ExamMonitoringEvent = {
+  id: string;
+  center_id?: string | null;
+  session_id: string;
+  attempt_id: string;
+  event_type: string;
+  severity: string;
+  risk_score: number;
+  details?: Record<string, unknown> | null;
+  reported_by_id?: string | null;
+  occurred_at: string;
+  created_at: string;
+};
+
+export type DeviceSession = {
+  id: string;
+  center_id: string;
+  session_id: string;
+  attempt_id?: string | null;
+  device_key: string;
+  device_label?: string | null;
+  ip_address?: string | null;
+  user_agent?: string | null;
+  status: string;
+  risk_reason?: string | null;
+  created_at: string;
+  last_seen_at: string;
+};
+
+export type ExamMonitoringFilters = {
+  attempt_id?: string;
+  session_id?: string;
+  severity?: string;
+  min_risk_score?: number;
+  limit?: number;
+};
+
+export type CenterIncidentPayload = {
+  center_id: string;
+  session_id?: string;
+  attempt_id?: string;
+  incident_type: string;
+  severity: string;
+  description: string;
+};
+
+export type CenterIncident = CenterIncidentPayload & {
+  id: string;
+  status: string;
+  resolution_notes?: string | null;
+  reported_by_id?: string | null;
+  resolved_by_id?: string | null;
+  new_attempt_id?: string | null;
+  created_at: string;
+  resolved_at?: string | null;
+};
+
 export type PaymentPayload = {
   booking_reference: string;
   amount_gnf: number;
@@ -252,6 +486,29 @@ function normalizeApiBaseUrl(value: string): string {
 
 const API_BASE_URL = normalizeApiBaseUrl(import.meta.env.VITE_API_BASE_URL ?? import.meta.env.VITE_API_URL ?? 'http://localhost:8000');
 
+export class ApiError extends Error {
+  status: number;
+
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+  }
+}
+
+async function buildApiError(response: Response): Promise<ApiError> {
+  let message = `API error ${response.status}`;
+  try {
+    const payload = await response.json();
+    if (typeof payload.detail === 'string') {
+      message = payload.detail;
+    }
+  } catch {
+    // Keep the HTTP fallback when the backend does not return JSON.
+  }
+  return new ApiError(response.status, message);
+}
+
 function buildPaymentQuery(filters: PaymentFilters = {}): string {
   const query = new URLSearchParams();
   if (filters.provider) query.set('provider', filters.provider);
@@ -266,7 +523,7 @@ function buildPaymentQuery(filters: PaymentFilters = {}): string {
 async function getJson<T>(path: string): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`);
   if (!response.ok) {
-    throw new Error(`API error ${response.status}`);
+    throw await buildApiError(response);
   }
   return response.json() as Promise<T>;
 }
@@ -274,7 +531,7 @@ async function getJson<T>(path: string): Promise<T> {
 async function getPrivateJson<T>(path: string): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, { headers: getAuthHeaders() });
   if (!response.ok) {
-    throw new Error(`API error ${response.status}`);
+    throw await buildApiError(response);
   }
   return response.json() as Promise<T>;
 }
@@ -286,7 +543,7 @@ async function postJson<T>(path: string, body: unknown): Promise<T> {
     body: JSON.stringify(body),
   });
   if (!response.ok) {
-    throw new Error(`API error ${response.status}`);
+    throw await buildApiError(response);
   }
   return response.json() as Promise<T>;
 }
@@ -307,7 +564,7 @@ async function postPrivateJson<T>(path: string, body: unknown): Promise<T> {
     body: JSON.stringify(body),
   });
   if (!response.ok) {
-    throw new Error(`API error ${response.status}`);
+    throw await buildApiError(response);
   }
   return response.json() as Promise<T>;
 }
@@ -319,15 +576,15 @@ async function patchPrivateJson<T>(path: string, body: unknown): Promise<T> {
     body: JSON.stringify(body),
   });
   if (!response.ok) {
-    throw new Error(`API error ${response.status}`);
+    throw await buildApiError(response);
   }
   return response.json() as Promise<T>;
 }
 
-async function downloadProtectedCsv(url: string, filename: string): Promise<void> {
+async function downloadProtectedFile(url: string, filename: string): Promise<void> {
   const response = await fetch(url, { headers: getAuthHeaders() });
   if (!response.ok) {
-    throw new Error(`API error ${response.status}`);
+    throw await buildApiError(response);
   }
   const blob = await response.blob();
   const objectUrl = window.URL.createObjectURL(blob);
@@ -338,6 +595,10 @@ async function downloadProtectedCsv(url: string, filename: string): Promise<void
   link.click();
   link.remove();
   window.URL.revokeObjectURL(objectUrl);
+}
+
+async function downloadProtectedCsv(url: string, filename: string): Promise<void> {
+  return downloadProtectedFile(url, filename);
 }
 
 export function getDashboard(): Promise<DashboardData> {
@@ -352,8 +613,36 @@ export function getCenters(): Promise<Center[]> {
   return getJson<Center[]>('/api/v1/centers');
 }
 
+export function getCandidates(): Promise<Candidate[]> {
+  return getJson<Candidate[]>('/api/v1/candidates');
+}
+
 export function updateCenterStatus(centerId: string, status: string, reason: string): Promise<Center> {
   return patchPrivateJson<Center>(`/api/v1/centers/${encodeURIComponent(centerId)}/status`, { status, reason });
+}
+
+export function importOfficialCandidates(source: string, reason: string, candidates: CandidateOfficialImportRow[], dryRun = false): Promise<CandidateOfficialImportResult> {
+  return postPrivateJson<CandidateOfficialImportResult>('/api/v1/candidates/import-official', { source, reason, dry_run: dryRun, candidates });
+}
+
+export function importOfficialCenters(source: string, reason: string, centers: CenterOfficialImportRow[], dryRun = false): Promise<CenterOfficialImportResult> {
+  return postPrivateJson<CenterOfficialImportResult>('/api/v1/centers/import-official', { source, reason, dry_run: dryRun, centers });
+}
+
+export function getCenterStations(filters: { center_id?: string; status_filter?: string; limit?: number } = {}): Promise<CenterStation[]> {
+  const query = new URLSearchParams();
+  if (filters.center_id) query.set('center_id', filters.center_id);
+  if (filters.status_filter) query.set('status_filter', filters.status_filter);
+  query.set('limit', String(filters.limit ?? 50));
+  return getPrivateJson<CenterStation[]>(`/api/v1/center-stations?${query.toString()}`);
+}
+
+export function createCenterStation(payload: CenterStationPayload): Promise<CenterStation> {
+  return postPrivateJson<CenterStation>('/api/v1/center-stations', payload);
+}
+
+export function updateCenterStation(stationId: string, payload: Partial<Pick<CenterStationPayload, 'label' | 'room' | 'status'>>): Promise<CenterStation> {
+  return patchPrivateJson<CenterStation>(`/api/v1/center-stations/${encodeURIComponent(stationId)}`, payload);
 }
 
 export function getDashboardCsvUrl(): string {
@@ -412,12 +701,40 @@ export function getInstitutionalActionCenter(): Promise<InstitutionalActionCente
   return getPrivateJson<InstitutionalActionCenter>('/api/v1/dashboard/institutional-action-center');
 }
 
-export function getCandidateIdentityChecks(): Promise<CandidateIdentityCheck[]> {
-  return getPrivateJson<CandidateIdentityCheck[]>('/api/v1/candidate-identity?limit=25');
+export function getCandidateIdentityChecks(filters: CandidateIdentityFilters = {}): Promise<CandidateIdentityCheck[]> {
+  const query = new URLSearchParams();
+  if (filters.status_filter) query.set('status_filter', filters.status_filter);
+  if (filters.candidate_id) query.set('candidate_id', filters.candidate_id);
+  query.set('limit', String(filters.limit ?? 25));
+  return getPrivateJson<CandidateIdentityCheck[]>(`/api/v1/candidate-identity?${query.toString()}`);
+}
+
+export function submitCandidateIdentity(payload: CandidateIdentityPayload): Promise<CandidateIdentityCheck> {
+  return postJson<CandidateIdentityCheck>('/api/v1/candidate-identity', payload);
 }
 
 export function decideCandidateIdentity(checkId: string, status: string, reason: string): Promise<CandidateIdentityCheck> {
   return postPrivateJson<CandidateIdentityCheck>(`/api/v1/candidate-identity/${encodeURIComponent(checkId)}/decision`, { status, reason });
+}
+
+export function submitCandidateSubmission(payload: CandidateSubmissionPayload): Promise<CandidateSubmission> {
+  return postJson<CandidateSubmission>('/api/v1/candidate-submissions', payload);
+}
+
+export function getCandidateSubmissions(filters: CandidateSubmissionFilters = {}): Promise<CandidateSubmission[]> {
+  const query = new URLSearchParams();
+  if (filters.candidate_id) query.set('candidate_id', filters.candidate_id);
+  if (filters.attempt_id) query.set('attempt_id', filters.attempt_id);
+  if (filters.status_filter) query.set('status_filter', filters.status_filter);
+  query.set('limit', String(filters.limit ?? 25));
+  return getPrivateJson<CandidateSubmission[]>(`/api/v1/candidate-submissions?${query.toString()}`);
+}
+
+export function handleCandidateSubmission(submissionId: string, status: string, adminResponse: string): Promise<CandidateSubmission> {
+  return postPrivateJson<CandidateSubmission>(`/api/v1/candidate-submissions/${encodeURIComponent(submissionId)}/handle`, {
+    status,
+    admin_response: adminResponse,
+  });
 }
 
 export function getQuestionGovernanceItems(): Promise<QuestionGovernanceItem[]> {
@@ -426,6 +743,10 @@ export function getQuestionGovernanceItems(): Promise<QuestionGovernanceItem[]> 
 
 export function decideQuestionGovernance(questionId: string, status: string, reason: string): Promise<QuestionGovernanceItem> {
   return postPrivateJson<QuestionGovernanceItem>(`/api/v1/question-governance/${encodeURIComponent(questionId)}/decision`, { status, reason });
+}
+
+export function importOfficialQuestions(source: string, reason: string, questions: QuestionOfficialImportRow[], dryRun = false): Promise<QuestionOfficialImportResult> {
+  return postPrivateJson<QuestionOfficialImportResult>('/api/v1/questions/import-official', { source, reason, dry_run: dryRun, questions });
 }
 
 export function getInstitutionalAuthorizations(): Promise<InstitutionalAuthorization[]> {
@@ -458,12 +779,20 @@ export function downloadInstitutionalReportCsv(): Promise<void> {
   return downloadProtectedCsv(`${API_BASE_URL}/api/v1/dashboard/institutional-report.csv`, 'coderoute-institutional-report.csv');
 }
 
+export function downloadInstitutionalReportPdf(): Promise<void> {
+  return downloadProtectedFile(`${API_BASE_URL}/api/v1/dashboard/institutional-report.pdf`, 'coderoute-institutional-report.pdf');
+}
+
 export function downloadExamAttemptsCsv(): Promise<void> {
   return downloadProtectedCsv(getExamAttemptsCsvUrl(), 'coderoute-exam-attempts.csv');
 }
 
 export function downloadAdminPaymentsCsv(filters: PaymentFilters = {}): Promise<void> {
   return downloadProtectedCsv(getAdminPaymentsCsvUrl(filters), 'coderoute-payments.csv');
+}
+
+export function importOfficialPayments(source: string, reason: string, payments: PaymentOfficialImportRow[], dryRun = false): Promise<PaymentOfficialImportResult> {
+  return postPrivateJson<PaymentOfficialImportResult>('/api/v1/payments/admin/import-official', { source, reason, dry_run: dryRun, payments });
 }
 
 export function downloadAuditLogsCsv(filters: AuditLogFilters = {}): Promise<void> {
@@ -478,8 +807,67 @@ export function getExamSummary(): Promise<ExamSummary> {
   return getJson<ExamSummary>('/api/v1/exams/summary');
 }
 
+export function getQuestions(): Promise<ExamQuestion[]> {
+  return getJson<ExamQuestion[]>('/api/v1/questions');
+}
+
+export function startExamFromBooking(bookingReference: string, deviceKey?: string, deviceLabel?: string): Promise<ExamAttempt> {
+  return postJson<ExamAttempt>('/api/v1/exams/start-from-booking', {
+    booking_reference: bookingReference,
+    device_key: deviceKey,
+    device_label: deviceLabel,
+  });
+}
+
+export function submitExamAttempt(attemptId: string, answers: Record<string, string>): Promise<ExamAttempt> {
+  return postJson<ExamAttempt>(`/api/v1/exams/${encodeURIComponent(attemptId)}/submit`, { answers });
+}
+
+export function getExamMonitoringSummaries(filters: ExamMonitoringFilters = {}): Promise<ExamMonitoringSummary[]> {
+  const query = new URLSearchParams();
+  if (filters.session_id) query.set('session_id', filters.session_id);
+  if (filters.min_risk_score !== undefined) query.set('min_risk_score', String(filters.min_risk_score));
+  query.set('limit', String(filters.limit ?? 25));
+  return getPrivateJson<ExamMonitoringSummary[]>(`/api/v1/exam-monitoring/summary?${query.toString()}`);
+}
+
+export function getExamMonitoringEvents(filters: ExamMonitoringFilters = {}): Promise<ExamMonitoringEvent[]> {
+  const query = new URLSearchParams();
+  if (filters.attempt_id) query.set('attempt_id', filters.attempt_id);
+  if (filters.session_id) query.set('session_id', filters.session_id);
+  if (filters.severity) query.set('severity', filters.severity);
+  query.set('limit', String(filters.limit ?? 25));
+  return getPrivateJson<ExamMonitoringEvent[]>(`/api/v1/exam-monitoring/events?${query.toString()}`);
+}
+
+export function getDeviceSessionAlerts(filters: { session_id?: string; center_id?: string; limit?: number } = {}): Promise<DeviceSession[]> {
+  const query = new URLSearchParams();
+  if (filters.session_id) query.set('session_id', filters.session_id);
+  if (filters.center_id) query.set('center_id', filters.center_id);
+  query.set('limit', String(filters.limit ?? 25));
+  return getPrivateJson<DeviceSession[]>(`/api/v1/device-sessions/alerts?${query.toString()}`);
+}
+
 export function validateEntry(payload: EntryValidationPayload): Promise<EntryValidationResult> {
   return postJson<EntryValidationResult>('/api/v1/entries/validate', payload);
+}
+
+export function reportCenterIncident(payload: CenterIncidentPayload): Promise<CenterIncident> {
+  return postPrivateJson<CenterIncident>('/api/v1/center-incidents', payload);
+}
+
+export function getCenterIncidents(statusFilter = 'open', limit = 25): Promise<CenterIncident[]> {
+  const query = new URLSearchParams();
+  if (statusFilter) query.set('status_filter', statusFilter);
+  query.set('limit', String(limit));
+  return getPrivateJson<CenterIncident[]>(`/api/v1/center-incidents?${query.toString()}`);
+}
+
+export function resolveCenterIncident(incidentId: string, resolutionNotes: string, allowRetake: boolean): Promise<CenterIncident> {
+  return postPrivateJson<CenterIncident>(`/api/v1/center-incidents/${encodeURIComponent(incidentId)}/resolve`, {
+    resolution_notes: resolutionNotes,
+    allow_retake: allowRetake,
+  });
 }
 
 export function createPayment(payload: PaymentPayload): Promise<PaymentResult> {

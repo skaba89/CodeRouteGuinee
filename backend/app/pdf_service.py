@@ -1,15 +1,43 @@
+import qrcode
+
+
 def _escape_pdf_text(value: object) -> str:
     text = str(value).replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
     return text.encode("latin-1", "replace").decode("latin-1")
 
 
-def build_simple_pdf(title: str, lines: list[str]) -> bytes:
+def _qr_pdf_commands(payload: str, x: float = 418, y: float = 604, size: float = 118) -> list[str]:
+    qr = qrcode.QRCode(border=1)
+    qr.add_data(payload)
+    qr.make(fit=True)
+    matrix = qr.get_matrix()
+    cell = size / len(matrix)
+    commands = ["0 0 0 rg"]
+    for row_index, row in enumerate(matrix):
+        for column_index, enabled in enumerate(row):
+            if enabled:
+                cell_x = x + (column_index * cell)
+                cell_y = y + size - ((row_index + 1) * cell)
+                commands.append(f"{cell_x:.2f} {cell_y:.2f} {cell:.2f} {cell:.2f} re f")
+    return commands
+
+
+def build_simple_pdf(title: str, lines: list[str], qr_payload: str | None = None) -> bytes:
     text_lines = [title, ""] + lines
     stream_lines = ["BT", "/F1 16 Tf", "72 760 Td", "20 TL"]
     for line in text_lines:
         stream_lines.append(f"({_escape_pdf_text(line)}) Tj")
         stream_lines.append("T*")
     stream_lines.append("ET")
+    if qr_payload:
+        stream_lines.extend(_qr_pdf_commands(qr_payload))
+        stream_lines.extend([
+            "BT",
+            "/F1 9 Tf",
+            "404 590 Td",
+            "(QR verification centre) Tj",
+            "ET",
+        ])
     stream = "\n".join(stream_lines).encode("latin-1", "replace")
 
     objects = [
@@ -71,7 +99,7 @@ def build_convocation_pdf(convocation: dict) -> bytes:
         "Tout retard, substitution ou tentative de fraude peut entrainer un refus d entree.",
         "Document verifiable par le centre agree via CodeRoute Guinee.",
     ]
-    return build_simple_pdf("CodeRoute Guinee - Convocation officielle", lines)
+    return build_simple_pdf("CodeRoute Guinee - Convocation officielle", lines, qr_payload=convocation["qr_payload"])
 
 
 def build_result_certificate_pdf(candidate: dict, session: dict, center: dict, attempt: dict) -> bytes:
@@ -92,3 +120,39 @@ def build_result_certificate_pdf(candidate: dict, session: dict, center: dict, a
         "Document genere par CodeRoute Guinee pour verification administrative.",
     ]
     return build_simple_pdf("CodeRoute Guinee - Attestation de resultat", lines)
+
+
+def _format_status_counts(label: str, values: dict[str, int]) -> list[str]:
+    if not values:
+        return [f"{label}: aucune donnee consolidee"]
+    return [f"{label} - {status}: {count}" for status, count in sorted(values.items())]
+
+
+def build_institutional_report_pdf(report: dict) -> bytes:
+    recommendations = report.get("recommendations") or []
+    lines = [
+        "Document administratif - Rapport institutionnel",
+        f"Destinataire: {report['generated_for']}",
+        f"Score maturite: {report['readiness_score']}%",
+        f"Statut: {report['readiness_label']}",
+        f"Candidats references: {report['candidates']}",
+        f"Evenements d audit: {report['audit_events']}",
+        "",
+        "1. Synthese nationale",
+        "Plateforme de pilotage du code de la route: candidats, centres, examens, finances, audit et antifraude.",
+        "Objectif: permettre une decision de pilote national avec indicateurs, preuves et actions suivies.",
+        "",
+        "2. Indicateurs consolides",
+        *_format_status_counts("Centres", report.get("centers_by_status", {})),
+        *_format_status_counts("Questions", report.get("questions_by_status", {})),
+        *_format_status_counts("Identites", report.get("identity_checks_by_status", {})),
+        *_format_status_counts("Habilitations", report.get("authorizations_by_status", {})),
+        "",
+        "3. Recommandations prioritaires",
+        *[f"{index}. {recommendation}" for index, recommendation in enumerate(recommendations[:6], start=1)],
+        "",
+        "4. Decision proposee",
+        "Valider un pilote institutionnel encadre avec centres retenus, donnees officielles limitees, supervision nationale et rapport hebdomadaire.",
+        "Document genere par CodeRoute Guinee pour presentation administrative et suivi de mise en production.",
+    ]
+    return build_simple_pdf("CodeRoute Guinee - Rapport institutionnel", lines)

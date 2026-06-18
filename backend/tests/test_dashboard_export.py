@@ -30,6 +30,13 @@ def test_institutional_report_requires_authentication() -> None:
     assert response.status_code == 401
 
 
+def test_institutional_report_pdf_requires_authentication() -> None:
+    with TestClient(app) as client:
+        response = client.get("/api/v1/dashboard/institutional-report.pdf")
+
+    assert response.status_code == 401
+
+
 def test_institutional_action_center_requires_authentication() -> None:
     with TestClient(app) as client:
         response = client.get("/api/v1/dashboard/institutional-action-center")
@@ -168,5 +175,32 @@ def test_institutional_report_csv_writes_audit_log_for_admin() -> None:
             )
             assert audit_log is not None
             assert audit_log.entity == "dashboard"
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_institutional_report_pdf_writes_audit_log_for_admin() -> None:
+    admin_user = SimpleNamespace(id="test-report-pdf-admin", role="admin", is_active=True)
+    app.dependency_overrides[get_current_user] = lambda: admin_user
+
+    try:
+        with TestClient(app) as client:
+            response = client.get("/api/v1/dashboard/institutional-report.pdf")
+
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "application/pdf"
+        assert "coderoute-institutional-report.pdf" in response.headers["content-disposition"]
+        assert response.content.startswith(b"%PDF")
+        assert b"Rapport institutionnel" in response.content
+
+        with SessionLocal() as db:
+            audit_log = db.scalar(
+                select(AuditLog)
+                .where(AuditLog.actor_id == "test-report-pdf-admin")
+                .where(AuditLog.action == "dashboard.institutional_report_export_pdf")
+            )
+            assert audit_log is not None
+            assert audit_log.entity == "dashboard"
+            assert audit_log.details["recommendations"] >= 0
     finally:
         app.dependency_overrides.clear()

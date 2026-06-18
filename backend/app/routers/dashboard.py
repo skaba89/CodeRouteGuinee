@@ -19,6 +19,7 @@ from app.models_question import Question
 from app.models_question_governance import QuestionGovernanceDecision
 from app.models_session import ExamSession
 from app.models_user import User
+from app.pdf_service import build_institutional_report_pdf
 from app.schemas import DashboardRead
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
@@ -326,6 +327,26 @@ def export_institutional_report_csv(
     csv_content = "\n".join(rows) + "\n"
     headers = {"Content-Disposition": "attachment; filename=coderoute-institutional-report.csv"}
     return Response(content=csv_content, media_type="text/csv", headers=headers)
+
+
+@router.get("/institutional-report.pdf")
+def export_institutional_report_pdf(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "super_admin")),
+) -> Response:
+    report = _build_institutional_report(db)
+    db.add(
+        AuditLog(
+            actor_id=current_user.id,
+            action="dashboard.institutional_report_export_pdf",
+            entity="dashboard",
+            entity_id="institutional-report",
+            details={"readiness_score": report.readiness_score, "recommendations": len(report.recommendations)},
+        )
+    )
+    db.commit()
+    headers = {"Content-Disposition": "attachment; filename=coderoute-institutional-report.pdf"}
+    return Response(content=build_institutional_report_pdf(report.model_dump()), media_type="application/pdf", headers=headers)
 
 
 @router.get("/anti-fraud", response_model=AntiFraudDashboardRead)

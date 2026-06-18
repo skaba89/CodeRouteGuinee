@@ -31,3 +31,5 @@ def test_build_convocation_pdf_contains_official_sections() -> None:
     assert b"Document administratif - Convocation candidat" in content
     assert b"Controle d entree" in content
     assert b"Consignes candidat" in content
+    assert b"QR verification centre" in content
+    assert b" re f" in content

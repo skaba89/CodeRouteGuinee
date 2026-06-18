@@ -72,6 +72,32 @@ class CandidateRead(CandidateCreate):
     model_config = {"from_attributes": True}
 
 
+class CandidateOfficialImportRow(BaseModel):
+    first_name: str = Field(min_length=2, max_length=120)
+    last_name: str = Field(min_length=2, max_length=120)
+    identity_number: str = Field(min_length=3, max_length=120)
+    phone: str = Field(min_length=5, max_length=50)
+    permit_category: str = Field(default="B", min_length=1, max_length=10)
+    status: Literal["registered", "verified", "suspended"] = "registered"
+
+
+class CandidateOfficialImportRequest(BaseModel):
+    source: str = Field(min_length=3, max_length=120)
+    reason: str = Field(min_length=5, max_length=255)
+    dry_run: bool = False
+    candidates: list[CandidateOfficialImportRow] = Field(min_length=1, max_length=1000)
+
+
+class CandidateOfficialImportResult(BaseModel):
+    dry_run: bool = False
+    imported: int
+    created: int
+    updated: int
+    skipped: int
+    candidate_ids: list[str]
+    references: list[str]
+
+
 class CandidateIdentityCreate(BaseModel):
     candidate_id: str
     document_type: Literal["national_id", "passport", "driver_file"] = "national_id"
@@ -120,6 +146,31 @@ class CenterStatusUpdate(BaseModel):
     reason: str = Field(min_length=5)
 
 
+class CenterOfficialImportRow(BaseModel):
+    code: str = Field(min_length=2, max_length=50)
+    name: str = Field(min_length=3, max_length=255)
+    city: str = Field(min_length=2, max_length=120)
+    address: str = Field(min_length=3, max_length=255)
+    capacity: int = Field(default=20, ge=1, le=500)
+    status: Literal["pending_audit", "active", "accredited", "suspended"] = "pending_audit"
+
+
+class CenterOfficialImportRequest(BaseModel):
+    source: str = Field(min_length=3, max_length=120)
+    reason: str = Field(min_length=5, max_length=255)
+    dry_run: bool = False
+    centers: list[CenterOfficialImportRow] = Field(min_length=1, max_length=500)
+
+
+class CenterOfficialImportResult(BaseModel):
+    dry_run: bool = False
+    imported: int
+    created: int
+    updated: int
+    skipped: int
+    codes: list[str]
+
+
 class QuestionCreate(BaseModel):
     category: str
     text: str
@@ -134,6 +185,31 @@ class QuestionRead(QuestionCreate):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class QuestionOfficialImportRow(BaseModel):
+    category: str = Field(min_length=2, max_length=80)
+    text: str = Field(min_length=10)
+    options: list[str] = Field(min_length=2, max_length=6)
+    correct_answer: str = Field(min_length=1, max_length=255)
+    explanation: str | None = None
+    is_active: bool = True
+
+
+class QuestionOfficialImportRequest(BaseModel):
+    source: str = Field(min_length=3, max_length=120)
+    reason: str = Field(min_length=5, max_length=255)
+    dry_run: bool = False
+    questions: list[QuestionOfficialImportRow] = Field(min_length=1, max_length=1000)
+
+
+class QuestionOfficialImportResult(BaseModel):
+    dry_run: bool = False
+    imported: int
+    created: int
+    updated: int
+    skipped: int
+    question_ids: list[str]
 
 
 class QuestionGovernanceDecisionCreate(BaseModel):
@@ -196,6 +272,12 @@ class ExamSessionRead(BaseModel):
 class ExamStartRequest(BaseModel):
     candidate_id: str
     session_id: str
+
+
+class ExamStartFromBookingRequest(BaseModel):
+    booking_reference: str = Field(min_length=3)
+    device_key: str | None = Field(default=None, min_length=4, max_length=160)
+    device_label: str | None = Field(default=None, max_length=120)
 
 
 class ExamSubmitRequest(BaseModel):

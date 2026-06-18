@@ -5,10 +5,11 @@ Ce document liste le minimum a verrouiller avant une presentation ou un pilote i
 ## Configuration
 
 1. Copier `.env.example` vers `.env`.
-2. Remplacer `SECRET_KEY`, `ADMIN_REGISTRATION_TOKEN`, `POSTGRES_PASSWORD` et `BOOTSTRAP_ADMIN_PASSWORD`.
-3. Configurer `CORS_ORIGINS` avec les domaines officiels uniquement.
-4. Garder `AUTO_CREATE_TABLES=false` en production: les tables doivent etre gerees par Alembic.
-5. Ajuster `LOGIN_RATE_LIMIT_ATTEMPTS` et `LOGIN_RATE_LIMIT_WINDOW_SECONDS` selon la politique de securite.
+2. Definir `ENVIRONMENT=production`.
+3. Remplacer `SECRET_KEY`, `ADMIN_REGISTRATION_TOKEN`, `POSTGRES_PASSWORD` et `BOOTSTRAP_ADMIN_PASSWORD`.
+4. Configurer `CORS_ORIGINS` avec les domaines officiels uniquement.
+5. Garder `AUTO_CREATE_TABLES=false` en production: les tables doivent etre gerees par Alembic.
+6. Ajuster `LOGIN_RATE_LIMIT_ATTEMPTS` et `LOGIN_RATE_LIMIT_WINDOW_SECONDS` selon la politique de securite.
 
 ## Base de donnees
 
@@ -18,6 +19,54 @@ docker compose run --rm backend alembic upgrade head
 ```
 
 Le conteneur backend execute aussi `alembic upgrade head` au demarrage pour appliquer les migrations disponibles.
+
+## Runbook de mise en production
+
+1. Preparer les secrets hors depot: cle JWT, token d'inscription admin, mot de passe PostgreSQL, compte bootstrap, URL publique API et origine frontend.
+2. Executer le preflight de configuration.
+3. Construire les images ou artefacts deployables depuis une branche taguee et testee.
+4. Demarrer PostgreSQL puis appliquer les migrations Alembic.
+5. Creer ou verifier le compte super administrateur avec le script bootstrap.
+6. Executer les smoke tests locaux et verifier les endpoints publics.
+7. Valider le go/no-go avec un responsable technique et un responsable metier avant ouverture aux centres.
+
+Commandes minimales:
+
+```bash
+python scripts/preflight_deploy.py --env-file .env --target production
+docker compose up -d postgres
+docker compose run --rm backend alembic upgrade head
+docker compose run --rm backend python -m app.bootstrap_admin
+python scripts/smoke_local.py
+```
+
+Apres demarrage de l'API, relancer le preflight avec readiness:
+
+```bash
+python scripts/preflight_deploy.py --env-file .env --target production --api-url https://api.coderoute.gov.gn
+```
+
+## Sauvegardes et restauration
+
+Plan minimum recommande:
+
+- sauvegarde PostgreSQL quotidienne chiffree;
+- retention de 30 jours pour le pilote, a ajuster par decision institutionnelle;
+- test de restauration mensuel sur un environnement de recette;
+- conservation separee des fichiers exportes et des journaux d'audit critiques.
+
+Exemple de sauvegarde:
+
+```bash
+pg_dump "$DATABASE_URL" --format=custom --file=coderoute-guinee.backup
+```
+
+Exemple de restauration en recette:
+
+```bash
+pg_restore --clean --if-exists --dbname="$DATABASE_URL_RECETTE" coderoute-guinee.backup
+docker compose run --rm backend alembic upgrade head
+```
 
 ## Premier administrateur
 
@@ -76,6 +125,20 @@ Chaque utilisateur connecte peut changer son propre mot de passe via `/api/v1/au
 - `auth.password_changed`
 - `auth.password_change_failed`
 
+## Monitoring minimal
+
+Avant un pilote avec candidats reels, superviser au minimum:
+
+- disponibilite `/health` et `/health/readiness`;
+- erreurs backend et erreurs frontend;
+- saturation disque, CPU, memoire et connexions PostgreSQL;
+- connexions echouees, `auth.login_blocked` et changements de roles;
+- paiements non rapproches ou rejetes;
+- alertes du monitoring examen et sessions a risque eleve;
+- taille des journaux d'audit et succes des exports CSV/PDF.
+
+Les alertes critiques doivent identifier un responsable et un canal d'escalade.
+
 ## Controle avant presentation
 
 ```bash
@@ -87,9 +150,23 @@ Puis verifier:
 
 - `/health`
 - `/health/readiness`
+- statut `configuration` dans `/health/readiness`
 - `/docs`
 - connexion administrateur
 - dashboard national
 - exports institutionnels
 - export CSV du journal d'audit national
 - parcours candidat jusqu'a convocation
+
+## Checklist go/no-go
+
+- `python scripts/preflight_deploy.py --env-file .env --target production --api-url ...` sans erreur.
+- Domaine officiel et HTTPS valides.
+- `CORS_ORIGINS` limite aux domaines autorises.
+- `AUTO_CREATE_TABLES=false` confirme.
+- Migrations appliquees sans erreur.
+- Super administrateur cree avec mot de passe non partage.
+- Sauvegarde et restauration testees.
+- Tests backend, build frontend et tests E2E verts.
+- Procedure support centre documentee.
+- Donnees de demonstration retirees des environnements officiels.

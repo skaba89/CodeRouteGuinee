@@ -37,6 +37,22 @@ jobs:
             test_file: tests/test_e2e_manual_review_decisions.py
           - name: next-feature-69
             test_file: tests/test_e2e_candidate_submissions.py
+          - name: dashboard-exports
+            test_file: tests/test_dashboard_export.py
+          - name: pdf-service
+            test_file: tests/test_pdf_service.py
+          - name: health-readiness
+            test_file: tests/test_health.py
+          - name: deploy-preflight
+            test_file: tests/test_deploy_preflight.py
+          - name: center-governance
+            test_file: tests/test_center_governance.py
+          - name: question-governance
+            test_file: tests/test_question_governance.py
+          - name: candidate-official-import
+            test_file: tests/test_candidate_official_import.py
+          - name: payment-official-import
+            test_file: tests/test_payment_official_import.py
     name: backend-tests (${{ matrix.name }})
     steps:
       - uses: actions/checkout@v4
@@ -76,6 +92,9 @@ jobs:
       - name: Build frontend
         working-directory: frontend
         run: npm run build
+      - name: Typecheck frontend
+        working-directory: frontend
+        run: npm run typecheck
 
   frontend-ui-tests:
     runs-on: ubuntu-latest
