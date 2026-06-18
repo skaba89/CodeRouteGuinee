@@ -37,6 +37,7 @@ test.describe('CodeRoute Guinee UI smoke tests', () => {
     await expect(page.getByRole('heading', { name: 'Verification identite candidat' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Filtrer les pieces' })).toBeDisabled();
     await expect(page.getByRole('heading', { name: 'Recours et reclamations candidats' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Importer questions officielles' })).toBeDisabled();
     await expect(page.getByRole('heading', { name: 'Dossier de presentation Etat' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Securite et conformite' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Preparation production' })).toBeVisible();

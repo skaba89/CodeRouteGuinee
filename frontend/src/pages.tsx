@@ -36,6 +36,7 @@ import {
   type PaymentResult,
   type PaymentSummary,
   type QuestionGovernanceItem,
+  type QuestionOfficialImportRow,
   createInstitutionalAuthorization,
   createInstitutionalUser,
   createPayment,
@@ -72,6 +73,7 @@ import {
   getQuestionGovernanceItems,
   handleCandidateSubmission,
   importOfficialCenters,
+  importOfficialQuestions,
   resetInstitutionalUserPassword,
   reportCenterIncident,
   resolveCenterIncident,
@@ -791,6 +793,31 @@ function parseCenterImportCsv(value: string): CenterOfficialImportRow[] {
     });
 }
 
+function parseQuestionImportCsv(value: string): QuestionOfficialImportRow[] {
+  return value
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith('#'))
+    .map((line, index) => {
+      const [category, text, optionsValue, correctAnswer, explanation = '', activeValue = 'true'] = line.split(';').map((item) => item.trim());
+      const options = optionsValue ? optionsValue.split('|').map((option) => option.trim()).filter(Boolean) : [];
+      if (!category || !text || options.length < 2 || !correctAnswer) {
+        throw new Error(`Ligne ${index + 1} incomplete`);
+      }
+      if (!options.includes(correctAnswer)) {
+        throw new Error(`Bonne reponse absente des options ligne ${index + 1}`);
+      }
+      return {
+        category,
+        text,
+        options,
+        correct_answer: correctAnswer,
+        explanation: explanation || null,
+        is_active: activeValue.toLowerCase() !== 'false',
+      };
+    });
+}
+
 export function AdminPage() {
   const { currentUser, isPresentationMode } = useAuthSession();
   const canAdminAct = canUseProtectedActions(currentUser, isPresentationMode, ['admin', 'super_admin']);
@@ -821,6 +848,9 @@ export function AdminPage() {
   const [submissionAdminStatus, setSubmissionAdminStatus] = useState<string | null>(null);
   const [questionGovernance, setQuestionGovernance] = useState<QuestionGovernanceItem[]>(fallbackQuestionGovernance);
   const [questionGovernanceStatus, setQuestionGovernanceStatus] = useState<string | null>(null);
+  const [questionImportSource, setQuestionImportSource] = useState('Commission nationale du code');
+  const [questionImportReason, setQuestionImportReason] = useState('Chargement officiel de la banque pilote');
+  const [questionImportCsv, setQuestionImportCsv] = useState('signalisation;Que signifie un feu rouge fixe ?;S arreter|Passer avec prudence|Accelerer;S arreter;Le feu rouge impose l arret.;true');
   const [institutionalAuthorizations, setInstitutionalAuthorizations] = useState<InstitutionalAuthorization[]>(fallbackInstitutionalAuthorizations);
   const [authorizationStatus, setAuthorizationStatus] = useState<string | null>(null);
   const [authorizationForm, setAuthorizationForm] = useState<InstitutionalAuthorizationPayload>({
@@ -1139,6 +1169,23 @@ export function AdminPage() {
       getDashboard().then(setDashboard).catch(() => undefined);
     } catch {
       setQuestionGovernanceStatus('Decision question impossible : connectez-vous avec un role admin ou super admin.');
+    }
+  }
+
+  async function handleOfficialQuestionImport(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setQuestionGovernanceStatus(null);
+    if (blockProtectedAction(setQuestionGovernanceStatus)) return;
+    try {
+      const rows = parseQuestionImportCsv(questionImportCsv);
+      const result = await importOfficialQuestions(questionImportSource, questionImportReason, rows);
+      setQuestionGovernanceStatus(`Import questions termine : ${result.imported} question(s), ${result.created} creee(s), ${result.updated} mise(s) a jour.`);
+      const refreshedQuestions = await getQuestionGovernanceItems();
+      setQuestionGovernance(refreshedQuestions);
+      await refreshAuditLogs();
+      getDashboard().then(setDashboard).catch(() => undefined);
+    } catch (error) {
+      setQuestionGovernanceStatus(error instanceof Error ? `Import questions impossible : ${error.message}` : 'Import questions impossible.');
     }
   }
 
@@ -1867,6 +1914,15 @@ export function AdminPage() {
         <h3>Banque nationale de questions</h3>
         <p>Publication, suspension et relecture officielle des questions utilisees dans les examens.</p>
         {questionGovernanceStatus && <p className={questionGovernanceStatus.includes('impossible') || questionGovernanceStatus.includes('Mode demo') ? 'form-error' : 'login-status'}>{questionGovernanceStatus}</p>}
+        <form className="official-import-form" onSubmit={handleOfficialQuestionImport}>
+          <label>Source officielle<input value={questionImportSource} onChange={(event) => setQuestionImportSource(event.target.value)} /></label>
+          <label>Motif<input value={questionImportReason} onChange={(event) => setQuestionImportReason(event.target.value)} /></label>
+          <label>Questions a importer
+            <textarea value={questionImportCsv} onChange={(event) => setQuestionImportCsv(event.target.value)} />
+          </label>
+          <small>Format : categorie;question;option1|option2|option3;bonne_reponse;explication;active. La bonne reponse doit exister dans les options.</small>
+          <button type="submit" disabled={!canAdminAct}>Importer questions officielles</button>
+        </form>
         <div className="table-shell">
         <table>
           <thead><tr><th>Categorie</th><th>Question</th><th>Statut</th><th>Active</th><th>Decision</th></tr></thead>

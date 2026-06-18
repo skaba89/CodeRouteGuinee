@@ -47,6 +47,8 @@ jobs:
             test_file: tests/test_deploy_preflight.py
           - name: center-governance
             test_file: tests/test_center_governance.py
+          - name: question-governance
+            test_file: tests/test_question_governance.py
     name: backend-tests (${{ matrix.name }})
     steps:
       - uses: actions/checkout@v4

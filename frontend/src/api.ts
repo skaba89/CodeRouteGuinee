@@ -253,6 +253,23 @@ export type QuestionGovernanceItem = {
   decided_at?: string | null;
 };
 
+export type QuestionOfficialImportRow = {
+  category: string;
+  text: string;
+  options: string[];
+  correct_answer: string;
+  explanation?: string | null;
+  is_active: boolean;
+};
+
+export type QuestionOfficialImportResult = {
+  imported: number;
+  created: number;
+  updated: number;
+  skipped: number;
+  question_ids: string[];
+};
+
 export type InstitutionalAuthorization = {
   id: string;
   authority: string;
@@ -615,6 +632,10 @@ export function getQuestionGovernanceItems(): Promise<QuestionGovernanceItem[]> 
 
 export function decideQuestionGovernance(questionId: string, status: string, reason: string): Promise<QuestionGovernanceItem> {
   return postPrivateJson<QuestionGovernanceItem>(`/api/v1/question-governance/${encodeURIComponent(questionId)}/decision`, { status, reason });
+}
+
+export function importOfficialQuestions(source: string, reason: string, questions: QuestionOfficialImportRow[]): Promise<QuestionOfficialImportResult> {
+  return postPrivateJson<QuestionOfficialImportResult>('/api/v1/questions/import-official', { source, reason, questions });
 }
 
 export function getInstitutionalAuthorizations(): Promise<InstitutionalAuthorization[]> {

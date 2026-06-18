@@ -159,6 +159,29 @@ class QuestionRead(QuestionCreate):
     model_config = {"from_attributes": True}
 
 
+class QuestionOfficialImportRow(BaseModel):
+    category: str = Field(min_length=2, max_length=80)
+    text: str = Field(min_length=10)
+    options: list[str] = Field(min_length=2, max_length=6)
+    correct_answer: str = Field(min_length=1, max_length=255)
+    explanation: str | None = None
+    is_active: bool = True
+
+
+class QuestionOfficialImportRequest(BaseModel):
+    source: str = Field(min_length=3, max_length=120)
+    reason: str = Field(min_length=5, max_length=255)
+    questions: list[QuestionOfficialImportRow] = Field(min_length=1, max_length=1000)
+
+
+class QuestionOfficialImportResult(BaseModel):
+    imported: int
+    created: int
+    updated: int
+    skipped: int
+    question_ids: list[str]
+
+
 class QuestionGovernanceDecisionCreate(BaseModel):
     status: Literal["published", "suspended", "needs_revision"]
     reason: str = Field(min_length=5)

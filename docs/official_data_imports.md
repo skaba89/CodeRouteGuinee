@@ -65,3 +65,51 @@ Statuts acceptes:
 - Importer d'abord en staging.
 - Verifier le journal d'audit apres import.
 - Exporter le dashboard et le rapport institutionnel PDF apres validation.
+
+## Questions officielles
+
+Endpoint protege:
+
+```text
+POST /api/v1/questions/import-official
+```
+
+Roles autorises:
+
+- `admin`
+- `super_admin`
+
+Payload JSON:
+
+```json
+{
+  "source": "Commission nationale du code",
+  "reason": "Chargement banque pilote",
+  "questions": [
+    {
+      "category": "signalisation",
+      "text": "Que signifie un feu rouge fixe ?",
+      "options": ["S arreter", "Passer avec prudence", "Accelerer"],
+      "correct_answer": "S arreter",
+      "explanation": "Le feu rouge impose l arret.",
+      "is_active": true
+    }
+  ]
+}
+```
+
+Regles:
+
+- la cle d'upsert est `category + text` normalisee;
+- la bonne reponse doit etre presente dans `options`;
+- un doublon dans le meme lot bloque l'import;
+- le lot est limite a 1000 questions;
+- chaque import est journalise dans `audit_logs`;
+- les questions inactives restent visibles dans la gouvernance admin, mais pas dans l'examen public.
+
+Format CSV accepte dans l'interface admin:
+
+```text
+categorie;question;option1|option2|option3;bonne_reponse;explication;active
+signalisation;Que signifie un feu rouge fixe ?;S arreter|Passer avec prudence|Accelerer;S arreter;Le feu rouge impose l arret.;true
+```

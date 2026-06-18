@@ -46,6 +46,151 @@ def test_question_governance_requires_admin_authentication() -> None:
     assert response.status_code == 401
 
 
+def test_question_official_import_requires_admin_authentication() -> None:
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/v1/questions/import-official",
+            json={
+                "source": "Commission nationale",
+                "reason": "Import initial",
+                "questions": [
+                    {
+                        "category": "signalisation",
+                        "text": "Que signifie un feu rouge fixe ?",
+                        "options": ["S'arreter", "Passer avec prudence"],
+                        "correct_answer": "S'arreter",
+                        "explanation": "Le feu rouge impose l'arret.",
+                        "is_active": True,
+                    }
+                ],
+            },
+        )
+
+    assert response.status_code == 401
+
+
+def test_admin_can_import_official_questions_with_audit_log() -> None:
+    with TestClient(app) as client:
+        suffix = str(uuid4())[:8]
+        headers = _admin_headers(client)
+        question_text = f"Question officielle priorite {suffix}"
+
+        response = client.post(
+            "/api/v1/questions/import-official",
+            headers=headers,
+            json={
+                "source": "Commission nationale du code",
+                "reason": "Chargement banque pilote",
+                "questions": [
+                    {
+                        "category": "priorite",
+                        "text": question_text,
+                        "options": ["Priorite a droite", "Priorite a gauche", "Arret obligatoire"],
+                        "correct_answer": "Priorite a droite",
+                        "explanation": "En absence de signalisation, la priorite a droite s applique.",
+                        "is_active": True,
+                    }
+                ],
+            },
+        )
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["imported"] == 1
+        assert payload["created"] == 1
+        question_id = payload["question_ids"][0]
+
+        update_response = client.post(
+            "/api/v1/questions/import-official",
+            headers=headers,
+            json={
+                "source": "Commission nationale du code",
+                "reason": "Correction explication",
+                "questions": [
+                    {
+                        "category": "priorite",
+                        "text": question_text,
+                        "options": ["Priorite a droite", "Priorite a gauche", "Arret obligatoire"],
+                        "correct_answer": "Priorite a droite",
+                        "explanation": "Regle generale de priorite hors signalisation contraire.",
+                        "is_active": False,
+                    }
+                ],
+            },
+        )
+
+        assert update_response.status_code == 200
+        assert update_response.json()["updated"] == 1
+        assert update_response.json()["question_ids"] == [question_id]
+
+        governance = client.get("/api/v1/question-governance", headers=headers)
+        imported = next(item for item in governance.json() if item["question_id"] == question_id)
+        assert imported["is_active"] is False
+
+        with SessionLocal() as db:
+            audit_log = db.scalar(
+                select(AuditLog)
+                .where(AuditLog.action == "question.official_import")
+                .where(AuditLog.entity == "question")
+                .order_by(AuditLog.created_at.desc())
+            )
+            assert audit_log is not None
+            assert audit_log.details["source"] == "Commission nationale du code"
+            assert audit_log.details["imported"] == 1
+
+
+def test_question_official_import_rejects_invalid_payload() -> None:
+    with TestClient(app) as client:
+        headers = _admin_headers(client)
+        response = client.post(
+            "/api/v1/questions/import-official",
+            headers=headers,
+            json={
+                "source": "Commission nationale",
+                "reason": "Rejet reponse invalide",
+                "questions": [
+                    {
+                        "category": "signalisation",
+                        "text": "Quel panneau impose l arret complet au conducteur ?",
+                        "options": ["Cedez le passage", "Sens interdit"],
+                        "correct_answer": "Stop",
+                        "explanation": "La bonne reponse doit etre dans les options.",
+                        "is_active": True,
+                    }
+                ],
+            },
+        )
+        assert response.status_code == 422
+        assert "Correct answer" in str(response.json()["detail"])
+
+        duplicate = client.post(
+            "/api/v1/questions/import-official",
+            headers=headers,
+            json={
+                "source": "Commission nationale",
+                "reason": "Rejet doublon",
+                "questions": [
+                    {
+                        "category": "signalisation",
+                        "text": "Que signifie un feu rouge fixe sur la chaussee ?",
+                        "options": ["S'arreter", "Passer"],
+                        "correct_answer": "S'arreter",
+                        "is_active": True,
+                    },
+                    {
+                        "category": "Signalisation",
+                        "text": "Que signifie un feu rouge fixe sur la chaussee ?",
+                        "options": ["S'arreter", "Passer"],
+                        "correct_answer": "S'arreter",
+                        "is_active": True,
+                    },
+                ],
+            },
+        )
+        assert duplicate.status_code == 422
+        assert "Duplicate questions" in str(duplicate.json()["detail"])
+
+
 def test_admin_can_suspend_and_republish_question_with_audit_log() -> None:
     with TestClient(app) as client:
         headers = _admin_headers(client)
