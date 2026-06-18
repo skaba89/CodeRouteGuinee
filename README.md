@@ -37,6 +37,13 @@ cp .env.example .env
 docker compose up --build
 ```
 
+Si le port `8000` est deja occupe, modifiez `BACKEND_PORT` dans `.env`, par exemple :
+
+```env
+BACKEND_PORT=8010
+FRONTEND_PORT=5173
+```
+
 Pour verrouiller la creation de comptes `admin` ou `super_admin` via `/api/v1/auth/register`,
 configurez `ADMIN_REGISTRATION_TOKEN` et envoyez la meme valeur dans l'en-tete
 `X-Admin-Registration-Token` lors des creations autorisees. Ce jeton doit etre active
@@ -57,6 +64,12 @@ docker compose exec backend python -m app.seed_demo
 ```
 
 Le script prepare un jeu de donnees utilisable pour une demonstration : admin, centre agree, candidat, session, reservation, paiement, convocation, questions et resultat d'examen.
+
+Par securite, `seed_demo` est bloque hors `ENVIRONMENT=development`. Pour une base jetable de staging/demo uniquement :
+
+```bash
+docker compose exec -e ALLOW_DEMO_SEED_NON_DEV=true backend python -m app.seed_demo
+```
 
 Pour un environnement institutionnel, utilisez plutot le bootstrap administrateur controle par variables d'environnement :
 
