@@ -23,19 +23,27 @@ Le conteneur backend execute aussi `alembic upgrade head` au demarrage pour appl
 ## Runbook de mise en production
 
 1. Preparer les secrets hors depot: cle JWT, token d'inscription admin, mot de passe PostgreSQL, compte bootstrap, URL publique API et origine frontend.
-2. Construire les images ou artefacts deployables depuis une branche taguee et testee.
-3. Demarrer PostgreSQL puis appliquer les migrations Alembic.
-4. Creer ou verifier le compte super administrateur avec le script bootstrap.
-5. Executer les smoke tests locaux et verifier les endpoints publics.
-6. Valider le go/no-go avec un responsable technique et un responsable metier avant ouverture aux centres.
+2. Executer le preflight de configuration.
+3. Construire les images ou artefacts deployables depuis une branche taguee et testee.
+4. Demarrer PostgreSQL puis appliquer les migrations Alembic.
+5. Creer ou verifier le compte super administrateur avec le script bootstrap.
+6. Executer les smoke tests locaux et verifier les endpoints publics.
+7. Valider le go/no-go avec un responsable technique et un responsable metier avant ouverture aux centres.
 
 Commandes minimales:
 
 ```bash
+python scripts/preflight_deploy.py --env-file .env --target production
 docker compose up -d postgres
 docker compose run --rm backend alembic upgrade head
 docker compose run --rm backend python -m app.bootstrap_admin
 python scripts/smoke_local.py
+```
+
+Apres demarrage de l'API, relancer le preflight avec readiness:
+
+```bash
+python scripts/preflight_deploy.py --env-file .env --target production --api-url https://api.coderoute.gov.gn
 ```
 
 ## Sauvegardes et restauration
@@ -152,6 +160,7 @@ Puis verifier:
 
 ## Checklist go/no-go
 
+- `python scripts/preflight_deploy.py --env-file .env --target production --api-url ...` sans erreur.
 - Domaine officiel et HTTPS valides.
 - `CORS_ORIGINS` limite aux domaines autorises.
 - `AUTO_CREATE_TABLES=false` confirme.

@@ -43,6 +43,8 @@ jobs:
             test_file: tests/test_pdf_service.py
           - name: health-readiness
             test_file: tests/test_health.py
+          - name: deploy-preflight
+            test_file: tests/test_deploy_preflight.py
     name: backend-tests (${{ matrix.name }})
     steps:
       - uses: actions/checkout@v4

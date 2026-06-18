@@ -65,6 +65,7 @@ docker compose run --rm backend python -m app.bootstrap_admin
 ```
 
 Consultez `docs/production_readiness.md` pour le demarrage PostgreSQL, les migrations Alembic et les variables critiques.
+Consultez aussi `docs/deployment_runbook.md` pour la procedure staging/production.
 
 ## Verification E2E locale rapide
 
@@ -77,6 +78,12 @@ Pour inclure la preview frontend dans le controle :
 
 ```bash
 CODEROUTE_API_URL=http://127.0.0.1:8000 CODEROUTE_FRONTEND_URL=http://127.0.0.1:4173 python scripts/smoke_local.py
+```
+
+Avant une bascule staging ou production :
+
+```bash
+python scripts/preflight_deploy.py --env-file .env --target production --api-url https://api.coderoute.gov.gn
 ```
 
 Pour le scenario complet de presentation, consulter :
