@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
@@ -23,5 +23,5 @@ class ExamMonitoringEvent(Base):
     risk_score: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     details: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     reported_by_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"), nullable=True)
-    occurred_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    occurred_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC).replace(tzinfo=None), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC).replace(tzinfo=None), nullable=False)

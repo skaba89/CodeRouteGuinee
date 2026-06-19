@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
@@ -132,7 +132,7 @@ def test_candidate_registration_center_booking_and_40_question_multimedia_exam_t
             headers=headers,
             json={
                 "center_id": center["id"],
-                "starts_at": (datetime.utcnow() + timedelta(days=10)).isoformat(),
+                "starts_at": (datetime.now(UTC) + timedelta(days=10)).isoformat(),
                 "capacity": 40,
             },
         )

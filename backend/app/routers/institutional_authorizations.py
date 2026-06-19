@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
@@ -69,7 +69,7 @@ def update_authorization_status(
 
     previous_status = authorization.status
     authorization.status = payload.status
-    authorization.updated_at = datetime.utcnow()
+    authorization.updated_at = datetime.now(UTC).replace(tzinfo=None)
     db.add(authorization)
     db.flush()
     db.add(

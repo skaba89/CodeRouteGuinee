@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
@@ -77,7 +77,7 @@ def test_device_session_duplicate_detection_end_to_end() -> None:
             headers=admin_headers,
             json={
                 "center_id": center["id"],
-                "starts_at": (datetime.utcnow() + timedelta(days=5)).isoformat(),
+                "starts_at": (datetime.now(UTC) + timedelta(days=5)).isoformat(),
                 "capacity": 20,
             },
         )
@@ -185,7 +185,7 @@ def test_start_exam_from_booking_registers_device_session_and_duplicate_alert() 
             headers=admin_headers,
             json={
                 "center_id": center["id"],
-                "starts_at": (datetime.utcnow() + timedelta(days=5)).isoformat(),
+                "starts_at": (datetime.now(UTC) + timedelta(days=5)).isoformat(),
                 "capacity": 20,
             },
         )

@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
@@ -60,7 +60,7 @@ def test_candidate_submission_lifecycle_and_admin_handling() -> None:
             headers=admin_headers,
             json={
                 "center_id": center["id"],
-                "starts_at": (datetime.utcnow() + timedelta(days=9)).isoformat(),
+                "starts_at": (datetime.now(UTC) + timedelta(days=9)).isoformat(),
                 "capacity": 20,
             },
         )

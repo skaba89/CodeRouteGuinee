@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlalchemy import DateTime, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
@@ -22,5 +22,5 @@ class CandidateFollowup(Base):
     message: Mapped[str] = mapped_column(Text, nullable=False)
     admin_response: Mapped[str | None] = mapped_column(Text, nullable=True)
     handled_by_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC).replace(tzinfo=None), nullable=False)
     handled_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

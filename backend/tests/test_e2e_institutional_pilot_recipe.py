@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
@@ -118,7 +118,7 @@ def test_institutional_pilot_recipe_from_official_imports_to_certificate() -> No
             headers=headers,
             json={
                 "center_id": center["id"],
-                "starts_at": (datetime.utcnow() + timedelta(days=7)).isoformat(),
+                "starts_at": (datetime.now(UTC) + timedelta(days=7)).isoformat(),
                 "capacity": 40,
             },
         )

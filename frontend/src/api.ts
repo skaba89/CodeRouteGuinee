@@ -837,6 +837,50 @@ export function getEntrySummary(): Promise<EntrySummary> {
   return getJson<EntrySummary>('/api/v1/entries/summary');
 }
 
+export type ExamResultItem = {
+  number: number;
+  question_id: string;
+  category: string;
+  text: string;
+  options: string[];
+  given_answer: string | null;
+  correct_answer: string;
+  is_correct: boolean;
+  explanation: string;
+};
+
+export type ExamDetailedResult = {
+  attempt_id: string;
+  candidate_name: string;
+  score: number;
+  total: number;
+  score_percent: number;
+  passed: boolean;
+  threshold: number;
+  submitted_at: string;
+  questions: ExamResultItem[];
+};
+
+export type ExamLiveStatus = {
+  attempt_id: string;
+  status: string;
+  remaining_seconds: number;
+  elapsed_seconds: number;
+  total_seconds: number;
+  question_count: number;
+  score: number | null;
+  passed: boolean | null;
+  expired: boolean;
+};
+
+export function getExamResults(attemptId: string): Promise<ExamDetailedResult> {
+  return getPrivateJson<ExamDetailedResult>(`/api/v1/exams/${attemptId}/results`);
+}
+
+export function getExamLiveStatus(attemptId: string): Promise<ExamLiveStatus> {
+  return getPrivateJson<ExamLiveStatus>(`/api/v1/exams/${attemptId}/status`);
+}
+
 export function getExamSummary(): Promise<ExamSummary> {
   return getJson<ExamSummary>('/api/v1/exams/summary');
 }
@@ -914,6 +958,13 @@ export function getConvocationPdfUrl(reference: string): string {
 
 export function getExamCertificatePdfUrl(attemptId: string): string {
   return `${API_BASE_URL}/api/v1/exams/${encodeURIComponent(attemptId)}/certificate.pdf`;
+}
+
+export async function downloadExamCertificatePdf(attemptId: string): Promise<void> {
+  return downloadProtectedFile(
+    `${API_BASE_URL}/api/v1/exams/${attemptId}/certificate.pdf`,
+    `coderoute-certificat-${attemptId}.pdf`
+  );
 }
 
 export function verifyExamCertificate(attemptId: string): Promise<ExamCertificateVerification> {

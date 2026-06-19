@@ -1,174 +1,268 @@
-// ResultsPage — CodeRoute Guinée
-// Extrait de src/pages.tsx L3346-L3484
-// Pour modifier, éditer ce fichier directement.
-
-import { type AuthUser } from '../authClient';
-import { type UserRole } from '../auth';
+/**
+ * ResultsPage — CodeRoute Guinée
+ * Page des résultats d'examen : vérification de certificat + résultats détaillés.
+ */
+import { useState, useEffect, type FormEvent } from 'react';
 import { useAuthSession, canUseProtectedActions } from '../authSession';
-import * as api from '../api';
 import {
-  buildDemoExamAttempt,
-  buildDemoCertificateVerification,
-  buildDemoQuestionImage,
-  filterDemoIdentityChecks,
-  filterDemoSubmissions,
-  filterDemoAuditLogs,
-  filterDemoMonitoring,
-  filterDemoPayments,
-  buildDemoImportStatus,
-  buildRiskLabel,
-  formatNumber,
-  formatCurrency,
-  formatAuditDetails,
-  getActionErrorMessage,
-  sanitizePaymentFilters,
-  downloadLocalFile,
-  type AuditLogEntry,
-  type AuditLogFilters,
-  type CandidateIdentityCheck,
-  type CandidateIdentityFilters,
-  type CandidateSubmission,
-  type CandidateSubmissionFilters,
-  type ExamAttempt,
+  getExamSummary,
+  getExamResults,
+  verifyExamCertificate,
+  downloadExamCertificatePdf,
+  type ExamSummary,
   type ExamCertificateVerification,
-  type ExamMonitoringFilters,
-  type PaymentFilters,
-} from './helpers';
+  type ExamDetailedResult,
+} from '../api';
+import { buildDemoCertificateVerification, getActionErrorMessage } from './helpers';
+
+const DEMO_ATTEMPT_KEY = 'coderoute-demo-attempt-id';
+
+const fallbackSummary: ExamSummary = {
+  total_attempts: 0,
+  submitted_attempts: 0,
+  passed_attempts: 0,
+  failed_attempts: 0,
+  average_score: 0,
+};
 
 export function ResultsPage() {
-  const [examSummary, setExamSummary] = useState<ExamSummary>(fallbackExamSummary);
-  const [attemptId, setAttemptId] = useState(() => window.localStorage.getItem(DEMO_EXAM_ATTEMPT_STORAGE_KEY) ?? 'demo-attempt-1');
-  const [certificateVerification, setCertificateVerification] = useState<ExamCertificateVerification | null>(null);
-  const [certificateError, setCertificateError] = useState<string | null>(null);
-  const [isVerifyingCertificate, setIsVerifyingCertificate] = useState(false);
-  useEffect(() => {
-    getExamSummary().then(setExamSummary).catch(() => undefined);
-  }, []);
+  const { currentUser, isPresentationMode } = useAuthSession();
+  const canUseApi = canUseProtectedActions(currentUser, isPresentationMode, ['candidate', 'center', 'admin', 'super_admin']);
 
-  async function handleCertificateVerification(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!attemptId) return;
-    setIsVerifyingCertificate(true);
-    setCertificateVerification(null);
-    setCertificateError(null);
+  const [attemptId, setAttemptId] = useState(
+    () => sessionStorage.getItem(DEMO_ATTEMPT_KEY) ?? localStorage.getItem(DEMO_ATTEMPT_KEY) ?? ''
+  );
+  const [summary, setSummary] = useState<ExamSummary>(fallbackSummary);
+  const [cert, setCert] = useState<ExamCertificateVerification | null>(null);
+  const [certError, setCertError] = useState<string | null>(null);
+  const [verifying, setVerifying] = useState(false);
+
+  const [detailedResult, setDetailedResult] = useState<ExamDetailedResult | null>(null);
+  const [loadingResult, setLoadingResult] = useState(false);
+  const [resultError, setResultError] = useState<string | null>(null);
+  const [filter, setFilter] = useState<'all' | 'correct' | 'wrong'>('all');
+
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
+
+  useEffect(() => {
+    if (!canUseApi) return;
+    getExamSummary().then(setSummary).catch(() => undefined);
+  }, [canUseApi]);
+
+  // Charger auto les résultats si un attemptId est stocké
+  useEffect(() => {
+    if (!attemptId || !canUseApi) return;
+    handleLoadResults();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function handleVerifyCertificate(e: FormEvent) {
+    e.preventDefault();
+    if (!attemptId.trim()) return;
+    setVerifying(true);
+    setCert(null);
+    setCertError(null);
     try {
-      if (attemptId.startsWith('demo-')) {
-        setCertificateVerification(buildDemoCertificateVerification(attemptId));
+      if (!canUseApi || attemptId.startsWith('DEMO-') || attemptId.startsWith('demo-')) {
+        setCert(buildDemoCertificateVerification(attemptId));
         return;
       }
       const result = await verifyExamCertificate(attemptId);
-      setCertificateVerification(result);
-    } catch {
-      setCertificateVerification(buildDemoCertificateVerification(attemptId));
-      setCertificateError("API certificat indisponible. Verification demo affichee localement.");
+      setCert(result);
+    } catch (err) {
+      setCertError(getActionErrorMessage(err, 'Vérification impossible.'));
     } finally {
-      setIsVerifyingCertificate(false);
+      setVerifying(false);
     }
   }
 
-  const score = 36;
-  const total = 40;
-  const threshold = 35;
-  const passed = score >= threshold;
-  const certificateUrl = attemptId ? getExamCertificatePdfUrl(attemptId) : null;
-  const successRate = examSummary.submitted_attempts
-    ? Math.round((examSummary.passed_attempts / examSummary.submitted_attempts) * 100)
-    : 0;
-  const resultChecks = [
-    ['Identite candidat', 'Validee'],
-    ['Session examen', 'Cloturee'],
-    ['Correction', 'Automatique'],
-    ['Certificat', passed ? 'Pret' : 'Bloque'],
-  ];
-  const scoreBreakdown = [
-    ['Signalisation', 10, 10],
-    ['Priorites', 9, 10],
-    ['Securite routiere', 8, 10],
-    ['Infractions', 9, 10],
-  ];
-  const nextSteps = passed
-    ? [
-        'Validation numerique par le centre agree',
-        'Controle administratif du dossier candidat',
-        'Transmission vers le circuit de delivrance du permis',
-      ]
-    : [
-        'Notification du candidat',
-        'Programmation d une nouvelle session',
-        'Revision ciblee sur les themes insuffisants',
-      ];
+  async function handleLoadResults() {
+    if (!attemptId.trim() || !canUseApi) return;
+    setLoadingResult(true);
+    setResultError(null);
+    try {
+      const result = await getExamResults(attemptId);
+      setDetailedResult(result);
+    } catch {
+      setResultError("Résultats non disponibles — l'examen n'est peut-être pas encore soumis.");
+    } finally {
+      setLoadingResult(false);
+    }
+  }
+
+  async function handleDownloadPdf() {
+    if (!attemptId.trim() || !canUseApi) return;
+    setDownloadingPdf(true);
+    try {
+      await downloadExamCertificatePdf(attemptId);
+    } catch {
+      setCertError("Téléchargement impossible — vérifiez que l'examen est admis.");
+    } finally {
+      setDownloadingPdf(false);
+    }
+  }
+
+  const filteredQuestions = detailedResult?.questions.filter(q =>
+    filter === 'all' ? true : filter === 'correct' ? q.is_correct : !q.is_correct
+  ) ?? [];
+
   return (
-    <section className="screen results-workspace">
-      <div className="results-main">
+    <section className="screen results-screen">
+      <div className="results-workspace">
+
+        {/* ── En-tête ── */}
         <div className="results-header">
-          <div>
-            <p className="eyebrow dark">Resultat candidat</p>
-            <h2>Releve officiel du code de la route</h2>
-            <p>Score, admissibilite, verification du certificat et suite administrative reunis dans une vue unique.</p>
-          </div>
-          <span className={passed ? 'badge ok' : 'badge'}>{passed ? 'Admis' : 'Non admis'}</span>
+          <span className="eyebrow dark">Résultats officiels</span>
+          <h2>Vérification & Résultats d'examen</h2>
+          <p>Consultez les résultats d'un examen par son identifiant de tentative.</p>
         </div>
-        <div className="result-identity-grid">
-          <div className="mini-card">Reference candidat : <strong>GN-CODE-2026-000001</strong></div>
-          <div className="mini-card">Session : <strong>Centre Kaloum - 20/06/2026</strong></div>
-          <div className="mini-card">Seuil de reussite : <strong>{threshold} / {total}</strong></div>
-          <div className="mini-card">Moyenne nationale : <strong>{examSummary.average_score} / {total}</strong></div>
-        </div>
-        <div className="result-official-grid">
-          {resultChecks.map(([label, value]) => (
-            <article key={label}>
-              <span>{label}</span>
-              <strong>{value}</strong>
-            </article>
-          ))}
-        </div>
-        <div className="score-breakdown">
-          <h3>Ventilation du score</h3>
-          {scoreBreakdown.map(([label, value, max]) => (
-            <div className="score-row" key={label}>
-              <span>{label}</span>
-              <div><i style={{ width: `${(Number(value) / Number(max)) * 100}%` }} /></div>
-              <strong>{value} / {max}</strong>
+
+        {/* ── Statistiques nationales (admin) ── */}
+        {canUseApi && (currentUser?.role === 'admin' || currentUser?.role === 'super_admin') && (
+          <div className="results-stats-grid">
+            <div className="stat-card">
+              <span className="stat-label">Tentatives total</span>
+              <strong className="stat-value">{summary.total_attempts}</strong>
             </div>
-          ))}
-        </div>
-      </div>
-      <div className="result-card">
-        <span className="result-label">Decision nationale</span>
-        <strong>{score} / {total}</strong>
-        <p>{passed ? 'Resultat positif. Certificat numerique pret pour validation administrative.' : 'Resultat insuffisant. Nouvelle presentation possible selon les regles nationales.'}</p>
-        <div className="metrics compact">
-          <article><strong>{formatNumber(examSummary.submitted_attempts)}</strong><span>Examens soumis</span></article>
-          <article><strong>{formatNumber(examSummary.passed_attempts)}</strong><span>Admis</span></article>
-          <article><strong>{successRate}%</strong><span>Taux de reussite</span></article>
-        </div>
-        <div className="next-steps-panel">
-          <strong>Suite administrative</strong>
-          {nextSteps.map((step, index) => (
-            <span key={step}><b>{index + 1}</b>{step}</span>
-          ))}
-        </div>
-        <form className="certificate-field" onSubmit={handleCertificateVerification}>
-          <label>ID tentative examen<input value={attemptId} onChange={(event) => setAttemptId(event.target.value)} placeholder="Coller l'ID de tentative seedee" /></label>
-          <button disabled={isVerifyingCertificate || !attemptId}>{isVerifyingCertificate ? 'Verification...' : 'Verifier certificat'}</button>
-        </form>
-        {certificateVerification && (
-          <div className={certificateVerification.valid ? 'certificate-verification ok' : 'certificate-verification'}>
-            <strong>{certificateVerification.valid ? 'Certificat authentique' : 'Certificat non valide'}</strong>
-            <span>{certificateVerification.reason ?? certificateVerification.candidate_name ?? certificateVerification.status}</span>
-            {certificateVerification.valid && <span>{certificateVerification.center_name} - Score {certificateVerification.score}</span>}
+            <div className="stat-card">
+              <span className="stat-label">Soumis</span>
+              <strong className="stat-value">{summary.submitted_attempts}</strong>
+            </div>
+            <div className="stat-card stat-passed">
+              <span className="stat-label">Admis</span>
+              <strong className="stat-value">{summary.passed_attempts}</strong>
+            </div>
+            <div className="stat-card stat-failed">
+              <span className="stat-label">Ajournés</span>
+              <strong className="stat-value">{summary.failed_attempts}</strong>
+            </div>
+            <div className="stat-card">
+              <span className="stat-label">Score moyen</span>
+              <strong className="stat-value">{summary.average_score}<span style={{fontSize:14,fontWeight:700}}>/40</span></strong>
+            </div>
           </div>
         )}
-        {certificateError && <p className="form-error">{certificateError}</p>}
-        <div className="certificate-trace">
-          <span>Empreinte certificat</span>
-          <strong>GN-CERT-2026-4F8A-921C</strong>
-        </div>
-        <div className="actions result-actions">
-          <a href="#/candidate">Retour dossier</a>
-          <a href="#/admin" className="secondary">Voir supervision</a>
-          {certificateUrl && <a href={certificateUrl} target="_blank" rel="noreferrer">Telecharger attestation PDF</a>}
-        </div>
+
+        {/* ── Formulaire de recherche ── */}
+        <form className="results-search-form" onSubmit={handleVerifyCertificate}>
+          <label>
+            Identifiant de tentative
+            <input
+              value={attemptId}
+              onChange={e => setAttemptId(e.target.value)}
+              placeholder="ATT-... ou DEMO-..."
+            />
+          </label>
+          <div className="results-search-actions">
+            <button type="submit" disabled={verifying || !attemptId.trim()}>
+              {verifying ? 'Vérification…' : '🔍 Vérifier le certificat'}
+            </button>
+            {canUseApi && (
+              <button type="button" className="secondary-button"
+                onClick={handleLoadResults} disabled={loadingResult || !attemptId.trim()}>
+                {loadingResult ? 'Chargement…' : '📊 Résultats détaillés'}
+              </button>
+            )}
+          </div>
+        </form>
+
+        {certError && <p className="form-error">{certError}</p>}
+
+        {/* ── Certificat ── */}
+        {cert && (
+          <div className={`certificate-result ${cert.valid && cert.passed ? 'admitted' : cert.valid && cert.passed === false ? 'failed' : 'invalid'}`}>
+            <div className="certificate-result-header">
+              <span className="cert-icon">{cert.valid && cert.passed ? '🏆' : cert.valid && cert.passed === false ? '📋' : '❌'}</span>
+              <div>
+                <h3>{cert.valid && cert.passed ? 'Admis — Certificat authentique' : cert.valid && cert.passed === false ? 'Ajourné' : 'Certificat non valide'}</h3>
+                {cert.candidate_name && <p className="cert-name">{cert.candidate_name}</p>}
+              </div>
+              {cert.valid && cert.passed && canUseApi && (
+                <button className="btn-download-cert" onClick={handleDownloadPdf} disabled={downloadingPdf}>
+                  {downloadingPdf ? '…' : '⬇ PDF'}
+                </button>
+              )}
+            </div>
+            {cert.valid && (
+              <div className="certificate-fields">
+                {cert.candidate_reference && (
+                  <div className="certificate-field"><small>Référence</small><b>{cert.candidate_reference}</b></div>
+                )}
+                {cert.identity_number && (
+                  <div className="certificate-field"><small>NINA</small><b>{cert.identity_number}</b></div>
+                )}
+                {cert.permit_category && (
+                  <div className="certificate-field"><small>Catégorie</small><b>{cert.permit_category}</b></div>
+                )}
+                {cert.center_name && (
+                  <div className="certificate-field"><small>Centre</small><b>{cert.center_name} — {cert.center_city}</b></div>
+                )}
+                {cert.score !== null && cert.score !== undefined && (
+                  <div className="certificate-field"><small>Score</small><b>{cert.score}/40</b></div>
+                )}
+                {cert.submitted_at && (
+                  <div className="certificate-field"><small>Date</small><b>{new Date(cert.submitted_at).toLocaleDateString('fr-FR')}</b></div>
+                )}
+              </div>
+            )}
+            {cert.reason && !cert.valid && <p className="cert-reason">{cert.reason}</p>}
+          </div>
+        )}
+
+        {/* ── Résultats détaillés ── */}
+        {detailedResult && (
+          <div className="detailed-results">
+            {/* Verdict */}
+            <div className={`exam-verdict-banner ${detailedResult.passed ? 'passed' : 'failed'}`}>
+              <span className="verdict-emoji">{detailedResult.passed ? '🏆' : '📋'}</span>
+              <div className="verdict-body">
+                <h3>{detailedResult.passed ? 'Admis !' : 'Ajourné'}</h3>
+                <p>{detailedResult.candidate_name}</p>
+              </div>
+              <div className="verdict-score">
+                <strong>{detailedResult.score} <span>/ {detailedResult.total}</span></strong>
+                <small>{detailedResult.score_percent}%</small>
+              </div>
+            </div>
+
+            {/* Filtres */}
+            <div className="result-filter-bar">
+              {(['all', 'correct', 'wrong'] as const).map(f => (
+                <button key={f} type="button"
+                  className={`result-filter-btn ${filter === f ? 'active' : ''}`}
+                  onClick={() => setFilter(f)}>
+                  {f === 'all' ? `Toutes (${detailedResult.questions.length})`
+                    : f === 'correct' ? `✅ Correctes (${detailedResult.questions.filter(q => q.is_correct).length})`
+                    : `❌ Incorrectes (${detailedResult.questions.filter(q => !q.is_correct).length})`}
+                </button>
+              ))}
+            </div>
+
+            {/* Liste de questions */}
+            <div className="result-questions-list">
+              {filteredQuestions.map(q => (
+                <div key={q.question_id} className={`result-q-item ${q.is_correct ? 'correct' : 'wrong'}`}>
+                  <div className="result-q-head">
+                    <span className="result-q-num">Q{q.number}</span>
+                    <span className="result-q-cat">{q.category}</span>
+                    <span className="result-q-icon">{q.is_correct ? '✅' : '❌'}</span>
+                  </div>
+                  <p className="result-q-text">{q.text}</p>
+                  {q.given_answer && !q.is_correct && (
+                    <p className="result-q-given">Votre réponse : <strong>{q.given_answer}</strong></p>
+                  )}
+                  {!q.is_correct && (
+                    <p className="result-q-correct">Bonne réponse : <strong>{q.correct_answer}</strong></p>
+                  )}
+                  {q.explanation && (
+                    <p className="result-q-expl">💡 {q.explanation}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {resultError && <p className="form-error" style={{marginTop: 12}}>{resultError}</p>}
       </div>
     </section>
   );

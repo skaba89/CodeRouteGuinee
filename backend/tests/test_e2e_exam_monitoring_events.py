@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
@@ -60,7 +60,7 @@ def test_exam_monitoring_events_risk_summary_and_audit_log() -> None:
             headers=admin_headers,
             json={
                 "center_id": center["id"],
-                "starts_at": (datetime.utcnow() + timedelta(days=6)).isoformat(),
+                "starts_at": (datetime.now(UTC) + timedelta(days=6)).isoformat(),
                 "capacity": 20,
             },
         )

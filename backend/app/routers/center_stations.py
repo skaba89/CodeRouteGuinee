@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
@@ -130,7 +130,7 @@ def update_center_station(
         station.room = payload.room
     if payload.status is not None:
         station.status = normalize_status(payload.status)
-    station.updated_at = datetime.utcnow()
+    station.updated_at = datetime.now(UTC).replace(tzinfo=None)
 
     db.add(station)
     db.flush()

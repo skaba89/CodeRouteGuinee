@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
@@ -21,5 +21,5 @@ class ExamAttempt(Base):
     answers: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     score: Mapped[int | None] = mapped_column(Integer, nullable=True)
     passed: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
-    started_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    started_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC).replace(tzinfo=None), nullable=False)
     submitted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

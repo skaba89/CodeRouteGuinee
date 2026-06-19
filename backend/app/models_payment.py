@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlalchemy import DateTime, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
@@ -22,4 +22,4 @@ class Payment(Base):
     phone: Mapped[str] = mapped_column(String(50), nullable=False)
     status: Mapped[str] = mapped_column(String(50), default="paid", nullable=False)
     receipt_number: Mapped[str] = mapped_column(String(100), unique=True, index=True, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC).replace(tzinfo=None), nullable=False)

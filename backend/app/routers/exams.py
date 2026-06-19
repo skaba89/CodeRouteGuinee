@@ -1,6 +1,6 @@
 import csv
 import io
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy import select
@@ -91,7 +91,7 @@ def _register_exam_start_device(
     if not device_key:
         return
     normalized_device_key = device_key.strip()
-    now = datetime.utcnow()
+    now = datetime.now(UTC).replace(tzinfo=None)
     duplicate = db.scalar(
         select(DeviceSession).where(
             DeviceSession.center_id == session.center_id,
@@ -322,7 +322,7 @@ def submit_exam(
     if not attempt:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Exam attempt not found")
 
-    now = datetime.utcnow()
+    now = datetime.now(UTC).replace(tzinfo=None)
     if attempt.status == "submitted":
         _write_exam_guard_log(db, attempt, "exam.replay_submission", "already_submitted", now)
         db.commit()
@@ -406,7 +406,7 @@ def get_exam_status(
     if not attempt:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Exam attempt not found")
 
-    now = datetime.utcnow()
+    now = datetime.now(UTC).replace(tzinfo=None)
     elapsed_seconds = int((now - attempt.started_at).total_seconds())
     total_seconds = EXAM_DURATION_MINUTES * 60
     remaining_seconds = max(0, total_seconds - elapsed_seconds)
@@ -541,7 +541,7 @@ def get_exam_results(
 
 @router.get("/{attempt_id}/certificate/verify", response_model=ExamCertificateVerificationRead)
 def verify_exam_certificate(attempt_id: str, db: Session = Depends(get_db)) -> ExamCertificateVerificationRead:
-    checked_at = datetime.utcnow()
+    checked_at = datetime.now(UTC).replace(tzinfo=None)
     attempt = db.get(ExamAttempt, attempt_id)
     if not attempt:
         _write_certificate_verification_log(

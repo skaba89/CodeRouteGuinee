@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
@@ -16,7 +16,7 @@ router = APIRouter(prefix="/candidates", tags=["candidates"])
 
 def build_candidate_reference(db: Session) -> str:
     count = db.query(Candidate).count() + 1
-    return f"GN-CODE-{datetime.utcnow().year}-{count:06d}"
+    return f"GN-CODE-{datetime.now(UTC).year}-{count:06d}"
 
 
 @router.get("", response_model=list[CandidateRead])

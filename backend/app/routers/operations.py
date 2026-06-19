@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
@@ -78,7 +78,7 @@ def _count_payment_alerts(db: Session) -> int:
 
 
 def _build_operations_summary(db: Session) -> OperationsSummaryRead:
-    now = datetime.utcnow()
+    now = datetime.now(UTC).replace(tzinfo=None)
     since_24h = now - timedelta(hours=24)
     open_incidents = db.query(CenterIncident).filter(CenterIncident.status == "open").count()
     critical_incidents = db.query(CenterIncident).filter(

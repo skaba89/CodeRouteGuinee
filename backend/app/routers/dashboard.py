@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, Response
 from pydantic import BaseModel
@@ -129,7 +129,7 @@ def dashboard(
 
 
 def _build_action_center(db: Session) -> InstitutionalActionCenterRead:
-    soon = datetime.utcnow() + timedelta(days=30)
+    soon = datetime.now(UTC).replace(tzinfo=None) + timedelta(days=30)
     pending_identities = db.query(CandidateIdentityCheck).filter(CandidateIdentityCheck.status.in_(["pending", "needs_review"])).count()
     centers_to_review = db.query(Center).filter(Center.status.in_(["pending_audit", "suspended"])).count()
     authorizations_to_sign = db.query(InstitutionalAuthorization).filter(InstitutionalAuthorization.status.in_(["draft", "pending_signature"])).count()

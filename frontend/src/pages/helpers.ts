@@ -489,29 +489,29 @@ const dossierRisks = [
   ['Production', 'CI/CD, sauvegardes, monitoring, secrets et procedures exploitation sont requis.'],
 ];
 
-const DEMO_EXAM_ATTEMPT_STORAGE_KEY = 'coderoute-demo-exam-attempt-id';
+export const DEMO_EXAM_ATTEMPT_STORAGE_KEY = 'coderoute-demo-exam-attempt-id';
 
-function formatNumber(value: number): string {
+export function formatNumber(value: number): string {
   return new Intl.NumberFormat('fr-FR').format(value);
 }
 
-function formatCurrency(value: number): string {
+export function formatCurrency(value: number): string {
   return `${formatNumber(value)} GNF`;
 }
 
-function buildRiskLabel(denied: number): string {
+export function buildRiskLabel(denied: number): string {
   if (denied >= 10) return 'A verifier';
   if (denied >= 4) return 'Audit';
   return 'Normal';
 }
 
-function formatAuditDetails(details?: AuditLogEntry['details']): string {
+export function formatAuditDetails(details?: AuditLogEntry['details']): string {
   if (!details) return 'Aucun detail';
   const entries = Object.entries(details).slice(0, 3);
   return entries.map(([key, value]) => `${key}: ${String(value)}`).join(' | ');
 }
 
-function sanitizePaymentFilters(filters: PaymentFilters): PaymentFilters {
+export function sanitizePaymentFilters(filters: PaymentFilters): PaymentFilters {
   return {
     provider: filters.provider || undefined,
     status: filters.status || undefined,
@@ -520,7 +520,7 @@ function sanitizePaymentFilters(filters: PaymentFilters): PaymentFilters {
   };
 }
 
-function downloadLocalFile(filename: string, content: string, type = 'text/csv;charset=utf-8'): void {
+export function downloadLocalFile(filename: string, content: string, type = 'text/csv;charset=utf-8'): void {
   const blob = new Blob([content], { type });
   const objectUrl = window.URL.createObjectURL(blob);
   const link = document.createElement('a');
@@ -532,11 +532,11 @@ function downloadLocalFile(filename: string, content: string, type = 'text/csv;c
   window.URL.revokeObjectURL(objectUrl);
 }
 
-function buildDemoImportStatus(label: string, count: number): string {
+export function buildDemoImportStatus(label: string, count: number): string {
   return `Simulation ${label} terminee : ${count} ligne(s) validee(s), aucune donnee officielle ecrite.`;
 }
 
-function buildDemoExamAttempt(status: 'started' | 'submitted' = 'started'): ExamAttempt {
+export function buildDemoExamAttempt(status: 'started' | 'submitted' = 'started'): ExamAttempt {
   return {
     id: 'demo-attempt-1',
     candidate_id: 'GN-CODE-2026-000001',
@@ -550,7 +550,7 @@ function buildDemoExamAttempt(status: 'started' | 'submitted' = 'started'): Exam
   };
 }
 
-function buildDemoCertificateVerification(attemptId: string): ExamCertificateVerification {
+export function buildDemoCertificateVerification(attemptId: string): ExamCertificateVerification {
   return {
     valid: true,
     attempt_id: attemptId,
@@ -568,12 +568,12 @@ function buildDemoCertificateVerification(attemptId: string): ExamCertificateVer
   };
 }
 
-function buildDemoQuestionImage(label: string, color = '#1f7a4d'): string {
+export function buildDemoQuestionImage(label: string, color = '#1f7a4d'): string {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540"><rect width="960" height="540" fill="#eef5f1"/><path d="M0 430h960v110H0z" fill="#263238"/><path d="M0 485h960" stroke="#f4d03f" stroke-width="12" stroke-dasharray="48 32"/><circle cx="480" cy="215" r="96" fill="${color}"/><rect x="452" y="112" width="56" height="210" rx="10" fill="#fff"/><rect x="375" y="187" width="210" height="56" rx="10" fill="#fff"/><text x="480" y="72" text-anchor="middle" font-family="Arial" font-size="34" font-weight="700" fill="#18332a">${label}</text></svg>`;
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 }
 
-function filterDemoIdentityChecks(filters: CandidateIdentityFilters): CandidateIdentityCheck[] {
+export function filterDemoIdentityChecks(filters: CandidateIdentityFilters): CandidateIdentityCheck[] {
   return fallbackIdentityChecks.filter((item) => {
     const statusMatches = !filters.status_filter || item.status === filters.status_filter;
     const candidateMatches = !filters.candidate_id || item.candidate_id.toLowerCase().includes(filters.candidate_id.toLowerCase());
@@ -581,7 +581,7 @@ function filterDemoIdentityChecks(filters: CandidateIdentityFilters): CandidateI
   }).slice(0, filters.limit ?? 25);
 }
 
-function filterDemoSubmissions(filters: CandidateSubmissionFilters): CandidateSubmission[] {
+export function filterDemoSubmissions(filters: CandidateSubmissionFilters): CandidateSubmission[] {
   return fallbackCandidateSubmissions.filter((item) => {
     const statusMatches = !filters.status_filter || item.status === filters.status_filter;
     const candidateMatches = !filters.candidate_id || item.candidate_id.toLowerCase().includes(filters.candidate_id.toLowerCase());
@@ -590,7 +590,7 @@ function filterDemoSubmissions(filters: CandidateSubmissionFilters): CandidateSu
   }).slice(0, filters.limit ?? 25);
 }
 
-function filterDemoAuditLogs(filters: AuditLogFilters): AuditLogEntry[] {
+export function filterDemoAuditLogs(filters: AuditLogFilters): AuditLogEntry[] {
   return fallbackAuditLogs.filter((item) => {
     const actionMatches = !filters.action || item.action.toLowerCase().includes(filters.action.toLowerCase());
     const entityMatches = !filters.entity || item.entity.toLowerCase().includes(filters.entity.toLowerCase());
@@ -598,7 +598,7 @@ function filterDemoAuditLogs(filters: AuditLogFilters): AuditLogEntry[] {
   }).slice(0, filters.limit ?? 25);
 }
 
-function filterDemoMonitoring(filters: ExamMonitoringFilters): {
+export function filterDemoMonitoring(filters: ExamMonitoringFilters): {
   summaries: ExamMonitoringSummary[];
   events: ExamMonitoringEvent[];
   deviceAlerts: DeviceSession[];
@@ -618,7 +618,7 @@ function filterDemoMonitoring(filters: ExamMonitoringFilters): {
   };
 }
 
-function filterDemoPayments(filters: PaymentFilters): {
+export function filterDemoPayments(filters: PaymentFilters): {
   summary: PaymentSummary;
   items: PaymentReconciliationItem[];
   alerts: PaymentAlert[];
@@ -649,7 +649,7 @@ function filterDemoPayments(filters: PaymentFilters): {
   };
 }
 
-function getActionErrorMessage(error: unknown, fallback: string): string {
+export function getActionErrorMessage(error: unknown, fallback: string): string {
   return error instanceof Error && error.message ? error.message : fallback;
 }
 

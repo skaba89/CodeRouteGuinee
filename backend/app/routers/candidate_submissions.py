@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
@@ -124,7 +124,7 @@ def handle_submission(
     item.status = next_status
     item.admin_response = payload.admin_response
     item.handled_by_id = current_user.id
-    item.handled_at = datetime.utcnow()
+    item.handled_at = datetime.now(UTC).replace(tzinfo=None)
     db.add(item)
     db.flush()
     db.add(

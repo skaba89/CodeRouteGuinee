@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
@@ -61,7 +61,7 @@ def _seed_operations_alerts() -> None:
         session = ExamSession(
             reference=f"GN-OPS-SESSION-{suffix}",
             center_id=center.id,
-            starts_at=datetime.utcnow() + timedelta(days=1),
+            starts_at=datetime.now(UTC) + timedelta(days=1),
             capacity=20,
         )
         booking = Booking(

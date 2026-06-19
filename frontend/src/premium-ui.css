@@ -2937,3 +2937,227 @@ tr:last-child td {
   .exam-question-grid { grid-template-columns: repeat(10, 1fr); }
   .exam-submit-btn { grid-column: 1 / -1; }
 }
+
+/* ══════════════════════════════════════════════════════════════════════
+   RESULTS PAGE — résultats détaillés
+   ══════════════════════════════════════════════════════════════════════ */
+
+.results-screen { align-items: stretch; }
+
+.results-workspace {
+  max-width: 780px;
+  margin: 0 auto;
+  padding: 24px 20px;
+  display: grid;
+  gap: 20px;
+}
+
+.results-header h2 { margin: 8px 0 4px; }
+.results-header p { color: var(--premium-muted); font-size: 14px; }
+
+/* Stats grid */
+.results-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 10px;
+}
+
+.stat-card {
+  background: #fff;
+  border: 1px solid rgba(6,43,82,.08);
+  border-radius: 16px;
+  padding: 14px 16px;
+  display: grid;
+  gap: 4px;
+  box-shadow: 0 4px 16px rgba(15,23,42,.05);
+}
+
+.stat-label { font-size: 11px; font-weight: 850; text-transform: uppercase; letter-spacing: .05em; color: var(--premium-muted); }
+.stat-value { font-size: 26px; font-weight: 900; color: var(--premium-navy); }
+.stat-passed .stat-value { color: #0f6e56; }
+.stat-failed .stat-value { color: #c0392b; }
+
+/* Search form */
+.results-search-form {
+  background: #fff;
+  border: 1px solid rgba(6,43,82,.08);
+  border-radius: 20px;
+  padding: 20px;
+  display: grid;
+  gap: 14px;
+  box-shadow: 0 4px 16px rgba(15,23,42,.05);
+}
+
+.results-search-form label {
+  display: grid;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 850;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  color: var(--premium-navy);
+}
+
+.results-search-form input {
+  min-height: 46px;
+  border: 1.5px solid rgba(6,43,82,.12);
+  border-radius: 12px;
+  padding: 0 14px;
+  font: inherit;
+  font-size: 14px;
+  color: var(--premium-ink);
+}
+
+.results-search-form input:focus {
+  outline: none;
+  border-color: #0f6e56;
+  box-shadow: 0 0 0 3px rgba(15,110,86,.1);
+}
+
+.results-search-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.results-search-actions button { flex: 1 1 180px; }
+
+/* Certificate result */
+.certificate-result {
+  border-radius: 20px;
+  padding: 20px;
+  border: 2px solid transparent;
+}
+
+.certificate-result.admitted {
+  background: linear-gradient(135deg, #f0fdf4, #ecfdf5);
+  border-color: #86efac;
+}
+
+.certificate-result.failed {
+  background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+  border-color: #cbd5e1;
+}
+
+.certificate-result.invalid {
+  background: #fff5f5;
+  border-color: #fca5a5;
+}
+
+.certificate-result-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.cert-icon { font-size: 36px; }
+
+.certificate-result-header h3 {
+  font-size: 17px;
+  font-weight: 900;
+  color: var(--premium-navy);
+  margin: 0 0 2px;
+}
+
+.cert-name { font-size: 13px; color: var(--premium-muted); margin: 0; }
+
+.btn-download-cert {
+  margin-left: auto;
+  background: linear-gradient(135deg, #0f6e56, #27ae60) !important;
+  color: #fff !important;
+  padding: 8px 16px;
+  border-radius: 10px;
+  font-weight: 900;
+  font-size: 13px;
+  min-height: unset;
+}
+
+.certificate-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+}
+
+.cert-reason { font-size: 13px; color: #c0392b; margin: 0; font-weight: 700; }
+
+/* Detailed results */
+.detailed-results { display: grid; gap: 16px; }
+
+.exam-verdict-banner {
+  border-radius: 20px;
+  padding: 20px 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  color: #fff;
+}
+
+.exam-verdict-banner.passed { background: linear-gradient(135deg, #0f6e56, #27ae60); }
+.exam-verdict-banner.failed { background: linear-gradient(135deg, #1e3a5f, #2c4a6e); }
+
+.verdict-emoji { font-size: 36px; }
+.verdict-body { flex: 1; }
+.verdict-body h3 { font-size: 18px; margin: 0 0 2px; color: inherit; }
+.verdict-body p { font-size: 13px; opacity: .8; margin: 0; }
+.verdict-score { text-align: right; }
+.verdict-score strong { font-size: 32px; font-weight: 900; display: block; }
+.verdict-score strong span { font-size: 16px; font-weight: 700; opacity: .7; }
+.verdict-score small { font-size: 12px; opacity: .7; }
+
+/* Filter bar */
+.result-filter-bar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.result-filter-btn {
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1.5px solid rgba(6,43,82,.12);
+  background: #fff;
+  font-size: 13px;
+  font-weight: 750;
+  color: #475569;
+  cursor: pointer;
+  transition: all .15s;
+  min-height: unset;
+  box-shadow: none;
+}
+
+.result-filter-btn:hover { border-color: #94a3b8; background: #f1f5f9; }
+.result-filter-btn.active { background: #1e3a5f; border-color: #1e3a5f; color: #fff; }
+
+/* Questions list */
+.result-questions-list { display: grid; gap: 10px; }
+
+.result-q-item {
+  border-radius: 14px;
+  padding: 14px 18px;
+  border: 1.5px solid rgba(6,43,82,.08);
+  background: #fff;
+  display: grid;
+  gap: 7px;
+  transition: box-shadow .15s;
+}
+
+.result-q-item:hover { box-shadow: 0 4px 16px rgba(15,23,42,.06); }
+.result-q-item.correct { border-color: #86efac; background: #f0fdf4; }
+.result-q-item.wrong { border-color: #fca5a5; background: #fff5f5; }
+
+.result-q-head { display: flex; align-items: center; gap: 8px; }
+.result-q-num {
+  font-weight: 900; font-size: 12px; color: #1e3a5f;
+  background: #f1f5f9; padding: 3px 8px; border-radius: 6px;
+}
+.result-q-cat {
+  font-size: 10px; font-weight: 850; text-transform: uppercase;
+  letter-spacing: .05em; color: #64748b; flex: 1;
+}
+.result-q-icon { font-size: 16px; }
+.result-q-text { font-weight: 700; color: #0f172a; font-size: 14px; line-height: 1.45; margin: 0; }
+.result-q-given { font-size: 12px; color: #dc2626; margin: 0; }
+.result-q-given strong, .result-q-correct strong { font-weight: 850; }
+.result-q-correct { font-size: 12px; color: #0f6e56; margin: 0; }
+.result-q-expl { font-size: 12px; color: #475569; background: rgba(6,43,82,.03); padding: 7px 10px; border-radius: 8px; line-height: 1.5; margin: 0; }

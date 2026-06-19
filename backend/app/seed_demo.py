@@ -1,5 +1,5 @@
 import os
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select
 
@@ -148,7 +148,7 @@ def get_or_create_session(db, center: Center) -> ExamSession:
     session = ExamSession(
         reference=DEMO_SESSION_REFERENCE,
         center_id=center.id,
-        starts_at=datetime.utcnow() + timedelta(days=1),
+        starts_at=datetime.now(UTC) + timedelta(days=1),
         capacity=30,
         status="planned",
     )
@@ -206,7 +206,7 @@ def get_or_create_attempt(db, candidate: Candidate, session: ExamSession, questi
         answers=answers,
         score=len(answers),
         passed=True,
-        submitted_at=datetime.utcnow(),
+        submitted_at=datetime.now(UTC),
     )
     db.add(attempt)
     db.commit()

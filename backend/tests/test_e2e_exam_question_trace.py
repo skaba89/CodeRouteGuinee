@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
@@ -77,7 +77,7 @@ def test_exam_question_trace_is_created_and_used_for_scoring() -> None:
             headers=admin_headers,
             json={
                 "center_id": center["id"],
-                "starts_at": (datetime.utcnow() + timedelta(days=11)).isoformat(),
+                "starts_at": (datetime.now(UTC) + timedelta(days=11)).isoformat(),
                 "capacity": 20,
             },
         )

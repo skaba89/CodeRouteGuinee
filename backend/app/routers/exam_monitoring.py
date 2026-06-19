@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
@@ -90,7 +90,7 @@ def create_monitoring_event(
     center = db.get(Center, session.center_id)
     severity = normalize_severity(payload.severity)
     risk_score = SEVERITY_SCORES[severity]
-    occurred_at = payload.occurred_at or datetime.utcnow()
+    occurred_at = payload.occurred_at or datetime.now(UTC).replace(tzinfo=None)
 
     event = ExamMonitoringEvent(
         center_id=center.id if center else None,

@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime
 
 
 def build_qr_payload(reference: str, verification_code: str) -> str:
@@ -32,5 +32,5 @@ def build_convocation_payload(booking: object, candidate: object, session: objec
         },
         "verification_code": booking.verification_code,
         "qr_payload": build_qr_payload(booking.reference, booking.verification_code),
-        "issued_at": datetime.utcnow().isoformat(),
+        "issued_at": datetime.now(UTC).replace(tzinfo=None).isoformat(),
     }

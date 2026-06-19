@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
@@ -90,7 +90,7 @@ def register_device_heartbeat(
     if attempt and attempt.session_id != session.id:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Attempt does not belong to this session")
 
-    now = datetime.utcnow()
+    now = datetime.now(UTC).replace(tzinfo=None)
     existing = db.scalar(
         select(DeviceSession).where(
             DeviceSession.center_id == center.id,

@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
@@ -29,7 +29,7 @@ def _seed_center_and_session() -> tuple[str, str, str]:
         session = ExamSession(
             reference=f"GN-SESSION-E2E-{suffix}",
             center_id=center.id,
-            starts_at=datetime.utcnow() + timedelta(days=7),
+            starts_at=datetime.now(UTC) + timedelta(days=7),
             capacity=20,
         )
         db.add(session)
