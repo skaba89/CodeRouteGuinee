@@ -1,4 +1,4 @@
-from datetime import datetime
+from app.time_utils import utc_now
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
@@ -107,7 +107,7 @@ def resolve_center_incident(
     if incident.status == "resolved":
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Center incident already resolved")
 
-    now = datetime.utcnow()
+    now = utc_now()
     attempt = db.get(ExamAttempt, incident.attempt_id) if incident.attempt_id else None
     new_attempt = None
 

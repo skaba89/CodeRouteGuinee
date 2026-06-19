@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from app.time_utils import utc_now
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
@@ -42,8 +43,8 @@ def test_admin_can_create_and_approve_institutional_authorization_with_audit_log
                 "reference": f"MT-CODE-{suffix}",
                 "title": "Convention pilote CodeRoute Guinee",
                 "scope": "Autorisation pilote pour la digitalisation des examens du code de la route.",
-                "valid_from": datetime.utcnow().isoformat(),
-                "valid_until": (datetime.utcnow() + timedelta(days=365)).isoformat(),
+                "valid_from": utc_now().isoformat(),
+                "valid_until": (utc_now() + timedelta(days=365)).isoformat(),
             },
         )
         assert create_response.status_code == 201

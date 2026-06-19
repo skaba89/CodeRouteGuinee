@@ -1,5 +1,6 @@
-import uuid
 from datetime import datetime
+import uuid
+from app.time_utils import utc_now
 
 from sqlalchemy import DateTime, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column
@@ -24,5 +25,5 @@ class DeviceSession(Base):
     user_agent: Mapped[str | None] = mapped_column(String(255), nullable=True)
     status: Mapped[str] = mapped_column(String(40), default="active", nullable=False)
     risk_reason: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
-    last_seen_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)

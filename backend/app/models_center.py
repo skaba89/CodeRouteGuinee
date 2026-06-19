@@ -1,5 +1,6 @@
-import uuid
 from datetime import datetime
+import uuid
+from app.time_utils import utc_now
 
 from sqlalchemy import DateTime, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
@@ -21,4 +22,4 @@ class Center(Base):
     address: Mapped[str] = mapped_column(String(255), nullable=False)
     capacity: Mapped[int] = mapped_column(Integer, default=20, nullable=False)
     status: Mapped[str] = mapped_column(String(50), default="pending_audit", nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)

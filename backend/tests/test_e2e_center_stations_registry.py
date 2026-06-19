@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from app.time_utils import utc_now
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
@@ -77,7 +78,7 @@ def test_center_station_registry_flags_unknown_device_keys() -> None:
             headers=admin_headers,
             json={
                 "center_id": center["id"],
-                "starts_at": (datetime.utcnow() + timedelta(days=10)).isoformat(),
+                "starts_at": (utc_now() + timedelta(days=10)).isoformat(),
                 "capacity": 20,
             },
         )

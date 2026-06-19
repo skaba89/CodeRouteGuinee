@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from app.time_utils import utc_now
 from types import SimpleNamespace
 
 from app.models_audit import AuditLog
@@ -14,21 +15,21 @@ class FakeDb:
 
 
 def test_exam_attempt_is_not_expired_before_duration_limit() -> None:
-    now = datetime.utcnow()
+    now = utc_now()
     attempt = SimpleNamespace(started_at=now - timedelta(minutes=EXAM_DURATION_MINUTES - 1))
 
     assert _is_attempt_expired(attempt, now) is False
 
 
 def test_exam_attempt_is_expired_after_duration_limit() -> None:
-    now = datetime.utcnow()
+    now = utc_now()
     attempt = SimpleNamespace(started_at=now - timedelta(minutes=EXAM_DURATION_MINUTES + 1))
 
     assert _is_attempt_expired(attempt, now) is True
 
 
 def test_exam_guard_log_contains_attempt_context() -> None:
-    now = datetime.utcnow()
+    now = utc_now()
     attempt = SimpleNamespace(
         id="attempt-1",
         candidate_id="candidate-1",

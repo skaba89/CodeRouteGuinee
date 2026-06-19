@@ -1,4 +1,4 @@
-from datetime import datetime
+from app.time_utils import utc_now
 
 from fastapi import APIRouter, Depends, status
 from sqlalchemy import select
@@ -14,7 +14,7 @@ router = APIRouter(prefix="/sessions", tags=["sessions"])
 
 def build_session_reference(db: Session) -> str:
     count = db.query(ExamSession).count() + 1
-    return f"GN-SESSION-{datetime.utcnow().year}-{count:06d}"
+    return f"GN-SESSION-{utc_now().year}-{count:06d}"
 
 
 @router.get("", response_model=list[ExamSessionRead])

@@ -1,4 +1,4 @@
-from datetime import datetime
+from app.time_utils import utc_now
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
@@ -74,7 +74,7 @@ def decide_identity_check(
     item.status = payload.status
     item.verified_by_id = current_user.id
     item.decision_reason = payload.reason
-    item.decided_at = datetime.utcnow()
+    item.decided_at = utc_now()
     db.add(item)
     db.flush()
     db.add(

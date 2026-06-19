@@ -1,5 +1,6 @@
-import uuid
 from datetime import datetime
+import uuid
+from app.time_utils import utc_now
 
 from sqlalchemy import DateTime, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column
@@ -20,4 +21,4 @@ class Booking(Base):
     session_id: Mapped[str] = mapped_column(ForeignKey("exam_sessions.id"), nullable=False)
     status: Mapped[str] = mapped_column(String(50), default="confirmed", nullable=False)
     verification_code: Mapped[str] = mapped_column(String(120), unique=True, index=True, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)

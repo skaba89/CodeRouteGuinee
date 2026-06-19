@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from app.time_utils import utc_now
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
@@ -59,7 +60,7 @@ def test_candidate_booking_payment_entry_exam_certificate_flow() -> None:
             headers=headers,
             json={
                 "center_id": center["id"],
-                "starts_at": (datetime.utcnow() + timedelta(days=7)).isoformat(),
+                "starts_at": (utc_now() + timedelta(days=7)).isoformat(),
                 "capacity": 40,
             },
         )

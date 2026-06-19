@@ -1,5 +1,6 @@
-import uuid
 from datetime import datetime
+import uuid
+from app.time_utils import utc_now
 
 from sqlalchemy import Boolean, DateTime, String
 from sqlalchemy.orm import Mapped, mapped_column
@@ -20,4 +21,4 @@ class User(Base):
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     role: Mapped[str] = mapped_column(String(50), default="candidate", nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)

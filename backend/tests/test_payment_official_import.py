@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from app.time_utils import utc_now
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
@@ -56,7 +57,7 @@ def _seed_booking() -> str:
         session = ExamSession(
             reference=f"GN-PAY-SESSION-{suffix}",
             center_id=center.id,
-            starts_at=datetime.utcnow() + timedelta(days=5),
+            starts_at=utc_now() + timedelta(days=5),
             capacity=20,
         )
         db.add(session)

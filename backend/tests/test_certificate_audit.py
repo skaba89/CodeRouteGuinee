@@ -1,4 +1,5 @@
 from datetime import datetime
+from app.time_utils import utc_now
 
 from app.models_audit import AuditLog
 from app.routers.exams import _write_certificate_verification_log
@@ -13,7 +14,7 @@ class FakeDb:
 
 
 def test_certificate_verification_log_contains_context() -> None:
-    now = datetime.utcnow()
+    now = utc_now()
     db = FakeDb()
 
     _write_certificate_verification_log(

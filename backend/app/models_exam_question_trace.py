@@ -1,5 +1,6 @@
-import uuid
 from datetime import datetime
+import uuid
+from app.time_utils import utc_now
 
 from sqlalchemy import DateTime, ForeignKey, Integer, JSON, String
 from sqlalchemy.orm import Mapped, mapped_column
@@ -21,4 +22,4 @@ class ExamQuestionTrace(Base):
     bank_hash: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
     version_label: Mapped[str] = mapped_column(String(80), nullable=False)
     selection_mode: Mapped[str] = mapped_column(String(80), default="active_bank_snapshot", nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)

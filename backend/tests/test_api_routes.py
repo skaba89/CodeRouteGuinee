@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from app.time_utils import utc_now
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
@@ -69,7 +70,7 @@ def test_candidate_center_question_and_dashboard_routes() -> None:
             headers=headers,
             json={
                 "center_id": center_id,
-                "starts_at": (datetime.utcnow() + timedelta(days=1)).isoformat(),
+                "starts_at": (utc_now() + timedelta(days=1)).isoformat(),
                 "capacity": 20,
             },
         )

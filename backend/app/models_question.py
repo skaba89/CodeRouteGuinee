@@ -1,5 +1,6 @@
-import uuid
 from datetime import datetime
+import uuid
+from app.time_utils import utc_now
 
 from sqlalchemy import Boolean, DateTime, JSON, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
@@ -24,4 +25,4 @@ class Question(Base):
     media_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     media_alt: Mapped[str | None] = mapped_column(String(255), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)

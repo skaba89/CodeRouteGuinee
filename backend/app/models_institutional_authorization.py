@@ -1,5 +1,6 @@
-import uuid
 from datetime import datetime
+import uuid
+from app.time_utils import utc_now
 
 from sqlalchemy import DateTime, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
@@ -22,5 +23,5 @@ class InstitutionalAuthorization(Base):
     status: Mapped[str] = mapped_column(String(40), default="draft", nullable=False, index=True)
     valid_from: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     valid_until: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)
     updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

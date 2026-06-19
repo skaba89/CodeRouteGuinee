@@ -1,5 +1,6 @@
-import uuid
 from datetime import datetime
+import uuid
+from app.time_utils import utc_now
 
 from sqlalchemy import DateTime, String
 from sqlalchemy.orm import Mapped, mapped_column
@@ -22,4 +23,4 @@ class Candidate(Base):
     phone: Mapped[str] = mapped_column(String(50), nullable=False)
     permit_category: Mapped[str] = mapped_column(String(10), default="B", nullable=False)
     status: Mapped[str] = mapped_column(String(50), default="registered", nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)

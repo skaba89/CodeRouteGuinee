@@ -1,5 +1,6 @@
-import uuid
 from datetime import datetime
+import uuid
+from app.time_utils import utc_now
 
 from sqlalchemy import DateTime, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
@@ -26,5 +27,5 @@ class CenterIncident(Base):
     reported_by_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     resolved_by_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     new_attempt_id: Mapped[str | None] = mapped_column(ForeignKey("exam_attempts.id"), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

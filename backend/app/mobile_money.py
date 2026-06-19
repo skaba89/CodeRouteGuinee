@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import datetime
+from app.time_utils import utc_now
 
 
 @dataclass(frozen=True)
@@ -24,7 +24,7 @@ def normalize_provider(provider: str) -> str:
 
 def simulate_mobile_money_payment(provider: str, phone: str, amount_gnf: int) -> ProviderResult:
     normalized = normalize_provider(provider)
-    timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
+    timestamp = utc_now().strftime("%Y%m%d%H%M%S")
     suffix = phone[-4:] if len(phone) >= 4 else "0000"
     return ProviderResult(
         provider=normalized,

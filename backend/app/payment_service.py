@@ -1,8 +1,8 @@
-from datetime import datetime
+from app.time_utils import utc_now
 
 
 def build_payment_reference(sequence_number: int) -> str:
-    return f"GN-PAY-{datetime.utcnow().year}-{sequence_number:06d}"
+    return f"GN-PAY-{utc_now().year}-{sequence_number:06d}"
 
 
 def build_receipt_number(reference: str) -> str:

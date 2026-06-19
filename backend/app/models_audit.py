@@ -1,5 +1,6 @@
-import uuid
 from datetime import datetime
+import uuid
+from app.time_utils import utc_now
 
 from sqlalchemy import DateTime, JSON, String
 from sqlalchemy.orm import Mapped, mapped_column
@@ -20,4 +21,4 @@ class AuditLog(Base):
     entity: Mapped[str] = mapped_column(String(120), nullable=False)
     entity_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     details: Mapped[dict | None] = mapped_column(JSON, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)

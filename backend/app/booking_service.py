@@ -1,10 +1,10 @@
 import hashlib
 import secrets
-from datetime import datetime
+from app.time_utils import utc_now
 
 
 def build_booking_reference(sequence_number: int) -> str:
-    return f"GN-CONV-{datetime.utcnow().year}-{sequence_number:06d}"
+    return f"GN-CONV-{utc_now().year}-{sequence_number:06d}"
 
 
 def build_verification_code(reference: str) -> str:

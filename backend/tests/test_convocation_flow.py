@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from app.time_utils import utc_now
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
@@ -26,7 +27,7 @@ def test_convocation_payload_contains_booking_context() -> None:
         headers = _admin_headers(client)
         center = client.post("/api/v1/centers", headers=headers, json={"code": f"CNV-{suffix}", "name": "Centre convocation", "city": "Conakry", "address": "Matoto", "capacity": 20, "status": "active"}).json()
         candidate = client.post("/api/v1/candidates", json={"first_name": "Fatoumata", "last_name": "Diallo", "identity_number": f"CNV-ID-{suffix}", "phone": "+224333333333", "permit_category": "B"}).json()
-        session = client.post("/api/v1/sessions", headers=headers, json={"center_id": center["id"], "starts_at": (datetime.utcnow() + timedelta(days=3)).isoformat(), "capacity": 20}).json()
+        session = client.post("/api/v1/sessions", headers=headers, json={"center_id": center["id"], "starts_at": (utc_now() + timedelta(days=3)).isoformat(), "capacity": 20}).json()
         booking = client.post("/api/v1/bookings", json={"candidate_id": candidate["id"], "session_id": session["id"]}).json()
 
         response = client.get(f"/api/v1/bookings/{booking['reference']}/convocation")
