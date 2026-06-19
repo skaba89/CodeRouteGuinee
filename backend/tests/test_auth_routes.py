@@ -169,6 +169,56 @@ def test_privileged_registration_can_require_bootstrap_token() -> None:
         auth.settings.admin_registration_token = previous_token
 
 
+def test_production_privileged_registration_requires_configured_bootstrap_token() -> None:
+    previous_token = auth.settings.admin_registration_token
+    previous_environment = auth.settings.environment
+    auth.settings.admin_registration_token = None
+    auth.settings.environment = "production"
+    try:
+        with TestClient(app) as client:
+            suffix = str(uuid4())[:8]
+            response = client.post(
+                "/api/v1/auth/register",
+                json={
+                    "email": f"prod-admin-denied-{suffix}@coderoute.gn",
+                    "full_name": "Production Admin",
+                    "password": "StrongPass123",
+                    "role": "admin",
+                },
+            )
+
+        assert response.status_code == 403
+    finally:
+        auth.settings.admin_registration_token = previous_token
+        auth.settings.environment = previous_environment
+
+
+def test_production_privileged_registration_accepts_valid_bootstrap_token() -> None:
+    previous_token = auth.settings.admin_registration_token
+    previous_environment = auth.settings.environment
+    auth.settings.admin_registration_token = "prod-bootstrap-token"
+    auth.settings.environment = "production"
+    try:
+        with TestClient(app) as client:
+            suffix = str(uuid4())[:8]
+            response = client.post(
+                "/api/v1/auth/register",
+                headers={"X-Admin-Registration-Token": "prod-bootstrap-token"},
+                json={
+                    "email": f"prod-admin-allowed-{suffix}@coderoute.gn",
+                    "full_name": "Production Admin",
+                    "password": "StrongPass123",
+                    "role": "super_admin",
+                },
+            )
+
+        assert response.status_code == 201
+        assert response.json()["role"] == "super_admin"
+    finally:
+        auth.settings.admin_registration_token = previous_token
+        auth.settings.environment = previous_environment
+
+
 def test_register_rejects_unknown_role() -> None:
     with TestClient(app) as client:
         suffix = str(uuid4())[:8]

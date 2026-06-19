@@ -43,6 +43,12 @@ def audit_auth_event(db: Session, action: str, email: str, request: Request, use
     db.commit()
 
 
+def requires_privileged_registration_token(role: str) -> bool:
+    return role in PRIVILEGED_ROLES and (
+        settings.environment == "production" or bool(settings.admin_registration_token)
+    )
+
+
 @router.post("/register", response_model=UserRead, status_code=status.HTTP_201_CREATED)
 def register(
     payload: UserCreate,
@@ -52,10 +58,9 @@ def register(
     existing = db.scalar(select(User).where(User.email == payload.email.lower()))
     if existing:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered")
-    if (
-        payload.role in PRIVILEGED_ROLES
-        and settings.admin_registration_token
-        and x_admin_registration_token != settings.admin_registration_token
+    if requires_privileged_registration_token(payload.role) and (
+        not settings.admin_registration_token
+        or x_admin_registration_token != settings.admin_registration_token
     ):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Privileged role registration requires bootstrap authorization")
     user = User(
