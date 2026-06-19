@@ -1,5 +1,4 @@
 import csv
-import hashlib
 import io
 from datetime import datetime, timedelta
 
@@ -9,7 +8,14 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.deps import get_current_user, require_roles
-from app.exam_engine import score_answers
+from app.exam_engine import (
+    EXAM_DURATION_MINUTES,
+    build_question_bank_hash,
+    build_score_summary,
+    build_selected_questions_hash,
+    score_answers,
+    select_exam_questions,
+)
 from app.models_audit import AuditLog
 from app.models_booking import Booking
 from app.models_candidate import Candidate
@@ -25,34 +31,33 @@ from app.schemas import ExamAttemptRead, ExamCertificateVerificationRead, ExamSt
 
 router = APIRouter(prefix="/exams", tags=["exams"])
 
-EXAM_DURATION_MINUTES = 30
 
 
 def _is_attempt_expired(attempt: ExamAttempt, now: datetime) -> bool:
     return now - attempt.started_at > timedelta(minutes=EXAM_DURATION_MINUTES)
 
 
-def _build_question_bank_hash(questions: list[Question]) -> str:
-    payload = "|".join(f"{question.id}:{question.correct_answer}:{question.is_active}" for question in questions)
-    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
-
 
 def _create_exam_attempt(db: Session, candidate_id: str, session_id: str) -> ExamAttempt:
-    questions = list(db.scalars(select(Question).where(Question.is_active.is_(True)).order_by(Question.id)).all())
+    # Charger toute la banque active
+    all_questions = list(db.scalars(select(Question).where(Question.is_active.is_(True))).all())
+    # Sélectionner 40 questions selon la répartition officielle par catégorie
+    selected = select_exam_questions(all_questions)
     attempt = ExamAttempt(candidate_id=candidate_id, session_id=session_id)
     db.add(attempt)
     db.flush()
 
-    question_ids = [question.id for question in questions]
-    bank_hash = _build_question_bank_hash(questions)
-    version_label = f"active-bank-{bank_hash[:12]}" if question_ids else "active-bank-empty"
+    question_ids = [q.id for q in selected]
+    bank_hash = build_question_bank_hash(all_questions)
+    selection_hash = build_selected_questions_hash(selected)
+    version_label = f"official-{bank_hash[:12]}" if question_ids else "bank-empty"
     trace = ExamQuestionTrace(
         attempt_id=attempt.id,
         question_ids=question_ids,
         question_count=len(question_ids),
         bank_hash=bank_hash,
-        version_label=version_label,
-        selection_mode="active_bank_snapshot",
+        version_label=f"{version_label}|sel-{selection_hash[:12]}",
+        selection_mode="official_category_distribution",
     )
     db.add(trace)
     db.add(
@@ -354,15 +359,184 @@ def submit_exam(
     answer_key = {question.id: question.correct_answer for question in questions}
     result = score_answers(answer_key, payload.answers)
 
+    candidate = db.get(Candidate, attempt.candidate_id)
+    summary = build_score_summary(
+        result,
+        candidate_name=f"{candidate.first_name} {candidate.last_name}" if candidate else "",
+    )
+
     attempt.answers = payload.answers
     attempt.score = result["correct_answers"]
     attempt.passed = result["passed"]
     attempt.status = "submitted"
     attempt.submitted_at = now
     db.add(attempt)
+    db.add(AuditLog(
+        actor_id=current_user.id,
+        action="exam.submitted",
+        entity="exam_attempt",
+        entity_id=attempt.id,
+        details={
+            "candidate_id": attempt.candidate_id,
+            "session_id": attempt.session_id,
+            "score": result["correct_answers"],
+            "total": result["total_questions"],
+            "score_percent": result["score_percent"],
+            "passed": result["passed"],
+            "unanswered": result["unanswered"],
+            "summary": summary,
+        },
+    ))
     db.commit()
     db.refresh(attempt)
     return attempt
+
+
+@router.get("/{attempt_id}/status")
+def get_exam_status(
+    attempt_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    """
+    Statut en temps réel d'un examen en cours.
+    Retourne le temps restant, le nombre de questions, et le statut.
+    """
+    attempt = db.get(ExamAttempt, attempt_id)
+    if not attempt:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Exam attempt not found")
+
+    now = datetime.utcnow()
+    elapsed_seconds = int((now - attempt.started_at).total_seconds())
+    total_seconds = EXAM_DURATION_MINUTES * 60
+    remaining_seconds = max(0, total_seconds - elapsed_seconds)
+
+    trace = db.scalar(select(ExamQuestionTrace).where(ExamQuestionTrace.attempt_id == attempt.id))
+    question_count = trace.question_count if trace else 0
+
+    is_expired = remaining_seconds == 0 and attempt.status == "started"
+    if is_expired:
+        attempt.status = "expired"
+        attempt.submitted_at = now
+        db.add(attempt)
+        db.commit()
+
+    return {
+        "attempt_id": attempt.id,
+        "status": attempt.status,
+        "elapsed_seconds": elapsed_seconds,
+        "remaining_seconds": remaining_seconds,
+        "total_seconds": total_seconds,
+        "question_count": question_count,
+        "started_at": attempt.started_at.isoformat() if attempt.started_at else None,
+        "submitted_at": attempt.submitted_at.isoformat() if attempt.submitted_at else None,
+        "score": attempt.score if attempt.status == "submitted" else None,
+        "passed": attempt.passed if attempt.status == "submitted" else None,
+        "expired": is_expired or attempt.status == "expired",
+    }
+
+
+@router.get("/{attempt_id}/questions")
+def get_exam_questions(
+    attempt_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> list[dict]:
+    """
+    Retourne les 40 questions de l'examen (sans les bonnes réponses).
+    Accessible uniquement si l'examen est en cours.
+    """
+    attempt = db.get(ExamAttempt, attempt_id)
+    if not attempt:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Exam attempt not found")
+    if attempt.status not in ("started",):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Questions uniquement accessibles pendant un examen en cours",
+        )
+
+    trace = db.scalar(select(ExamQuestionTrace).where(ExamQuestionTrace.attempt_id == attempt.id))
+    if not trace or not trace.question_ids:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Trace d'examen introuvable")
+
+    questions = list(db.scalars(select(Question).where(Question.id.in_(trace.question_ids))).all())
+    # Trier dans l'ordre de sélection original
+    order_map = {qid: i for i, qid in enumerate(trace.question_ids)}
+    questions.sort(key=lambda q: order_map.get(q.id, 9999))
+
+    return [
+        {
+            "id": q.id,
+            "number": i + 1,
+            "category": q.category,
+            "text": q.text,
+            "options": q.options,
+            "media_type": q.media_type,
+            "media_url": q.media_url,
+            "media_alt": q.media_alt,
+            # NE PAS exposer correct_answer ni explanation pendant l'examen
+        }
+        for i, q in enumerate(questions)
+    ]
+
+
+@router.get("/{attempt_id}/results")
+def get_exam_results(
+    attempt_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    """
+    Résultats détaillés après soumission (avec bonnes réponses et explications).
+    Accessible uniquement après soumission.
+    """
+    attempt = db.get(ExamAttempt, attempt_id)
+    if not attempt:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Exam attempt not found")
+    if attempt.status != "submitted":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Résultats disponibles seulement après soumission",
+        )
+
+    trace = db.scalar(select(ExamQuestionTrace).where(ExamQuestionTrace.attempt_id == attempt.id))
+    if not trace or not trace.question_ids:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Trace introuvable")
+
+    questions = list(db.scalars(select(Question).where(Question.id.in_(trace.question_ids))).all())
+    order_map = {qid: i for i, qid in enumerate(trace.question_ids)}
+    questions.sort(key=lambda q: order_map.get(q.id, 9999))
+
+    submitted = attempt.answers or {}
+    items = []
+    for i, q in enumerate(questions):
+        given = submitted.get(q.id)
+        correct = q.correct_answer
+        items.append({
+            "number": i + 1,
+            "question_id": q.id,
+            "category": q.category,
+            "text": q.text,
+            "options": q.options,
+            "given_answer": given,
+            "correct_answer": correct,
+            "is_correct": given == correct,
+            "explanation": q.explanation,
+        })
+
+    candidate = db.get(Candidate, attempt.candidate_id)
+    from app.exam_engine import EXAM_PASS_THRESHOLD
+    return {
+        "attempt_id": attempt.id,
+        "candidate_name": f"{candidate.first_name} {candidate.last_name}" if candidate else "",
+        "score": attempt.score,
+        "total": trace.question_count,
+        "score_percent": round((attempt.score or 0) / trace.question_count * 100, 2) if trace.question_count else 0,
+        "passed": attempt.passed,
+        "threshold": EXAM_PASS_THRESHOLD,
+        "submitted_at": attempt.submitted_at.isoformat() if attempt.submitted_at else None,
+        "questions": items,
+    }
 
 
 @router.get("/{attempt_id}/certificate/verify", response_model=ExamCertificateVerificationRead)
