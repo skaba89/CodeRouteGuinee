@@ -5,8 +5,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.auth_guard import LoginRateLimiter
-from app.db.session import get_db
 from app.core.config import get_settings
+from app.db.session import get_db
 from app.deps import get_current_user
 from app.models_audit import AuditLog
 from app.models_user import User
@@ -78,17 +78,17 @@ def login(
     db: Session = Depends(get_db),
 ) -> Token:
     key = login_rate_limit_key(request, form.username)
-    if login_rate_limiter.is_blocked(key):
+    if login_rate_limiter.is_blocked(key, db):
         audit_auth_event(db, "auth.login_blocked", form.username, request)
         raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Too many login attempts")
 
     user = db.scalar(select(User).where(User.email == form.username.lower()))
     if not user or not verify_password(form.password, user.password_hash):
-        login_rate_limiter.register_failure(key)
+        login_rate_limiter.register_failure(key, db)
         audit_auth_event(db, "auth.login_failed", form.username, request, user)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
 
-    login_rate_limiter.reset(key)
+    login_rate_limiter.reset(key, db)
     audit_auth_event(db, "auth.login_success", form.username, request, user)
     return Token(
         access_token=create_access_token(user.id, user.role),

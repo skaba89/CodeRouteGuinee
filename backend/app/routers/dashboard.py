@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 
-from pydantic import BaseModel
 from fastapi import APIRouter, Depends, Response
+from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 

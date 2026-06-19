@@ -1,4 +1,4 @@
-import { getAuthHeaders } from './authClient';
+import { fetchWithAuth, getAuthHeaders } from './authClient';
 
 export type DashboardData = {
   candidates: number;
@@ -559,7 +559,7 @@ async function getJson<T>(path: string): Promise<T> {
 }
 
 async function getPrivateJson<T>(path: string): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, { headers: getAuthHeaders() });
+  const response = await fetchWithAuth(`${API_BASE_URL}${path}`);
   if (!response.ok) {
     throw await buildApiError(response);
   }
@@ -588,9 +588,9 @@ function buildAuditQuery(filters: AuditLogFilters = {}): string {
 }
 
 async function postPrivateJson<T>(path: string, body: unknown): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  const response = await fetchWithAuth(`${API_BASE_URL}${path}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
   if (!response.ok) {
@@ -600,9 +600,9 @@ async function postPrivateJson<T>(path: string, body: unknown): Promise<T> {
 }
 
 async function patchPrivateJson<T>(path: string, body: unknown): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  const response = await fetchWithAuth(`${API_BASE_URL}${path}`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
   if (!response.ok) {
@@ -612,7 +612,7 @@ async function patchPrivateJson<T>(path: string, body: unknown): Promise<T> {
 }
 
 async function downloadProtectedFile(url: string, filename: string): Promise<void> {
-  const response = await fetch(url, { headers: getAuthHeaders() });
+  const response = await fetchWithAuth(url);
   if (!response.ok) {
     throw await buildApiError(response);
   }
@@ -632,7 +632,7 @@ async function downloadProtectedCsv(url: string, filename: string): Promise<void
 }
 
 export function getDashboard(): Promise<DashboardData> {
-  return getJson<DashboardData>('/api/v1/dashboard');
+  return getPrivateJson<DashboardData>('/api/v1/dashboard');
 }
 
 export function getOperationalReadiness(): Promise<OperationalReadiness> {
@@ -640,7 +640,7 @@ export function getOperationalReadiness(): Promise<OperationalReadiness> {
 }
 
 export function getCenters(): Promise<Center[]> {
-  return getJson<Center[]>('/api/v1/centers');
+  return getPrivateJson<Center[]>('/api/v1/centers');
 }
 
 export function getCandidates(): Promise<Candidate[]> {

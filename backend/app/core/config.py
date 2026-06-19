@@ -1,4 +1,5 @@
 from functools import lru_cache
+
 from pydantic_settings import BaseSettings
 
 
@@ -20,6 +21,18 @@ class Settings(BaseSettings):
     bootstrap_admin_full_name: str = "Administrateur National CodeRoute"
     login_rate_limit_attempts: int = 5
     login_rate_limit_window_seconds: int = 300
+
+    # Mobile Money
+    mobile_money_mode: str = "sandbox"
+    orange_money_client_id: str = ""
+    orange_money_client_secret: str = ""
+    orange_money_merchant_code: str = ""
+    orange_money_base_url: str = "https://api.orange.com"
+    mtn_money_subscription_key: str = ""
+    mtn_money_api_user_id: str = ""
+    mtn_money_api_key: str = ""
+    mtn_money_environment: str = "sandbox"
+    mtn_money_base_url: str = "https://sandbox.momodeveloper.mtn.com"
 
     @property
     def cors_origin_list(self) -> list[str]:

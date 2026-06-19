@@ -1,5 +1,5 @@
-from contextlib import asynccontextmanager
 from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -8,7 +8,34 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app.core.config import get_settings
 from app.db.session import init_db
-from app.routers import auth, bookings, candidates, candidate_identity, candidate_submissions, center_incidents, center_stations, centers, dashboard, device_sessions, documents, entries, exam_monitoring, exam_question_traces, exam_reviews, exams, health, institutional_authorizations, operations, payment_reconciliation, payments, question_governance, questions, sessions, supervision, users
+from app.routers import (
+    auth,
+    bookings,
+    candidate_identity,
+    candidate_submissions,
+    candidates,
+    center_incidents,
+    center_stations,
+    centers,
+    dashboard,
+    device_sessions,
+    documents,
+    entries,
+    exam_monitoring,
+    exam_question_traces,
+    exam_reviews,
+    exams,
+    health,
+    institutional_authorizations,
+    operations,
+    payment_reconciliation,
+    payments,
+    question_governance,
+    questions,
+    sessions,
+    supervision,
+    users,
+)
 
 settings = get_settings()
 

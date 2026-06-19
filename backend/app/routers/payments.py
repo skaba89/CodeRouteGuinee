@@ -93,11 +93,6 @@ def create_payment(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Booking not found")
 
     if current_user.role not in ("admin", "super_admin"):
-        candidate = db.scalar(
-            select(Candidate).where(
-                Candidate.phone == current_user.email,
-            )
-        )
         candidate_by_id = db.scalar(select(Candidate).where(Candidate.id == booking.candidate_id))
         if candidate_by_id is None or candidate_by_id.phone != payload.phone:
             existing_payment = db.scalar(

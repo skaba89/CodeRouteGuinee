@@ -5,14 +5,13 @@ from sqlalchemy.orm import Session
 from app.booking_service import build_booking_reference, build_verification_code
 from app.convocation_service import build_convocation_payload
 from app.db.session import get_db
+from app.deps import get_current_user, require_roles
 from app.models_booking import Booking
 from app.models_candidate import Candidate
 from app.models_center import Center
 from app.models_session import ExamSession
-from app.qr_service import generate_qr_svg
-from app.deps import get_current_user, require_roles
-from app.models_audit import AuditLog
 from app.models_user import User
+from app.qr_service import generate_qr_svg
 from app.schemas import BookingCreate, BookingRead, BookingVerificationRead
 
 router = APIRouter(prefix="/bookings", tags=["bookings"])

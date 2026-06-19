@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -20,13 +20,13 @@ def get_password_hash(password: str) -> str:
 
 
 def create_access_token(subject: str, role: str) -> str:
-    expire = datetime.now(timezone.utc) + timedelta(minutes=settings.access_token_expire_minutes)
+    expire = datetime.now(UTC) + timedelta(minutes=settings.access_token_expire_minutes)
     payload = {"sub": subject, "role": role, "exp": expire, "type": "access"}
     return jwt.encode(payload, settings.secret_key, algorithm=settings.algorithm)
 
 
 def create_refresh_token(subject: str) -> str:
-    expire = datetime.now(timezone.utc) + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+    expire = datetime.now(UTC) + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
     payload = {"sub": subject, "exp": expire, "type": "refresh"}
     return jwt.encode(payload, settings.secret_key, algorithm=settings.algorithm)
 

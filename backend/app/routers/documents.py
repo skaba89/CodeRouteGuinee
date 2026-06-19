@@ -4,11 +4,11 @@ from sqlalchemy.orm import Session
 
 from app.convocation_service import build_convocation_payload
 from app.db.session import get_db
+from app.deps import get_current_user
 from app.models_booking import Booking
 from app.models_candidate import Candidate
 from app.models_center import Center
 from app.models_session import ExamSession
-from app.deps import get_current_user
 from app.models_user import User
 from app.pdf_service import build_convocation_pdf
 

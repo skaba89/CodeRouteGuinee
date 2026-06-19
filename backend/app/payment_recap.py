@@ -1,5 +1,5 @@
 from collections import defaultdict
-from typing import Iterable
+from collections.abc import Iterable
 
 
 def summarize_payments(payments: Iterable[object]) -> dict:

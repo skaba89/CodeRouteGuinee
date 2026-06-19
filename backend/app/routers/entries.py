@@ -5,10 +5,10 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.deps import require_roles
-from app.models_user import User
 from app.entry_service import build_entry_denied, build_entry_success
 from app.models_audit import AuditLog
 from app.models_booking import Booking
+from app.models_user import User
 
 router = APIRouter(prefix="/entries", tags=["entries"])
 

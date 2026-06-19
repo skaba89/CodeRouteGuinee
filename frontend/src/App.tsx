@@ -1,9 +1,9 @@
 import { FormEvent, useEffect, useState } from 'react';
 
 import { canAccessRoute, demoRoles, navigationItems, type UserRole } from './auth';
-import { type AuthUser, changePassword, getAccessToken, getCurrentUser, loginUser, logoutUser } from './authClient';
+import { type AuthUser, changePassword, getAccessToken, getRefreshToken, getCurrentUser, loginUser, logoutUser } from './authClient';
 import { AuthSessionProvider } from './authSession';
-import { AdminPage, CandidatePage, CenterPage, ExamPage, HomePage, InstitutionalDossierPage, ResultsPage } from './pages';
+import { AdminPage, CandidatePage, CenterPage, ExamPage, HomePage, InstitutionalDossierPage, ResultsPage } from './pages/index';
 import './role.css';
 
 type AppRoute = 'home' | 'candidate' | 'center' | 'admin' | 'exam' | 'results' | 'dossier' | 'login' | 'account';
@@ -32,7 +32,7 @@ function getInitialRole(): UserRole {
 }
 
 function getInitialPresentationMode(): boolean {
-  if (!getAccessToken()) {
+  if (!getAccessToken() && !getRefreshToken()) {
     return true;
   }
   return window.localStorage.getItem(PRESENTATION_MODE_STORAGE_KEY) !== 'false';
@@ -183,7 +183,7 @@ export default function App() {
   const [role, setRole] = useState<UserRole>(getInitialRole);
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const [isPresentationMode, setIsPresentationMode] = useState(getInitialPresentationMode);
-  const [isSessionLoading, setIsSessionLoading] = useState(Boolean(getAccessToken()));
+  const [isSessionLoading, setIsSessionLoading] = useState(Boolean(getAccessToken() || getRefreshToken()));
 
   useEffect(() => {
     const onHashChange = () => setRoute(getRouteFromHash());
@@ -192,7 +192,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (!getAccessToken()) {
+    if (!getAccessToken() && !getRefreshToken()) {
       setIsPresentationMode(true);
       setIsSessionLoading(false);
       return;
@@ -210,6 +210,18 @@ export default function App() {
         setIsPresentationMode(true);
       })
       .finally(() => setIsSessionLoading(false));
+  }, []);
+
+  // Écouter l'expiration automatique de session (refresh token expiré)
+  useEffect(() => {
+    function handleSessionExpired() {
+      setCurrentUser(null);
+      setIsPresentationMode(true);
+      setRole('candidate');
+      window.location.hash = '#/login';
+    }
+    window.addEventListener('coderoute:session-expired', handleSessionExpired);
+    return () => window.removeEventListener('coderoute:session-expired', handleSessionExpired);
   }, []);
 
   useEffect(() => {

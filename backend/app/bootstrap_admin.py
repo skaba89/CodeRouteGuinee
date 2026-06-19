@@ -6,7 +6,6 @@ from app.db.session import SessionLocal, init_db
 from app.models_user import User
 from app.security import get_password_hash
 
-
 MIN_BOOTSTRAP_PASSWORD_LENGTH = 12
 
 
