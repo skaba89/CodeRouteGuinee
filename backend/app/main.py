@@ -8,6 +8,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app.core.config import get_settings
 from app.db.session import init_db
+from app.monitoring import init_sentry
 from app.routers import (
     auth,
     bookings,
@@ -42,6 +43,12 @@ settings = get_settings()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    init_sentry(
+        dsn=settings.sentry_dsn or None,
+        environment=settings.sentry_environment or settings.environment,
+        release="0.14.0",
+        traces_sample_rate=settings.sentry_sample_rate,
+    )
     init_db()
     yield
 

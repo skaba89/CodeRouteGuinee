@@ -2,6 +2,8 @@ import { FormEvent, useEffect, useState } from 'react';
 
 import { canAccessRoute, demoRoles, navigationItems, type UserRole } from './auth';
 import { type AuthUser, changePassword, getAccessToken, getRefreshToken, getCurrentUser, loginUser, logoutUser } from './authClient';
+import { LocaleSwitcher } from './components/LocaleSwitcher';
+import { t } from './i18n';
 import { AuthSessionProvider } from './authSession';
 import { AdminPage, CandidatePage, CenterPage, ExamPage, HomePage, InstitutionalDossierPage, ResultsPage } from './pages/index';
 import './role.css';
@@ -296,6 +298,7 @@ export default function App() {
         </div>
 
         <div className="session-panel">
+          <LocaleSwitcher />
           <span>{sessionLabel}</span>
           <button onClick={handleLogout}>{isPresentationMode ? 'Quitter' : 'Deconnexion'}</button>
         </div>

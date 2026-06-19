@@ -316,6 +316,15 @@ def simulate_mobile_money_payment(provider: str, phone: str, amount_gnf: int) ->
         # Provider inconnu en production → sandbox forcé
         return _sandbox_payment(normalized, phone, amount_gnf)
     except Exception as exc:
+        try:
+            from app.monitoring import capture_exception
+            capture_exception(exc, {
+                "provider": normalized,
+                "amount_gnf": amount_gnf,
+                "phone_suffix": phone[-4:] if len(phone) >= 4 else "???",
+            })
+        except Exception:
+            pass
         return ProviderResult(
             provider=normalized,
             status="failed",

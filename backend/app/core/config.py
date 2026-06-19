@@ -19,6 +19,11 @@ class Settings(BaseSettings):
     bootstrap_admin_email: str | None = None
     bootstrap_admin_password: str | None = None
     bootstrap_admin_full_name: str = "Administrateur National CodeRoute"
+    # Monitoring Sentry
+    sentry_dsn: str = ""
+    sentry_environment: str = ""
+    sentry_sample_rate: float = 0.2
+
     login_rate_limit_attempts: int = 5
     login_rate_limit_window_seconds: int = 300
 

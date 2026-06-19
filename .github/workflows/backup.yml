@@ -1,0 +1,67 @@
+name: Backup PostgreSQL
+
+on:
+  schedule:
+    # Tous les jours à 02h00 UTC (03h00 en Guinée, GMT+1)
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run (affiche la commande sans exécuter)'
+        required: false
+        default: 'false'
+        type: boolean
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q postgresql-client
+
+      - name: Create env file
+        run: |
+          cat > .env.backup <<EOF2
+          DATABASE_URL=${{ secrets.DATABASE_URL }}
+          EOF2
+
+      - name: Run backup
+        env:
+          DRY_RUN: ${{ inputs.dry_run == 'true' && '--dry-run' || '' }}
+        run: |
+          python scripts/postgres_backup.py \
+            --env-file .env.backup \
+            --backup-dir backups \
+            backup \
+            --prefix coderoute-guinee \
+            $DRY_RUN
+
+      - name: Upload backup artifact
+        if: ${{ inputs.dry_run != 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: postgres-backup-${{ github.run_number }}
+          path: backups/
+          retention-days: 30
+
+      - name: Notify on failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `[ALERTE] Backup PostgreSQL échoué — ${new Date().toISOString().split('T')[0]}`,
+              body: `Le backup automatique quotidien a échoué.\n\nRun: ${context.runId}\nVoir les logs : https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+              labels: ['backup', 'critical'],
+            });
