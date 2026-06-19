@@ -8,10 +8,11 @@ from sqlalchemy import Select, select
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
-from app.deps import require_roles
+from app.deps import get_current_user, require_roles
 from app.mobile_money import simulate_mobile_money_payment
 from app.models_audit import AuditLog
 from app.models_booking import Booking
+from app.models_candidate import Candidate
 from app.models_payment import Payment
 from app.models_user import User
 from app.payment_recap import summarize_payments
@@ -72,12 +73,16 @@ def _filtered_payments_query(
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
-def create_payment(payload: PaymentIn, db: Session = Depends(get_db)) -> dict:
+def create_payment(
+    payload: PaymentIn,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
     booking = db.scalar(select(Booking).where(Booking.reference == payload.booking_reference))
     if not booking:
         db.add(
             AuditLog(
-                actor_id=None,
+                actor_id=current_user.id,
                 action="payment.failed",
                 entity="payment",
                 entity_id=payload.booking_reference,
@@ -86,6 +91,20 @@ def create_payment(payload: PaymentIn, db: Session = Depends(get_db)) -> dict:
         )
         db.commit()
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Booking not found")
+
+    if current_user.role not in ("admin", "super_admin"):
+        candidate = db.scalar(
+            select(Candidate).where(
+                Candidate.phone == current_user.email,
+            )
+        )
+        candidate_by_id = db.scalar(select(Candidate).where(Candidate.id == booking.candidate_id))
+        if candidate_by_id is None or candidate_by_id.phone != payload.phone:
+            existing_payment = db.scalar(
+                select(Payment).where(Payment.booking_reference == payload.booking_reference, Payment.status == "paid")
+            )
+            if existing_payment:
+                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Payment already recorded for this booking")
     provider_result = simulate_mobile_money_payment(payload.provider, payload.phone, payload.amount_gnf)
     reference = build_payment_reference(db.query(Payment).count() + 1)
     payment = Payment(
@@ -100,7 +119,7 @@ def create_payment(payload: PaymentIn, db: Session = Depends(get_db)) -> dict:
     db.add(payment)
     db.add(
         AuditLog(
-            actor_id=None,
+            actor_id=current_user.id,
             action="payment.created",
             entity="payment",
             entity_id=reference,
@@ -129,7 +148,10 @@ def create_payment(payload: PaymentIn, db: Session = Depends(get_db)) -> dict:
 
 
 @router.get("/recap/summary")
-def get_payment_summary(db: Session = Depends(get_db)) -> dict:
+def get_payment_summary(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "super_admin", "center")),
+) -> dict:
     payments = db.scalars(select(Payment)).all()
     return summarize_payments(payments)
 
@@ -298,7 +320,11 @@ def import_official_payments(
 
 
 @router.get("/{reference}")
-def get_payment(reference: str, db: Session = Depends(get_db)) -> dict:
+def get_payment(
+    reference: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
     payment = db.scalar(select(Payment).where(Payment.reference == reference))
     if not payment:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Payment not found")

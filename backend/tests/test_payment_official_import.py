@@ -151,7 +151,7 @@ def test_admin_can_import_official_payments_with_audit_log() -> None:
         assert update_response.json()["updated"] == 1
         assert update_response.json()["references"] == [reference]
 
-        payment_response = client.get(f"/api/v1/payments/{reference}")
+        payment_response = client.get(f"/api/v1/payments/{reference}", headers=headers)
         assert payment_response.status_code == 200
         assert payment_response.json()["status"] == "pending"
         assert payment_response.json()["receipt_number"] == receipt_number

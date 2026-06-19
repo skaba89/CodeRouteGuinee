@@ -20,14 +20,31 @@ def build_candidate_reference(db: Session) -> str:
 
 
 @router.get("", response_model=list[CandidateRead])
-def list_candidates(db: Session = Depends(get_db)) -> list[Candidate]:
+def list_candidates(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "super_admin", "center")),
+) -> list[Candidate]:
     return list(db.scalars(select(Candidate).order_by(Candidate.created_at.desc())).all())
 
 
 @router.post("", response_model=CandidateRead, status_code=status.HTTP_201_CREATED)
-def create_candidate(payload: CandidateCreate, db: Session = Depends(get_db)) -> Candidate:
+def create_candidate(
+    payload: CandidateCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "super_admin")),
+) -> Candidate:
     candidate = Candidate(reference=build_candidate_reference(db), **payload.model_dump())
     db.add(candidate)
+    db.flush()
+    db.add(
+        AuditLog(
+            actor_id=current_user.id,
+            action="candidate.created",
+            entity="candidate",
+            entity_id=candidate.id,
+            details={"reference": candidate.reference, "identity_number": candidate.identity_number},
+        )
+    )
     db.commit()
     db.refresh(candidate)
     return candidate

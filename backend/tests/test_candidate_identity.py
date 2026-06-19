@@ -22,10 +22,11 @@ def _admin_headers(client: TestClient) -> dict[str, str]:
     return {"Authorization": f"Bearer {token_response.json()['access_token']}"}
 
 
-def _candidate(client: TestClient) -> dict:
+def _candidate(client: TestClient, headers: dict) -> dict:
     suffix = str(uuid4())[:8]
     response = client.post(
         "/api/v1/candidates",
+        headers=headers,
         json={
             "first_name": "Mariam",
             "last_name": "Diallo",
@@ -40,9 +41,11 @@ def _candidate(client: TestClient) -> dict:
 
 def test_candidate_identity_submission_creates_pending_check() -> None:
     with TestClient(app) as client:
-        candidate = _candidate(client)
+        headers = _admin_headers(client)
+        candidate = _candidate(client, headers)
         response = client.post(
             "/api/v1/candidate-identity",
+            headers=headers,
             json={
                 "candidate_id": candidate["id"],
                 "document_type": "national_id",
@@ -67,9 +70,10 @@ def test_candidate_identity_list_requires_admin_authentication() -> None:
 def test_admin_can_decide_candidate_identity_with_audit_log() -> None:
     with TestClient(app) as client:
         headers = _admin_headers(client)
-        candidate = _candidate(client)
+        candidate = _candidate(client, headers)
         created = client.post(
             "/api/v1/candidate-identity",
+            headers=headers,
             json={
                 "candidate_id": candidate["id"],
                 "document_type": "passport",

@@ -10,13 +10,20 @@ from app.models_candidate import Candidate
 from app.models_center import Center
 from app.models_session import ExamSession
 from app.qr_service import generate_qr_svg
+from app.deps import get_current_user, require_roles
+from app.models_audit import AuditLog
+from app.models_user import User
 from app.schemas import BookingCreate, BookingRead, BookingVerificationRead
 
 router = APIRouter(prefix="/bookings", tags=["bookings"])
 
 
 @router.post("", response_model=BookingRead, status_code=status.HTTP_201_CREATED)
-def create_booking(payload: BookingCreate, db: Session = Depends(get_db)) -> Booking:
+def create_booking(
+    payload: BookingCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "super_admin", "center")),
+) -> Booking:
     sequence_number = db.query(Booking).count() + 1
     reference = build_booking_reference(sequence_number)
     booking = Booking(
@@ -32,7 +39,11 @@ def create_booking(payload: BookingCreate, db: Session = Depends(get_db)) -> Boo
 
 
 @router.get("/{reference}", response_model=BookingRead)
-def get_booking(reference: str, db: Session = Depends(get_db)) -> Booking:
+def get_booking(
+    reference: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Booking:
     booking = db.scalar(select(Booking).where(Booking.reference == reference))
     if not booking:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Booking not found")
@@ -40,7 +51,11 @@ def get_booking(reference: str, db: Session = Depends(get_db)) -> Booking:
 
 
 @router.get("/{reference}/convocation")
-def get_convocation(reference: str, db: Session = Depends(get_db)) -> dict:
+def get_convocation(
+    reference: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
     booking = db.scalar(select(Booking).where(Booking.reference == reference))
     if not booking:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Booking not found")
@@ -53,7 +68,11 @@ def get_convocation(reference: str, db: Session = Depends(get_db)) -> dict:
 
 
 @router.get("/{reference}/convocation/qr.svg")
-def get_convocation_qr(reference: str, db: Session = Depends(get_db)) -> Response:
+def get_convocation_qr(
+    reference: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Response:
     booking = db.scalar(select(Booking).where(Booking.reference == reference))
     if not booking:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Booking not found")

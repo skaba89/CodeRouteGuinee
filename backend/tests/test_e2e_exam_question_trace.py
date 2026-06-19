@@ -38,6 +38,8 @@ def test_exam_question_trace_is_created_and_used_for_scoring() -> None:
 
     with TestClient(app) as client:
         admin_headers = _auth_headers(client, "admin")
+        center_headers = _auth_headers(client, "center")
+        headers = admin_headers
 
         created_questions = []
         for index in range(3):
@@ -84,6 +86,7 @@ def test_exam_question_trace_is_created_and_used_for_scoring() -> None:
 
         candidate_response = client.post(
             "/api/v1/candidates",
+            headers=admin_headers,
             json={
                 "first_name": "Ibrahima",
                 "last_name": f"Trace-{suffix}",
@@ -97,6 +100,7 @@ def test_exam_question_trace_is_created_and_used_for_scoring() -> None:
 
         start_response = client.post(
             "/api/v1/exams/start",
+            headers=center_headers,
             json={"candidate_id": candidate["id"], "session_id": session["id"]},
         )
         assert start_response.status_code == 201
@@ -115,12 +119,13 @@ def test_exam_question_trace_is_created_and_used_for_scoring() -> None:
         assert len(trace["question_ids"]) == trace["question_count"]
         assert {question["id"] for question in created_questions}.issubset(set(trace["question_ids"]))
 
-        active_questions_response = client.get("/api/v1/questions")
+        active_questions_response = client.get("/api/v1/questions", headers=headers)
         assert active_questions_response.status_code == 200
         active_answer_key = {question["id"]: question["correct_answer"] for question in active_questions_response.json()}
         answers = {question_id: active_answer_key.get(question_id, "A") for question_id in trace["question_ids"]}
         submit_response = client.post(
             f"/api/v1/exams/{attempt['id']}/submit",
+            headers=center_headers,
             json={"answers": answers},
         )
         assert submit_response.status_code == 200

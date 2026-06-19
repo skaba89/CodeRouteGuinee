@@ -7,6 +7,7 @@ from app.db.session import SessionLocal, init_db
 from app.main import app
 from app.models_center import Center
 from app.models_session import ExamSession
+from tests.conftest import get_admin_headers, get_center_headers
 
 
 def _seed_center_and_session() -> tuple[str, str, str]:
@@ -44,6 +45,9 @@ def test_candidate_booking_payment_convocation_and_entry_flow() -> None:
     suffix = uuid4().hex[:8]
 
     with TestClient(app) as client:
+        admin_headers = get_admin_headers(client)
+        center_headers = get_center_headers(client)
+
         candidate_response = client.post(
             "/api/v1/candidates",
             json={
@@ -53,6 +57,7 @@ def test_candidate_booking_payment_convocation_and_entry_flow() -> None:
                 "phone": "+224622123456",
                 "permit_category": "B",
             },
+            headers=admin_headers,
         )
         assert candidate_response.status_code == 201
         candidate = candidate_response.json()
@@ -60,6 +65,7 @@ def test_candidate_booking_payment_convocation_and_entry_flow() -> None:
         booking_response = client.post(
             "/api/v1/bookings",
             json={"candidate_id": candidate["id"], "session_id": session_id},
+            headers=admin_headers,
         )
         assert booking_response.status_code == 201
         booking = booking_response.json()
@@ -72,19 +78,26 @@ def test_candidate_booking_payment_convocation_and_entry_flow() -> None:
                 "provider": "orange_money",
                 "phone": "+224622123456",
             },
+            headers=admin_headers,
         )
         assert payment_response.status_code == 201
         payment = payment_response.json()
         assert payment["booking_reference"] == booking["reference"]
         assert payment["status"] == "paid"
 
-        convocation_response = client.get(f"/api/v1/bookings/{booking['reference']}/convocation")
+        convocation_response = client.get(
+            f"/api/v1/bookings/{booking['reference']}/convocation",
+            headers=admin_headers,
+        )
         assert convocation_response.status_code == 200
         convocation = convocation_response.json()
         assert convocation["booking_reference"] == booking["reference"]
         assert convocation["center"]["code"] == center_code
 
-        pdf_response = client.get(f"/api/v1/documents/convocations/{booking['reference']}.pdf")
+        pdf_response = client.get(
+            f"/api/v1/documents/convocations/{booking['reference']}.pdf",
+            headers=admin_headers,
+        )
         assert pdf_response.status_code == 200
         assert pdf_response.content.startswith(b"%PDF")
         assert pdf_response.headers["content-type"] == "application/pdf"
@@ -98,6 +111,7 @@ def test_candidate_booking_payment_convocation_and_entry_flow() -> None:
                 "verification_code": booking["verification_code"],
                 "center_code": center_code,
             },
+            headers=center_headers,
         )
         assert entry_response.status_code == 200
         assert entry_response.json()["allowed"] is True
@@ -109,6 +123,7 @@ def test_candidate_booking_payment_convocation_and_entry_flow() -> None:
                 "verification_code": booking["verification_code"],
                 "center_code": center_code,
             },
+            headers=center_headers,
         )
         assert duplicate_entry_response.status_code == 200
         assert duplicate_entry_response.json()["reason"] == "already_checked_in"

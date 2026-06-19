@@ -6,7 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
-from app.deps import require_roles
+from app.deps import get_current_user, require_roles
 from app.models_audit import AuditLog
 from app.models_candidate import Candidate
 from app.models_candidate_followup import CandidateFollowup
@@ -53,7 +53,11 @@ def _status(value: str) -> str:
 
 
 @router.post("", response_model=SubmissionRead, status_code=status.HTTP_201_CREATED)
-def create_submission(payload: SubmissionCreate, db: Session = Depends(get_db)) -> CandidateFollowup:
+def create_submission(
+    payload: SubmissionCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> CandidateFollowup:
     candidate = db.get(Candidate, payload.candidate_id)
     if not candidate:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Candidate not found")

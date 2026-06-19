@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.deps import require_roles
 from app.models_session import ExamSession
+from app.models_user import User
 from app.schemas import ExamSessionCreate, ExamSessionRead
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
@@ -18,7 +19,10 @@ def build_session_reference(db: Session) -> str:
 
 
 @router.get("", response_model=list[ExamSessionRead])
-def list_sessions(db: Session = Depends(get_db)) -> list[ExamSession]:
+def list_sessions(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "super_admin", "center", "candidate")),
+) -> list[ExamSession]:
     return list(db.scalars(select(ExamSession).order_by(ExamSession.starts_at.desc())).all())
 
 

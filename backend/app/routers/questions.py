@@ -13,7 +13,10 @@ router = APIRouter(prefix="/questions", tags=["questions"])
 
 
 @router.get("", response_model=list[QuestionRead])
-def list_questions(db: Session = Depends(get_db)) -> list[Question]:
+def list_questions(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "super_admin", "center")),
+) -> list[Question]:
     return list(db.scalars(select(Question).where(Question.is_active.is_(True))).all())
 
 

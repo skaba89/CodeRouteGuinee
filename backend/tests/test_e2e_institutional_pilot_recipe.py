@@ -39,6 +39,7 @@ def test_institutional_pilot_recipe_from_official_imports_to_certificate() -> No
 
     with TestClient(app) as client:
         headers = _admin_headers(client)
+        center_headers = _admin_headers(client)  # même token admin pour les actions centre
 
         center_payload = {
             "source": "Liste officielle DNTT - recette",
@@ -62,7 +63,7 @@ def test_institutional_pilot_recipe_from_official_imports_to_certificate() -> No
         center_import = client.post("/api/v1/centers/import-official", headers=headers, json={**center_payload, "dry_run": False})
         assert center_import.status_code == 200
         assert center_import.json()["created"] == 1
-        center = next(item for item in client.get("/api/v1/centers").json() if item["code"] == center_code)
+        center = next(item for item in client.get("/api/v1/centers", headers=headers).json() if item["code"] == center_code)
 
         candidate_payload = {
             "source": "Registre national pilote - recette",
@@ -124,7 +125,7 @@ def test_institutional_pilot_recipe_from_official_imports_to_certificate() -> No
         assert session_response.status_code == 201
         session = session_response.json()
 
-        booking_response = client.post("/api/v1/bookings", json={"candidate_id": candidate_id, "session_id": session["id"]})
+        booking_response = client.post("/api/v1/bookings", headers=headers, json={"candidate_id": candidate_id, "session_id": session["id"]})
         assert booking_response.status_code == 201
         booking = booking_response.json()
 
@@ -151,12 +152,13 @@ def test_institutional_pilot_recipe_from_official_imports_to_certificate() -> No
         assert payment_import.status_code == 200
         assert payment_import.json()["created"] == 1
 
-        convocation_pdf = client.get(f"/api/v1/documents/convocations/{booking['reference']}.pdf")
+        convocation_pdf = client.get(f"/api/v1/documents/convocations/{booking['reference']}.pdf", headers=headers)
         assert convocation_pdf.status_code == 200
         assert convocation_pdf.content.startswith(b"%PDF")
 
         entry_response = client.post(
             "/api/v1/entries/validate",
+            headers=headers,
             json={
                 "reference": booking["reference"],
                 "verification_code": booking["verification_code"],
@@ -168,6 +170,7 @@ def test_institutional_pilot_recipe_from_official_imports_to_certificate() -> No
 
         start_response = client.post(
             "/api/v1/exams/start-from-booking",
+            headers=center_headers,
             json={
                 "booking_reference": booking["reference"],
                 "device_key": f"PILOT-DEVICE-{suffix}",
@@ -178,12 +181,12 @@ def test_institutional_pilot_recipe_from_official_imports_to_certificate() -> No
         attempt = start_response.json()
         assert attempt["status"] == "started"
 
-        questions = client.get("/api/v1/questions").json()
+        questions = client.get("/api/v1/questions", headers=headers).json()
         imported_questions = [question for question in questions if question["category"] == "recette-pilote" and suffix in question["text"]]
         assert len(imported_questions) == 40
         answers = {question["id"]: question["correct_answer"] for question in questions}
 
-        submit_response = client.post(f"/api/v1/exams/{attempt['id']}/submit", json={"answers": answers})
+        submit_response = client.post(f"/api/v1/exams/{attempt['id']}/submit", headers=headers, json={"answers": answers})
         assert submit_response.status_code == 200
         submitted_attempt = submit_response.json()
         assert submitted_attempt["passed"] is True

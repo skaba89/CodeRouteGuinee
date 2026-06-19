@@ -16,7 +16,11 @@ router = APIRouter(prefix="/candidate-identity", tags=["candidate-identity"])
 
 
 @router.post("", response_model=CandidateIdentityRead, status_code=status.HTTP_201_CREATED)
-def create_identity_check(payload: CandidateIdentityCreate, db: Session = Depends(get_db)) -> CandidateIdentityCheck:
+def create_identity_check(
+    payload: CandidateIdentityCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("candidate", "admin", "super_admin", "center")),
+) -> CandidateIdentityCheck:
     candidate = db.get(Candidate, payload.candidate_id)
     if not candidate:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Candidate not found")
@@ -26,7 +30,7 @@ def create_identity_check(payload: CandidateIdentityCreate, db: Session = Depend
     db.flush()
     db.add(
         AuditLog(
-            actor_id=None,
+            actor_id=current_user.id,
             action="candidate_identity.submitted",
             entity="candidate_identity",
             entity_id=item.id,

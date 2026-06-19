@@ -8,13 +8,19 @@ from app.models_booking import Booking
 from app.models_candidate import Candidate
 from app.models_center import Center
 from app.models_session import ExamSession
+from app.deps import get_current_user
+from app.models_user import User
 from app.pdf_service import build_convocation_pdf
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 
 
 @router.get("/convocations/{reference}.pdf")
-def get_convocation_pdf(reference: str, db: Session = Depends(get_db)) -> Response:
+def get_convocation_pdf(
+    reference: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Response:
     booking = db.scalar(select(Booking).where(Booking.reference == reference))
     if not booking:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Booking not found")

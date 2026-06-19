@@ -5,6 +5,7 @@ from fastapi.testclient import TestClient
 
 from app.db.session import init_db
 from app.main import app
+from tests.conftest import get_admin_headers, get_center_headers
 
 
 def _admin_headers(client: TestClient) -> dict[str, str]:
@@ -37,6 +38,8 @@ def test_candidate_booking_payment_entry_exam_certificate_flow() -> None:
     suffix = uuid4().hex[:8]
 
     with TestClient(app) as client:
+        admin_headers = get_admin_headers(client)
+        center_headers = get_center_headers(client)
         headers = _admin_headers(client)
 
         center_response = client.post(
@@ -82,6 +85,7 @@ def test_candidate_booking_payment_entry_exam_certificate_flow() -> None:
 
         candidate_response = client.post(
             "/api/v1/candidates",
+            headers=headers,
             json={
                 "first_name": "Mamadou",
                 "last_name": "Diallo",
@@ -95,19 +99,20 @@ def test_candidate_booking_payment_entry_exam_certificate_flow() -> None:
 
         booking_response = client.post(
             "/api/v1/bookings",
+            headers=headers,
             json={"candidate_id": candidate["id"], "session_id": session["id"]},
         )
         assert booking_response.status_code == 201
         booking = booking_response.json()
 
-        convocation_response = client.get(f"/api/v1/bookings/{booking['reference']}/convocation")
+        convocation_response = client.get(f"/api/v1/bookings/{booking['reference']}/convocation", headers=headers)
         assert convocation_response.status_code == 200
         convocation = convocation_response.json()
         assert convocation["reference"] == booking["reference"]
         assert convocation["candidate"]["reference"] == candidate["reference"]
         assert convocation["qr_payload"].startswith("CODEROUTE-GN")
 
-        qr_response = client.get(f"/api/v1/bookings/{booking['reference']}/convocation/qr.svg")
+        qr_response = client.get(f"/api/v1/bookings/{booking['reference']}/convocation/qr.svg", headers=headers)
         assert qr_response.status_code == 200
         assert "image/svg+xml" in qr_response.headers["content-type"]
         assert qr_response.text.lstrip().startswith("<?xml")
@@ -115,6 +120,7 @@ def test_candidate_booking_payment_entry_exam_certificate_flow() -> None:
 
         payment_response = client.post(
             "/api/v1/payments",
+            headers=headers,
             json={
                 "booking_reference": booking["reference"],
                 "amount_gnf": 250000,
@@ -129,6 +135,7 @@ def test_candidate_booking_payment_entry_exam_certificate_flow() -> None:
 
         entry_response = client.post(
             "/api/v1/entries/validate",
+            headers=center_headers,
             json={
                 "reference": booking["reference"],
                 "verification_code": booking["verification_code"],
@@ -142,19 +149,21 @@ def test_candidate_booking_payment_entry_exam_certificate_flow() -> None:
 
         start_response = client.post(
             "/api/v1/exams/start",
+            headers=center_headers,
             json={"candidate_id": candidate["id"], "session_id": session["id"]},
         )
         assert start_response.status_code == 201
         attempt = start_response.json()
         assert attempt["status"] == "started"
 
-        questions_response = client.get("/api/v1/questions")
+        questions_response = client.get("/api/v1/questions", headers=headers)
         assert questions_response.status_code == 200
         answers = {question["id"]: question["correct_answer"] for question in questions_response.json()}
         assert len(answers) >= 40
 
         submit_response = client.post(
             f"/api/v1/exams/{attempt['id']}/submit",
+            headers=center_headers,
             json={"answers": answers},
         )
         assert submit_response.status_code == 200
@@ -169,7 +178,7 @@ def test_candidate_booking_payment_entry_exam_certificate_flow() -> None:
         assert certificate["candidate_reference"] == candidate["reference"]
         assert certificate["center_name"] == center["name"]
 
-        pdf_response = client.get(f"/api/v1/exams/{attempt['id']}/certificate.pdf")
+        pdf_response = client.get(f"/api/v1/exams/{attempt['id']}/certificate.pdf", headers=headers)
         assert pdf_response.status_code == 200
         assert pdf_response.content.startswith(b"%PDF")
         assert pdf_response.headers["content-type"] == "application/pdf"

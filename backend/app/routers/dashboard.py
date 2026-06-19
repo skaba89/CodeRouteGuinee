@@ -121,7 +121,10 @@ def _risk_status(score: int) -> str:
 
 
 @router.get("", response_model=DashboardRead)
-def dashboard(db: Session = Depends(get_db)) -> DashboardRead:
+def dashboard(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "super_admin", "center")),
+) -> DashboardRead:
     return _build_dashboard(db)
 
 

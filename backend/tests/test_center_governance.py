@@ -115,7 +115,7 @@ def test_admin_can_import_official_centers_with_audit_log() -> None:
         assert update_response.status_code == 200
         assert update_response.json()["updated"] == 1
 
-        centers = client.get("/api/v1/centers").json()
+        centers = client.get("/api/v1/centers", headers=headers).json()
         imported = next(center for center in centers if center["code"] == f"IMP-{suffix}-1")
         assert imported["capacity"] == 35
         assert imported["status"] == "active"

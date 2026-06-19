@@ -5,6 +5,7 @@ from fastapi.testclient import TestClient
 
 from app.db.session import SessionLocal, init_db
 from app.main import app
+from tests.conftest import get_admin_headers, get_center_headers
 from app.models_candidate import Candidate
 from app.models_center import Center
 from app.models_question import Question
@@ -69,21 +70,25 @@ def test_exam_scoring_certificate_and_public_verification_end_to_end() -> None:
     candidate_id, session_id = _seed_exam_context()
 
     with TestClient(app) as client:
+        admin_headers = get_admin_headers(client)
+        center_headers = get_center_headers(client)
         start_response = client.post(
             "/api/v1/exams/start",
+            headers=center_headers,
             json={"candidate_id": candidate_id, "session_id": session_id},
         )
         assert start_response.status_code == 201
         attempt = start_response.json()
         assert attempt["status"] == "started"
 
-        questions_response = client.get("/api/v1/questions")
+        questions_response = client.get("/api/v1/questions", headers=admin_headers)
         assert questions_response.status_code == 200
         answers = {question["id"]: question["correct_answer"] for question in questions_response.json()}
         assert len(answers) >= 40
 
         submit_response = client.post(
             f"/api/v1/exams/{attempt['id']}/submit",
+            headers=center_headers,
             json={"answers": answers},
         )
         assert submit_response.status_code == 200
@@ -94,11 +99,12 @@ def test_exam_scoring_certificate_and_public_verification_end_to_end() -> None:
 
         duplicate_submit_response = client.post(
             f"/api/v1/exams/{attempt['id']}/submit",
+            headers=center_headers,
             json={"answers": answers},
         )
         assert duplicate_submit_response.status_code == 409
 
-        certificate_response = client.get(f"/api/v1/exams/{attempt['id']}/certificate.pdf")
+        certificate_response = client.get(f"/api/v1/exams/{attempt['id']}/certificate.pdf", headers=admin_headers)
         assert certificate_response.status_code == 200
         assert certificate_response.content.startswith(b"%PDF")
 
@@ -110,7 +116,7 @@ def test_exam_scoring_certificate_and_public_verification_end_to_end() -> None:
         assert verification["passed"] is True
         assert verification["score"] >= 35
 
-        summary_response = client.get("/api/v1/exams/summary")
+        summary_response = client.get("/api/v1/exams/summary", headers=admin_headers)
         assert summary_response.status_code == 200
         summary = summary_response.json()
         assert summary["submitted_attempts"] >= 1

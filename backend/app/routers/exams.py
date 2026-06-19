@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
-from app.deps import require_roles
+from app.deps import get_current_user, require_roles
 from app.exam_engine import score_answers
 from app.models_audit import AuditLog
 from app.models_booking import Booking
@@ -196,12 +196,20 @@ def _write_certificate_verification_log(
 
 
 @router.post("/start", response_model=ExamAttemptRead, status_code=status.HTTP_201_CREATED)
-def start_exam(payload: ExamStartRequest, db: Session = Depends(get_db)) -> ExamAttempt:
+def start_exam(
+    payload: ExamStartRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("center", "admin", "super_admin")),
+) -> ExamAttempt:
     return _create_exam_attempt(db, payload.candidate_id, payload.session_id)
 
 
 @router.post("/start-from-booking", response_model=ExamAttemptRead, status_code=status.HTTP_201_CREATED)
-def start_exam_from_booking(payload: ExamStartFromBookingRequest, db: Session = Depends(get_db)) -> ExamAttempt:
+def start_exam_from_booking(
+    payload: ExamStartFromBookingRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("center", "admin", "super_admin")),
+) -> ExamAttempt:
     booking = db.scalar(select(Booking).where(Booking.reference == payload.booking_reference))
     if not booking:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Booking not found")
@@ -218,7 +226,10 @@ def start_exam_from_booking(payload: ExamStartFromBookingRequest, db: Session = 
 
 
 @router.get("/summary")
-def get_exam_summary(db: Session = Depends(get_db)) -> dict:
+def get_exam_summary(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "super_admin")),
+) -> dict:
     attempts = db.scalars(select(ExamAttempt)).all()
     submitted = [attempt for attempt in attempts if attempt.status == "submitted"]
     passed = [attempt for attempt in submitted if attempt.passed]
@@ -296,7 +307,12 @@ def export_exam_attempts_csv(
 
 
 @router.post("/{attempt_id}/submit", response_model=ExamAttemptRead)
-def submit_exam(attempt_id: str, payload: ExamSubmitRequest, db: Session = Depends(get_db)) -> ExamAttempt:
+def submit_exam(
+    attempt_id: str,
+    payload: ExamSubmitRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("center", "admin", "super_admin")),
+) -> ExamAttempt:
     attempt = db.get(ExamAttempt, attempt_id)
     if not attempt:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Exam attempt not found")
@@ -440,7 +456,11 @@ def verify_exam_certificate(attempt_id: str, db: Session = Depends(get_db)) -> E
 
 
 @router.get("/{attempt_id}/certificate.pdf")
-def get_exam_certificate(attempt_id: str, db: Session = Depends(get_db)) -> Response:
+def get_exam_certificate(
+    attempt_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Response:
     attempt = db.get(ExamAttempt, attempt_id)
     if not attempt:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Exam attempt not found")

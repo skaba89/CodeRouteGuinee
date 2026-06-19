@@ -37,6 +37,7 @@ def test_candidate_center_question_and_dashboard_routes() -> None:
 
         candidate_response = client.post(
             "/api/v1/candidates",
+            headers=headers,
             json={
                 "first_name": "Mamadou",
                 "last_name": "Diallo",
@@ -60,7 +61,7 @@ def test_candidate_center_question_and_dashboard_routes() -> None:
         )
         assert question_response.status_code == 201
 
-        centers = client.get("/api/v1/centers").json()
+        centers = client.get("/api/v1/centers", headers=headers).json()
         assert isinstance(centers, list)
         center_id = centers[0]["id"]
 
@@ -76,6 +77,6 @@ def test_candidate_center_question_and_dashboard_routes() -> None:
         assert session_response.status_code == 201
         assert session_response.json()["reference"].startswith("GN-SESSION-")
 
-        dashboard_response = client.get("/api/v1/dashboard")
+        dashboard_response = client.get("/api/v1/dashboard", headers=headers)
         assert dashboard_response.status_code == 200
         assert dashboard_response.json()["candidates"] >= 1

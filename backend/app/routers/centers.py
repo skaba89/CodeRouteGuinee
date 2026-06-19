@@ -13,7 +13,10 @@ router = APIRouter(prefix="/centers", tags=["centers"])
 
 
 @router.get("", response_model=list[CenterRead])
-def list_centers(db: Session = Depends(get_db)) -> list[Center]:
+def list_centers(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "super_admin", "center", "candidate")),
+) -> list[Center]:
     return list(db.scalars(select(Center).order_by(Center.created_at.desc())).all())
 
 

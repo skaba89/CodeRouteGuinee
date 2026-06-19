@@ -33,10 +33,11 @@ def _auth_headers(client: TestClient, role: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
-def _create_candidate(client: TestClient, suffix: str, index: int) -> dict:
+def _create_candidate(client: TestClient, suffix: str, index: int, headers: dict) -> dict:
     response = client.post(
         "/api/v1/candidates",
-        json={
+        headers=headers,
+            json={
             "first_name": f"Candidat{index}",
             "last_name": f"Station-{suffix}",
             "identity_number": f"ID-ST-{suffix}-{index}",
@@ -100,11 +101,12 @@ def test_center_station_registry_flags_unknown_device_keys() -> None:
         assert station["device_key"] == known_device_key
         assert station["status"] == "active"
 
-        candidate_one = _create_candidate(client, suffix, 1)
-        candidate_two = _create_candidate(client, suffix, 2)
+        candidate_one = _create_candidate(client, suffix, 1, admin_headers)
+        candidate_two = _create_candidate(client, suffix, 2, admin_headers)
 
         attempt_one_response = client.post(
             "/api/v1/exams/start",
+            headers=center_headers,
             json={"candidate_id": candidate_one["id"], "session_id": session["id"]},
         )
         assert attempt_one_response.status_code == 201
@@ -112,6 +114,7 @@ def test_center_station_registry_flags_unknown_device_keys() -> None:
 
         attempt_two_response = client.post(
             "/api/v1/exams/start",
+            headers=center_headers,
             json={"candidate_id": candidate_two["id"], "session_id": session["id"]},
         )
         assert attempt_two_response.status_code == 201

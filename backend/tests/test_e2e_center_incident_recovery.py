@@ -39,6 +39,7 @@ def test_center_incident_blocks_attempt_and_allows_retake() -> None:
     with TestClient(app) as client:
         admin_headers = _auth_headers(client, "admin")
         center_headers = _auth_headers(client, "center")
+        headers = admin_headers
 
         center_response = client.post(
             "/api/v1/centers",
@@ -83,6 +84,7 @@ def test_center_incident_blocks_attempt_and_allows_retake() -> None:
 
         candidate_response = client.post(
             "/api/v1/candidates",
+            headers=admin_headers,
             json={
                 "first_name": "Fatoumata",
                 "last_name": "Camara",
@@ -96,6 +98,7 @@ def test_center_incident_blocks_attempt_and_allows_retake() -> None:
 
         start_response = client.post(
             "/api/v1/exams/start",
+            headers=center_headers,
             json={"candidate_id": candidate["id"], "session_id": session["id"]},
         )
         assert start_response.status_code == 201
@@ -121,6 +124,7 @@ def test_center_incident_blocks_attempt_and_allows_retake() -> None:
 
         blocked_submit_response = client.post(
             f"/api/v1/exams/{initial_attempt['id']}/submit",
+            headers=center_headers,
             json={"answers": {}},
         )
         assert blocked_submit_response.status_code == 409
@@ -140,7 +144,7 @@ def test_center_incident_blocks_attempt_and_allows_retake() -> None:
         assert resolved_incident["new_attempt_id"]
         assert resolved_incident["new_attempt_id"] != initial_attempt["id"]
 
-        questions_response = client.get("/api/v1/questions")
+        questions_response = client.get("/api/v1/questions", headers=headers)
         assert questions_response.status_code == 200
         answers = {question["id"]: question["correct_answer"] for question in questions_response.json()}
         assert len(answers) >= 40
@@ -148,6 +152,7 @@ def test_center_incident_blocks_attempt_and_allows_retake() -> None:
         new_attempt_id = resolved_incident["new_attempt_id"]
         submit_response = client.post(
             f"/api/v1/exams/{new_attempt_id}/submit",
+            headers=center_headers,
             json={"answers": answers},
         )
         assert submit_response.status_code == 200

@@ -38,6 +38,7 @@ def test_candidate_submission_lifecycle_and_admin_handling() -> None:
 
     with TestClient(app) as client:
         admin_headers = _auth_headers(client, "admin")
+        center_headers = _auth_headers(client, "center")
 
         center_response = client.post(
             "/api/v1/centers",
@@ -68,6 +69,7 @@ def test_candidate_submission_lifecycle_and_admin_handling() -> None:
 
         candidate_response = client.post(
             "/api/v1/candidates",
+            headers=admin_headers,
             json={
                 "first_name": "Fatoumata",
                 "last_name": f"Submission-{suffix}",
@@ -81,6 +83,7 @@ def test_candidate_submission_lifecycle_and_admin_handling() -> None:
 
         attempt_response = client.post(
             "/api/v1/exams/start",
+            headers=center_headers,
             json={"candidate_id": candidate["id"], "session_id": session["id"]},
         )
         assert attempt_response.status_code == 201
@@ -88,6 +91,7 @@ def test_candidate_submission_lifecycle_and_admin_handling() -> None:
 
         submission_response = client.post(
             "/api/v1/candidate-submissions",
+            headers=admin_headers,
             json={
                 "candidate_id": candidate["id"],
                 "attempt_id": attempt["id"],

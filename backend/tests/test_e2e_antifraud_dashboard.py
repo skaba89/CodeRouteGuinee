@@ -5,6 +5,7 @@ from fastapi.testclient import TestClient
 
 from app.db.session import init_db
 from app.main import app
+from tests.conftest import get_admin_headers, get_center_headers
 
 
 def _auth_headers(client: TestClient, role: str) -> dict[str, str]:
@@ -33,9 +34,10 @@ def _auth_headers(client: TestClient, role: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
-def _create_candidate(client: TestClient, suffix: str, index: int) -> dict:
+def _create_candidate(client: TestClient, suffix: str, index: int, headers: dict) -> dict:
     response = client.post(
         "/api/v1/candidates",
+        headers=headers,
         json={
             "first_name": f"Candidat{index}",
             "last_name": f"AntiFraud-{suffix}",
@@ -53,6 +55,8 @@ def test_national_antifraud_dashboard_aggregates_risk_signals() -> None:
     device_key = f"AF-PC-{suffix}-01"
 
     with TestClient(app) as client:
+        admin_headers = get_admin_headers(client)
+        center_headers = get_center_headers(client)
         admin_headers = _auth_headers(client, "admin")
         center_headers = _auth_headers(client, "center")
 
@@ -83,11 +87,12 @@ def test_national_antifraud_dashboard_aggregates_risk_signals() -> None:
         assert session_response.status_code == 201
         session = session_response.json()
 
-        candidate_one = _create_candidate(client, suffix, 1)
-        candidate_two = _create_candidate(client, suffix, 2)
+        candidate_one = _create_candidate(client, suffix, 1, admin_headers)
+        candidate_two = _create_candidate(client, suffix, 2, admin_headers)
 
         attempt_one_response = client.post(
             "/api/v1/exams/start",
+            headers=center_headers,
             json={"candidate_id": candidate_one["id"], "session_id": session["id"]},
         )
         assert attempt_one_response.status_code == 201
@@ -95,6 +100,7 @@ def test_national_antifraud_dashboard_aggregates_risk_signals() -> None:
 
         attempt_two_response = client.post(
             "/api/v1/exams/start",
+            headers=center_headers,
             json={"candidate_id": candidate_two["id"], "session_id": session["id"]},
         )
         assert attempt_two_response.status_code == 201
@@ -171,6 +177,6 @@ def test_national_antifraud_dashboard_aggregates_risk_signals() -> None:
         assert risk_center["total_risk_score"] >= 20
         assert risk_center["status"] in {"manual_review", "critical_review"}
 
-        public_dashboard_response = client.get("/api/v1/dashboard")
+        public_dashboard_response = client.get("/api/v1/dashboard", headers=admin_headers)
         assert public_dashboard_response.status_code == 200
         assert public_dashboard_response.json()["fraud_alerts"] >= 4

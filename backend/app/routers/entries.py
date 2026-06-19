@@ -4,6 +4,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
+from app.deps import require_roles
+from app.models_user import User
 from app.entry_service import build_entry_denied, build_entry_success
 from app.models_audit import AuditLog
 from app.models_booking import Booking
@@ -33,7 +35,11 @@ def _record_entry_log(db: Session, reference: str, result: str, reason: str | No
 
 
 @router.post("/validate")
-def validate_entry(payload: EntryIn, db: Session = Depends(get_db)) -> dict:
+def validate_entry(
+    payload: EntryIn,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("center", "admin", "super_admin")),
+) -> dict:
     booking = db.scalar(select(Booking).where(Booking.reference == payload.reference))
     if not booking:
         _record_entry_log(db, payload.reference, "denied", "booking_not_found", payload.center_code)
@@ -55,7 +61,10 @@ def validate_entry(payload: EntryIn, db: Session = Depends(get_db)) -> dict:
 
 
 @router.get("/summary")
-def get_entry_summary(db: Session = Depends(get_db)) -> dict:
+def get_entry_summary(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "super_admin")),
+) -> dict:
     logs = db.scalars(select(AuditLog).where(AuditLog.action == "entry_validation")).all()
     total = 0
     by_result: dict[str, int] = {}
@@ -73,7 +82,10 @@ def get_entry_summary(db: Session = Depends(get_db)) -> dict:
 
 
 @router.get("/logs")
-def list_entry_logs(db: Session = Depends(get_db)) -> list[dict]:
+def list_entry_logs(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "super_admin")),
+) -> list[dict]:
     logs = db.scalars(select(AuditLog).where(AuditLog.action == "entry_validation").order_by(AuditLog.created_at.desc()).limit(100)).all()
     return [
         {

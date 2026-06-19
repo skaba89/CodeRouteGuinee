@@ -103,7 +103,7 @@ def test_admin_can_import_official_candidates_with_audit_log() -> None:
         assert update_response.json()["candidate_ids"] == [candidate_id]
         assert update_response.json()["references"] == [reference]
 
-        candidates = client.get("/api/v1/candidates").json()
+        candidates = client.get("/api/v1/candidates", headers=headers).json()
         imported = next(candidate for candidate in candidates if candidate["id"] == candidate_id)
         assert imported["phone"] == "+224620000099"
         assert imported["status"] == "verified"

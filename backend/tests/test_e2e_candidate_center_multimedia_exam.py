@@ -83,7 +83,7 @@ def test_candidate_registration_center_booking_and_40_question_multimedia_exam_t
         assert client.post("/api/v1/centers/import-official", headers=headers, json={**center_payload, "dry_run": True}).json()["created"] == 1
         center_import = client.post("/api/v1/centers/import-official", headers=headers, json={**center_payload, "dry_run": False})
         assert center_import.status_code == 200
-        center = next(item for item in client.get("/api/v1/centers").json() if item["code"] == center_code)
+        center = next(item for item in client.get("/api/v1/centers", headers=headers).json() if item["code"] == center_code)
 
         candidate_payload = {
             "source": "Registre candidats multimedia",
@@ -120,7 +120,7 @@ def test_candidate_registration_center_booking_and_40_question_multimedia_exam_t
         assert question_import.status_code == 200
         assert question_import.json()["imported"] == 40
 
-        fetched_questions = client.get("/api/v1/questions").json()
+        fetched_questions = client.get("/api/v1/questions", headers=headers).json()
         imported_questions = [question for question in fetched_questions if question["category"] == "multimedia-pilote" and suffix in question["text"]]
         assert len(imported_questions) == 40
         assert sum(1 for question in imported_questions if question["media_type"] == "image") == 20
@@ -139,16 +139,17 @@ def test_candidate_registration_center_booking_and_40_question_multimedia_exam_t
         assert session_response.status_code == 201
         session = session_response.json()
 
-        booking_response = client.post("/api/v1/bookings", json={"candidate_id": candidate_id, "session_id": session["id"]})
+        booking_response = client.post("/api/v1/bookings", headers=headers, json={"candidate_id": candidate_id, "session_id": session["id"]})
         assert booking_response.status_code == 201
         booking = booking_response.json()
 
-        convocation_response = client.get(f"/api/v1/bookings/{booking['reference']}/convocation")
+        convocation_response = client.get(f"/api/v1/bookings/{booking['reference']}/convocation", headers=headers)
         assert convocation_response.status_code == 200
         assert convocation_response.json()["candidate"]["reference"] == candidate_reference
 
         entry_response = client.post(
             "/api/v1/entries/validate",
+            headers=headers,
             json={
                 "reference": booking["reference"],
                 "verification_code": booking["verification_code"],
@@ -160,6 +161,7 @@ def test_candidate_registration_center_booking_and_40_question_multimedia_exam_t
 
         start_response = client.post(
             "/api/v1/exams/start-from-booking",
+            headers=headers,
             json={
                 "booking_reference": booking["reference"],
                 "device_key": f"MM-DEVICE-{suffix}",
@@ -170,7 +172,7 @@ def test_candidate_registration_center_booking_and_40_question_multimedia_exam_t
         attempt = start_response.json()
 
         answers = {question["id"]: question["correct_answer"] for question in fetched_questions}
-        submit_response = client.post(f"/api/v1/exams/{attempt['id']}/submit", json={"answers": answers})
+        submit_response = client.post(f"/api/v1/exams/{attempt['id']}/submit", headers=headers, json={"answers": answers})
         assert submit_response.status_code == 200
         submitted_attempt = submit_response.json()
         assert submitted_attempt["status"] == "submitted"
@@ -183,7 +185,7 @@ def test_candidate_registration_center_booking_and_40_question_multimedia_exam_t
         assert certificate.json()["candidate_reference"] == candidate_reference
         assert certificate.json()["center_name"] == center["name"]
 
-        exam_summary = client.get("/api/v1/exams/summary")
+        exam_summary = client.get("/api/v1/exams/summary", headers=headers)
         assert exam_summary.status_code == 200
         assert exam_summary.json()["submitted_attempts"] >= 1
 

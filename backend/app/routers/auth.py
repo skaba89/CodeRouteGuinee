@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -10,7 +11,7 @@ from app.deps import get_current_user
 from app.models_audit import AuditLog
 from app.models_user import User
 from app.schemas import PasswordChangeRequest, Token, UserCreate, UserRead
-from app.security import create_access_token, get_password_hash, verify_password
+from app.security import create_access_token, create_refresh_token, decode_refresh_token, get_password_hash, verify_password
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 settings = get_settings()
@@ -89,7 +90,10 @@ def login(
 
     login_rate_limiter.reset(key)
     audit_auth_event(db, "auth.login_success", form.username, request, user)
-    return Token(access_token=create_access_token(user.id, user.role))
+    return Token(
+        access_token=create_access_token(user.id, user.role),
+        refresh_token=create_refresh_token(user.id),
+    )
 
 
 @router.get("/me", response_model=UserRead)
@@ -127,3 +131,26 @@ def change_password(
         )
     )
     db.commit()
+
+
+class RefreshRequest(BaseModel):
+    refresh_token: str
+
+
+
+
+@router.post("/refresh", response_model=Token)
+def refresh_token(
+    payload_in: RefreshRequest,
+    db: Session = Depends(get_db),
+) -> Token:
+    payload = decode_refresh_token(payload_in.refresh_token)
+    if not payload or not payload.get("sub"):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired refresh token")
+    user = db.get(User, payload["sub"])
+    if not user or not user.is_active:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Inactive or unknown user")
+    return Token(
+        access_token=create_access_token(user.id, user.role),
+        refresh_token=create_refresh_token(user.id),
+    )

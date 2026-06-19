@@ -69,6 +69,7 @@ def test_manual_review_decision_updates_attempt_and_audit_log() -> None:
 
         candidate_response = client.post(
             "/api/v1/candidates",
+            headers=admin_headers,
             json={
                 "first_name": "Mamadou",
                 "last_name": f"Review-{suffix}",
@@ -82,6 +83,7 @@ def test_manual_review_decision_updates_attempt_and_audit_log() -> None:
 
         attempt_response = client.post(
             "/api/v1/exams/start",
+            headers=center_headers,
             json={"candidate_id": candidate["id"], "session_id": session["id"]},
         )
         assert attempt_response.status_code == 201

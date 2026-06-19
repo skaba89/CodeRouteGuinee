@@ -33,10 +33,11 @@ def _auth_headers(client: TestClient, role: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
-def _create_candidate(client: TestClient, suffix: str, index: int) -> dict:
+def _create_candidate(client: TestClient, suffix: str, index: int, headers: dict) -> dict:
     response = client.post(
         "/api/v1/candidates",
-        json={
+        headers=headers,
+            json={
             "first_name": f"Candidat{index}",
             "last_name": f"Device-{suffix}",
             "identity_number": f"ID-DEV-{suffix}-{index}",
@@ -83,11 +84,12 @@ def test_device_session_duplicate_detection_end_to_end() -> None:
         assert session_response.status_code == 201
         session = session_response.json()
 
-        candidate_one = _create_candidate(client, suffix, 1)
-        candidate_two = _create_candidate(client, suffix, 2)
+        candidate_one = _create_candidate(client, suffix, 1, admin_headers)
+        candidate_two = _create_candidate(client, suffix, 2, admin_headers)
 
         attempt_one_response = client.post(
             "/api/v1/exams/start",
+            headers=center_headers,
             json={"candidate_id": candidate_one["id"], "session_id": session["id"]},
         )
         assert attempt_one_response.status_code == 201
@@ -95,6 +97,7 @@ def test_device_session_duplicate_detection_end_to_end() -> None:
 
         attempt_two_response = client.post(
             "/api/v1/exams/start",
+            headers=center_headers,
             json={"candidate_id": candidate_two["id"], "session_id": session["id"]},
         )
         assert attempt_two_response.status_code == 201
@@ -159,6 +162,8 @@ def test_start_exam_from_booking_registers_device_session_and_duplicate_alert() 
 
     with TestClient(app) as client:
         admin_headers = _auth_headers(client, "admin")
+        center_headers = _auth_headers(client, "center")
+        headers = admin_headers
 
         center_response = client.post(
             "/api/v1/centers",
@@ -187,11 +192,11 @@ def test_start_exam_from_booking_registers_device_session_and_duplicate_alert() 
         assert session_response.status_code == 201
         session = session_response.json()
 
-        candidate_one = _create_candidate(client, suffix, 11)
-        candidate_two = _create_candidate(client, suffix, 12)
+        candidate_one = _create_candidate(client, suffix, 11, admin_headers)
+        candidate_two = _create_candidate(client, suffix, 12, admin_headers)
 
-        booking_one_response = client.post("/api/v1/bookings", json={"candidate_id": candidate_one["id"], "session_id": session["id"]})
-        booking_two_response = client.post("/api/v1/bookings", json={"candidate_id": candidate_two["id"], "session_id": session["id"]})
+        booking_one_response = client.post("/api/v1/bookings", headers=headers, json={"candidate_id": candidate_one["id"], "session_id": session["id"]})
+        booking_two_response = client.post("/api/v1/bookings", headers=headers, json={"candidate_id": candidate_two["id"], "session_id": session["id"]})
         assert booking_one_response.status_code == 201
         assert booking_two_response.status_code == 201
         booking_one = booking_one_response.json()
@@ -199,6 +204,7 @@ def test_start_exam_from_booking_registers_device_session_and_duplicate_alert() 
 
         first_attempt_response = client.post(
             "/api/v1/exams/start-from-booking",
+            headers=center_headers,
             json={
                 "booking_reference": booking_one["reference"],
                 "device_key": device_key,
@@ -209,6 +215,7 @@ def test_start_exam_from_booking_registers_device_session_and_duplicate_alert() 
 
         second_attempt_response = client.post(
             "/api/v1/exams/start-from-booking",
+            headers=center_headers,
             json={
                 "booking_reference": booking_two["reference"],
                 "device_key": device_key,
