@@ -2,10 +2,11 @@ FROM node:22-alpine
 
 WORKDIR /app
 
+# Installer seulement les dépendances (le code est monté via volume)
 COPY package.json package-lock.json ./
 RUN npm ci
 
-COPY . .
+# Le code source est monté via le volume ./frontend:/app dans docker-compose.yml
+# node_modules est préservé par le volume anonyme /app/node_modules
 
-# Mode développement uniquement — hot reload activé
 CMD ["npm", "run", "dev"]

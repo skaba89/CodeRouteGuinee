@@ -1,0 +1,27 @@
+# Dépendances
+node_modules/
+.npm/
+
+# Build
+dist/
+.vite/
+
+# Cache et logs
+.cache/
+*.log
+
+# Fichiers IDE et OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Tests
+playwright-report/
+test-results/
+
+# Fichiers sensibles
+.env
+.env.local
+.env.*.local

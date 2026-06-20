@@ -1,0 +1,48 @@
+# Cache et builds
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+coverage.xml
+coverage.json
+*.egg-info/
+dist/
+build/
+
+# Environnements virtuels
+.venv/
+venv/
+env/
+
+# Base de données locales
+*.db
+*.sqlite
+*.sqlite3
+
+# Fichiers IDE et OS
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Fichiers de test et données de dev
+tests/
+alembic/
+docs/
+scripts/
+
+# Fichiers sensibles
+.env
+.env.local
+.env.*.local

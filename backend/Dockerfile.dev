@@ -5,10 +5,11 @@ WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
+# Installer seulement les dépendances (le code est monté via volume)
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY . .
+# Le code source est monté via le volume ./backend:/app dans docker-compose.yml
+# Pas de COPY . . nécessaire — cela évite les problèmes de permissions sur Windows
 
-# Mode développement uniquement — rechargement automatique activé
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
