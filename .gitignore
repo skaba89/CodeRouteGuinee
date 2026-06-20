@@ -18,3 +18,7 @@ backend/.coverage
 frontend/.env.local
 .env
 *.db
+
+# Certificats TLS (ne jamais commiter les clés privées)
+nginx/certs/*.pem
+nginx/certs/*.key

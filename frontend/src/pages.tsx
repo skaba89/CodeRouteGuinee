@@ -9,6 +9,8 @@ import {
   type CenterIncident, type InstitutionalUser, type InstitutionalUserCreatePayload,
   type ExamCertificateVerification, type ExamDetailedResult, type ExamLiveStatus,
   type CandidateIdentityCheck, type CandidateSubmission,
+  type ExamMonitoringSummary, type ExamMonitoringEvent, type ExamMonitoringFilters,
+  type QuestionGovernanceItem,
   getDashboard, getCandidates, getCenters, getExamSummary, getEntrySummary,
   getAuditLogs, getAdminPaymentSummary, getPaymentReconciliationItems,
   getInstitutionalUsers, createInstitutionalUser,
@@ -19,7 +21,11 @@ import {
   downloadExamCertificatePdf, getExamResults,
   startExamFromBooking, submitExamAttempt, getExamLiveStatus,
   getCandidateIdentityChecks, getCandidateSubmissions,
-  downloadDashboardCsv, downloadAuditLogsCsv,
+  getExamMonitoringSummaries, getExamMonitoringEvents,
+  getQuestionGovernanceItems, decideQuestionGovernance,
+  getPaymentAlerts, getInstitutionalReport, downloadInstitutionalReportPdf,
+  downloadDashboardCsv, downloadAuditLogsCsv, downloadExamAttemptsCsv,
+  downloadAdminPaymentsCsv, decideCandidateIdentity, handleCandidateSubmission,
 } from './api';
 import { DEMO_QUESTIONS } from './pages/examQuestions';
 
@@ -530,7 +536,7 @@ export function AdminPage() {
   const canAdmin = canUseProtectedActions(currentUser, isPresentationMode, ['admin','super_admin']);
   const canSA = canUseProtectedActions(currentUser, isPresentationMode, ['super_admin']);
 
-  const [tab, setTab] = useState<'dashboard'|'candidates'|'payments'|'audit'|'users'>('dashboard');
+  const [tab, setTab] = useState<'dashboard'|'candidates'|'payments'|'monitoring'|'questions'|'audit'|'users'>('dashboard');
   const [dashboard, setDashboard] = useState<DashboardData | null>(null);
   const [examSum, setExamSum] = useState<ExamSummary | null>(null);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
@@ -571,11 +577,13 @@ export function AdminPage() {
   }
 
   const TABS = [
-    { id: 'dashboard', label: '📊 Dashboard' },
+    { id: 'dashboard',  label: '📊 Dashboard' },
     { id: 'candidates', label: '👥 Candidats' },
-    { id: 'payments', label: '💳 Paiements' },
-    { id: 'audit', label: '📋 Audit logs' },
-    { id: 'users', label: '👤 Utilisateurs' },
+    { id: 'payments',   label: '💳 Paiements' },
+    { id: 'monitoring', label: '🔍 Monitoring' },
+    { id: 'questions',  label: '📝 Questions' },
+    { id: 'audit',      label: '📋 Audit' },
+    { id: 'users',      label: '👤 Utilisateurs' },
   ] as const;
 
   return (
@@ -704,6 +712,12 @@ export function AdminPage() {
         </div>
       )}
 
+      {/* Monitoring tab */}
+      {tab === 'monitoring' && <MonitoringPanel canAdmin={canAdmin} />}
+
+      {/* Questions tab */}
+      {tab === 'questions' && <QuestionsPanel canAdmin={canAdmin} />}
+
       {/* Users tab */}
       {tab === 'users' && (
         <div className="g2">
@@ -758,6 +772,158 @@ export function AdminPage() {
         </div>
       )}
     </section>
+  );
+}
+
+// ── Monitoring sub-panel ───────────────────────────────────────────
+function MonitoringPanel({ canAdmin }: { canAdmin: boolean }) {
+  const [summaries, setSummaries] = useState<ExamMonitoringSummary[]>([]);
+  const [events, setEvents] = useState<ExamMonitoringEvent[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!canAdmin) { setLoading(false); return; }
+    Promise.allSettled([
+      getExamMonitoringSummaries({ limit: 20 }),
+      getExamMonitoringEvents({ limit: 30 }),
+    ]).then(([s, e]) => {
+      if (s.status === 'fulfilled') setSummaries(s.value);
+      if (e.status === 'fulfilled') setEvents(e.value);
+    }).finally(() => setLoading(false));
+  }, [canAdmin]);
+
+  if (!canAdmin) return <div className="alert aw">⚠️ Accès réservé aux administrateurs.</div>;
+
+  return (
+    <div className="g2">
+      <div className="card">
+        <div className="card-header">
+          <span className="card-title">🔍 Résumés de monitoring ({summaries.length})</span>
+          <button className="secondary-button btn-sm" onClick={() => getExamMonitoringSummaries({ limit: 20 }).then(setSummaries).catch(() => undefined)}>Actualiser</button>
+        </div>
+        {loading ? <p className="text-muted" style={{ padding: 16 }}>Chargement…</p> :
+          summaries.length === 0 ? <div style={{ padding: '24px', textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>Aucune anomalie détectée ✅</div> :
+          <div className="table-wrap">
+            <table>
+              <thead><tr><th>Tentative</th><th>Risque</th><th>Anomalies</th><th>Statut</th></tr></thead>
+              <tbody>
+                {summaries.map((s, i) => (
+                  <tr key={i}>
+                    <td><code style={{ fontSize: 11 }}>{s.attempt_id?.slice(0,16)}…</code></td>
+                    <td>
+                      <span className={`badge ${(s.max_risk_score ?? 0) > 70 ? 'br' : (s.max_risk_score ?? 0) > 40 ? 'bgo' : 'bg'}`}>
+                        {s.max_risk_score ?? 0}
+                      </span>
+                    </td>
+                    <td>{s.anomaly_count ?? 0}</td>
+                    <td><span className="badge bgr">{s.review_status ?? 'pending'}</span></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        }
+      </div>
+
+      <div className="card">
+        <div className="card-header">
+          <span className="card-title">⚡ Événements récents ({events.length})</span>
+          <button className="secondary-button btn-sm" onClick={() => downloadExamAttemptsCsv().catch(() => undefined)}>⬇ Export</button>
+        </div>
+        {loading ? <p className="text-muted" style={{ padding: 16 }}>Chargement…</p> :
+          events.length === 0 ? <div style={{ padding: '24px', textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>Aucun événement récent</div> :
+          <div className="table-wrap">
+            <table>
+              <thead><tr><th>Événement</th><th>Score</th><th>Date</th></tr></thead>
+              <tbody>
+                {events.slice(0, 20).map((e, i) => (
+                  <tr key={i}>
+                    <td style={{ fontSize: 12 }}>{e.event_type}</td>
+                    <td>
+                      <span className={`badge ${(e.risk_score ?? 0) > 70 ? 'br' : (e.risk_score ?? 0) > 40 ? 'bgo' : 'bgr'}`}>
+                        {e.risk_score ?? 0}
+                      </span>
+                    </td>
+                    <td style={{ fontSize: 11, color: 'var(--muted)' }}>
+                      {e.created_at ? fmtDate(e.created_at) : '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        }
+      </div>
+    </div>
+  );
+}
+
+// ── Questions sub-panel ─────────────────────────────────────────────
+function QuestionsPanel({ canAdmin }: { canAdmin: boolean }) {
+  const [items, setItems] = useState<QuestionGovernanceItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [deciding, setDeciding] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!canAdmin) { setLoading(false); return; }
+    getQuestionGovernanceItems().then(setItems).catch(() => undefined).finally(() => setLoading(false));
+  }, [canAdmin]);
+
+  async function handleDecide(questionId: string, status: 'approved' | 'rejected', reason: string) {
+    setDeciding(questionId);
+    try {
+      await decideQuestionGovernance(questionId, status, reason);
+      getQuestionGovernanceItems().then(setItems).catch(() => undefined);
+    } catch { /* silencieux */ }
+    finally { setDeciding(null); }
+  }
+
+  if (!canAdmin) return <div className="alert aw">⚠️ Accès réservé aux administrateurs.</div>;
+
+  return (
+    <div className="card">
+      <div className="card-header">
+        <span className="card-title">📝 Gouvernance des questions ({items.length})</span>
+        <button className="secondary-button btn-sm" onClick={() => getQuestionGovernanceItems().then(setItems).catch(() => undefined)}>Actualiser</button>
+      </div>
+      {loading ? <p className="text-muted" style={{ padding: 16 }}>Chargement…</p> :
+        items.length === 0 ? <div style={{ padding: '24px', textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>Toutes les questions sont validées ✅</div> :
+        <div className="table-wrap">
+          <table>
+            <thead><tr><th>Catégorie</th><th>Question</th><th>Statut</th><th>Actions</th></tr></thead>
+            <tbody>
+              {items.map(item => (
+                <tr key={item.id}>
+                  <td><span className="badge bb">{item.category}</span></td>
+                  <td style={{ maxWidth: 300, fontSize: 13 }}>
+                    {(item.text ?? '').slice(0, 80)}{(item.text ?? '').length > 80 ? '…' : ''}
+                  </td>
+                  <td>
+                    <span className={`badge ${item.governance_status === 'approved' ? 'bg' : item.governance_status === 'rejected' ? 'br' : 'bgo'}`}>
+                      {item.governance_status ?? 'pending'}
+                    </span>
+                  </td>
+                  <td>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button className="btn-sm btn-success"
+                        disabled={deciding === item.id || item.governance_status === 'approved'}
+                        onClick={() => handleDecide(item.id, 'approved', 'Validée par admin')}>
+                        ✅
+                      </button>
+                      <button className="btn-sm btn-danger"
+                        disabled={deciding === item.id || item.governance_status === 'rejected'}
+                        onClick={() => handleDecide(item.id, 'rejected', 'Rejetée par admin')}>
+                        ❌
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      }
+    </div>
   );
 }
 
@@ -830,19 +996,31 @@ export function InstitutionalDossierPage() {
 
       <div className="g2">
         <div className="card">
-          <div className="card-header"><span className="card-title">🪪 Vérifications d'identité ({identityChecks.length})</span></div>
+          <div className="card-header">
+            <span className="card-title">🪪 Vérifications d'identité ({identityChecks.length})</span>
+            <button className="secondary-button btn-sm" onClick={() => getCandidateIdentityChecks({ status_filter: 'pending', limit: 25 }).then(setIdentityChecks).catch(() => undefined)}>Actualiser</button>
+          </div>
           {identityChecks.length === 0 ? (
-            <p style={{ color: 'var(--muted)', fontSize: 13 }}>{canAdmin ? 'Aucune vérification en attente ✅' : 'Connectez-vous.'}</p>
+            <div style={{ padding: '20px', textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>{canAdmin ? 'Aucune vérification en attente ✅' : 'Connectez-vous.'}</div>
           ) : (
             <div className="table-wrap">
               <table>
-                <thead><tr><th>Candidat</th><th>Document</th><th>Statut</th></tr></thead>
+                <thead><tr><th>Candidat</th><th>Document</th><th>Référence</th><th>Statut</th><th>Actions</th></tr></thead>
                 <tbody>
                   {identityChecks.map(c => (
                     <tr key={c.id}>
-                      <td>{c.candidate_id}</td>
+                      <td style={{ fontSize: 12 }}>{c.candidate_id}</td>
                       <td>{c.document_type}</td>
+                      <td style={{ fontSize: 11 }}>{c.document_reference}</td>
                       <td><span className={`badge ${c.status === 'approved' ? 'bg' : c.status === 'pending' ? 'bgo' : 'br'}`}>{c.status}</span></td>
+                      <td>
+                        {c.status === 'pending' && canAdmin && (
+                          <div style={{ display: 'flex', gap: 4 }}>
+                            <button className="btn-sm btn-success" onClick={() => decideCandidateIdentity(c.id, 'approved', 'Validé').then(() => getCandidateIdentityChecks({ status_filter: 'pending', limit: 25 }).then(setIdentityChecks).catch(() => undefined)).catch(() => undefined)}>✅</button>
+                            <button className="btn-sm btn-danger" onClick={() => decideCandidateIdentity(c.id, 'rejected', 'Rejeté').then(() => getCandidateIdentityChecks({ status_filter: 'pending', limit: 25 }).then(setIdentityChecks).catch(() => undefined)).catch(() => undefined)}>❌</button>
+                          </div>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -852,19 +1030,31 @@ export function InstitutionalDossierPage() {
         </div>
 
         <div className="card">
-          <div className="card-header"><span className="card-title">📩 Recours candidats ({submissions.length})</span></div>
+          <div className="card-header">
+            <span className="card-title">📩 Recours candidats ({submissions.length})</span>
+            <button className="secondary-button btn-sm" onClick={() => getCandidateSubmissions({ status_filter: 'submitted', limit: 25 }).then(setSubmissions).catch(() => undefined)}>Actualiser</button>
+          </div>
           {submissions.length === 0 ? (
-            <p style={{ color: 'var(--muted)', fontSize: 13 }}>{canAdmin ? 'Aucun recours en attente ✅' : 'Connectez-vous.'}</p>
+            <div style={{ padding: '20px', textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>{canAdmin ? 'Aucun recours en attente ✅' : 'Connectez-vous.'}</div>
           ) : (
             <div className="table-wrap">
               <table>
-                <thead><tr><th>Candidat</th><th>Catégorie</th><th>Statut</th></tr></thead>
+                <thead><tr><th>Candidat</th><th>Catégorie</th><th>Message</th><th>Statut</th><th>Actions</th></tr></thead>
                 <tbody>
                   {submissions.map(s => (
                     <tr key={s.id}>
-                      <td>{s.candidate_id}</td>
-                      <td>{s.category}</td>
+                      <td style={{ fontSize: 12 }}>{s.candidate_id}</td>
+                      <td><span className="badge bb">{s.category}</span></td>
+                      <td style={{ maxWidth: 200, fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.message}</td>
                       <td><span className={`badge ${s.status === 'approved' ? 'bg' : s.status === 'submitted' ? 'bgo' : 'br'}`}>{s.status}</span></td>
+                      <td>
+                        {s.status === 'submitted' && canAdmin && (
+                          <div style={{ display: 'flex', gap: 4 }}>
+                            <button className="btn-sm btn-success" onClick={() => handleCandidateSubmission(s.id, 'approved', 'Accepté').then(() => getCandidateSubmissions({ status_filter: 'submitted', limit: 25 }).then(setSubmissions).catch(() => undefined)).catch(() => undefined)}>✅</button>
+                            <button className="btn-sm btn-danger" onClick={() => handleCandidateSubmission(s.id, 'rejected', 'Rejeté').then(() => getCandidateSubmissions({ status_filter: 'submitted', limit: 25 }).then(setSubmissions).catch(() => undefined)).catch(() => undefined)}>❌</button>
+                          </div>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -877,8 +1067,10 @@ export function InstitutionalDossierPage() {
           <div className="card-header"><span className="card-title">📊 Pilotage national</span></div>
           <div style={{ display: 'grid', gap: 10 }}>
             <a href="#/admin"><button className="secondary-button btn-block">→ Tableau de bord admin</button></a>
-            <button className="secondary-button btn-block" onClick={() => downloadDashboardCsv().catch(() => undefined)}>⬇ Export dashboard</button>
+            <button className="secondary-button btn-block" onClick={() => downloadInstitutionalReportPdf().catch(() => undefined)}>⬇ Rapport institutionnel PDF</button>
+            <button className="secondary-button btn-block" onClick={() => downloadDashboardCsv().catch(() => undefined)}>⬇ Export dashboard CSV</button>
             <button className="secondary-button btn-block" onClick={() => downloadAuditLogsCsv().catch(() => undefined)}>⬇ Export audit complet</button>
+            <button className="secondary-button btn-block" onClick={() => downloadExamAttemptsCsv().catch(() => undefined)}>⬇ Export examens CSV</button>
           </div>
         </div>
       </div>
