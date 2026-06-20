@@ -16,22 +16,25 @@ import {
   AdminPage,
   CandidatePage,
   CenterPage,
+  DrivingSchoolPage,
   ExamPage,
   HomePage,
   InstitutionalDossierPage,
   ResultsPage,
+  TrainingPage,
 } from './pages';
 
 type AppRoute =
   | 'home' | 'candidate' | 'center' | 'admin'
-  | 'exam' | 'results' | 'dossier' | 'login' | 'account';
+  | 'exam' | 'results' | 'dossier' | 'training' | 'school'
+  | 'login' | 'account';
 
 const ROLE_KEY = 'cr-role';
 const PRES_KEY = 'cr-pres';
 
 function getRouteFromHash(): AppRoute {
   const r = window.location.hash.replace('#/', '') as AppRoute;
-  const valid: AppRoute[] = ['candidate','center','admin','exam','results','dossier','login','account'];
+  const valid: AppRoute[] = ['candidate','center','admin','exam','results','dossier','training','school','login','account'];
   return valid.includes(r) ? r : 'home';
 }
 
@@ -278,8 +281,10 @@ export default function App() {
   else {
     const pageMap: Record<AppRoute, JSX.Element> = {
       home:      <HomePage />,
+      training:  <TrainingPage />,
       candidate: <CandidatePage />,
       center:    <CenterPage />,
+      school:    <DrivingSchoolPage />,
       admin:     <AdminPage />,
       dossier:   <InstitutionalDossierPage />,
       exam:      <ExamPage />,
