@@ -36,6 +36,7 @@ from app.routers import (
     questions,
     sessions,
     supervision,
+    training,
     users,
 )
 
@@ -118,5 +119,6 @@ app.include_router(exam_question_traces.router, prefix=settings.api_v1_prefix)
 app.include_router(candidate_submissions.router, prefix=settings.api_v1_prefix)
 app.include_router(dashboard.router, prefix=settings.api_v1_prefix)
 app.include_router(audit.router, prefix=settings.api_v1_prefix)
+app.include_router(training.router, prefix=settings.api_v1_prefix)
 app.include_router(supervision.router, prefix=settings.api_v1_prefix)
 app.include_router(users.router, prefix=settings.api_v1_prefix)
