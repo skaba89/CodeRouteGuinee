@@ -1,318 +1,338 @@
 import { FormEvent, useEffect, useState } from 'react';
-
 import { canAccessRoute, demoRoles, navigationItems, type UserRole } from './auth';
-import { type AuthUser, changePassword, getAccessToken, getRefreshToken, getCurrentUser, loginUser, logoutUser } from './authClient';
+import {
+  type AuthUser,
+  changePassword,
+  getAccessToken,
+  getRefreshToken,
+  getCurrentUser,
+  loginUser,
+  logoutUser,
+} from './authClient';
 import { LocaleSwitcher } from './components/LocaleSwitcher';
 import { t } from './i18n';
 import { AuthSessionProvider } from './authSession';
-import { AdminPage, CandidatePage, CenterPage, ExamPage, HomePage, InstitutionalDossierPage, ResultsPage } from './pages';
-import './role.css';
+import {
+  AdminPage,
+  CandidatePage,
+  CenterPage,
+  ExamPage,
+  HomePage,
+  InstitutionalDossierPage,
+  ResultsPage,
+} from './pages';
 
-type AppRoute = 'home' | 'candidate' | 'center' | 'admin' | 'exam' | 'results' | 'dossier' | 'login' | 'account';
+type AppRoute =
+  | 'home' | 'candidate' | 'center' | 'admin'
+  | 'exam' | 'results' | 'dossier' | 'login' | 'account';
 
-const ROLE_STORAGE_KEY = 'coderoute-demo-role';
-const PRESENTATION_MODE_STORAGE_KEY = 'coderoute-presentation-mode';
+const ROLE_KEY = 'cr-role';
+const PRES_KEY = 'cr-pres';
 
 function getRouteFromHash(): AppRoute {
-  const route = window.location.hash.replace('#/', '');
-  if (route === 'candidate' || route === 'center' || route === 'admin' || route === 'exam' || route === 'results' || route === 'dossier' || route === 'login' || route === 'account') {
-    return route;
-  }
-  return 'home';
+  const r = window.location.hash.replace('#/', '') as AppRoute;
+  const valid: AppRoute[] = ['candidate','center','admin','exam','results','dossier','login','account'];
+  return valid.includes(r) ? r : 'home';
 }
 
 function normalizeRole(role: string): UserRole {
-  return demoRoles.some((item) => item.value === role) ? role as UserRole : 'candidate';
+  return demoRoles.some(d => d.value === role) ? role as UserRole : 'candidate';
 }
 
-function getInitialRole(): UserRole {
-  const savedRole = window.localStorage.getItem(ROLE_STORAGE_KEY);
-  if (savedRole && demoRoles.some((item) => item.value === savedRole)) {
-    return savedRole as UserRole;
-  }
-  return 'super_admin';
+// ── Loading ───────────────────────────────────────────────────────
+function Loading() {
+  return (
+    <div className="login-screen">
+      <div style={{ textAlign: 'center', color: 'var(--muted)' }}>
+        <div style={{ fontSize: 32, marginBottom: 12 }}>⏳</div>
+        <p>Vérification de la session…</p>
+      </div>
+    </div>
+  );
 }
 
-function getInitialPresentationMode(): boolean {
-  if (!getAccessToken() && !getRefreshToken()) {
-    return true;
-  }
-  return window.localStorage.getItem(PRESENTATION_MODE_STORAGE_KEY) !== 'false';
-}
-
-function AccessDenied({ role, isPresentationMode }: { role: UserRole; isPresentationMode: boolean }) {
+// ── Access Denied ─────────────────────────────────────────────────
+function AccessDenied({ role }: { role: UserRole }) {
   return (
     <section className="screen access-denied">
-      <p className="eyebrow dark">Acces restreint</p>
-      <h2>Page non autorisee pour ce role</h2>
-      <p>Le role actif <strong>{role}</strong> ne dispose pas des permissions necessaires pour consulter cette page.</p>
-      {!isPresentationMode && <p>Connectez-vous avec un compte habilite ou demandez une elevation de role au super administrateur.</p>}
-      <div className="actions result-actions">
-        <a href="#/">Retour a l'accueil</a>
+      <div style={{ fontSize: 48, marginBottom: 12 }}>🔒</div>
+      <h2>Accès non autorisé</h2>
+      <p>Le rôle <strong>{role}</strong> ne peut pas accéder à cette page.</p>
+      <div className="actions" style={{ justifyContent: 'center', marginTop: 20 }}>
+        <a href="#/" style={{ color: 'var(--blue)', fontSize: 13 }}>← Retour à l'accueil</a>
       </div>
     </section>
   );
 }
 
-function LoadingSession() {
-  return (
-    <section className="screen login-screen">
-      <p className="eyebrow dark">Session securisee</p>
-      <h2>Verification de la session</h2>
-      <p>Controle du token et recuperation du profil utilisateur en cours.</p>
-    </section>
-  );
-}
-
+// ── Account Page ─────────────────────────────────────────────────
 function AccountPage({ currentUser }: { currentUser: AuthUser | null }) {
-  const [currentPassword, setCurrentPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [status, setStatus] = useState<string | null>(null);
+  const [cur, setCur] = useState('');
+  const [nw, setNw] = useState('');
+  const [conf, setConf] = useState('');
+  const [msg, setMsg] = useState<string | null>(null);
 
-  async function handlePasswordChange(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setStatus(null);
-
-    if (newPassword.length < 12) {
-      setStatus('Le nouveau mot de passe doit contenir au moins 12 caracteres.');
-      return;
-    }
-
-    if (newPassword !== confirmPassword) {
-      setStatus('La confirmation ne correspond pas au nouveau mot de passe.');
-      return;
-    }
-
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    setMsg(null);
+    if (nw.length < 12) { setMsg('Le nouveau mot de passe doit contenir au moins 12 caractères.'); return; }
+    if (nw !== conf) { setMsg('La confirmation ne correspond pas.'); return; }
     try {
-      await changePassword(currentPassword, newPassword);
-      setCurrentPassword('');
-      setNewPassword('');
-      setConfirmPassword('');
-      setStatus('Mot de passe mis a jour. La modification est journalisee dans l audit.');
+      await changePassword(cur, nw);
+      setCur(''); setNw(''); setConf('');
+      setMsg('✅ Mot de passe mis à jour.');
     } catch {
-      setStatus('Changement impossible : verifiez le mot de passe actuel et la session.');
+      setMsg('❌ Mot de passe actuel incorrect.');
     }
   }
 
   return (
-    <section className="screen account-screen">
-      <p className="eyebrow dark">Compte institutionnel</p>
-      <h2>Mon compte</h2>
-      <p>Gestion du profil connecte et rotation du mot de passe pour les agents habilites.</p>
-      <div className="account-profile-grid">
-        <article>
-          <span>Agent</span>
-          <strong>{currentUser?.full_name ?? 'Utilisateur connecte'}</strong>
-          <small>{currentUser?.email ?? 'Email indisponible'}</small>
-        </article>
-        <article>
-          <span>Role</span>
-          <strong>{currentUser?.role ?? 'session'}</strong>
-          <small>{currentUser?.is_active === false ? 'Compte inactif' : 'Compte actif'}</small>
-        </article>
+    <section className="screen" style={{ maxWidth: 600 }}>
+      <div className="page-header">
+        <span className="eyebrow dark">Compte</span>
+        <h1>Mon compte</h1>
+        <p>Gérez votre profil et sécurisez votre accès.</p>
       </div>
-      <form className="account-password-form" onSubmit={handlePasswordChange}>
-        <label>Mot de passe actuel<input type="password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} /></label>
-        <label>Nouveau mot de passe<input type="password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} /></label>
-        <label>Confirmer<input type="password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} /></label>
-        <button type="submit" disabled={currentPassword.length < 8 || newPassword.length < 12 || confirmPassword.length < 12}>Changer le mot de passe</button>
-      </form>
-      {status && <p className={status.includes('impossible') || status.includes('doit') || status.includes('confirmation') ? 'form-error' : 'login-status'}>{status}</p>}
+      <div className="acct-grid" style={{ marginBottom: 20 }}>
+        <div className="acct-card">
+          <span>Agent</span>
+          <strong>{currentUser?.full_name ?? '—'}</strong>
+          <small>{currentUser?.email ?? '—'}</small>
+        </div>
+        <div className="acct-card">
+          <span>Rôle</span>
+          <strong style={{ textTransform: 'capitalize' }}>{currentUser?.role ?? '—'}</strong>
+          <small>{currentUser?.is_active ? '✅ Compte actif' : '⚠️ Compte inactif'}</small>
+        </div>
+      </div>
+      <div className="card">
+        <div className="card-header"><span className="card-title">Changer le mot de passe</span></div>
+        <form className="pwd-form" onSubmit={handleSubmit}>
+          <label>Mot de passe actuel<input type="password" value={cur} onChange={e => setCur(e.target.value)} /></label>
+          <label>Nouveau mot de passe (12 car. min.)<input type="password" value={nw} onChange={e => setNw(e.target.value)} /></label>
+          <label>Confirmer<input type="password" value={conf} onChange={e => setConf(e.target.value)} /></label>
+          <button type="submit" className="btn-primary" disabled={!cur || nw.length < 12 || !conf}>Changer le mot de passe</button>
+          {msg && <p className={msg.startsWith('✅') ? 'login-status' : 'form-error'}>{msg}</p>}
+        </form>
+      </div>
     </section>
   );
 }
 
+// ── Login Page ────────────────────────────────────────────────────
 function LoginPage({
-  currentUser,
-  isPresentationMode,
-  role,
-  onRoleChange,
-  onLogin,
+  currentUser, isPres, role, onRoleChange, onLogin,
 }: {
   currentUser: AuthUser | null;
-  isPresentationMode: boolean;
+  isPres: boolean;
   role: UserRole;
-  onRoleChange: (role: UserRole) => void;
-  onLogin: (email: string, password: string) => Promise<void>;
+  onRoleChange: (r: UserRole) => void;
+  onLogin: (email: string, pass: string) => Promise<void>;
 }) {
-  const [email, setEmail] = useState('admin@coderoute.gov.gn');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState('');
+  const [pass, setPass] = useState('');
   const [status, setStatus] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setStatus('Connexion en cours...');
+  const DEMO_ACCOUNTS = [
+    { role: 'super_admin' as UserRole, label: 'Super Admin', email: 'super_admin@coderoute.gov.gn' },
+    { role: 'admin' as UserRole, label: 'Admin national', email: 'admin.national@coderoute.gov.gn' },
+    { role: 'center' as UserRole, label: 'Chef de centre', email: 'chef.conakry@coderoute.gov.gn' },
+    { role: 'candidate' as UserRole, label: 'Candidat (démo)', email: '' },
+  ];
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    if (!email || !pass) return;
+    setLoading(true);
+    setStatus('Connexion en cours…');
     try {
-      await onLogin(email, password);
-      setStatus('Connexion reussie. Redirection...');
+      await onLogin(email, pass);
     } catch {
-      setStatus('Connexion impossible avec ces identifiants. Verifiez le compte ou utilisez le mode presentation.');
+      setStatus('❌ Identifiants incorrects. Vérifiez votre email et mot de passe.');
+      setLoading(false);
     }
+  }
+
+  function fillDemo(acc: typeof DEMO_ACCOUNTS[0]) {
+    if (acc.email) { setEmail(acc.email); setPass('CodeRoute2026!'); }
+    onRoleChange(acc.role);
   }
 
   return (
-    <section className="screen login-screen">
-      <p className="eyebrow dark">Connexion securisee</p>
-      <h2>Acceder a CodeRoute Guinee</h2>
-      <p>Connexion reelle via JWT pour les agents habilites. Le mode presentation reste disponible pour les demonstrations controlees.</p>
-      <div className={isPresentationMode ? 'auth-session-card presentation' : 'auth-session-card'}>
-        <strong>{isPresentationMode ? 'Mode presentation actif' : `Session reelle : ${currentUser?.full_name ?? 'utilisateur connecte'}`}</strong>
-        <span>{isPresentationMode ? 'Les roles ci-dessous servent uniquement a presenter les parcours.' : `${currentUser?.email ?? ''} - role ${currentUser?.role ?? role}`}</span>
-      </div>
-      <form className="login-form" onSubmit={handleSubmit}>
-        <input value={email} onChange={(event) => setEmail(event.target.value)} placeholder="Email" type="email" />
-        <input value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Mot de passe" type="password" />
-        <button type="submit">Se connecter</button>
-      </form>
-      {status && <p className="login-status">{status}</p>}
-      <div className="login-role-grid">
-        {demoRoles.map((item) => (
-          <button key={item.value} className={role === item.value ? 'active-role' : ''} onClick={() => onRoleChange(item.value)}>
-            {item.label}
+    <div className="login-screen">
+      <div className="login-card">
+        <span className="eyebrow">Accès sécurisé</span>
+        <h2>CodeRoute Guinée</h2>
+        <p>Connectez-vous à la plateforme nationale d'examen du code de la route.</p>
+
+        {!isPres && currentUser && (
+          <div className="auth-session-card">
+            <strong>✅ Connecté : {currentUser.full_name}</strong>
+            <span>{currentUser.email} · {currentUser.role}</span>
+          </div>
+        )}
+
+        <form className="login-form" onSubmit={handleSubmit}>
+          <label>Adresse e-mail<input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="agent@coderoute.gov.gn" autoComplete="username" /></label>
+          <label>Mot de passe<input type="password" value={pass} onChange={e => setPass(e.target.value)} placeholder="••••••••••••" autoComplete="current-password" /></label>
+          <button type="submit" className="btn-login" disabled={loading || !email || !pass}>
+            {loading ? 'Connexion…' : 'Se connecter'}
           </button>
-        ))}
+          {status && <p className={status.startsWith('❌') ? 'form-error' : 'login-status'}>{status}</p>}
+        </form>
+
+        <div className="login-sep">Comptes de test disponibles</div>
+        <div className="demo-grid">
+          {DEMO_ACCOUNTS.map(acc => (
+            <button key={acc.role} type="button"
+              className={`demo-btn${role === acc.role && !acc.email ? ' active' : ''}`}
+              onClick={() => fillDemo(acc)}>
+              <b>{acc.label}</b>
+              <small>{acc.email || 'Mode présentation'}</small>
+            </button>
+          ))}
+        </div>
+        {isPres && (
+          <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 12, textAlign: 'center' }}>
+            Mode présentation actif — Rôle : <strong>{role}</strong>.{' '}
+            <a href="#/" style={{ color: 'var(--blue)' }}>Continuer →</a>
+          </p>
+        )}
       </div>
-      <div className="actions result-actions">
-        <a href="#/">Continuer avec ce role</a>
-      </div>
-    </section>
+    </div>
   );
 }
 
+// ── App ───────────────────────────────────────────────────────────
 export default function App() {
   const [route, setRoute] = useState<AppRoute>(getRouteFromHash());
-  const [role, setRole] = useState<UserRole>(getInitialRole);
+  const [role, setRole] = useState<UserRole>(
+    () => (localStorage.getItem(ROLE_KEY) as UserRole) ?? 'super_admin'
+  );
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
-  const [isPresentationMode, setIsPresentationMode] = useState(getInitialPresentationMode);
-  const [isSessionLoading, setIsSessionLoading] = useState(Boolean(getAccessToken() || getRefreshToken()));
+  const [isPres, setIsPres] = useState(() => !getAccessToken() && !getRefreshToken());
+  const [loading, setLoading] = useState(() => Boolean(getAccessToken() || getRefreshToken()));
 
   useEffect(() => {
-    const onHashChange = () => setRoute(getRouteFromHash());
-    window.addEventListener('hashchange', onHashChange);
-    return () => window.removeEventListener('hashchange', onHashChange);
+    const onHash = () => setRoute(getRouteFromHash());
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
   }, []);
 
   useEffect(() => {
-    if (!getAccessToken() && !getRefreshToken()) {
-      setIsPresentationMode(true);
-      setIsSessionLoading(false);
-      return;
-    }
-
+    if (!getAccessToken() && !getRefreshToken()) { setIsPres(true); setLoading(false); return; }
     getCurrentUser()
-      .then((user) => {
-        setCurrentUser(user);
-        setRole(normalizeRole(user.role));
-        setIsPresentationMode(false);
-      })
-      .catch(() => {
-        logoutUser();
-        setCurrentUser(null);
-        setIsPresentationMode(true);
-      })
-      .finally(() => setIsSessionLoading(false));
+      .then(u => { setCurrentUser(u); setRole(normalizeRole(u.role)); setIsPres(false); })
+      .catch(() => { logoutUser(); setIsPres(true); })
+      .finally(() => setLoading(false));
   }, []);
 
-  // Écouter l'expiration automatique de session (refresh token expiré)
   useEffect(() => {
-    function handleSessionExpired() {
-      setCurrentUser(null);
-      setIsPresentationMode(true);
-      setRole('candidate');
+    function onExpired() {
+      setCurrentUser(null); setIsPres(true); setRole('candidate');
       window.location.hash = '#/login';
     }
-    window.addEventListener('coderoute:session-expired', handleSessionExpired);
-    return () => window.removeEventListener('coderoute:session-expired', handleSessionExpired);
+    window.addEventListener('coderoute:session-expired', onExpired);
+    return () => window.removeEventListener('coderoute:session-expired', onExpired);
   }, []);
 
-  useEffect(() => {
-    window.localStorage.setItem(ROLE_STORAGE_KEY, role);
-  }, [role]);
+  useEffect(() => { localStorage.setItem(ROLE_KEY, role); }, [role]);
+  useEffect(() => { localStorage.setItem(PRES_KEY, String(isPres)); }, [isPres]);
 
-  useEffect(() => {
-    window.localStorage.setItem(PRESENTATION_MODE_STORAGE_KEY, String(isPresentationMode));
-  }, [isPresentationMode]);
-
-  function handleRoleChange(nextRole: UserRole) {
-    logoutUser();
-    setCurrentUser(null);
-    setIsPresentationMode(true);
-    setRole(nextRole);
-  }
-
-  async function handleLogin(email: string, password: string) {
-    await loginUser(email, password);
-    const user = await getCurrentUser();
-    setCurrentUser(user);
-    setRole(normalizeRole(user.role));
-    setIsPresentationMode(false);
+  async function handleLogin(email: string, pass: string) {
+    await loginUser(email, pass);
+    const u = await getCurrentUser();
+    setCurrentUser(u); setRole(normalizeRole(u.role)); setIsPres(false);
     window.location.hash = '#/';
   }
 
   function handleLogout() {
-    logoutUser();
-    setCurrentUser(null);
-    setIsPresentationMode(true);
-    setRole('candidate');
+    logoutUser(); setCurrentUser(null); setIsPres(true); setRole('candidate');
     window.location.hash = '#/login';
   }
 
-  const visibleNavigation = navigationItems.filter((item) => item.roles.includes(role));
-  const currentHref = route === 'home' ? '#/' : `#/${route}`;
-  const hasAccess = canAccessRoute(role, currentHref);
-  const currentRoleLabel = demoRoles.find((item) => item.value === role)?.label ?? role;
-  const sessionLabel = isPresentationMode ? `Presentation : ${currentRoleLabel}` : `${currentUser?.full_name ?? 'Session reelle'} : ${currentRoleLabel}`;
+  function handleRoleChange(r: UserRole) {
+    logoutUser(); setCurrentUser(null); setIsPres(true); setRole(r);
+  }
 
-  const loginPage = <LoginPage currentUser={currentUser} isPresentationMode={isPresentationMode} role={role} onRoleChange={handleRoleChange} onLogin={handleLogin} />;
-  const page = isSessionLoading ? <LoadingSession /> : route === 'login' ? loginPage : hasAccess ? {
-    home: <HomePage />,
-    candidate: <CandidatePage />,
-    center: <CenterPage />,
-    admin: <AdminPage />,
-    exam: <ExamPage />,
-    results: <ResultsPage />,
-    dossier: <InstitutionalDossierPage />,
-    account: isPresentationMode ? <AccessDenied role={role} isPresentationMode={isPresentationMode} /> : <AccountPage currentUser={currentUser} />,
-    login: loginPage,
-  }[route] : <AccessDenied role={role} isPresentationMode={isPresentationMode} />;
+  const visibleNav = navigationItems.filter(n => n.roles.includes(role));
+  const curHref = route === 'home' ? '#/' : `#/${route}`;
+  const hasAccess = canAccessRoute(role, curHref);
+  const roleLabel = demoRoles.find(d => d.value === role)?.label ?? role;
+  const sessionLabel = isPres
+    ? `Présentation · ${roleLabel}`
+    : `${currentUser?.full_name ?? 'Agent'} · ${roleLabel}`;
+
+  const loginPage = (
+    <LoginPage
+      currentUser={currentUser} isPres={isPres} role={role}
+      onRoleChange={handleRoleChange} onLogin={handleLogin}
+    />
+  );
+
+  let page: JSX.Element;
+  if (loading) page = <Loading />;
+  else if (route === 'login') page = loginPage;
+  else if (!hasAccess) page = <AccessDenied role={role} />;
+  else {
+    const pageMap: Record<AppRoute, JSX.Element> = {
+      home:      <HomePage />,
+      candidate: <CandidatePage />,
+      center:    <CenterPage />,
+      admin:     <AdminPage />,
+      dossier:   <InstitutionalDossierPage />,
+      exam:      <ExamPage />,
+      results:   <ResultsPage />,
+      account:   isPres ? <AccessDenied role={role} /> : <AccountPage currentUser={currentUser} />,
+      login:     loginPage,
+    };
+    page = pageMap[route];
+  }
 
   return (
     <main className="app-shell">
-      <nav className="top-nav" aria-label="Navigation principale">
-        <a href="#/" className="brand-link" aria-label="Retour a l'accueil CodeRoute Guinee">
-          <span className="brand-logo">CR</span>
-          <span className="brand-text">
-            <strong>CodeRoute Guinee</strong>
-            <small>Plateforme nationale d'examen</small>
-          </span>
+      <nav className="top-nav" role="navigation" aria-label="Navigation principale">
+        <a href="#/" className="brand-link">
+          <div className="brand-logo">CR</div>
+          <div className="brand-text">
+            <strong>CodeRoute Guinée</strong>
+            <small>Examen code de la route</small>
+          </div>
         </a>
 
         <div className="nav-links">
-          {visibleNavigation.map((item) => {
-            const itemRoute = item.href.replace('#/', '') || 'home';
-            return <a key={item.href} href={item.href} className={route === itemRoute ? 'active' : ''}>{item.label}</a>;
+          {visibleNav.map(item => {
+            const r = item.href.replace('#/', '') || 'home';
+            return (
+              <a key={item.href} href={item.href} className={route === r ? 'active' : ''}>
+                {t(`nav.${r}`) !== `nav.${r}` ? t(`nav.${r}`) : item.label}
+              </a>
+            );
           })}
-          {!isPresentationMode && <a href="#/account" className={route === 'account' ? 'active' : ''}>Mon compte</a>}
+          {!isPres && (
+            <a href="#/account" className={route === 'account' ? 'active' : ''}>Mon compte</a>
+          )}
           <a href="#/login" className={route === 'login' ? 'active' : ''}>Connexion</a>
         </div>
 
         <div className="session-panel">
           <LocaleSwitcher />
-          <span>{sessionLabel}</span>
-          <button onClick={handleLogout}>{isPresentationMode ? 'Quitter' : 'Deconnexion'}</button>
+          <span title={sessionLabel}>{sessionLabel}</span>
+          <button onClick={handleLogout}>{isPres ? 'Quitter' : 'Déconnexion'}</button>
         </div>
 
-        {isPresentationMode && (
+        {isPres && (
           <label className="role-switcher">
-            Role presentation
-            <select value={role} onChange={(event) => handleRoleChange(event.target.value as UserRole)}>
-              {demoRoles.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+            Rôle
+            <select value={role} onChange={e => handleRoleChange(e.target.value as UserRole)}>
+              {demoRoles.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
             </select>
           </label>
         )}
       </nav>
-      <AuthSessionProvider currentUser={currentUser} isPresentationMode={isPresentationMode} role={role}>
+
+      <AuthSessionProvider currentUser={currentUser} isPresentationMode={isPres} role={role}>
         {page}
       </AuthSessionProvider>
     </main>
