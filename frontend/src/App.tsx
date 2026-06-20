@@ -1,3 +1,4 @@
+import React from 'react';
 import { FormEvent, useEffect, useState } from 'react';
 import { canAccessRoute, demoRoles, navigationItems, type UserRole } from './auth';
 import {
@@ -275,12 +276,12 @@ export default function App() {
     />
   );
 
-  let page: JSX.Element;
+  let page: React.ReactElement;
   if (loading) page = <Loading />;
   else if (route === 'login') page = loginPage;
   else if (!hasAccess) page = <AccessDenied role={role} />;
   else {
-    const pageMap: Record<AppRoute, JSX.Element> = {
+    const pageMap: Record<AppRoute, React.ReactElement> = {
       home:      <HomePage />,
       training:  <TrainingPage />,
       candidate: <CandidatePage />,

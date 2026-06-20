@@ -26,6 +26,20 @@ import {
   getPaymentAlerts, getInstitutionalReport, downloadInstitutionalReportPdf,
   downloadDashboardCsv, downloadAuditLogsCsv, downloadExamAttemptsCsv,
   downloadAdminPaymentsCsv, decideCandidateIdentity, handleCandidateSubmission,
+  type OperationsSummary,
+  type InstitutionalReadiness,
+  type InstitutionalActionCenter,
+  type InstitutionalActionItem,
+  type CenterStation,
+  getOperationsSummary,
+  getInstitutionalReadiness,
+  getInstitutionalActionCenter,
+  downloadInstitutionalReportCsv,
+  importOfficialCandidates,
+  importOfficialCenters,
+  importOfficialQuestions,
+  getCenterStations,
+  createCenterStation,
 } from './api';
 import { DEMO_QUESTIONS } from './pages/examQuestions';
 
@@ -569,7 +583,7 @@ export function AdminPage() {
     e.preventDefault();
     setCreating(true); setMsg(null);
     try {
-      await createInstitutionalUser({ email: newEmail, full_name: newName, role: newRole, password: newPass });
+      await createInstitutionalUser({ email: newEmail, full_name: newName, role: newRole, initial_password: newPass, reason: 'Création par super_admin' });
       setMsg('✅ Utilisateur créé.');
       setNewEmail(''); setNewName(''); setNewPass('');
       getInstitutionalUsers().then(setUsers).catch(() => undefined);
@@ -813,12 +827,12 @@ function MonitoringPanel({ canAdmin }: { canAdmin: boolean }) {
                   <tr key={i}>
                     <td><code style={{ fontSize: 11 }}>{s.attempt_id?.slice(0,16)}…</code></td>
                     <td>
-                      <span className={`badge ${(s.max_risk_score ?? 0) > 70 ? 'br' : (s.max_risk_score ?? 0) > 40 ? 'bgo' : 'bg'}`}>
-                        {s.max_risk_score ?? 0}
+                      <span className={`badge ${((s as Record<string,unknown>)["max_risk_score"] as number ?? 0) > 70 ? 'br' : ((s as Record<string,unknown>)["max_risk_score"] as number ?? 0) > 40 ? 'bgo' : 'bg'}`}>
+                        {((s as Record<string,unknown>)["max_risk_score"] as number) ?? 0}
                       </span>
                     </td>
-                    <td>{s.anomaly_count ?? 0}</td>
-                    <td><span className="badge bgr">{s.review_status ?? 'pending'}</span></td>
+                    <td>{((s as Record<string,unknown>)["anomaly_count"] as number) ?? 0}</td>
+                    <td><span className="badge bgr">{((s as Record<string,unknown>)['review_status'] as string) ?? 'pending'}</span></td>
                   </tr>
                 ))}
               </tbody>
@@ -895,26 +909,26 @@ function QuestionsPanel({ canAdmin }: { canAdmin: boolean }) {
             <thead><tr><th>Catégorie</th><th>Question</th><th>Statut</th><th>Actions</th></tr></thead>
             <tbody>
               {items.map(item => (
-                <tr key={item.id}>
+                <tr key={item.question_id}>
                   <td><span className="badge bb">{item.category}</span></td>
                   <td style={{ maxWidth: 300, fontSize: 13 }}>
                     {(item.text ?? '').slice(0, 80)}{(item.text ?? '').length > 80 ? '…' : ''}
                   </td>
                   <td>
-                    <span className={`badge ${item.governance_status === 'approved' ? 'bg' : item.governance_status === 'rejected' ? 'br' : 'bgo'}`}>
-                      {item.governance_status ?? 'pending'}
+                    <span className={`badge ${item.latest_status === 'approved' ? 'bg' : item.latest_status === 'rejected' ? 'br' : 'bgo'}`}>
+                      {item.latest_status ?? 'pending'}
                     </span>
                   </td>
                   <td>
                     <div style={{ display: 'flex', gap: 6 }}>
                       <button className="btn-sm btn-success"
-                        disabled={deciding === item.id || item.governance_status === 'approved'}
-                        onClick={() => handleDecide(item.id, 'approved', 'Validée par admin')}>
+                        disabled={deciding === item.question_id || item.latest_status === 'approved'}
+                        onClick={() => handleDecide(item.question_id, 'approved', 'Validée par admin')}>
                         ✅
                       </button>
                       <button className="btn-sm btn-danger"
-                        disabled={deciding === item.id || item.governance_status === 'rejected'}
-                        onClick={() => handleDecide(item.id, 'rejected', 'Rejetée par admin')}>
+                        disabled={deciding === item.question_id || item.latest_status === 'rejected'}
+                        onClick={() => handleDecide(item.question_id, 'rejected', 'Rejetée par admin')}>
                         ❌
                       </button>
                     </div>
@@ -953,8 +967,8 @@ function PaymentsPanel({ canAdmin }: { canAdmin: boolean }) {
             <thead><tr><th>Référence</th><th>Réservation</th><th>Montant</th><th>Provider</th><th>Statut</th></tr></thead>
             <tbody>
               {items.slice(0, 50).map(p => (
-                <tr key={p.payment_reference}>
-                  <td><code style={{ fontSize: 11 }}>{p.payment_reference}</code></td>
+                <tr key={p.reference}>
+                  <td><code style={{ fontSize: 11 }}>{p.reference}</code></td>
                   <td style={{ fontSize: 12 }}>{p.booking_reference}</td>
                   <td>{fmtGNF(p.amount_gnf)}</td>
                   <td>{p.provider}</td>
@@ -1584,7 +1598,6 @@ export function ResultsPage() {
 // ══════════════════════════════════════════════════════════════════
 // TRAINING PAGE — Mode entraînement libre (Mois 4–6)
 // ══════════════════════════════════════════════════════════════════
-import { LocaleSwitcherFull } from './components/LocaleSwitcher';
 
 export function TrainingPage() {
   const { currentUser, isPresentationMode } = useAuthSession();
@@ -2018,13 +2031,6 @@ export function DrivingSchoolPage() {
 // Accessible depuis AdminPage onglet "Ministère"
 // ══════════════════════════════════════════════════════════════════
 
-import {
-  getOperationsSummary, getInstitutionalReadiness, getInstitutionalActionCenter,
-  getInstitutionalReport, downloadInstitutionalReportCsv,
-  importOfficialCandidates, importOfficialCenters, importOfficialQuestions,
-  getCenterStations, createCenterStation,
-  type OperationsSummary, type InstitutionalReadiness, type InstitutionalActionCenter,
-} from './api';
 
 export function MinisterialPage() {
   const { currentUser, isPresentationMode } = useAuthSession();
@@ -2081,21 +2087,21 @@ export function MinisterialPage() {
       if (importType === 'candidates') {
         const rows = lines.map(l => {
           const [last, first, nina, phone, cat] = l.split(',').map(s => s.trim().replace(/"/g,''));
-          return { last_name: last, first_name: first, identity_number: nina, phone, permit_category: cat || 'B' };
+          return { last_name: last, first_name: first, identity_number: nina, phone, permit_category: cat || 'B', status: 'registered' as const };
         });
         const r = await importOfficialCandidates('csv_import', `Import CSV ${importFile.name}`, rows, true);
         setImportStatus(`✅ Aperçu import : ${r.created ?? 0} nouveaux, ${r.skipped ?? 0} ignorés sur ${count} lignes`);
       } else if (importType === 'centers') {
         const rows = lines.map(l => {
           const [code, name, city, address, cap] = l.split(',').map(s => s.trim().replace(/"/g,''));
-          return { code, name, city, address, capacity: parseInt(cap) || 30 };
+          return { code, name, city, address, capacity: parseInt(cap) || 30, status: 'pending_audit' as const };
         });
         const r = await importOfficialCenters('csv_import', `Import CSV ${importFile.name}`, rows, true);
         setImportStatus(`✅ Aperçu import : ${r.created ?? 0} nouveaux centres sur ${count} lignes`);
       } else {
         const rows = lines.map(l => {
           const [cat, text, opt1, opt2, opt3, opt4, correct] = l.split(',').map(s => s.trim().replace(/"/g,''));
-          return { category: cat, text, options: [opt1,opt2,opt3,opt4].filter(Boolean), correct_answer: correct };
+          return { category: cat, text, options: [opt1,opt2,opt3,opt4].filter(Boolean), correct_answer: correct, is_active: true };
         });
         const r = await importOfficialQuestions('csv_import', `Import CSV ${importFile.name}`, rows, true);
         setImportStatus(`✅ Aperçu import : ${r.created ?? 0} nouvelles questions sur ${count} lignes`);
@@ -2110,7 +2116,7 @@ export function MinisterialPage() {
     if (!stLabel || !stCenter) return;
     setCreating(true);
     try {
-      await createCenterStation({ center_id: stCenter, label: stLabel, room: stRoom, status: 'available' });
+      await createCenterStation({ center_id: stCenter, label: stLabel, room: stRoom, status: 'active', device_key: stLabel.toUpperCase().replace(/\s+/g,'-') });
       getCenterStations({ limit: 50 }).then(setStations).catch(() => undefined);
       setStLabel(''); setStRoom('');
     } catch (err) {
@@ -2159,10 +2165,10 @@ export function MinisterialPage() {
             <>
               {opSummary && (
                 <div className="stats-grid" style={{ marginBottom: 20 }}>
-                  <div className="stat-card s-blue"><div className="stat-label">Sessions actives</div><div className="stat-value">{fmt(opSummary.active_sessions ?? 0)}</div></div>
-                  <div className="stat-card s-green"><div className="stat-label">Candidats aujourd'hui</div><div className="stat-value">{fmt(opSummary.candidates_today ?? 0)}</div></div>
-                  <div className="stat-card s-gold"><div className="stat-label">Taux de réussite</div><div className="stat-value">{opSummary.pass_rate_today ?? 0}<span style={{fontSize:16}}>%</span></div></div>
-                  <div className="stat-card s-red"><div className="stat-label">Alertes fraude</div><div className="stat-value">{fmt(opSummary.fraud_alerts_today ?? 0)}</div></div>
+                  <div className="stat-card s-blue"><div className="stat-label">Alertes critiques</div><div className="stat-value">{fmt(opSummary.critical_alerts ?? 0)}</div></div>
+                  <div className="stat-card s-green"><div className="stat-label">Candidats aujourd'hui</div><div className="stat-value">{fmt(opSummary.open_incidents ?? 0)}</div></div>
+                  <div className="stat-card s-gold"><div className="stat-label">Taux de réussite</div><div className="stat-value">{opSummary.high_risk_exam_events ?? 0}<span style={{fontSize:16}}>%</span></div></div>
+                  <div className="stat-card s-red"><div className="stat-label">Alertes fraude</div><div className="stat-value">{fmt(opSummary.payment_alerts ?? 0)}</div></div>
                 </div>
               )}
 
@@ -2196,10 +2202,10 @@ export function MinisterialPage() {
                   <div style={{ display:'grid', gap:14 }}>
                     {readiness?.items?.slice(0,6).map((item: import('./api').InstitutionalReadinessItem, i: number) => (
                       <div key={i} style={{ display:'flex', alignItems:'center', gap:10 }}>
-                        <span style={{ fontSize:20 }}>{item.status === 'ok' ? '✅' : item.status === 'warning' ? '⚠️' : '❌'}</span>
+                        <span style={{ fontSize:20 }}>{item.status === 'ready' ? '✅' : item.status === 'partial' ? '⚠️' : '❌'}</span>
                         <div style={{ flex:1 }}>
-                          <div style={{ fontSize:13, fontWeight:600 }}>{item.label}</div>
-                          {item.value && <div style={{ fontSize:11, color:'var(--muted)' }}>{item.value}</div>}
+                          <div style={{ fontSize:13, fontWeight:600 }}>{(item as {pillar?:string; label?:string}).pillar ?? (item as {label?:string}).label ?? ""}</div>
+                          <div style={{ fontSize:11, color:'var(--muted)' }}>{(item as {evidence?:string; val?:string}).evidence ?? (item as {val?:string}).val ?? ""}</div>
                         </div>
                       </div>
                     )) ?? (
@@ -2215,7 +2221,7 @@ export function MinisterialPage() {
                           <div key={i} style={{ display:'flex', alignItems:'center', gap:10 }}>
                             <span>{item.ok ? '✅' : '⚠️'}</span>
                             <div style={{ flex:1 }}>
-                              <div style={{ fontSize:13, fontWeight:600 }}>{item.label}</div>
+                              <div style={{ fontSize:13, fontWeight:600 }}>{(item as {pillar?:string; label?:string}).pillar ?? (item as {label?:string}).label ?? ""}</div>
                               <div style={{ fontSize:11, color:'var(--muted)' }}>{item.val}</div>
                             </div>
                           </div>
@@ -2351,13 +2357,13 @@ export function MinisterialPage() {
             {actionCenter?.items?.length ? (
               <div style={{ display:'grid', gap:12 }}>
                 {actionCenter.items.map((item: import('./api').InstitutionalActionItem, i: number) => (
-                  <div key={i} style={{ background:item.severity==='high'?'var(--red-l)':item.severity==='medium'?'var(--gold-l)':'var(--blue-l)', border:`1px solid ${item.severity==='high'?'#fca5a5':item.severity==='medium'?'#fde68a':'#bfdbfe'}`, borderRadius:'var(--r)', padding:'12px 14px' }}>
+                  <div key={i} style={{ background:item.severity==='critical'?'var(--red-l)':item.severity==='warning'?'var(--gold-l)':'var(--blue-l)', border:`1px solid ${item.severity==='critical'?'#fca5a5':item.severity==='warning'?'#fde68a':'#bfdbfe'}`, borderRadius:'var(--r)', padding:'12px 14px' }}>
                     <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
-                      <span>{item.severity==='high'?'🔴':item.severity==='medium'?'🟡':'🔵'}</span>
-                      <strong style={{ fontSize:13 }}>{item.title}</strong>
-                      <span className={`badge ${item.severity==='high'?'br':item.severity==='medium'?'bgo':'bb'}`} style={{ marginLeft:'auto' }}>{item.severity}</span>
+                      <span>{item.severity==='critical'?'🔴':item.severity==='warning'?'🟡':'🔵'}</span>
+                      <strong style={{ fontSize:13 }}>{item.label}</strong>
+                      <span className={`badge ${item.severity==='critical'?'br':item.severity==='warning'?'bgo':'bb'}`} style={{ marginLeft:'auto' }}>{item.severity}</span>
                     </div>
-                    <p style={{ fontSize:12, color:'var(--muted)', margin:0 }}>{item.description}</p>
+                    <p style={{ fontSize:12, color:'var(--muted)', margin:0 }}>{item.target} — {item.count}</p>
                   </div>
                 ))}
               </div>
@@ -2369,11 +2375,11 @@ export function MinisterialPage() {
                   { sev:'medium', title:'5 candidats avec résultats en attente > 48h', desc:'Les résultats de la session du 18/06 ne sont pas encore synchronisés.', action:'Vérifier sync' },
                   { sev:'low', title:'Renouvellement SSL dans 89 jours', desc:'Le certificat TLS de api.coderoute.gov.gn expire le 17/09/2026.', action:'Programmer renouvellement' },
                 ].map((a, i) => (
-                  <div key={i} style={{ background: a.sev==='high'?'var(--red-l)':a.sev==='medium'?'var(--gold-l)':'var(--blue-l)', border:`1px solid ${a.sev==='high'?'#fca5a5':a.sev==='medium'?'#fde68a':'#bfdbfe'}`, borderRadius:'var(--r)', padding:'12px 14px', marginBottom:10 }}>
+                  <div key={i} style={{ background: a.sev==='critical'?'var(--red-l)':a.sev==='medium'?'var(--gold-l)':'var(--blue-l)', border:`1px solid ${a.sev==='critical'?'#fca5a5':a.sev==='medium'?'#fde68a':'#bfdbfe'}`, borderRadius:'var(--r)', padding:'12px 14px', marginBottom:10 }}>
                     <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
-                      <span>{a.sev==='high'?'🔴':a.sev==='medium'?'🟡':'🔵'}</span>
+                      <span>{a.sev==='critical'?'🔴':a.sev==='medium'?'🟡':'🔵'}</span>
                       <strong style={{ fontSize:13, flex:1 }}>{a.title}</strong>
-                      <button className={`btn-sm ${a.sev==='high'?'btn-danger':a.sev==='medium'?'btn-gold':'secondary-button'}`}>{a.action}</button>
+                      <button className={`btn-sm ${a.sev==='critical'?'btn-danger':a.sev==='medium'?'btn-gold':'secondary-button'}`}>{a.action}</button>
                     </div>
                     <p style={{ fontSize:12, color:'var(--muted)', margin:0 }}>{a.desc}</p>
                   </div>

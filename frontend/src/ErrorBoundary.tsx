@@ -55,7 +55,7 @@ export class ErrorBoundary extends Component<Props, State> {
                 Retour à l'accueil
               </button>
             </div>
-            {import.meta.env.DEV && (
+            {(import.meta as {env?: {DEV?: boolean}}).env?.DEV && (
               <details style={{ marginTop: 20, textAlign: 'left' }}>
                 <summary style={{ fontSize: 12, color: '#667085', cursor: 'pointer' }}>
                   Détails techniques (dev)
