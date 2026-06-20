@@ -2,10 +2,23 @@
 // Extrait de src/pages.tsx L1218-L3113
 // Pour modifier, éditer ce fichier directement.
 
+import { type FormEvent, useEffect, useState } from 'react';
 import { type AuthUser } from '../authClient';
 import { type UserRole } from '../auth';
 import { useAuthSession, canUseProtectedActions } from '../authSession';
 import * as api from '../api';
+import {
+  type AuditLogEntry,
+  type AuditLogFilters,
+  type CandidateIdentityCheck,
+  type CandidateIdentityFilters,
+  type CandidateSubmission,
+  type CandidateSubmissionFilters,
+  type ExamAttempt,
+  type ExamCertificateVerification,
+  type ExamMonitoringFilters,
+  type PaymentFilters,
+} from '../api';
 import {
   buildDemoExamAttempt,
   buildDemoCertificateVerification,
@@ -23,16 +36,6 @@ import {
   getActionErrorMessage,
   sanitizePaymentFilters,
   downloadLocalFile,
-  type AuditLogEntry,
-  type AuditLogFilters,
-  type CandidateIdentityCheck,
-  type CandidateIdentityFilters,
-  type CandidateSubmission,
-  type CandidateSubmissionFilters,
-  type ExamAttempt,
-  type ExamCertificateVerification,
-  type ExamMonitoringFilters,
-  type PaymentFilters,
 } from './helpers';
 
 export function AdminPage() {
