@@ -1,8 +1,2 @@
-// Index des pages CodeRoute Guinée
-export { HomePage } from './HomePage';
-export { InstitutionalDossierPage } from './InstitutionalDossierPage';
-export { CandidatePage } from './CandidatePage';
-export { CenterPage } from './CenterPage';
-export { AdminPage } from './AdminPage';
-export { ExamPage } from './ExamPage';
-export { ResultsPage } from './ResultsPage';
+// Réexporte depuis pages.tsx — toutes les pages sont définies dans ce fichier unique
+export { AdminPage, CandidatePage, CenterPage, ExamPage, HomePage, InstitutionalDossierPage, ResultsPage } from '../pages';

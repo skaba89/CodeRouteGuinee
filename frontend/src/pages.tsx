@@ -1,3 +1,4 @@
+import { DEMO_QUESTIONS } from './examQuestions';
 import { type FormEvent, useEffect, useState } from 'react';
 
 import {
@@ -3113,370 +3114,621 @@ export function AdminPage() {
 
 export function ExamPage() {
   const { currentUser, isPresentationMode } = useAuthSession();
-  const canUseExamApi = canUseProtectedActions(currentUser, isPresentationMode, ['candidate', 'center', 'admin', 'super_admin']);
-  const fallbackExamQuestions: ExamQuestion[] = [
-    {
-      id: 'demo-question-red-light',
-      category: 'Signalisation lumineuse',
-      text: 'Que devez-vous faire face a un feu rouge fixe ?',
-      options: ['Marquer l arret obligatoire', 'Passer si la voie est libre', 'Klaxonner puis avancer', 'Continuer a vitesse reduite'],
-      correct_answer: 'Marquer l arret obligatoire',
-      media_type: 'image',
-      media_url: buildDemoQuestionImage('Feu rouge fixe', '#c0392b'),
-      media_alt: 'Illustration d un feu rouge avec arret obligatoire.',
-      is_active: true,
-      created_at: new Date().toISOString(),
-    },
-    {
-      id: 'demo-question-priority',
-      category: 'Priorite',
-      text: 'A une intersection sans panneau, quelle regle appliquez-vous ?',
-      options: ['La priorite a droite', 'Le vehicule le plus rapide passe', 'La priorite au vehicule le plus gros', 'Le premier qui klaxonne passe'],
-      correct_answer: 'La priorite a droite',
-      media_type: 'video',
-      media_url: 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4',
-      media_alt: 'Sequence video de demonstration pour illustrer une situation dynamique.',
-      is_active: true,
-      created_at: new Date().toISOString(),
-    },
-    {
-      id: 'demo-question-seatbelt',
-      category: 'Securite routiere',
-      text: 'Quand devez-vous attacher votre ceinture ?',
-      options: ['Avant tout demarrage', 'Uniquement sur autoroute', 'Seulement la nuit', 'Apres avoir atteint 50 km/h'],
-      correct_answer: 'Avant tout demarrage',
-      media_type: 'image',
-      media_url: buildDemoQuestionImage('Ceinture attachee', '#2471a3'),
-      media_alt: 'Illustration de securite avant demarrage.',
-      is_active: true,
-      created_at: new Date().toISOString(),
-    },
-  ];
-  const [examQuestions, setExamQuestions] = useState<ExamQuestion[]>(fallbackExamQuestions);
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [selectedAnswers, setSelectedAnswers] = useState<Record<number, number>>({ 0: 0 });
-  const [examBookingReference, setExamBookingReference] = useState('CRG-BOOK-DEMO-001');
-  const [examStationCode, setExamStationCode] = useState('CTR-KALOUM-POSTE-12');
-  const [deviceFingerprint] = useState(() => {
-    const userAgent = window.navigator.userAgent.slice(0, 28);
-    const language = window.navigator.language || 'fr-GN';
-    return `${language}-${userAgent.length}-${window.screen.width}x${window.screen.height}`;
-  });
-  const [examAttempt, setExamAttempt] = useState<ExamAttempt | null>(null);
-  const [examStatus, setExamStatus] = useState<string | null>(null);
-  const [isStartingExam, setIsStartingExam] = useState(false);
-  const [isSubmittingExam, setIsSubmittingExam] = useState(false);
-  const currentQuestion = examQuestions[currentQuestionIndex];
-  const displayQuestionNumber = currentQuestionIndex + 12;
-  const answeredCount = Object.keys(selectedAnswers).length;
-  const progress = Math.round((displayQuestionNumber / 40) * 100);
+  const isAuthenticated = !isPresentationMode && currentUser !== null;
 
+  const [phase, setPhase] = useState<'setup' | 'running' | 'expired' | 'reviewing' | 'results'>('setup');
+  const [questions, setQuestions] = useState<ExamQuestion[]>(buildDemoQuestions());
+  const [currentIdx, setCurrentIdx] = useState(0);
+  const [answers, setAnswers] = useState<Record<number, string>>({});
+  const [attemptId, setAttemptId] = useState<string | null>(null);
+  const [remainingSeconds, setRemainingSeconds] = useState(EXAM_DURATION);
+  const [bookingRef, setBookingRef] = useState('');
+  const [stationCode, setStationCode] = useState('POSTE-01');
+  const [statusMsg, setStatusMsg] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<ExamResult | null>(null);
+
+  const currentQ = questions[currentIdx];
+  const answeredCount = Object.keys(answers).length;
+
+  // Charger les questions de l'API si disponibles
   useEffect(() => {
-    getQuestions()
-      .then((questions) => {
-        const activeQuestions = questions.filter((question) => question.is_active);
-        if (activeQuestions.length > 0) {
-          setExamQuestions(activeQuestions.map((question, index) => question.media_url ? question : {
-            ...question,
-            media_type: index % 2 === 0 ? 'image' : 'video',
-            media_url: index % 2 === 0
-              ? buildDemoQuestionImage(`Scenario ${index + 1}`, index % 4 === 0 ? '#c0392b' : '#1f7a4d')
-              : 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4',
-            media_alt: 'Illustration pedagogique ajoutee pour la presentation.',
-          }));
-          setCurrentQuestionIndex(0);
-          setSelectedAnswers({});
+    if (!isAuthenticated || !attemptId) return;
+    fetchWithAuth(`${API}/api/v1/exams/${attemptId}/questions`)
+      .then((r) => r.json())
+      .then((qs: ExamQuestion[]) => {
+        if (Array.isArray(qs) && qs.length > 0) {
+          // Enrichir les questions sans media avec une illustration par défaut
+          const enriched = qs.map((q) => enrichWithMedia(q));
+          setQuestions(enriched);
         }
       })
-      .catch(() => setExamStatus('Mode demo : banque de questions API indisponible.'));
-  }, []);
+      .catch(() => {/* Garder les questions démo */});
+  }, [attemptId, isAuthenticated]);
 
-  async function handleStartExam() {
-    if (!canUseExamApi) {
-      const demoAttempt = buildDemoExamAttempt('started');
-      setExamAttempt(demoAttempt);
-      window.localStorage.setItem(DEMO_EXAM_ATTEMPT_STORAGE_KEY, demoAttempt.id);
-      setExamStatus(`Tentative demo demarree : ${demoAttempt.id}. Trace appareil simulee.`);
+  // Polling du statut timer
+  useEffect(() => {
+    if (phase !== 'running' || !attemptId || !isAuthenticated) return;
+    const interval = setInterval(() => {
+      fetchWithAuth(`${API}/api/v1/exams/${attemptId}/status`)
+        .then((r) => r.json())
+        .then((s: ExamStatus) => {
+          setRemainingSeconds(s.remaining_seconds);
+          if (s.expired || s.status === 'expired') {
+            setPhase('expired');
+          }
+        })
+        .catch(() => {});
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [phase, attemptId, isAuthenticated]);
+
+  const handleTimerExpire = useCallback(() => {
+    if (phase === 'running') setPhase('expired');
+  }, [phase]);
+
+  async function handleStart() {
+    if (!isAuthenticated) {
+      // Mode démo
+      setAttemptId(`DEMO-${Date.now()}`);
+      setPhase('running');
+      setRemainingSeconds(EXAM_DURATION);
+      setStatusMsg('Mode démonstration — examen simulé (30 min)');
       return;
     }
-    setIsStartingExam(true);
-    setExamStatus(null);
-    try {
-      const attempt = await startExamFromBooking(examBookingReference, deviceFingerprint, examStationCode);
-      setExamAttempt(attempt);
-      window.localStorage.setItem(DEMO_EXAM_ATTEMPT_STORAGE_KEY, attempt.id);
-      setExamStatus(`Tentative API demarree : ${attempt.id}. Trace appareil enregistree.`);
-    } catch (error) {
-      setExamStatus(getActionErrorMessage(error, 'Demarrage API impossible. Mode demo maintenu.'));
-    } finally {
-      setIsStartingExam(false);
+    if (!bookingRef.trim()) {
+      setStatusMsg('Veuillez saisir une référence de réservation.');
+      return;
     }
-  }
-
-  async function handleSubmitExam() {
-    if (!canUseExamApi) {
-      if (!examAttempt) {
-        setExamStatus('Demarrez une tentative demo avant de soumettre.');
+    setLoading(true);
+    setStatusMsg('');
+    try {
+      const r = await fetchWithAuth(`${API}/api/v1/exams/start-from-booking`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          booking_reference: bookingRef.trim(),
+          device_key: stationCode.trim(),
+          device_label: stationCode.trim(),
+        }),
+      });
+      if (!r.ok) {
+        const err = await r.json();
+        setStatusMsg(err.detail ?? 'Impossible de démarrer l\'examen.');
         return;
       }
-      const submittedAttempt = buildDemoExamAttempt('submitted');
-      setExamAttempt(submittedAttempt);
-      window.localStorage.setItem(DEMO_EXAM_ATTEMPT_STORAGE_KEY, submittedAttempt.id);
-      setExamStatus(`Tentative demo soumise : score ${submittedAttempt.score}/40, certificat pret dans Resultats.`);
-      return;
-    }
-    if (!examAttempt) {
-      setExamStatus('Demarrez une tentative API avant de soumettre.');
-      return;
-    }
-    setIsSubmittingExam(true);
-    setExamStatus(null);
-    const answers = Object.fromEntries(
-      Object.entries(selectedAnswers)
-        .map(([questionIndex, answerIndex]) => {
-          const question = examQuestions[Number(questionIndex)];
-          return question ? [question.id, question.options[answerIndex]] : null;
-        })
-        .filter((entry): entry is [string, string] => Boolean(entry)),
-    );
-    try {
-      const submittedAttempt = await submitExamAttempt(examAttempt.id, answers);
-      setExamAttempt(submittedAttempt);
-      window.localStorage.setItem(DEMO_EXAM_ATTEMPT_STORAGE_KEY, submittedAttempt.id);
-      setExamStatus(`Tentative soumise : score ${submittedAttempt.score ?? 0}, statut ${submittedAttempt.status}.`);
-    } catch (error) {
-      setExamStatus(getActionErrorMessage(error, 'Soumission impossible. Verifiez la tentative API.'));
+      const attempt = await r.json();
+      setAttemptId(attempt.id);
+      sessionStorage.setItem(DEMO_ATTEMPT_KEY, attempt.id);
+      const statusR = await fetchWithAuth(`${API}/api/v1/exams/${attempt.id}/status`);
+      const status: ExamStatus = await statusR.json();
+      setRemainingSeconds(status.remaining_seconds);
+      setPhase('running');
+      setStatusMsg('');
+    } catch {
+      setStatusMsg('Erreur de connexion au serveur.');
     } finally {
-      setIsSubmittingExam(false);
+      setLoading(false);
     }
   }
-  const examChecks = [
-    ['Identite', currentUser?.full_name ?? 'Presentation'],
-    ['Poste', examStationCode],
-    ['Reservation', examBookingReference],
-    ['Trace appareil', deviceFingerprint],
-  ];
-  const monitoringEvents = [
-    ['08:42', 'Connexion poste autorisee', 'ok'],
-    ['08:51', 'Questionnaire charge et scelle', 'ok'],
-    ['09:03', 'Aucune alerte de comportement', 'ok'],
-  ];
 
-  return (
-    <section className="screen exam-screen">
-      <div className="exam-workspace">
-        <p className="eyebrow dark">Examen securise</p>
-        <div className="exam-header">
-          <div>
-            <h2>Question {displayQuestionNumber} / 40</h2>
-            <p>Mode centre agree avec surveillance, minuterie et trace d'audit de la tentative.</p>
+  async function handleSubmit() {
+    if (phase === 'running' && answeredCount < questions.length) {
+      setPhase('reviewing');
+      return;
+    }
+    await doSubmit();
+  }
+
+  async function doSubmit() {
+    const payload: Record<string, string> = {};
+    questions.forEach((q, i) => {
+      if (answers[i] !== undefined) payload[q.id] = answers[i];
+    });
+
+    if (!isAuthenticated || !attemptId || attemptId.startsWith('DEMO-')) {
+      // Résultats démo
+      const score = Object.values(payload).filter((_, i) => payload[questions[i]?.id] === questions[i]?.correct_answer).length;
+      const demoResult: ExamResult = {
+        attempt_id: attemptId ?? 'DEMO',
+        candidate_name: currentUser?.full_name ?? 'Candidat',
+        score,
+        total: questions.length,
+        score_percent: Math.round((score / questions.length) * 100 * 10) / 10,
+        passed: score >= 35,
+        threshold: 35,
+        submitted_at: new Date().toISOString(),
+        questions: questions.map((q, i) => ({
+          ...q,
+          given_answer: answers[i],
+          is_correct: answers[i] === q.correct_answer,
+        })),
+      };
+      setResult(demoResult);
+      setPhase('results');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const r = await fetchWithAuth(`${API}/api/v1/exams/${attemptId}/submit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ answers: payload }),
+      });
+      if (!r.ok) {
+        const err = await r.json();
+        setStatusMsg(err.detail ?? 'Erreur lors de la soumission.');
+        return;
+      }
+      // Charger les résultats détaillés
+      const resR = await fetchWithAuth(`${API}/api/v1/exams/${attemptId}/results`);
+      const res: ExamResult = await resR.json();
+      setResult(res);
+      setPhase('results');
+    } catch {
+      setStatusMsg('Erreur lors de la soumission.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function selectAnswer(option: string) {
+    setAnswers((prev) => ({ ...prev, [currentIdx]: option }));
+  }
+
+  // ── Rendu phase setup ────────────────────────────────────────────────
+
+  if (phase === 'setup') {
+    return (
+      <section className="screen exam-screen">
+        <div className="exam-setup-card">
+          <div className="exam-setup-header">
+            <span className="eyebrow">Examen officiel</span>
+            <h2>Code de la route — Catégorie B</h2>
+            <p>40 questions · 30 minutes · Seuil d'admission : 35/40 (87,5 %)</p>
           </div>
-          <span className={canUseExamApi ? 'badge ok' : 'badge'}>{canUseExamApi ? 'Session API autorisee' : 'Mode presentation'}</span>
-        </div>
-        {!canUseExamApi && <p className="protected-action-note">Mode presentation : demarrage et soumission demo actifs localement ; la tentative API officielle reste reservee aux sessions reelles.</p>}
-        <div className="exam-trace-controls">
-          <label>Reference reservation<input value={examBookingReference} onChange={(event) => setExamBookingReference(event.target.value)} /></label>
-          <label>Poste centre<input value={examStationCode} onChange={(event) => setExamStationCode(event.target.value)} /></label>
-          <label>Trace appareil<input value={deviceFingerprint} readOnly /></label>
-        </div>
-        <div className="exam-progress" aria-label="Progression examen"><span style={{ width: `${progress}%` }} /></div>
-        <article className="question-card">
-          <span className="question-category">{currentQuestion.category}</span>
-          <p className="question">{currentQuestion.text}</p>
-          {currentQuestion.media_url && currentQuestion.media_type === 'image' && (
-            <figure className="question-media">
-              <img src={currentQuestion.media_url} alt={currentQuestion.media_alt ?? 'Illustration de la question'} />
-              {currentQuestion.media_alt && <figcaption>{currentQuestion.media_alt}</figcaption>}
-            </figure>
+          <div className="exam-setup-rules">
+            <div className="rule-item"><span>📋</span><span>40 questions illustrées</span></div>
+            <div className="rule-item"><span>⏱️</span><span>30 minutes chronométrées</span></div>
+            <div className="rule-item"><span>✅</span><span>35 bonnes réponses requises</span></div>
+            <div className="rule-item"><span>🔒</span><span>Navigation libre entre questions</span></div>
+            <div className="rule-item"><span>🎯</span><span>Résultats détaillés à la fin</span></div>
+          </div>
+
+          {isAuthenticated ? (
+            <div className="exam-setup-fields">
+              <label>
+                Référence de réservation
+                <input value={bookingRef} onChange={(e) => setBookingRef(e.target.value)}
+                  placeholder="GN-BOOK-..." />
+              </label>
+              <label>
+                Code du poste
+                <input value={stationCode} onChange={(e) => setStationCode(e.target.value)}
+                  placeholder="POSTE-01" />
+              </label>
+            </div>
+          ) : (
+            <p className="exam-demo-notice">
+              🎓 Mode démonstration — 40 questions illustrées disponibles sans connexion
+            </p>
           )}
-          {currentQuestion.media_url && currentQuestion.media_type === 'video' && (
-            <figure className="question-media">
-              <video src={currentQuestion.media_url} controls preload="metadata" aria-label={currentQuestion.media_alt ?? 'Video de la question'} />
-              {currentQuestion.media_alt && <figcaption>{currentQuestion.media_alt}</figcaption>}
-            </figure>
-          )}
-          {currentQuestion.options.map((answer, index) => (
-            <button
-              type="button"
-              className={selectedAnswers[currentQuestionIndex] === index ? 'answer selected' : 'answer'}
-              key={answer}
-              onClick={() => setSelectedAnswers((current) => ({ ...current, [currentQuestionIndex]: index }))}
-            >
-              <strong>{String.fromCharCode(65 + index)}.</strong> {answer}
-            </button>
-          ))}
-        </article>
-        <div className="exam-navigation">
-          <button className="secondary-button" disabled={currentQuestionIndex === 0} onClick={() => setCurrentQuestionIndex((index) => Math.max(0, index - 1))}>Question precedente</button>
-          <span>{answeredCount} reponse(s) saisie(s)</span>
-          <button disabled={currentQuestionIndex === examQuestions.length - 1} onClick={() => setCurrentQuestionIndex((index) => Math.min(examQuestions.length - 1, index + 1))}>Question suivante</button>
-        </div>
-        <div className="exam-api-actions">
-          <button onClick={handleStartExam} disabled={isStartingExam || !examBookingReference || examAttempt?.status === 'started'}>{isStartingExam ? 'Demarrage...' : canUseExamApi ? 'Demarrer tentative API' : 'Demarrer tentative demo'}</button>
-          <button className="secondary-button" onClick={handleSubmitExam} disabled={isSubmittingExam || !examAttempt || examAttempt.status !== 'started'}>
-            {isSubmittingExam ? 'Soumission...' : 'Soumettre les reponses'}
+
+          {statusMsg && <p className="form-error">{statusMsg}</p>}
+
+          <button className="exam-start-btn" onClick={handleStart} disabled={loading}>
+            {loading ? 'Démarrage...' : isAuthenticated ? '🚀 Démarrer l\'examen officiel' : '🎓 Commencer la démonstration'}
           </button>
         </div>
-        {examStatus && <p className={examStatus.includes('impossible') || examStatus.includes('indisponible') ? 'form-error' : 'login-status'}>{examStatus}</p>}
-      </div>
-      <aside className="timer-card exam-control-card">
-        <span>Temps restant</span>
-        <strong>18:24</strong>
-        <p>Score requis : 35 / 40</p>
-        <div className="exam-check-grid">
-          {examChecks.map(([label, value]) => (
-            <div key={label}><small>{label}</small><b>{value}</b></div>
-          ))}
-        </div>
-        <div className="monitoring-feed">
-          <strong>Surveillance</strong>
-          {monitoringEvents.map(([time, label, status]) => (
-            <div className="monitoring-event" key={`${time}-${label}`}>
-              <span>{time}</span>
-              <p>{label}</p>
-              <i className={`status-dot ${status}`} />
+      </section>
+    );
+  }
+
+  // ── Rendu phase reviewing (avant soumission) ──────────────────────────
+
+  if (phase === 'reviewing') {
+    const unanswered = questions.filter((_, i) => answers[i] === undefined);
+    return (
+      <section className="screen exam-screen">
+        <div className="exam-review-card">
+          <h2>Vérification avant soumission</h2>
+          <p>Vous avez répondu à <strong>{answeredCount}</strong> question(s) sur {questions.length}.</p>
+          {unanswered.length > 0 && (
+            <div className="exam-unanswered-list">
+              <p className="warning-text">⚠️ Questions sans réponse :</p>
+              {unanswered.map((q) => (
+                <button key={q.id} type="button" className="unanswered-btn"
+                  onClick={() => { setCurrentIdx(q.number - 1); setPhase('running'); }}>
+                  Question {q.number} — {q.category}
+                </button>
+              ))}
             </div>
+          )}
+          <div className="review-actions">
+            <button className="secondary-button" onClick={() => setPhase('running')}>↩ Revenir à l'examen</button>
+            <button className="exam-submit-final" onClick={doSubmit} disabled={loading}>
+              {loading ? 'Soumission...' : '✅ Soumettre définitivement'}
+            </button>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  // ── Rendu phase expired ───────────────────────────────────────────────
+
+  if (phase === 'expired') {
+    return (
+      <section className="screen exam-screen">
+        <div className="exam-expired-card">
+          <p className="exam-expired-icon">⏰</p>
+          <h2>Temps écoulé</h2>
+          <p>Le temps de 30 minutes est écoulé. Vos réponses vont être soumises automatiquement.</p>
+          <button onClick={doSubmit} disabled={loading}>
+            {loading ? 'Soumission...' : 'Voir mes résultats'}
+          </button>
+        </div>
+      </section>
+    );
+  }
+
+  // ── Rendu phase results ───────────────────────────────────────────────
+
+  if (phase === 'results' && result) {
+    return (
+      <section className="screen exam-screen">
+        <ResultsView result={result} />
+      </section>
+    );
+  }
+
+  // ── Rendu phase running ───────────────────────────────────────────────
+
+  if (!currentQ) return null;
+
+  return (
+    <section className="screen exam-screen exam-screen--running">
+      {/* Sidebar gauche : timer + grille */}
+      <aside className="exam-sidebar">
+        <Timer remainingSeconds={remainingSeconds} onExpire={handleTimerExpire} />
+
+        <div className="exam-sidebar-info">
+          <p><strong>{answeredCount}</strong> / {questions.length} répondues</p>
+          <p>Seuil : 35/40</p>
+        </div>
+
+        <QuestionGrid
+          total={questions.length}
+          current={currentIdx}
+          answers={answers}
+          onSelect={setCurrentIdx}
+        />
+
+        <button className="exam-submit-btn" onClick={handleSubmit} disabled={loading}>
+          {loading ? 'En cours...' : answeredCount < questions.length
+            ? `Vérifier (${questions.length - answeredCount} sans réponse)`
+            : '✅ Soumettre l\'examen'}
+        </button>
+
+        {statusMsg && <p className="form-error" style={{ fontSize: 12 }}>{statusMsg}</p>}
+      </aside>
+
+      {/* Zone principale : question */}
+      <main className="exam-main">
+        <div className="exam-main-header">
+          <span className="exam-q-cat">{currentQ.category}</span>
+          <span className="exam-q-num">Question {currentIdx + 1} / {questions.length}</span>
+        </div>
+
+        {/* Barre de progression */}
+        <div className="exam-progress-bar">
+          <div className="exam-progress-fill" style={{ width: `${((currentIdx + 1) / questions.length) * 100}%` }} />
+        </div>
+
+        {/* Media illustratif */}
+        <QuestionMedia q={currentQ} />
+
+        {/* Texte de la question */}
+        <p className="exam-question-text">{currentQ.text}</p>
+
+        {/* Options */}
+        <div className="exam-options">
+          {currentQ.options.map((opt, oi) => (
+            <button
+              key={oi}
+              type="button"
+              className={`exam-option ${answers[currentIdx] === opt ? 'selected' : ''}`}
+              onClick={() => selectAnswer(opt)}
+            >
+              <span className="exam-option-letter">{String.fromCharCode(65 + oi)}</span>
+              <span className="exam-option-text">{opt}</span>
+              {answers[currentIdx] === opt && <span className="exam-option-check">✓</span>}
+            </button>
           ))}
         </div>
-      </aside>
+
+        {/* Navigation */}
+        <div className="exam-nav">
+          <button
+            className="secondary-button"
+            disabled={currentIdx === 0}
+            onClick={() => setCurrentIdx((i) => Math.max(0, i - 1))}
+          >
+            ← Précédente
+          </button>
+          <span className="exam-nav-skip">
+            {answers[currentIdx] === undefined ? (
+              <button className="exam-skip-btn"
+                onClick={() => setCurrentIdx((i) => Math.min(questions.length - 1, i + 1))}>
+                Passer →
+              </button>
+            ) : null}
+          </span>
+          <button
+            disabled={currentIdx === questions.length - 1}
+            onClick={() => setCurrentIdx((i) => Math.min(questions.length - 1, i + 1))}
+          >
+            Suivante →
+          </button>
+        </div>
+      </main>
     </section>
   );
 }
 
-export function ResultsPage() {
-  const [examSummary, setExamSummary] = useState<ExamSummary>(fallbackExamSummary);
-  const [attemptId, setAttemptId] = useState(() => window.localStorage.getItem(DEMO_EXAM_ATTEMPT_STORAGE_KEY) ?? 'demo-attempt-1');
-  const [certificateVerification, setCertificateVerification] = useState<ExamCertificateVerification | null>(null);
-  const [certificateError, setCertificateError] = useState<string | null>(null);
-  const [isVerifyingCertificate, setIsVerifyingCertificate] = useState(false);
-  useEffect(() => {
-    getExamSummary().then(setExamSummary).catch(() => undefined);
-  }, []);
+// ── Enrichissement automatique des questions API sans media ────────────────
 
-  async function handleCertificateVerification(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!attemptId) return;
-    setIsVerifyingCertificate(true);
-    setCertificateVerification(null);
-    setCertificateError(null);
+function enrichWithMedia(q: ExamQuestion): ExamQuestion {
+  if (q.media_url) return q;
+  const cat = q.category.toLowerCase();
+  if (cat.includes('signal')) return { ...q, media_type: 'svg', media_url: 'priority', media_alt: 'Illustration signalisation' };
+  if (cat.includes('priorit')) return { ...q, media_type: 'svg', media_url: 'intersection_priority_right', media_alt: 'Situation de priorité' };
+  if (cat.includes('girat') || cat.includes('rondpoint')) return { ...q, media_type: 'svg', media_url: 'intersection_roundabout', media_alt: 'Giratoire' };
+  if (cat.includes('vitesse') || cat.includes('distance')) return { ...q, media_type: 'svg', media_url: 'situation_safe_distance', media_alt: 'Distance de sécurité' };
+  if (cat.includes('dépasse') || cat.includes('manoeuv')) return { ...q, media_type: 'svg', media_url: 'situation_overtake_forbidden', media_alt: 'Situation de dépassement' };
+  if (cat.includes('urgence') || cat.includes('secours')) return { ...q, media_type: 'svg', media_url: 'situation_emergency_vehicle', media_alt: 'Véhicule d\'urgence' };
+  return q;
+}
+
+export function ResultsPage() {
+  const { currentUser, isPresentationMode } = useAuthSession();
+  const canUseApi = canUseProtectedActions(currentUser, isPresentationMode, ['candidate', 'center', 'admin', 'super_admin']);
+
+  const [attemptId, setAttemptId] = useState(
+    () => sessionStorage.getItem(DEMO_ATTEMPT_KEY) ?? localStorage.getItem(DEMO_ATTEMPT_KEY) ?? ''
+  );
+  const [summary, setSummary] = useState<ExamSummary>(fallbackSummary);
+  const [cert, setCert] = useState<ExamCertificateVerification | null>(null);
+  const [certError, setCertError] = useState<string | null>(null);
+  const [verifying, setVerifying] = useState(false);
+
+  const [detailedResult, setDetailedResult] = useState<ExamDetailedResult | null>(null);
+  const [loadingResult, setLoadingResult] = useState(false);
+  const [resultError, setResultError] = useState<string | null>(null);
+  const [filter, setFilter] = useState<'all' | 'correct' | 'wrong'>('all');
+
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
+
+  useEffect(() => {
+    if (!canUseApi) return;
+    getExamSummary().then(setSummary).catch(() => undefined);
+  }, [canUseApi]);
+
+  // Charger auto les résultats si un attemptId est stocké
+  useEffect(() => {
+    if (!attemptId || !canUseApi) return;
+    handleLoadResults();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function handleVerifyCertificate(e: FormEvent) {
+    e.preventDefault();
+    if (!attemptId.trim()) return;
+    setVerifying(true);
+    setCert(null);
+    setCertError(null);
     try {
-      if (attemptId.startsWith('demo-')) {
-        setCertificateVerification(buildDemoCertificateVerification(attemptId));
+      if (!canUseApi || attemptId.startsWith('DEMO-') || attemptId.startsWith('demo-')) {
+        setCert(buildDemoCertificateVerification(attemptId));
         return;
       }
       const result = await verifyExamCertificate(attemptId);
-      setCertificateVerification(result);
-    } catch {
-      setCertificateVerification(buildDemoCertificateVerification(attemptId));
-      setCertificateError("API certificat indisponible. Verification demo affichee localement.");
+      setCert(result);
+    } catch (err) {
+      setCertError(getActionErrorMessage(err, 'Vérification impossible.'));
     } finally {
-      setIsVerifyingCertificate(false);
+      setVerifying(false);
     }
   }
 
-  const score = 36;
-  const total = 40;
-  const threshold = 35;
-  const passed = score >= threshold;
-  const certificateUrl = attemptId ? getExamCertificatePdfUrl(attemptId) : null;
-  const successRate = examSummary.submitted_attempts
-    ? Math.round((examSummary.passed_attempts / examSummary.submitted_attempts) * 100)
-    : 0;
-  const resultChecks = [
-    ['Identite candidat', 'Validee'],
-    ['Session examen', 'Cloturee'],
-    ['Correction', 'Automatique'],
-    ['Certificat', passed ? 'Pret' : 'Bloque'],
-  ];
-  const scoreBreakdown = [
-    ['Signalisation', 10, 10],
-    ['Priorites', 9, 10],
-    ['Securite routiere', 8, 10],
-    ['Infractions', 9, 10],
-  ];
-  const nextSteps = passed
-    ? [
-        'Validation numerique par le centre agree',
-        'Controle administratif du dossier candidat',
-        'Transmission vers le circuit de delivrance du permis',
-      ]
-    : [
-        'Notification du candidat',
-        'Programmation d une nouvelle session',
-        'Revision ciblee sur les themes insuffisants',
-      ];
+  async function handleLoadResults() {
+    if (!attemptId.trim() || !canUseApi) return;
+    setLoadingResult(true);
+    setResultError(null);
+    try {
+      const result = await getExamResults(attemptId);
+      setDetailedResult(result);
+    } catch {
+      setResultError("Résultats non disponibles — l'examen n'est peut-être pas encore soumis.");
+    } finally {
+      setLoadingResult(false);
+    }
+  }
+
+  async function handleDownloadPdf() {
+    if (!attemptId.trim() || !canUseApi) return;
+    setDownloadingPdf(true);
+    try {
+      await downloadExamCertificatePdf(attemptId);
+    } catch {
+      setCertError("Téléchargement impossible — vérifiez que l'examen est admis.");
+    } finally {
+      setDownloadingPdf(false);
+    }
+  }
+
+  const filteredQuestions = detailedResult?.questions.filter(q =>
+    filter === 'all' ? true : filter === 'correct' ? q.is_correct : !q.is_correct
+  ) ?? [];
+
   return (
-    <section className="screen results-workspace">
-      <div className="results-main">
+    <section className="screen results-screen">
+      <div className="results-workspace">
+
+        {/* ── En-tête ── */}
         <div className="results-header">
-          <div>
-            <p className="eyebrow dark">Resultat candidat</p>
-            <h2>Releve officiel du code de la route</h2>
-            <p>Score, admissibilite, verification du certificat et suite administrative reunis dans une vue unique.</p>
-          </div>
-          <span className={passed ? 'badge ok' : 'badge'}>{passed ? 'Admis' : 'Non admis'}</span>
+          <span className="eyebrow dark">Résultats officiels</span>
+          <h2>Vérification & Résultats d'examen</h2>
+          <p>Consultez les résultats d'un examen par son identifiant de tentative.</p>
         </div>
-        <div className="result-identity-grid">
-          <div className="mini-card">Reference candidat : <strong>GN-CODE-2026-000001</strong></div>
-          <div className="mini-card">Session : <strong>Centre Kaloum - 20/06/2026</strong></div>
-          <div className="mini-card">Seuil de reussite : <strong>{threshold} / {total}</strong></div>
-          <div className="mini-card">Moyenne nationale : <strong>{examSummary.average_score} / {total}</strong></div>
-        </div>
-        <div className="result-official-grid">
-          {resultChecks.map(([label, value]) => (
-            <article key={label}>
-              <span>{label}</span>
-              <strong>{value}</strong>
-            </article>
-          ))}
-        </div>
-        <div className="score-breakdown">
-          <h3>Ventilation du score</h3>
-          {scoreBreakdown.map(([label, value, max]) => (
-            <div className="score-row" key={label}>
-              <span>{label}</span>
-              <div><i style={{ width: `${(Number(value) / Number(max)) * 100}%` }} /></div>
-              <strong>{value} / {max}</strong>
+
+        {/* ── Statistiques nationales (admin) ── */}
+        {canUseApi && (currentUser?.role === 'admin' || currentUser?.role === 'super_admin') && (
+          <div className="results-stats-grid">
+            <div className="stat-card">
+              <span className="stat-label">Tentatives total</span>
+              <strong className="stat-value">{summary.total_attempts}</strong>
             </div>
-          ))}
-        </div>
-      </div>
-      <div className="result-card">
-        <span className="result-label">Decision nationale</span>
-        <strong>{score} / {total}</strong>
-        <p>{passed ? 'Resultat positif. Certificat numerique pret pour validation administrative.' : 'Resultat insuffisant. Nouvelle presentation possible selon les regles nationales.'}</p>
-        <div className="metrics compact">
-          <article><strong>{formatNumber(examSummary.submitted_attempts)}</strong><span>Examens soumis</span></article>
-          <article><strong>{formatNumber(examSummary.passed_attempts)}</strong><span>Admis</span></article>
-          <article><strong>{successRate}%</strong><span>Taux de reussite</span></article>
-        </div>
-        <div className="next-steps-panel">
-          <strong>Suite administrative</strong>
-          {nextSteps.map((step, index) => (
-            <span key={step}><b>{index + 1}</b>{step}</span>
-          ))}
-        </div>
-        <form className="certificate-field" onSubmit={handleCertificateVerification}>
-          <label>ID tentative examen<input value={attemptId} onChange={(event) => setAttemptId(event.target.value)} placeholder="Coller l'ID de tentative seedee" /></label>
-          <button disabled={isVerifyingCertificate || !attemptId}>{isVerifyingCertificate ? 'Verification...' : 'Verifier certificat'}</button>
-        </form>
-        {certificateVerification && (
-          <div className={certificateVerification.valid ? 'certificate-verification ok' : 'certificate-verification'}>
-            <strong>{certificateVerification.valid ? 'Certificat authentique' : 'Certificat non valide'}</strong>
-            <span>{certificateVerification.reason ?? certificateVerification.candidate_name ?? certificateVerification.status}</span>
-            {certificateVerification.valid && <span>{certificateVerification.center_name} - Score {certificateVerification.score}</span>}
+            <div className="stat-card">
+              <span className="stat-label">Soumis</span>
+              <strong className="stat-value">{summary.submitted_attempts}</strong>
+            </div>
+            <div className="stat-card stat-passed">
+              <span className="stat-label">Admis</span>
+              <strong className="stat-value">{summary.passed_attempts}</strong>
+            </div>
+            <div className="stat-card stat-failed">
+              <span className="stat-label">Ajournés</span>
+              <strong className="stat-value">{summary.failed_attempts}</strong>
+            </div>
+            <div className="stat-card">
+              <span className="stat-label">Score moyen</span>
+              <strong className="stat-value">{summary.average_score}<span style={{fontSize:14,fontWeight:700}}>/40</span></strong>
+            </div>
           </div>
         )}
-        {certificateError && <p className="form-error">{certificateError}</p>}
-        <div className="certificate-trace">
-          <span>Empreinte certificat</span>
-          <strong>GN-CERT-2026-4F8A-921C</strong>
-        </div>
-        <div className="actions result-actions">
-          <a href="#/candidate">Retour dossier</a>
-          <a href="#/admin" className="secondary">Voir supervision</a>
-          {certificateUrl && <a href={certificateUrl} target="_blank" rel="noreferrer">Telecharger attestation PDF</a>}
-        </div>
+
+        {/* ── Formulaire de recherche ── */}
+        <form className="results-search-form" onSubmit={handleVerifyCertificate}>
+          <label>
+            Identifiant de tentative
+            <input
+              value={attemptId}
+              onChange={e => setAttemptId(e.target.value)}
+              placeholder="ATT-... ou DEMO-..."
+            />
+          </label>
+          <div className="results-search-actions">
+            <button type="submit" disabled={verifying || !attemptId.trim()}>
+              {verifying ? 'Vérification…' : '🔍 Vérifier le certificat'}
+            </button>
+            {canUseApi && (
+              <button type="button" className="secondary-button"
+                onClick={handleLoadResults} disabled={loadingResult || !attemptId.trim()}>
+                {loadingResult ? 'Chargement…' : '📊 Résultats détaillés'}
+              </button>
+            )}
+          </div>
+        </form>
+
+        {certError && <p className="form-error">{certError}</p>}
+
+        {/* ── Certificat ── */}
+        {cert && (
+          <div className={`certificate-result ${cert.valid && cert.passed ? 'admitted' : cert.valid && cert.passed === false ? 'failed' : 'invalid'}`}>
+            <div className="certificate-result-header">
+              <span className="cert-icon">{cert.valid && cert.passed ? '🏆' : cert.valid && cert.passed === false ? '📋' : '❌'}</span>
+              <div>
+                <h3>{cert.valid && cert.passed ? 'Admis — Certificat authentique' : cert.valid && cert.passed === false ? 'Ajourné' : 'Certificat non valide'}</h3>
+                {cert.candidate_name && <p className="cert-name">{cert.candidate_name}</p>}
+              </div>
+              {cert.valid && cert.passed && canUseApi && (
+                <button className="btn-download-cert" onClick={handleDownloadPdf} disabled={downloadingPdf}>
+                  {downloadingPdf ? '…' : '⬇ PDF'}
+                </button>
+              )}
+            </div>
+            {cert.valid && (
+              <div className="certificate-fields">
+                {cert.candidate_reference && (
+                  <div className="certificate-field"><small>Référence</small><b>{cert.candidate_reference}</b></div>
+                )}
+                {cert.identity_number && (
+                  <div className="certificate-field"><small>NINA</small><b>{cert.identity_number}</b></div>
+                )}
+                {cert.permit_category && (
+                  <div className="certificate-field"><small>Catégorie</small><b>{cert.permit_category}</b></div>
+                )}
+                {cert.center_name && (
+                  <div className="certificate-field"><small>Centre</small><b>{cert.center_name} — {cert.center_city}</b></div>
+                )}
+                {cert.score !== null && cert.score !== undefined && (
+                  <div className="certificate-field"><small>Score</small><b>{cert.score}/40</b></div>
+                )}
+                {cert.submitted_at && (
+                  <div className="certificate-field"><small>Date</small><b>{new Date(cert.submitted_at).toLocaleDateString('fr-FR')}</b></div>
+                )}
+              </div>
+            )}
+            {cert.reason && !cert.valid && <p className="cert-reason">{cert.reason}</p>}
+          </div>
+        )}
+
+        {/* ── Résultats détaillés ── */}
+        {detailedResult && (
+          <div className="detailed-results">
+            {/* Verdict */}
+            <div className={`exam-verdict-banner ${detailedResult.passed ? 'passed' : 'failed'}`}>
+              <span className="verdict-emoji">{detailedResult.passed ? '🏆' : '📋'}</span>
+              <div className="verdict-body">
+                <h3>{detailedResult.passed ? 'Admis !' : 'Ajourné'}</h3>
+                <p>{detailedResult.candidate_name}</p>
+              </div>
+              <div className="verdict-score">
+                <strong>{detailedResult.score} <span>/ {detailedResult.total}</span></strong>
+                <small>{detailedResult.score_percent}%</small>
+              </div>
+            </div>
+
+            {/* Filtres */}
+            <div className="result-filter-bar">
+              {(['all', 'correct', 'wrong'] as const).map(f => (
+                <button key={f} type="button"
+                  className={`result-filter-btn ${filter === f ? 'active' : ''}`}
+                  onClick={() => setFilter(f)}>
+                  {f === 'all' ? `Toutes (${detailedResult.questions.length})`
+                    : f === 'correct' ? `✅ Correctes (${detailedResult.questions.filter(q => q.is_correct).length})`
+                    : `❌ Incorrectes (${detailedResult.questions.filter(q => !q.is_correct).length})`}
+                </button>
+              ))}
+            </div>
+
+            {/* Liste de questions */}
+            <div className="result-questions-list">
+              {filteredQuestions.map(q => (
+                <div key={q.question_id} className={`result-q-item ${q.is_correct ? 'correct' : 'wrong'}`}>
+                  <div className="result-q-head">
+                    <span className="result-q-num">Q{q.number}</span>
+                    <span className="result-q-cat">{q.category}</span>
+                    <span className="result-q-icon">{q.is_correct ? '✅' : '❌'}</span>
+                  </div>
+                  <p className="result-q-text">{q.text}</p>
+                  {q.given_answer && !q.is_correct && (
+                    <p className="result-q-given">Votre réponse : <strong>{q.given_answer}</strong></p>
+                  )}
+                  {!q.is_correct && (
+                    <p className="result-q-correct">Bonne réponse : <strong>{q.correct_answer}</strong></p>
+                  )}
+                  {q.explanation && (
+                    <p className="result-q-expl">💡 {q.explanation}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {resultError && <p className="form-error" style={{marginTop: 12}}>{resultError}</p>}
       </div>
     </section>
   );

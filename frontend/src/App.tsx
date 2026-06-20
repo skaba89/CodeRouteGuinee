@@ -5,7 +5,7 @@ import { type AuthUser, changePassword, getAccessToken, getRefreshToken, getCurr
 import { LocaleSwitcher } from './components/LocaleSwitcher';
 import { t } from './i18n';
 import { AuthSessionProvider } from './authSession';
-import { AdminPage, CandidatePage, CenterPage, ExamPage, HomePage, InstitutionalDossierPage, ResultsPage } from './pages/index';
+import { AdminPage, CandidatePage, CenterPage, ExamPage, HomePage, InstitutionalDossierPage, ResultsPage } from './pages';
 import './role.css';
 
 type AppRoute = 'home' | 'candidate' | 'center' | 'admin' | 'exam' | 'results' | 'dossier' | 'login' | 'account';
