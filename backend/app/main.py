@@ -10,6 +10,7 @@ from app.core.config import get_settings
 from app.db.session import init_db
 from app.monitoring import init_sentry
 from app.routers import (
+    audit,
     auth,
     bookings,
     candidate_identity,
@@ -116,5 +117,6 @@ app.include_router(exam_reviews.router, prefix=settings.api_v1_prefix)
 app.include_router(exam_question_traces.router, prefix=settings.api_v1_prefix)
 app.include_router(candidate_submissions.router, prefix=settings.api_v1_prefix)
 app.include_router(dashboard.router, prefix=settings.api_v1_prefix)
+app.include_router(audit.router, prefix=settings.api_v1_prefix)
 app.include_router(supervision.router, prefix=settings.api_v1_prefix)
 app.include_router(users.router, prefix=settings.api_v1_prefix)

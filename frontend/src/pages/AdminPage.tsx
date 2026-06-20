@@ -153,7 +153,7 @@ export function AdminPage() {
   async function refreshCenterIncidents() {
     if (!canAdminAct) {
       setCenterIncidents(fallbackCenterIncidents);
-      setIncidentAdminStatus('Apercu presentation charge : incidents ouverts simulés, sans action officielle.');
+      setIncidentAdminStatus('Incidents chargés en mode présentation.');
       return;
     }
     try {
@@ -174,7 +174,7 @@ export function AdminPage() {
         setPaymentItems(demo.items);
         setPaymentAlerts(demo.alerts);
         setActivePaymentFilters(cleanFilters);
-        setFinanceStatus('Apercu presentation : filtres financiers appliques sur donnees simulees.');
+        setFinanceStatus('Aperçu présentation : données financières simulées.');
         return;
       }
       const summary = await getAdminPaymentSummary(cleanFilters);
@@ -191,7 +191,7 @@ export function AdminPage() {
       setPaymentItems(demo.items);
       setPaymentAlerts(demo.alerts);
       setActivePaymentFilters(sanitizePaymentFilters(filters));
-      setFinanceStatus('Finance API indisponible : apercu presentation charge.');
+      setFinanceStatus('Finance API indisponible — vérifiez votre connexion.');
     }
   }
 
@@ -204,7 +204,7 @@ export function AdminPage() {
       };
       setIdentityChecks(filterDemoIdentityChecks(cleanFilters));
       setActiveIdentityFilters(cleanFilters);
-      setIdentityStatus('Apercu presentation : filtres appliques aux pieces simulees.');
+      setIdentityStatus('Aperçu présentation : pièces simulées.');
       return;
     }
     try {
@@ -232,7 +232,7 @@ export function AdminPage() {
       };
       setCandidateSubmissions(filterDemoSubmissions(cleanFilters));
       setActiveSubmissionFilters(cleanFilters);
-      setSubmissionAdminStatus('Apercu presentation : filtres appliques aux recours simules.');
+      setSubmissionAdminStatus('Aperçu présentation : recours simulés.');
       return;
     }
     try {
@@ -265,7 +265,7 @@ export function AdminPage() {
       setMonitoringEvents(demo.events);
       setDeviceSessionAlerts(demo.deviceAlerts);
       setActiveMonitoringFilters(cleanFilters);
-      setMonitoringStatus('Apercu presentation : monitoring simule charge selon les filtres.');
+      setMonitoringStatus('Aperçu présentation : monitoring simulé.');
       return;
     }
     try {
@@ -303,40 +303,40 @@ export function AdminPage() {
         setInstitutionalReadiness(readiness);
         setReadinessStatus(null);
       })
-      .catch(() => setReadinessStatus('Mode demo : connectez-vous avec un token admin pour charger le score institutionnel API.'));
+      .catch(() => setReadinessStatus('Chargement échoué — vérifiez votre connexion et vos droits d\'accès.'));
     getInstitutionalReport()
       .then((report) => {
         setInstitutionalReport(report);
         setInstitutionalReportStatus(null);
       })
-      .catch(() => setInstitutionalReportStatus('Mode demo : connectez-vous avec un token admin pour charger le rapport institutionnel API.'));
+      .catch(() => setInstitutionalReportStatus('Rapport indisponible — contactez le support si le problème persiste.'));
     getInstitutionalActionCenter()
       .then((actionCenter) => {
         setInstitutionalActionCenter(actionCenter.items.length > 0 ? actionCenter : fallbackInstitutionalActionCenter);
         setActionCenterStatus(null);
       })
-      .catch(() => setActionCenterStatus('Mode demo : connectez-vous avec un role admin pour charger le centre d action API.'));
+      .catch(() => setActionCenterStatus('Centre d\'action indisponible — vérifiez votre connexion API.'));
     getOperationsSummary()
       .then((summary) => {
         setOperationsSummary(summary);
         setOperationsStatus(null);
       })
-      .catch(() => setOperationsStatus('Mode demo : connectez-vous avec un role admin pour charger le resume exploitation API.'));
+      .catch(() => setOperationsStatus('Résumé exploitation indisponible — vérifiez votre connexion API.'));
     getCandidateIdentityChecks({ status_filter: 'pending', limit: 25 })
       .then((checks) => {
         setIdentityChecks(checks.length > 0 ? checks : fallbackIdentityChecks);
         setIdentityStatus(null);
       })
-      .catch(() => setIdentityStatus('Mode demo : connectez-vous avec un role admin pour traiter les identites API.'));
+      .catch(() => setIdentityStatus('Vérifications d\'identité indisponibles — vérifiez votre connexion API.'));
     getCandidateSubmissions({ status_filter: 'submitted', limit: 25 })
       .then((items) => {
         setCandidateSubmissions(items);
         setSubmissionAdminStatus(null);
       })
-      .catch(() => setSubmissionAdminStatus('Mode demo : connectez-vous avec un role admin pour traiter les recours API.'));
+      .catch(() => setSubmissionAdminStatus('Recours indisponibles — vérifiez votre connexion API.'));
     getExamMonitoringSummaries({ min_risk_score: 1, limit: 25 })
       .then(setMonitoringSummaries)
-      .catch(() => setMonitoringStatus('Mode demo : connectez-vous avec un role admin pour charger le monitoring examen API.'));
+      .catch(() => setMonitoringStatus('Monitoring indisponible — vérifiez votre connexion API.'));
     getExamMonitoringEvents({ limit: 25 })
       .then(setMonitoringEvents)
       .catch(() => undefined);
@@ -348,19 +348,19 @@ export function AdminPage() {
         setQuestionGovernance(items.length > 0 ? items : fallbackQuestionGovernance);
         setQuestionGovernanceStatus(null);
       })
-      .catch(() => setQuestionGovernanceStatus('Mode demo : connectez-vous avec un role admin pour gouverner la banque de questions API.'));
+      .catch(() => setQuestionGovernanceStatus('Gouvernance questions indisponible — vérifiez votre connexion API.'));
     getInstitutionalAuthorizations()
       .then((items) => {
         setInstitutionalAuthorizations(items.length > 0 ? items : fallbackInstitutionalAuthorizations);
         setAuthorizationStatus(null);
       })
-      .catch(() => setAuthorizationStatus('Mode demo : connectez-vous avec un role admin pour charger les habilitations API.'));
+      .catch(() => setAuthorizationStatus('Habilitations indisponibles — vérifiez votre connexion API.'));
     getInstitutionalUsers()
       .then((users) => {
         setInstitutionalUsers(users.length > 0 ? users : fallbackInstitutionalUsers);
         setUserGovernanceStatus(null);
       })
-      .catch(() => setUserGovernanceStatus('Mode demo : connectez-vous avec un role admin pour charger les comptes API.'));
+      .catch(() => setUserGovernanceStatus('Comptes utilisateurs indisponibles — vérifiez votre connexion API.'));
     getAuditLogs()
       .then((logs) => {
         setAuditLogs(logs);
@@ -391,7 +391,7 @@ export function AdminPage() {
       };
       setAuditLogs(filterDemoAuditLogs(cleanFilters));
       setActiveAuditFilters(cleanFilters);
-      setAuditStatus('Apercu presentation : logs simules filtres localement.');
+      setAuditStatus('Aperçu présentation : logs simulés.');
       return;
     }
     try {
@@ -656,7 +656,7 @@ export function AdminPage() {
   async function handleDashboardCsvExport() {
     if (!canAdminAct) {
       downloadLocalFile('coderoute-dashboard-demo.csv', `indicateur,valeur\ncandidats,${dashboard.candidates}\ncentres_agrees,${dashboard.accredited_centers}\nsessions,${dashboard.exam_sessions}\nalertes,${dashboard.fraud_alerts}\n`);
-      setCsvExportStatus('Export demo genere localement : connectez-vous pour exporter les donnees officielles.');
+      setCsvExportStatus('Export impossible — authentifiez-vous avec un compte admin pour exporter les données officielles.');
       return;
     }
     if (blockProtectedAction(setCsvExportStatus)) return;
@@ -676,7 +676,7 @@ export function AdminPage() {
   async function handleExamAttemptsCsvExport() {
     if (!canAdminAct) {
       downloadLocalFile('coderoute-examens-demo.csv', `indicateur,valeur\ntentatives,${examSummary.total_attempts}\nsoumises,${examSummary.submitted_attempts}\nadmis,${examSummary.passed_attempts}\nechecs,${examSummary.failed_attempts}\nscore_moyen,${examSummary.average_score}\n`);
-      setExamCsvExportStatus('Export examens demo genere localement.');
+      setExamCsvExportStatus('Export examens impossible — vérifiez votre authentification admin.');
       return;
     }
     if (blockProtectedAction(setExamCsvExportStatus)) return;
@@ -697,7 +697,7 @@ export function AdminPage() {
     if (!canAdminAct) {
       const rows = ['reference,reservation,operateur,statut,montant,recu', ...paymentItems.map((item) => `${item.reference},${item.booking_reference},${item.provider},${item.status},${item.amount_gnf},${item.receipt_number}`)];
       downloadLocalFile('coderoute-paiements-demo.csv', `${rows.join('\n')}\n`);
-      setPaymentCsvExportStatus('Export paiements demo genere localement.');
+      setPaymentCsvExportStatus('Export paiements impossible — vérifiez votre authentification admin.');
       return;
     }
     if (blockProtectedAction(setPaymentCsvExportStatus)) return;
@@ -718,7 +718,7 @@ export function AdminPage() {
     if (!canAdminAct) {
       const rows = ['date,action,entite', ...auditLogs.map((log) => `${log.created_at},${log.action},${log.entity}`)];
       downloadLocalFile('coderoute-audit-demo.csv', `${rows.join('\n')}\n`);
-      setAuditCsvExportStatus('Export audit demo genere localement.');
+      setAuditCsvExportStatus('Export audit impossible — vérifiez votre authentification super_admin.');
       return;
     }
     if (blockProtectedAction(setAuditCsvExportStatus)) return;
