@@ -1,0 +1,41 @@
+{
+  "expo": {
+    "name": "CodeRoute Guinée",
+    "slug": "coderoute-guinee",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0A2540"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "gn.gov.coderoute.app",
+      "buildNumber": "1"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0A2540"
+      },
+      "package": "gn.gov.coderoute",
+      "versionCode": 1,
+      "permissions": ["CAMERA", "NOTIFICATIONS", "INTERNET", "ACCESS_NETWORK_STATE"]
+    },
+    "plugins": [
+      "expo-router",
+      "expo-camera",
+      ["expo-notifications", {
+        "icon": "./assets/notification-icon.png",
+        "color": "#0A2540"
+      }]
+    ],
+    "scheme": "coderoute",
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

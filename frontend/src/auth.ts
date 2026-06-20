@@ -24,6 +24,7 @@ export const navigationItems: NavigationItem[] = [
   { label: 'Auto-école',      href: '#/school',     roles: ['driving_school','admin','super_admin'] },
   { label: 'Administration',  href: '#/admin',      roles: ['admin','super_admin'] },
   { label: 'Dossier État',    href: '#/dossier',    roles: ['admin','super_admin'] },
+  { label: 'Portail DNTT',    href: '#/ministerial', roles: ['admin','super_admin'] },
 ];
 
 export function canAccessRoute(role: UserRole, href: string): boolean {

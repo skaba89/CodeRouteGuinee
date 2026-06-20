@@ -20,13 +20,14 @@ import {
   ExamPage,
   HomePage,
   InstitutionalDossierPage,
+  MinisterialPage,
   ResultsPage,
   TrainingPage,
 } from './pages';
 
 type AppRoute =
   | 'home' | 'candidate' | 'center' | 'admin'
-  | 'exam' | 'results' | 'dossier' | 'training' | 'school'
+  | 'exam' | 'results' | 'dossier' | 'training' | 'school' | 'ministerial'
   | 'login' | 'account';
 
 const ROLE_KEY = 'cr-role';
@@ -34,7 +35,7 @@ const PRES_KEY = 'cr-pres';
 
 function getRouteFromHash(): AppRoute {
   const r = window.location.hash.replace('#/', '') as AppRoute;
-  const valid: AppRoute[] = ['candidate','center','admin','exam','results','dossier','training','school','login','account'];
+  const valid: AppRoute[] = ['candidate','center','admin','exam','results','dossier','training','school','ministerial','login','account'];
   return valid.includes(r) ? r : 'home';
 }
 
@@ -285,6 +286,7 @@ export default function App() {
       candidate: <CandidatePage />,
       center:    <CenterPage />,
       school:    <DrivingSchoolPage />,
+      ministerial: <MinisterialPage />,
       admin:     <AdminPage />,
       dossier:   <InstitutionalDossierPage />,
       exam:      <ExamPage />,

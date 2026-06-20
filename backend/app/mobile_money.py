@@ -51,6 +51,10 @@ def normalize_provider(provider: str) -> str:
         "orange_money": "orange_money",
         "mtn": "mtn_money",
         "mtn_money": "mtn_money",
+        "wave": "wave",
+        "wave_money": "wave",
+        "paydunya": "paydunya",
+        "pay_dunya": "paydunya",
         "sandbox": "sandbox",
     }
     return aliases.get(value, "sandbox")
@@ -313,6 +317,10 @@ def simulate_mobile_money_payment(provider: str, phone: str, amount_gnf: int) ->
             return _orange_money_payment(phone, amount_gnf)
         if normalized == "mtn_money":
             return _mtn_money_payment(phone, amount_gnf)
+        if normalized == "wave":
+            return _wave_payment(phone, amount_gnf)
+        if normalized == "paydunya":
+            return _paydunya_payment(phone, amount_gnf)
         # Provider inconnu en production → sandbox forcé
         return _sandbox_payment(normalized, phone, amount_gnf)
     except Exception as exc:
@@ -330,4 +338,175 @@ def simulate_mobile_money_payment(provider: str, phone: str, amount_gnf: int) ->
             status="failed",
             external_reference=f"ERR-{datetime.now(UTC).strftime('%Y%m%d%H%M%S')}",
             message=f"Erreur provider {normalized} : {exc!s}",
+        )
+
+
+# ══════════════════════════════════════════════════════════════════
+# WAVE MOBILE MONEY — Mois 10–12
+# Wave est devenu le 1er portefeuille mobile en Guinée (0 % frais)
+# API : https://wave.com/en/business/api
+# ══════════════════════════════════════════════════════════════════
+
+def _wave_payment(phone: str, amount_gnf: int) -> ProviderResult:
+    """
+    Paiement Wave Mobile Money (Guinée).
+
+    Flux checkout Wave :
+      1. POST /v1/checkout/sessions  → obtenir checkout_url
+      2. Rediriger l'utilisateur vers checkout_url
+      3. Webhook Wave → notifie le backend du résultat
+      4. GET /v1/checkout/sessions/{id} → vérifier le statut final
+
+    Variables d'environnement requises :
+      WAVE_API_KEY       — Bearer token Wave (format wave_sn_prod_xxxx)
+      WAVE_WEBHOOK_SECRET — Secret HMAC pour valider les webhooks
+      WAVE_BASE_URL      — https://api.wave.com (prod) ou sandbox
+    """
+    import os
+
+    import httpx
+
+    api_key = os.environ.get("WAVE_API_KEY", "")
+    base_url = os.environ.get("WAVE_BASE_URL", "https://api.wave.com")
+
+    if not api_key:
+        return ProviderResult(
+            provider="wave",
+            status="failed",
+            external_reference=f"ERR-WAVE-NO-KEY-{datetime.now(UTC).strftime('%Y%m%d%H%M%S')}",
+            message="Wave API Key manquant — configurez WAVE_API_KEY en production.",
+        )
+
+    try:
+        # Convertir GNF → WAVE accepte GNF nativement en Guinée
+        resp = httpx.post(
+            f"{base_url}/v1/checkout/sessions",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "currency": "GNF",
+                "amount": str(amount_gnf),
+                "client_reference": f"CODEROUTE-{uuid.uuid4().hex[:12].upper()}",
+                "success_url": "https://coderoute.gov.gn/#/candidate?payment=success",
+                "error_url": "https://coderoute.gov.gn/#/candidate?payment=error",
+            },
+            timeout=15,
+        )
+        if resp.status_code in (200, 201):
+            data = resp.json()
+            return ProviderResult(
+                provider="wave",
+                status="pending",  # Wave = asynchrone, le webhook confirme
+                external_reference=data.get("id", f"WAVE-{uuid.uuid4().hex[:12].upper()}"),
+                message=f"Paiement Wave initié — URL: {data.get('wave_launch_url', '')}",
+            )
+        return ProviderResult(
+            provider="wave",
+            status="failed",
+            external_reference=f"ERR-WAVE-{resp.status_code}",
+            message=f"Erreur Wave {resp.status_code}: {resp.text[:200]}",
+        )
+    except Exception as exc:
+        return ProviderResult(
+            provider="wave",
+            status="failed",
+            external_reference=f"ERR-WAVE-TIMEOUT-{datetime.now(UTC).strftime('%Y%m%d%H%M%S')}",
+            message=f"Wave indisponible : {exc!s}",
+        )
+
+
+# ══════════════════════════════════════════════════════════════════
+# PAYDUNYA — Mois 10–12
+# Agrégateur pan-africain : Orange Money, MTN, Wave, carte bancaire
+# API : https://paydunya.com/developers
+# ══════════════════════════════════════════════════════════════════
+
+def _paydunya_payment(phone: str, amount_gnf: int) -> ProviderResult:
+    """
+    Paiement via PayDunya (agrégateur multi-opérateurs Afrique de l'Ouest).
+
+    Avantage clé : PayDunya unifie Orange Money, MTN, Wave et carte bancaire
+    dans un seul appel API. Idéal pour le déploiement national (33 préfectures).
+
+    Variables d'environnement requises :
+      PAYDUNYA_MASTER_KEY  — Master Key de l'application
+      PAYDUNYA_PRIVATE_KEY — Private Key
+      PAYDUNYA_TOKEN       — Token d'accès
+      PAYDUNYA_MODE        — 'test' ou 'live'
+    """
+    import os
+
+    import httpx
+
+    master_key  = os.environ.get("PAYDUNYA_MASTER_KEY", "")
+    private_key = os.environ.get("PAYDUNYA_PRIVATE_KEY", "")
+    token       = os.environ.get("PAYDUNYA_TOKEN", "")
+    mode        = os.environ.get("PAYDUNYA_MODE", "test")
+
+    base_url = "https://app.paydunya.com/api/v1" if mode == "live" else "https://app.paydunya.com/sandbox-api/v1"
+
+    if not all([master_key, private_key, token]):
+        return ProviderResult(
+            provider="paydunya",
+            status="failed",
+            external_reference=f"ERR-PD-NO-CREDS-{datetime.now(UTC).strftime('%Y%m%d%H%M%S')}",
+            message="Credentials PayDunya manquants — configurez PAYDUNYA_* en production.",
+        )
+
+    try:
+        ref = f"CODEROUTE-{uuid.uuid4().hex[:12].upper()}"
+        resp = httpx.post(
+            f"{base_url}/checkout-invoice/create",
+            headers={
+                "PAYDUNYA-MASTER-KEY": master_key,
+                "PAYDUNYA-PRIVATE-KEY": private_key,
+                "PAYDUNYA-TOKEN": token,
+                "Content-Type": "application/json",
+            },
+            json={
+                "invoice": {
+                    "total_amount": amount_gnf,
+                    "description": f"Examen code de la route CodeRoute Guinée — {phone}",
+                },
+                "store": {
+                    "name": "CodeRoute Guinée",
+                    "tagline": "Plateforme nationale d'examen du code de la route",
+                    "postal_address": "Conakry, Guinée",
+                    "phone": "+224600000000",
+                },
+                "custom_data": {
+                    "phone": phone,
+                    "reference": ref,
+                },
+                "actions": {
+                    "cancel_url": "https://coderoute.gov.gn/#/candidate?payment=cancel",
+                    "return_url": "https://coderoute.gov.gn/#/candidate?payment=success",
+                    "callback_url": "https://api.coderoute.gov.gn/api/v1/payments/webhook/paydunya",
+                },
+            },
+            timeout=15,
+        )
+        if resp.status_code == 200:
+            data = resp.json()
+            if data.get("response_code") == "00":
+                return ProviderResult(
+                    provider="paydunya",
+                    status="pending",
+                    external_reference=data.get("token", ref),
+                    message=f"Paiement PayDunya initié — URL: {data.get('invoice_url', '')}",
+                )
+        return ProviderResult(
+            provider="paydunya",
+            status="failed",
+            external_reference=f"ERR-PD-{resp.status_code}",
+            message=f"Erreur PayDunya: {resp.text[:200]}",
+        )
+    except Exception as exc:
+        return ProviderResult(
+            provider="paydunya",
+            status="failed",
+            external_reference=f"ERR-PD-TIMEOUT-{datetime.now(UTC).strftime('%Y%m%d%H%M%S')}",
+            message=f"PayDunya indisponible : {exc!s}",
         )

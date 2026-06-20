@@ -1,8 +1,8 @@
 import csv
 import io
-from datetime import datetime
+from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from pydantic import BaseModel, Field
 from sqlalchemy import Select, select
 from sqlalchemy.orm import Session
@@ -331,3 +331,82 @@ def get_payment(
         "status": payment.status,
         "receipt_number": payment.receipt_number,
     }
+
+
+# ── Webhooks Mobile Money (Mois 10–12) ────────────────────────────────────
+
+@router.post("/webhook/wave", status_code=200, tags=["payments"])
+async def wave_webhook(request: Request, db: Session = Depends(get_db)) -> dict:
+    """
+    Webhook Wave Mobile Money.
+    Wave notifie le backend quand un paiement est confirmé.
+    Sécurité : vérification de la signature HMAC-SHA256.
+    """
+    import hashlib
+    import hmac
+    import os
+
+    body = await request.body()
+    signature = request.headers.get("Wave-Signature", "")
+    secret = os.environ.get("WAVE_WEBHOOK_SECRET", "")
+
+    if secret:
+        expected = hmac.new(
+            secret.encode(), body, hashlib.sha256
+        ).hexdigest()
+        if not hmac.compare_digest(f"sha256={expected}", signature):
+            from fastapi import HTTPException
+            raise HTTPException(status_code=401, detail="Signature Wave invalide")
+
+    import json
+    try:
+        data = json.loads(body)
+    except json.JSONDecodeError:
+        return {"status": "ignored", "reason": "invalid_json"}
+
+    checkout_id = data.get("id", "")
+    payment_status = data.get("payment_status", "")
+
+    if payment_status == "succeeded":
+        # Mettre à jour le statut du paiement en base
+        from app.models_payment import Payment
+        payment = db.query(Payment).filter(
+            Payment.external_reference == checkout_id
+        ).first()
+        if payment and payment.status == "pending":
+            payment.status = "paid"
+            payment.paid_at = datetime.now(UTC).replace(tzinfo=None)
+            db.commit()
+            return {"status": "processed", "payment_id": str(payment.id)}
+
+    return {"status": "received", "checkout_id": checkout_id}
+
+
+@router.post("/webhook/paydunya", status_code=200, tags=["payments"])
+async def paydunya_webhook(request: Request, db: Session = Depends(get_db)) -> dict:
+    """
+    Webhook PayDunya.
+    PayDunya notifie le statut du checkout (succès, annulation, erreur).
+    """
+    import json
+    body = await request.body()
+    try:
+        data = json.loads(body)
+    except json.JSONDecodeError:
+        return {"status": "ignored", "reason": "invalid_json"}
+
+    token = data.get("data", {}).get("invoice", {}).get("token", "")
+    status = data.get("data", {}).get("status", "")
+
+    if status == "completed":
+        from app.models_payment import Payment
+        payment = db.query(Payment).filter(
+            Payment.external_reference == token
+        ).first()
+        if payment and payment.status == "pending":
+            payment.status = "paid"
+            payment.paid_at = datetime.now(UTC).replace(tzinfo=None)
+            db.commit()
+            return {"status": "processed", "token": token}
+
+    return {"status": "received", "token": token, "payment_status": status}
