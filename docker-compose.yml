@@ -38,11 +38,16 @@ services:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-coderoute}:${POSTGRES_PASSWORD:-coderoute}@postgres:5432/${POSTGRES_DB:-coderoute}
       AUTO_CREATE_TABLES: "false"
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}
-    command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+    command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir /app/app"
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     volumes:
       - ./backend:/app
+      # Volumes anonymes pour masquer les dossiers de cache Windows (permissions incorrectes)
+      - /app/.pytest_cache
+      - /app/__pycache__
+      - /app/.mypy_cache
+      - /app/.ruff_cache
     depends_on:
       postgres:
         condition: service_healthy

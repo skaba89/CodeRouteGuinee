@@ -74,10 +74,16 @@ docker compose down -v
 
 ## Résolution des problèmes courants
 
-### Erreur `.pytest_cache: Accès refusé` sur Windows
-Supprimer le dossier manuellement :
+### Erreur `.pytest_cache: Accès refusé` ou `Permission denied` sur Windows
+Ce problème est résolu automatiquement depuis la dernière version — les volumes anonymes
+masquent `.pytest_cache` et le watcher ne surveille que `/app/app`.
+
+Si vous rencontrez encore l'erreur avec une ancienne version :
 ```powershell
+# Supprimer le cache localement
 Remove-Item -Recurse -Force backend\.pytest_cache
+# Forcer la recréation des conteneurs
+docker compose down -v
 docker compose up --build
 ```
 
