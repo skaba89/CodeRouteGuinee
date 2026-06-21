@@ -11,6 +11,7 @@ import {
   logoutUser,
 } from './authClient';
 import { LocaleSwitcher } from './components/LocaleSwitcher';
+import { AudioToggle, LocaleAudioSwitcher } from './components/AudioButton';
 import { t } from './i18n';
 import { AuthSessionProvider } from './authSession';
 import {

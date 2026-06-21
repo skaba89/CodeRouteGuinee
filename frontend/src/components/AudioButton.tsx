@@ -5,9 +5,8 @@ import { useEffect, useRef, useState } from 'react';
 import {
   getAudioEnabled, isAudioLocale, isTTSAvailable,
   preloadVoices, setAudioEnabled, speak, speakQuestion, stop,
-  type Locale,
 } from '../audio';
-import { useLocale, SUPPORTED_LOCALES } from '../i18n';
+import { useLocale, SUPPORTED_LOCALES, type Locale } from '../i18n';
 
 // ── Bouton lecture question ────────────────────────────────────────
 
