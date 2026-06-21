@@ -6,9 +6,9 @@ Create Date: 2026-06-20
 """
 from __future__ import annotations
 
-from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.engine import reflection
+from alembic import op
+from sqlalchemy import inspect, text
 
 revision = "20260620_0004"
 down_revision = "20260619_0003"
@@ -16,78 +16,80 @@ branch_labels = None
 depends_on = None
 
 
-def _is_sqlite() -> bool:
-    return op.get_bind().dialect.name == "sqlite"
+def _dialect() -> str:
+    return op.get_bind().dialect.name
+
+
+def _column_exists(table: str, column: str) -> bool:
+    insp = inspect(op.get_bind())
+    return column in {c["name"] for c in insp.get_columns(table)}
+
+
+def _constraint_exists(table: str, constraint_name: str) -> bool:
+    """Vérifie l'existence d'une contrainte CHECK via pg_constraint (PostgreSQL uniquement)."""
+    if _dialect() == "sqlite":
+        return False
+    result = op.get_bind().execute(
+        text(
+            "SELECT 1 FROM pg_constraint "
+            "WHERE conname = :name AND conrelid = :table::regclass"
+        ),
+        {"name": constraint_name, "table": table},
+    )
+    return result.fetchone() is not None
 
 
 def upgrade() -> None:
-    bind = op.get_bind()
-    inspector = reflection.Inspector.from_engine(bind)
-
-    # ── Colonnes Centre ────────────────────────────────────────────
-    center_cols = {c["name"] for c in inspector.get_columns("centers")}
-
-    if "commune" not in center_cols:
+    # ── Colonnes Centre ────────────────────────────────────────────────────
+    if not _column_exists("centers", "commune"):
         op.add_column("centers", sa.Column("commune", sa.String(120), nullable=True))
 
-    if "prefecture" not in center_cols:
+    if not _column_exists("centers", "prefecture"):
         op.add_column("centers", sa.Column("prefecture", sa.String(120), nullable=True))
 
-    if "max_sessions_per_week" not in center_cols:
+    if not _column_exists("centers", "max_sessions_per_week"):
         op.add_column(
             "centers",
             sa.Column("max_sessions_per_week", sa.Integer(), nullable=False, server_default="3"),
         )
 
-    if "latitude" not in center_cols:
+    if not _column_exists("centers", "latitude"):
         op.add_column("centers", sa.Column("latitude", sa.Float(), nullable=True))
 
-    if "longitude" not in center_cols:
+    if not _column_exists("centers", "longitude"):
         op.add_column("centers", sa.Column("longitude", sa.Float(), nullable=True))
 
-    # Valeurs par défaut pour les centres existants
-    op.execute("UPDATE centers SET max_sessions_per_week = 3 WHERE max_sessions_per_week IS NULL")
+    # Valeurs par défaut
+    op.execute(text("UPDATE centers SET max_sessions_per_week = 3 WHERE max_sessions_per_week IS NULL"))
 
-    # CHECK constraint uniquement sur PostgreSQL (SQLite les ignore)
-    if not _is_sqlite():
-        try:
+    # ── Contraintes CHECK — idempotentes via vérification préalable ────────
+    if _dialect() != "sqlite":
+        if not _constraint_exists("centers", "ck_centers_max_sessions_per_week"):
             op.create_check_constraint(
                 "ck_centers_max_sessions_per_week",
                 "centers",
                 "max_sessions_per_week >= 1 AND max_sessions_per_week <= 7",
             )
-        except Exception:
-            pass  # Contrainte déjà existante
 
-    # ── Capacité sessions ──────────────────────────────────────────
-    # Correction : capacity max = 35 (règle DNTT)
-    op.execute("UPDATE exam_sessions SET capacity = 35 WHERE capacity > 35")
+    # ── Capacité sessions ──────────────────────────────────────────────────
+    op.execute(text("UPDATE exam_sessions SET capacity = 35 WHERE capacity > 35"))
 
-    if not _is_sqlite():
-        try:
+    if _dialect() != "sqlite":
+        if not _constraint_exists("exam_sessions", "ck_exam_sessions_capacity_max_35"):
             op.create_check_constraint(
                 "ck_exam_sessions_capacity_max_35",
                 "exam_sessions",
                 "capacity >= 1 AND capacity <= 35",
             )
-        except Exception:
-            pass
 
 
 def downgrade() -> None:
-    bind = op.get_bind()
-    if not bind.dialect.name == "sqlite":
-        try:
+    if _dialect() != "sqlite":
+        if _constraint_exists("exam_sessions", "ck_exam_sessions_capacity_max_35"):
             op.drop_constraint("ck_exam_sessions_capacity_max_35", "exam_sessions", type_="check")
-        except Exception:
-            pass
-        try:
+        if _constraint_exists("centers", "ck_centers_max_sessions_per_week"):
             op.drop_constraint("ck_centers_max_sessions_per_week", "centers", type_="check")
-        except Exception:
-            pass
 
     for col in ["longitude", "latitude", "max_sessions_per_week", "prefecture", "commune"]:
-        try:
+        if _column_exists("centers", col):
             op.drop_column("centers", col)
-        except Exception:
-            pass
