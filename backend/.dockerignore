@@ -38,7 +38,7 @@ logs/
 
 # Fichiers de test et données de dev
 tests/
-alembic/
+# alembic/ est inclus — les migrations font partie du code source
 docs/
 scripts/
 

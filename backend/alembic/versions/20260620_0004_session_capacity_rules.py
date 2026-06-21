@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import sqlalchemy as sa
 from alembic import op
-from sqlalchemy import inspect, text
+from sqlalchemy import text
 
 revision = "20260620_0004"
 down_revision = "20260619_0003"
@@ -16,80 +16,146 @@ branch_labels = None
 depends_on = None
 
 
-def _dialect() -> str:
-    return op.get_bind().dialect.name
+def _is_pg() -> bool:
+    return op.get_bind().dialect.name == "postgresql"
 
 
-def _column_exists(table: str, column: str) -> bool:
-    insp = inspect(op.get_bind())
-    return column in {c["name"] for c in insp.get_columns(table)}
+def _is_sqlite() -> bool:
+    return op.get_bind().dialect.name == "sqlite"
 
 
-def _constraint_exists(table: str, constraint_name: str) -> bool:
-    """Vérifie l'existence d'une contrainte CHECK via pg_constraint (PostgreSQL uniquement)."""
-    if _dialect() == "sqlite":
-        return False
-    result = op.get_bind().execute(
-        text(
-            "SELECT 1 FROM pg_constraint "
-            "WHERE conname = :name AND conrelid = :table::regclass"
-        ),
-        {"name": constraint_name, "table": table},
-    )
-    return result.fetchone() is not None
+def _add_column_if_missing(table: str, column: str, col_def: sa.Column) -> None:
+    """Ajoute une colonne uniquement si elle n'existe pas déjà."""
+    if _is_pg():
+        op.get_bind().execute(text(f"""
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_name = '{table}' AND column_name = '{column}'
+                ) THEN
+                    ALTER TABLE {table} ADD COLUMN {column} {col_def.type.compile(op.get_bind().dialect)};
+                END IF;
+            END
+            $$;
+        """))
+    elif _is_sqlite():
+        # SQLite : pas de IF NOT EXISTS sur ADD COLUMN → on vérifie manuellement
+        result = op.get_bind().execute(text(f"PRAGMA table_info({table})"))
+        cols = {row[1] for row in result}
+        if column not in cols:
+            op.add_column(table, col_def)
+
+
+def _add_check_constraint_if_missing(constraint_name: str, table: str, condition: str) -> None:
+    """Crée une contrainte CHECK uniquement si elle n'existe pas — PostgreSQL uniquement."""
+    if not _is_pg():
+        return
+    op.get_bind().execute(text(f"""
+        DO $$
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_constraint
+                WHERE conname = '{constraint_name}'
+                  AND conrelid = '{table}'::regclass
+            ) THEN
+                ALTER TABLE {table} ADD CONSTRAINT {constraint_name} CHECK ({condition});
+            END IF;
+        END
+        $$;
+    """))
 
 
 def upgrade() -> None:
-    # ── Colonnes Centre ────────────────────────────────────────────────────
-    if not _column_exists("centers", "commune"):
-        op.add_column("centers", sa.Column("commune", sa.String(120), nullable=True))
+    # ── Colonnes Centre ─────────────────────────────────────────────────────
+    _add_column_if_missing("centers", "commune",
+        sa.Column("commune", sa.String(120), nullable=True))
 
-    if not _column_exists("centers", "prefecture"):
-        op.add_column("centers", sa.Column("prefecture", sa.String(120), nullable=True))
+    _add_column_if_missing("centers", "prefecture",
+        sa.Column("prefecture", sa.String(120), nullable=True))
 
-    if not _column_exists("centers", "max_sessions_per_week"):
-        op.add_column(
-            "centers",
-            sa.Column("max_sessions_per_week", sa.Integer(), nullable=False, server_default="3"),
-        )
+    _add_column_if_missing("centers", "max_sessions_per_week",
+        sa.Column("max_sessions_per_week", sa.Integer(), nullable=True))
 
-    if not _column_exists("centers", "latitude"):
-        op.add_column("centers", sa.Column("latitude", sa.Float(), nullable=True))
+    _add_column_if_missing("centers", "latitude",
+        sa.Column("latitude", sa.Float(), nullable=True))
 
-    if not _column_exists("centers", "longitude"):
-        op.add_column("centers", sa.Column("longitude", sa.Float(), nullable=True))
+    _add_column_if_missing("centers", "longitude",
+        sa.Column("longitude", sa.Float(), nullable=True))
 
     # Valeurs par défaut
-    op.execute(text("UPDATE centers SET max_sessions_per_week = 3 WHERE max_sessions_per_week IS NULL"))
+    op.get_bind().execute(text(
+        "UPDATE centers SET max_sessions_per_week = 3 WHERE max_sessions_per_week IS NULL"
+    ))
 
-    # ── Contraintes CHECK — idempotentes via vérification préalable ────────
-    if _dialect() != "sqlite":
-        if not _constraint_exists("centers", "ck_centers_max_sessions_per_week"):
-            op.create_check_constraint(
-                "ck_centers_max_sessions_per_week",
-                "centers",
-                "max_sessions_per_week >= 1 AND max_sessions_per_week <= 7",
-            )
+    # Rendre NOT NULL après avoir rempli les valeurs
+    if _is_pg():
+        op.get_bind().execute(text(
+            "ALTER TABLE centers ALTER COLUMN max_sessions_per_week SET NOT NULL"
+        ))
+        op.get_bind().execute(text(
+            "ALTER TABLE centers ALTER COLUMN max_sessions_per_week SET DEFAULT 3"
+        ))
 
-    # ── Capacité sessions ──────────────────────────────────────────────────
-    op.execute(text("UPDATE exam_sessions SET capacity = 35 WHERE capacity > 35"))
+    # ── Contraintes CHECK idempotentes (DO $$ IF NOT EXISTS $$) ────────────
+    _add_check_constraint_if_missing(
+        "ck_centers_max_sessions_per_week",
+        "centers",
+        "max_sessions_per_week >= 1 AND max_sessions_per_week <= 7",
+    )
 
-    if _dialect() != "sqlite":
-        if not _constraint_exists("exam_sessions", "ck_exam_sessions_capacity_max_35"):
-            op.create_check_constraint(
-                "ck_exam_sessions_capacity_max_35",
-                "exam_sessions",
-                "capacity >= 1 AND capacity <= 35",
-            )
+    # Capacité sessions : cap à 35
+    op.get_bind().execute(text(
+        "UPDATE exam_sessions SET capacity = 35 WHERE capacity > 35"
+    ))
+
+    _add_check_constraint_if_missing(
+        "ck_exam_sessions_capacity_max_35",
+        "exam_sessions",
+        "capacity >= 1 AND capacity <= 35",
+    )
 
 
 def downgrade() -> None:
-    if _dialect() != "sqlite":
-        if _constraint_exists("exam_sessions", "ck_exam_sessions_capacity_max_35"):
-            op.drop_constraint("ck_exam_sessions_capacity_max_35", "exam_sessions", type_="check")
-        if _constraint_exists("centers", "ck_centers_max_sessions_per_week"):
-            op.drop_constraint("ck_centers_max_sessions_per_week", "centers", type_="check")
+    if _is_pg():
+        # Supprimer les contraintes si elles existent
+        op.get_bind().execute(text("""
+            DO $$
+            BEGIN
+                IF EXISTS (
+                    SELECT 1 FROM pg_constraint
+                    WHERE conname = 'ck_exam_sessions_capacity_max_35'
+                      AND conrelid = 'exam_sessions'::regclass
+                ) THEN
+                    ALTER TABLE exam_sessions DROP CONSTRAINT ck_exam_sessions_capacity_max_35;
+                END IF;
+                IF EXISTS (
+                    SELECT 1 FROM pg_constraint
+                    WHERE conname = 'ck_centers_max_sessions_per_week'
+                      AND conrelid = 'centers'::regclass
+                ) THEN
+                    ALTER TABLE centers DROP CONSTRAINT ck_centers_max_sessions_per_week;
+                END IF;
+            END
+            $$;
+        """))
 
     for col in ["longitude", "latitude", "max_sessions_per_week", "prefecture", "commune"]:
-        if _column_exists("centers", col):
-            op.drop_column("centers", col)
+        if _is_pg():
+            op.get_bind().execute(text(f"""
+                DO $$
+                BEGIN
+                    IF EXISTS (
+                        SELECT 1 FROM information_schema.columns
+                        WHERE table_name = 'centers' AND column_name = '{col}'
+                    ) THEN
+                        ALTER TABLE centers DROP COLUMN {col};
+                    END IF;
+                END
+                $$;
+            """))
+        elif _is_sqlite():
+            try:
+                op.drop_column("centers", col)
+            except Exception:
+                pass
