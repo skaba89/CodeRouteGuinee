@@ -1,5 +1,16 @@
 import { type FormEvent, useEffect, useRef, useCallback, useState } from 'react';
 import { AudioModeBanner, LocaleAudioSwitcher, PlayButton, AudioToggle } from './components/AudioButton';
+import {
+  InstitutionalAuthsPanel,
+  DeviceAlertsPanel,
+  CenterManagementPanel,
+  QuestionsAdminPanel,
+  CandidateIdentityForm,
+  CandidateRecourseForm,
+  CertificatePdfButton,
+  CsvExportsPanel,
+  OfficialPaymentsImportPanel,
+} from './components/AdminExtras';
 import { isAudioLocale, speakFeedback, stop as stopAudio } from './audio';
 import { type Locale } from './i18n';
 import { type AuthUser } from './authClient';
@@ -43,6 +54,7 @@ import {
   importOfficialQuestions,
   getCenterStations,
   createCenterStation,
+  getExamCertificatePdfUrl,
 } from './api';
 import { DEMO_QUESTIONS } from './pages/examQuestions';
 
@@ -121,9 +133,8 @@ export function HomePage() {
             </div>
             <div className="card">
               <div className="card-header"><span className="card-title">⚡ Actions rapides</span></div>
-              <div className="actions">
-                <button className="btn-sm secondary-button" onClick={() => downloadDashboardCsv().catch(() => undefined)}>⬇ Export dashboard</button>
-                <button className="btn-sm secondary-button" onClick={() => downloadAuditLogsCsv().catch(() => undefined)}>⬇ Export audit</button>
+              <div style={{ marginTop: 12 }}>
+                <CsvExportsPanel />
               </div>
             </div>
           </>
@@ -159,6 +170,13 @@ export function HomePage() {
           <a href="#/exam"><button className="btn-success">Passer l'examen →</button></a>
         </div>
       </div>
+
+      {/* Formulaires dossier candidat */}
+      <div className="g2" style={{ marginTop: 16 }}>
+        <CandidateIdentityForm candidateId={currentUser?.id} />
+        <CandidateRecourseForm candidateId={currentUser?.id} />
+      </div>
+
     </section>
   );
 }
@@ -316,7 +334,7 @@ export function CandidatePage() {
                 — {cert.candidate_name ?? ''} {cert.score !== undefined ? `· ${cert.score}/40` : ''}
                 {cert.valid && cert.passed && (
                   <button type="button" className="btn-sm" style={{ marginLeft: 10 }}
-                    onClick={() => downloadExamCertificatePdf(certId).catch(() => undefined)}>
+                    onClick={() => { window.open(getExamCertificatePdfUrl(certId), '_blank', 'noopener'); }}>
                     ⬇ PDF
                   </button>
                 )}
@@ -543,6 +561,13 @@ export function CenterPage() {
           )}
         </div>
       </div>
+
+      {/* Gestion avancée du centre */}
+      <div className="g2" style={{ marginTop: 16 }}>
+        <CenterManagementPanel center={centers.find(c => c.code === centerCode) ?? null} />
+        <DeviceAlertsPanel centerId={centers.find(c => c.code === centerCode)?.id} />
+      </div>
+
     </section>
   );
 }
@@ -735,7 +760,12 @@ export function AdminPage() {
       {tab === 'monitoring' && <MonitoringPanel canAdmin={canAdmin} />}
 
       {/* Questions tab */}
-      {tab === 'questions' && <QuestionsPanel canAdmin={canAdmin} />}
+      {tab === 'questions' && (
+        <div style={{ display: 'grid', gap: 16 }}>
+          <QuestionsPanel canAdmin={canAdmin} />
+          <QuestionsAdminPanel canAdmin={canAdmin} />
+        </div>
+      )}
 
       {/* Users tab */}
       {tab === 'users' && (
@@ -1552,7 +1582,7 @@ export function ResultsPage() {
               {cert.candidate_name && <div style={{ fontSize: 12, marginTop: 2 }}>{cert.candidate_name} {cert.score !== undefined ? `· ${cert.score}/40` : ''}</div>}
               {cert.valid && cert.passed && (
                 <button type="button" className="btn-sm btn-success" style={{ marginTop: 8 }}
-                  onClick={() => downloadExamCertificatePdf(attemptId).catch(() => undefined)}>
+                  onClick={() => { window.open(getExamCertificatePdfUrl(attemptId), '_blank', 'noopener'); }}>
                   ⬇ Télécharger le certificat PDF
                 </button>
               )}
@@ -1602,6 +1632,7 @@ export function ResultsPage() {
           ))}
         </div>
       )}
+
     </section>
   );
 }
@@ -2431,6 +2462,21 @@ export function MinisterialPage() {
           </div>
         </div>
       )}
-    </section>
+
+      {/* Habilitations institutionnelles */}
+      {tab === 'alerts' && (
+        <div style={{ marginTop: 16 }}>
+          <InstitutionalAuthsPanel canAdmin={canAdmin} />
+        </div>
+      )}
+
+      {/* Import paiements officiels */}
+      {tab === 'import' && (
+        <div style={{ marginTop: 16 }}>
+          <OfficialPaymentsImportPanel canAdmin={canAdmin} />
+        </div>
+      )}
+
+        </section>
   );
 }
