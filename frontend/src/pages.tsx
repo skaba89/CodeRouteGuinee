@@ -1,4 +1,7 @@
 import { type FormEvent, useEffect, useRef, useCallback, useState } from 'react';
+import { AudioModeBanner, LocaleAudioSwitcher, PlayButton, AudioToggle } from './components/AudioButton';
+import { isAudioLocale, speakFeedback, stop as stopAudio } from './audio';
+import { type Locale } from './i18n';
 import { type AuthUser } from './authClient';
 import { type UserRole } from './auth';
 import { useAuthSession, canUseProtectedActions } from './authSession';
@@ -1306,6 +1309,7 @@ export function ExamPage() {
   if (phase === 'setup') return (
     <section className="screen" role="main" aria-label="Contenu principal">
       <div style={{ maxWidth: 520, margin: '0 auto' }}>
+        <AudioModeBanner />
         <div style={{ background: 'linear-gradient(135deg,var(--navy),var(--navy2))', borderRadius: 20, padding: 28, color: '#fff', marginBottom: 20, textAlign: 'center' }}>
           <div style={{ fontSize: 48, marginBottom: 8 }}>🇬🇳</div>
           <h2 style={{ color: '#fff', fontSize: 22 }}>Code de la route — Catégorie B</h2>
@@ -1432,7 +1436,10 @@ export function ExamPage() {
         <div style={{ background: '#fff', border: '1px solid var(--border)', borderRadius: 'var(--r-lg)', padding: '20px 22px', display: 'grid', gap: 16 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ background: 'var(--green-l)', color: 'var(--green)', padding: '3px 10px', borderRadius: 999, fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em' }}>{q.category}</span>
-            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--muted)' }}>Q {idx + 1} / {questions.length}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <AudioToggle />
+              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--muted)' }}>Q {idx + 1} / {questions.length}</span>
+            </div>
           </div>
 
           <div style={{ height: 5, background: 'var(--bg)', borderRadius: 999, overflow: 'hidden' }}>
@@ -1446,7 +1453,11 @@ export function ExamPage() {
             </div>
           )}
 
-          <p style={{ fontSize: 16, fontWeight: 700, color: 'var(--ink)', lineHeight: 1.5 }}>{q.text}</p>
+          {/* Bouton écouter (visible pour toutes les locales, obligatoire pour les langues nationales) */}
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+            <p style={{ fontSize: 16, fontWeight: 700, color: 'var(--ink)', lineHeight: 1.5, flex: 1 }}>{q.text}</p>
+            <PlayButton text={q.text} options={q.options} size={38} />
+          </div>
 
           <div style={{ display: 'grid', gap: 8 }}>
             {q.options.map((opt, i) => {
@@ -1660,6 +1671,10 @@ export function TrainingPage() {
     if (revealed) return;
     setAnswers(a => ({ ...a, [qi]: opt }));
     setRevealed(true);
+    // Feedback audio : correct ou incorrect (avec explication pour les mauvaises réponses)
+    const isCorrect = opt === questions[qi]?.correct_answer;
+    const expl = questions[qi]?.explanation ?? '';
+    speakFeedback(isCorrect, expl);
   }
 
   function next() {
@@ -1691,6 +1706,7 @@ export function TrainingPage() {
       </div>
 
       <div style={{ maxWidth: 700 }}>
+        <AudioModeBanner />
         {/* Sélecteur de catégorie */}
         <div className="card" style={{ marginBottom: 16 }}>
           <div className="card-header"><span className="card-title">🎯 Choisissez une catégorie</span></div>
@@ -1808,7 +1824,10 @@ export function TrainingPage() {
 
         {/* Question */}
         <div className="card" style={{ marginBottom: 14 }}>
-          <p style={{ fontSize: 17, fontWeight: 700, color: 'var(--ink)', lineHeight: 1.5, marginBottom: 18 }}>{q.text}</p>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 18 }}>
+            <p style={{ fontSize: 17, fontWeight: 700, color: 'var(--ink)', lineHeight: 1.5, flex: 1, margin: 0 }}>{q.text}</p>
+            <PlayButton text={q.text} options={q.options} size={40} />
+          </div>
 
           <div style={{ display: 'grid', gap: 9 }}>
             {q.options.map((opt, i) => {

@@ -110,6 +110,19 @@ function AccountPage({ currentUser }: { currentUser: AuthUser | null }) {
           <small>{currentUser?.is_active ? '✅ Compte actif' : '⚠️ Compte inactif'}</small>
         </div>
       </div>
+      {/* Sélecteur de langue avec badge audio */}
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div className="card-header">
+          <span className="card-title">🌍 Langue / Langue</span>
+          <AudioToggle />
+        </div>
+        <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 12 }}>
+          Les langues nationales guinéennes utilisent l'audio pour les questions d'examen.
+          Sélectionnez votre langue — un bouton 🔊 apparaîtra sur chaque question.
+        </p>
+        <LocaleAudioSwitcher />
+      </div>
+
       <div className="card">
         <div className="card-header"><span className="card-title">Changer le mot de passe</span></div>
         <form className="pwd-form" onSubmit={handleSubmit}>
