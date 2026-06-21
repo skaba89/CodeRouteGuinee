@@ -1,11 +1,12 @@
-from datetime import datetime, timedelta, UTC
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
 
 from app.db.session import init_db
 from app.main import app
-from tests.conftest import get_admin_headers, get_center_headers
+from app.routers import auth as _auth_module
+from tests.conftest import TEST_BOOTSTRAP_TOKEN, get_admin_headers, get_center_headers
 
 
 def _admin_headers(client: TestClient) -> dict[str, str]:
@@ -14,8 +15,10 @@ def _admin_headers(client: TestClient) -> dict[str, str]:
     email = f"admin-candidate-e2e-{suffix}@coderoute.local"
     password = "AdminPass123!"
 
+    _auth_module.settings.admin_registration_token = TEST_BOOTSTRAP_TOKEN
     register_response = client.post(
         "/api/v1/auth/register",
+        headers={"X-Admin-Registration-Token": TEST_BOOTSTRAP_TOKEN},
         json={
             "email": email,
             "full_name": "Admin Candidate E2E",
@@ -38,7 +41,7 @@ def test_candidate_booking_payment_entry_exam_certificate_flow() -> None:
     suffix = uuid4().hex[:8]
 
     with TestClient(app) as client:
-        admin_headers = get_admin_headers(client)
+        _ = get_admin_headers(client)
         center_headers = get_center_headers(client)
         headers = _admin_headers(client)
 

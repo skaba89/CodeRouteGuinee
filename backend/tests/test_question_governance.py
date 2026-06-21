@@ -7,15 +7,19 @@ from app.db.session import SessionLocal
 from app.main import app
 from app.models_audit import AuditLog
 from app.models_question import Question
+from app.routers import auth as _auth_module
+from tests.conftest import TEST_BOOTSTRAP_TOKEN
 
 
 def _admin_headers(client: TestClient) -> dict[str, str]:
     suffix = str(uuid4())[:8]
     email = f"admin-question-{suffix}@coderoute.gn"
-    password = "StrongPass123"
+    password = "StrongPass123!"
+    _auth_module.settings.admin_registration_token = TEST_BOOTSTRAP_TOKEN
     response = client.post(
         "/api/v1/auth/register",
-        json={"email": email, "full_name": "Admin Banque Questions", "password": password, "role": "admin"},
+        headers={"X-Admin-Registration-Token": TEST_BOOTSTRAP_TOKEN},
+            json={"email": email, "full_name": "Admin Banque Questions", "password": password, "role": "admin"},
     )
     assert response.status_code == 201
     token_response = client.post("/api/v1/auth/login", data={"username": email, "password": password})

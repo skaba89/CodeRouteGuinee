@@ -1,21 +1,23 @@
 """
 Tests pour le refresh token JWT et le rate limiter persistant.
 """
-import time
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
 
 from app.main import app
+from app.routers import auth as _auth_module
 from app.routers import auth as auth_router
 from app.security import create_access_token, create_refresh_token, decode_refresh_token
+from tests.conftest import TEST_BOOTSTRAP_TOKEN
 
 
 def test_refresh_token_created_on_login() -> None:
     """La réponse de login inclut access_token ET refresh_token."""
     suffix = uuid4().hex[:8]
     with TestClient(app) as client:
-        client.post("/api/v1/auth/register", json={
+        _auth_module.settings.admin_registration_token = TEST_BOOTSTRAP_TOKEN
+        client.post("/api/v1/auth/register", headers={"X-Admin-Registration-Token": TEST_BOOTSTRAP_TOKEN}, json={
             "email": f"refresh-{suffix}@coderoute.test",
             "full_name": "Refresh Test",
             "password": "RefreshPass2026!",
@@ -37,7 +39,8 @@ def test_refresh_endpoint_returns_new_tokens() -> None:
     """POST /auth/refresh génère un nouveau access_token valide."""
     suffix = uuid4().hex[:8]
     with TestClient(app) as client:
-        client.post("/api/v1/auth/register", json={
+        client.post("/api/v1/auth/register", headers={"X-Admin-Registration-Token": TEST_BOOTSTRAP_TOKEN},
+            json={
             "email": f"refresh2-{suffix}@coderoute.test",
             "full_name": "Refresh Test 2",
             "password": "RefreshPass2026!",
@@ -71,7 +74,8 @@ def test_access_token_cannot_be_used_as_refresh() -> None:
     """Un access token (type='access') ne peut pas renouveler la session."""
     suffix = uuid4().hex[:8]
     with TestClient(app) as client:
-        client.post("/api/v1/auth/register", json={
+        _auth_module.settings.admin_registration_token = TEST_BOOTSTRAP_TOKEN
+        client.post("/api/v1/auth/register", headers={"X-Admin-Registration-Token": TEST_BOOTSTRAP_TOKEN}, json={
             "email": f"no-reuse-{suffix}@coderoute.test",
             "full_name": "No Reuse",
             "password": "NoReuse2026!",
@@ -99,7 +103,8 @@ def test_rate_limiter_persistent_resets_on_success() -> None:
 
     try:
         with TestClient(app) as client:
-            client.post("/api/v1/auth/register", json={
+            _auth_module.settings.admin_registration_token = TEST_BOOTSTRAP_TOKEN
+            client.post("/api/v1/auth/register", headers={"X-Admin-Registration-Token": TEST_BOOTSTRAP_TOKEN}, json={
                 "email": email, "full_name": "Rate Reset",
                 "password": password, "role": "center",
             })
@@ -121,7 +126,6 @@ def test_rate_limiter_persistent_resets_on_success() -> None:
 
 def test_decode_refresh_token_rejects_access_type() -> None:
     """decode_refresh_token() refuse les tokens de type 'access'."""
-    from app.security import decode_access_token
     token = create_access_token("user-id-123", "admin")
     # decode_refresh_token doit retourner None pour un access token
     result = decode_refresh_token(token)

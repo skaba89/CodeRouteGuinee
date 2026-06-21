@@ -3,31 +3,35 @@ from uuid import uuid4
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
+from app import main
 from app.db.session import SessionLocal
+from app.main import app
 from app.models_audit import AuditLog
 from app.routers import auth
-from app import main
-from app.main import app
 
 
 def test_register_login_and_me() -> None:
     auth.login_rate_limiter.clear()
-    with TestClient(app) as client:
-        suffix = str(uuid4())[:8]
-        email = f"admin-{suffix}@coderoute.gn"
-        password = "StrongPass123"
+    previous_token = auth.settings.admin_registration_token
+    auth.settings.admin_registration_token = "test-bootstrap-register"
+    try:
+        with TestClient(app) as client:
+            suffix = str(uuid4())[:8]
+            email = f"admin-{suffix}@coderoute.gn"
+            password = "StrongPass123!"
 
-        register_response = client.post(
-            "/api/v1/auth/register",
-            json={
-                "email": email,
-                "full_name": "Admin CodeRoute",
-                "password": password,
-                "role": "admin",
-            },
-        )
-        assert register_response.status_code == 201
-        assert register_response.json()["role"] == "admin"
+            register_response = client.post(
+                "/api/v1/auth/register",
+                headers={"X-Admin-Registration-Token": "test-bootstrap-register"},
+                json={
+                    "email": email,
+                    "full_name": "Admin CodeRoute",
+                    "password": password,
+                    "role": "admin",
+                },
+            )
+            assert register_response.status_code == 201
+            assert register_response.json()["role"] == "admin"
 
         login_response = client.post(
             "/api/v1/auth/login",
@@ -39,50 +43,61 @@ def test_register_login_and_me() -> None:
         me_response = client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token}"})
         assert me_response.status_code == 200
         assert me_response.json()["email"] == email
+    finally:
+        auth.settings.admin_registration_token = previous_token
 
 
 def test_user_can_change_own_password() -> None:
     auth.login_rate_limiter.clear()
-    with TestClient(app) as client:
-        suffix = str(uuid4())[:8]
-        email = f"password-{suffix}@coderoute.gn"
-        old_password = "StrongPass123"
-        new_password = "NewStrongPass123"
-        client.post(
-            "/api/v1/auth/register",
-            json={
-                "email": email,
-                "full_name": "Password User",
-                "password": old_password,
-                "role": "admin",
-            },
-        )
-        token = client.post("/api/v1/auth/login", data={"username": email, "password": old_password}).json()["access_token"]
+    previous_token = auth.settings.admin_registration_token
+    auth.settings.admin_registration_token = "test-bootstrap-changepwd"
+    try:
+        with TestClient(app) as client:
+            suffix = str(uuid4())[:8]
+            email = f"password-{suffix}@coderoute.gn"
+            old_password = "StrongPass123!"
+            new_password = "NewStrongPass123!"
+            client.post(
+                "/api/v1/auth/register",
+                headers={"X-Admin-Registration-Token": "test-bootstrap-changepwd"},
+                json={
+                    "email": email,
+                    "full_name": "Password User",
+                    "password": old_password,
+                    "role": "admin",
+                },
+            )
+            token = client.post("/api/v1/auth/login", data={"username": email, "password": old_password}).json()["access_token"]
 
-        change_response = client.post(
-            "/api/v1/auth/change-password",
-            headers={"Authorization": f"Bearer {token}"},
-            json={"current_password": old_password, "new_password": new_password},
-        )
-        old_login = client.post("/api/v1/auth/login", data={"username": email, "password": old_password})
-        new_login = client.post("/api/v1/auth/login", data={"username": email, "password": new_password})
+            change_response = client.post(
+                "/api/v1/auth/change-password",
+                headers={"Authorization": f"Bearer {token}"},
+                json={"current_password": old_password, "new_password": new_password},
+            )
+            old_login = client.post("/api/v1/auth/login", data={"username": email, "password": old_password})
+            new_login = client.post("/api/v1/auth/login", data={"username": email, "password": new_password})
 
-    assert change_response.status_code == 204
-    assert old_login.status_code == 401
-    assert new_login.status_code == 200
+        assert change_response.status_code == 204
+        assert old_login.status_code == 401
+        assert new_login.status_code == 200
+    finally:
+        auth.settings.admin_registration_token = previous_token
 
 
 def test_login_failures_are_rate_limited_and_audited() -> None:
     auth.login_rate_limiter.clear()
     previous_attempts = auth.login_rate_limiter.max_attempts
+    previous_token = auth.settings.admin_registration_token
+    auth.settings.admin_registration_token = "test-bootstrap-ratelimit"
     auth.login_rate_limiter.max_attempts = 2
     try:
         with TestClient(app) as client:
             suffix = str(uuid4())[:8]
             email = f"limited-admin-{suffix}@coderoute.gn"
-            password = "StrongPass123"
+            password = "StrongPass123!"
             client.post(
                 "/api/v1/auth/register",
+                headers={"X-Admin-Registration-Token": "test-bootstrap-ratelimit"},
                 json={
                     "email": email,
                     "full_name": "Limited Admin",
@@ -111,6 +126,7 @@ def test_login_failures_are_rate_limited_and_audited() -> None:
             assert "auth.login_blocked" in audit_actions
     finally:
         auth.login_rate_limiter.max_attempts = previous_attempts
+        auth.settings.admin_registration_token = previous_token
         auth.login_rate_limiter.clear()
 
 
@@ -151,7 +167,7 @@ def test_privileged_registration_can_require_bootstrap_token() -> None:
             payload = {
                 "email": f"secure-admin-{suffix}@coderoute.gn",
                 "full_name": "Secure Admin",
-                "password": "StrongPass123",
+                "password": "StrongPass123!",
                 "role": "admin",
             }
 
@@ -177,7 +193,7 @@ def test_register_rejects_unknown_role() -> None:
             json={
                 "email": f"unknown-role-{suffix}@coderoute.gn",
                 "full_name": "Unknown Role",
-                "password": "StrongPass123",
+                "password": "StrongPass123!",
                 "role": "root",
             },
         )

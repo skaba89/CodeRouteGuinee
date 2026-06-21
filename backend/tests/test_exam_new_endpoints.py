@@ -4,9 +4,9 @@ Tests E2E pour les nouveaux endpoints examen :
   GET /exams/{id}/questions
   GET /exams/{id}/results
 """
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
-import pytest
 from fastapi.testclient import TestClient
 
 from app.db.session import SessionLocal, init_db
@@ -14,7 +14,6 @@ from app.main import app
 from app.models_center import Center
 from app.models_session import ExamSession
 from tests.conftest import get_admin_headers, get_center_headers
-from datetime import datetime, timedelta, UTC
 
 
 def _seed_center_session_question_base():

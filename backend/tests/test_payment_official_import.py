@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, UTC
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
@@ -10,17 +10,21 @@ from app.models_audit import AuditLog
 from app.models_booking import Booking
 from app.models_candidate import Candidate
 from app.models_center import Center
-from app.models_session import ExamSession
 from app.models_payment import Payment
+from app.models_session import ExamSession
+from app.routers import auth as _auth_module
+from tests.conftest import TEST_BOOTSTRAP_TOKEN
 
 
 def _admin_headers(client: TestClient) -> dict[str, str]:
     suffix = str(uuid4())[:8]
     email = f"admin-payment-import-{suffix}@coderoute.gn"
-    password = "StrongPass123"
+    password = "StrongPass123!"
+    _auth_module.settings.admin_registration_token = TEST_BOOTSTRAP_TOKEN
     response = client.post(
         "/api/v1/auth/register",
-        json={"email": email, "full_name": "Admin Import Paiement", "password": password, "role": "admin"},
+        headers={"X-Admin-Registration-Token": TEST_BOOTSTRAP_TOKEN},
+            json={"email": email, "full_name": "Admin Import Paiement", "password": password, "role": "admin"},
     )
     assert response.status_code == 201
     token_response = client.post("/api/v1/auth/login", data={"username": email, "password": password})

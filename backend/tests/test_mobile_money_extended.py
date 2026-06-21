@@ -5,20 +5,15 @@ Modules ciblés :
   app/mobile_money.py (42% → objectif 80%+)
 """
 import os
-import unittest
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from app.mobile_money import (
-    ProviderResult,
+    _paydunya_payment,
     _sandbox_payment,
     _wave_payment,
-    _paydunya_payment,
     normalize_provider,
     simulate_mobile_money_payment,
 )
-
 
 # ── normalize_provider ────────────────────────────────────────────
 

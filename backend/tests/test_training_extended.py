@@ -4,7 +4,6 @@ Tests étendus training — couverture mock-exam et check-answer.
 Modules ciblés :
   app/routers/training.py (62% → objectif 90%+)
 """
-import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app

@@ -46,6 +46,7 @@ def audit_auth_event(db: Session, action: str, email: str, request: Request, use
 
 @router.post("/register", response_model=UserRead, status_code=status.HTTP_201_CREATED)
 def register(
+    request: Request,
     payload: UserCreate,
     db: Session = Depends(get_db),
     x_admin_registration_token: str | None = Header(default=None),
@@ -53,12 +54,48 @@ def register(
     existing = db.scalar(select(User).where(User.email == payload.email.lower()))
     if existing:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered")
-    if (
-        payload.role in PRIVILEGED_ROLES
-        and settings.admin_registration_token
-        and x_admin_registration_token != settings.admin_registration_token
-    ):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Privileged role registration requires bootstrap authorization")
+
+    # ── Protection rôles privilégiés ──────────────────────────────────────
+    # Règle : admin / super_admin nécessitent TOUJOURS un token valide.
+    # La faille de l'ancienne implémentation : si ADMIN_REGISTRATION_TOKEN
+    # n'était pas configuré, la condition court-circuitait et n'importe qui
+    # pouvait créer un admin. Ce bloc corrige ce comportement.
+    if payload.role in PRIVILEGED_ROLES:
+        token_configured = bool(settings.admin_registration_token)
+        token_valid      = (
+            token_configured
+            and x_admin_registration_token == settings.admin_registration_token
+        )
+        if not token_valid:
+            # Audit de la tentative refusée
+            db.add(
+                AuditLog(
+                    actor_id=None,
+                    action="auth.register_privileged_denied",
+                    entity="auth",
+                    entity_id=None,
+                    details={
+                        "email":       payload.email.strip().lower(),
+                        "role":        payload.role,
+                        "reason":      "no_token" if not token_configured else "bad_token",
+                        "ip":          request.client.host if request.client else "unknown",
+                        "user_agent":  request.headers.get("user-agent", "unknown")[:255],
+                        "token_provided": x_admin_registration_token is not None,
+                        "token_configured": token_configured,
+                    },
+                )
+            )
+            db.commit()
+            if not token_configured:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Privileged role registration is disabled (ADMIN_REGISTRATION_TOKEN not configured)",
+                )
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Privileged role registration requires a valid bootstrap token",
+            )
+
     user = User(
         email=payload.email.lower(),
         full_name=payload.full_name,

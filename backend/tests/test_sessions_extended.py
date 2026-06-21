@@ -7,13 +7,11 @@ Modules ciblés :
 from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
-import pytest
 from fastapi.testclient import TestClient
 
 from app.db.session import SessionLocal, init_db
 from app.main import app
 from app.models_center import Center
-from app.models_session import ExamSession
 from tests.conftest import get_admin_headers
 
 
@@ -27,7 +25,10 @@ def _make_center(commune: str = "TestExt") -> Center:
         address=f"Rue Ext {s}", capacity=35,
         max_sessions_per_week=3, status="accredited",
     )
-    db.add(center); db.commit(); db.refresh(center); db.close()
+    db.add(center)
+    db.commit()
+    db.refresh(center)
+    db.close()
     return center
 
 

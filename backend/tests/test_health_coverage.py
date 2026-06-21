@@ -4,15 +4,12 @@ Tests health.py — couverture /health et /health/readiness.
 Cible : app/routers/health.py (21% → 95%+)
 Lignes non couvertes : 23-65 (_build_configuration_check), 83-119 (readiness)
 """
-import os
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
-import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
 from app.routers.health import _build_configuration_check
-
 
 # ── /health ──────────────────────────────────────────────────────
 
@@ -235,6 +232,7 @@ class TestReadinessDegraded:
     def test_readiness_degraded_when_db_fails(self):
         """Simule une panne DB — le readiness doit retourner degraded."""
         from sqlalchemy.exc import OperationalError
+
         from app.db.session import get_db
 
         def bad_db():

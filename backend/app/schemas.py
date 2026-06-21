@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class Token(BaseModel):
@@ -10,11 +10,42 @@ class Token(BaseModel):
     token_type: str = "bearer"
 
 
+def _validate_strong_password(v: str) -> str:
+    """
+    Politique de mot de passe CodeRoute Guinée :
+      - 12 caractères minimum
+      - Au moins 1 majuscule (A-Z)
+      - Au moins 1 minuscule (a-z)
+      - Au moins 1 chiffre (0-9)
+      - Au moins 1 caractère spécial (!@#$%^&*…)
+    """
+    import re
+    errors: list[str] = []
+    if len(v) < 12:
+        errors.append("Le mot de passe doit contenir au moins 12 caractères")
+    if not re.search(r"[A-Z]", v):
+        errors.append("Le mot de passe doit contenir au moins une majuscule")
+    if not re.search(r"[a-z]", v):
+        errors.append("Le mot de passe doit contenir au moins une minuscule")
+    if not re.search(r"[0-9]", v):
+        errors.append("Le mot de passe doit contenir au moins un chiffre")
+    if not re.search(r"[^A-Za-z0-9]", v):
+        errors.append("Le mot de passe doit contenir au moins un caractère spécial")
+    if errors:
+        raise ValueError(" | ".join(errors))
+    return v
+
+
 class UserCreate(BaseModel):
     email: str
     full_name: str
-    password: str = Field(min_length=8)
+    password: str = Field(min_length=12)
     role: Literal["super_admin", "admin", "center", "candidate"] = "candidate"
+
+    @field_validator("password")
+    @classmethod
+    def password_strength(cls, v: str) -> str:
+        return _validate_strong_password(v)
 
 
 class InstitutionalUserCreate(BaseModel):
@@ -50,10 +81,20 @@ class PasswordChangeRequest(BaseModel):
     current_password: str = Field(min_length=8)
     new_password: str = Field(min_length=12)
 
+    @field_validator("new_password")
+    @classmethod
+    def new_password_strength(cls, v: str) -> str:
+        return _validate_strong_password(v)
+
 
 class UserPasswordReset(BaseModel):
     new_password: str = Field(min_length=12)
     reason: str = Field(min_length=5)
+
+    @field_validator("new_password")
+    @classmethod
+    def new_password_strength(cls, v: str) -> str:
+        return _validate_strong_password(v)
 
 
 class CandidateCreate(BaseModel):

@@ -7,24 +7,41 @@ from app.db.session import SessionLocal
 from app.main import app
 from app.models_audit import AuditLog
 
+# Bootstrap token pour la création de comptes privilégiés dans les tests
+_GOVERNANCE_BOOTSTRAP_TOKEN = "test-governance-bootstrap-token"
+
 
 def register_user(client: TestClient, role: str) -> dict:
+    from app.routers import auth as _auth_mod
     suffix = str(uuid4())[:8]
-    response = client.post(
-        "/api/v1/auth/register",
-        json={
-            "email": f"{role}-{suffix}@coderoute.gn",
-            "full_name": f"{role} CodeRoute",
-            "password": "StrongPass123",
-            "role": role,
-        },
-    )
+    privileged = {"admin", "super_admin"}
+    prev = _auth_mod.settings.admin_registration_token
+    if role in privileged:
+        _auth_mod.settings.admin_registration_token = _GOVERNANCE_BOOTSTRAP_TOKEN
+    try:
+        headers = (
+            {"X-Admin-Registration-Token": _GOVERNANCE_BOOTSTRAP_TOKEN}
+            if role in privileged else {}
+        )
+        response = client.post(
+            "/api/v1/auth/register",
+            headers=headers,
+            json={
+                "email": f"{role}-{suffix}@coderoute.gn",
+                "full_name": f"{role} CodeRoute",
+                "password": "StrongPass123!",
+                "role": role,
+            },
+        )
+    finally:
+        if role in privileged:
+            _auth_mod.settings.admin_registration_token = prev
     assert response.status_code == 201
     return response.json()
 
 
 def login_token(client: TestClient, email: str) -> str:
-    response = client.post("/api/v1/auth/login", data={"username": email, "password": "StrongPass123"})
+    response = client.post("/api/v1/auth/login", data={"username": email, "password": "StrongPass123!"})
     assert response.status_code == 200
     return response.json()["access_token"]
 
@@ -139,10 +156,10 @@ def test_super_admin_can_reset_user_password() -> None:
         response = client.post(
             f"/api/v1/users/{candidate['id']}/reset-password",
             headers={"Authorization": f"Bearer {token}"},
-            json={"new_password": "ResetStrongPass123", "reason": "Reinitialisation administrative controlee"},
+            json={"new_password": "ResetStrongPass123!!", "reason": "Reinitialisation administrative controlee"},
         )
-        old_login = client.post("/api/v1/auth/login", data={"username": candidate["email"], "password": "StrongPass123"})
-        new_login = client.post("/api/v1/auth/login", data={"username": candidate["email"], "password": "ResetStrongPass123"})
+        old_login = client.post("/api/v1/auth/login", data={"username": candidate["email"], "password": "StrongPass123!"})
+        new_login = client.post("/api/v1/auth/login", data={"username": candidate["email"], "password": "ResetStrongPass123!!"})
 
     assert response.status_code == 200
     assert old_login.status_code == 401

@@ -1,4 +1,4 @@
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 
 from app.models_audit import AuditLog
 from app.routers.exams import _write_certificate_verification_log
