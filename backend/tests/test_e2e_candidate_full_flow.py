@@ -50,7 +50,7 @@ def test_candidate_booking_payment_entry_exam_certificate_flow() -> None:
                 "name": "Centre E2E Conakry",
                 "city": "Conakry",
                 "address": "Kaloum",
-                "capacity": 50,
+                "capacity": 35,
                 "status": "accredited",
             },
         )
@@ -63,7 +63,7 @@ def test_candidate_booking_payment_entry_exam_certificate_flow() -> None:
             json={
                 "center_id": center["id"],
                 "starts_at": (datetime.now(UTC) + timedelta(days=7)).isoformat(),
-                "capacity": 40,
+                "capacity": 35,
             },
         )
         assert session_response.status_code == 201

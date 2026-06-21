@@ -1,0 +1,46 @@
+{
+  "name": "CodeRoute Guinée",
+  "short_name": "CodeRoute",
+  "description": "Plateforme nationale d'examen du code de la route — République de Guinée",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0A2540",
+  "theme_color": "#0A2540",
+  "lang": "fr",
+  "categories": ["education", "government"],
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/screenshot-home.png",
+      "sizes": "390x844",
+      "type": "image/png",
+      "label": "Accueil CodeRoute Guinée"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Entraînement",
+      "url": "/#/training",
+      "description": "Accéder au mode entraînement"
+    },
+    {
+      "name": "Mon dossier",
+      "url": "/#/candidate",
+      "description": "Voir mon dossier candidat"
+    }
+  ]
+}

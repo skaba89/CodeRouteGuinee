@@ -28,6 +28,7 @@ def _seed_center_session_question_base():
             city="Conakry",
             address="Test",
             capacity=10,
+            max_sessions_per_week=3,
             status="accredited",
         )
         db.add(center)

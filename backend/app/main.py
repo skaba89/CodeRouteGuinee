@@ -8,6 +8,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app.core.config import get_settings
 from app.db.session import init_db
+from app.logging_config import setup_logging
 from app.monitoring import init_sentry
 from app.routers import (
     audit,
@@ -41,6 +42,10 @@ from app.routers import (
 )
 
 settings = get_settings()
+
+
+# Initialiser le logging structuré
+setup_logging()
 
 
 @asynccontextmanager

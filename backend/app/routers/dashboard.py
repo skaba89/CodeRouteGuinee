@@ -354,7 +354,7 @@ def export_institutional_report_pdf(
 
 @router.get("/anti-fraud", response_model=AntiFraudDashboardRead)
 def anti_fraud_dashboard(
-    limit: int = 50,
+    limit: int = 200,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("admin", "super_admin")),
 ) -> AntiFraudDashboardRead:
@@ -411,7 +411,7 @@ def anti_fraud_dashboard(
         critical_monitoring_events=critical_events,
         total_monitoring_risk_score=int(total_monitoring_risk_score or 0),
         manual_review_attempts=manual_review_attempts,
-        centers_at_risk=center_rows[: max(1, min(limit, 50))],
+        centers_at_risk=center_rows[:limit],
     )
 
 

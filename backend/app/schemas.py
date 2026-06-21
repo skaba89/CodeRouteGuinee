@@ -130,14 +130,21 @@ class CenterCreate(BaseModel):
     code: str
     name: str
     city: str
+    commune: str | None = None
+    prefecture: str | None = None
     address: str
-    capacity: int = 20
+    latitude: float | None = None
+    longitude: float | None = None
+    capacity: int = Field(default=35, ge=1, le=35)  # Max légal DNTT : 35 candidats/session
+    max_sessions_per_week: int = Field(default=3, ge=1, le=7)  # Max 3 sessions/semaine
     status: Literal["pending_audit", "active", "accredited", "suspended"] = "pending_audit"
 
 
 class CenterRead(CenterCreate):
     id: str
     created_at: datetime
+    # En lecture, pas de contrainte max sur capacity (données legacy possibles en base)
+    capacity: int = Field(default=35, ge=1)
 
     model_config = {"from_attributes": True}
 
@@ -261,7 +268,7 @@ class InstitutionalAuthorizationRead(InstitutionalAuthorizationCreate):
 class ExamSessionCreate(BaseModel):
     center_id: str
     starts_at: datetime
-    capacity: int = 20
+    capacity: int = Field(default=35, ge=1, le=35)  # Max 35 candidats par session (DNTT)
 
 
 class ExamSessionRead(BaseModel):
@@ -269,9 +276,19 @@ class ExamSessionRead(BaseModel):
     reference: str
     center_id: str
     starts_at: datetime
-    capacity: int
+    capacity: int  # Max 35 (DNTT)
     status: str
     created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class ExamSessionWithCenterRead(ExamSessionRead):
+    """Session avec les informations du centre — pour les vues calendrier."""
+    center_name: str | None = None
+    center_commune: str | None = None
+    center_prefecture: str | None = None
+    center_city: str | None = None
 
     model_config = {"from_attributes": True}
 

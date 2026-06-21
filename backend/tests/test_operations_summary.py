@@ -50,6 +50,7 @@ def _seed_operations_alerts() -> None:
             city="Conakry",
             address="Kaloum",
             capacity=20,
+            max_sessions_per_week=3,
             status="accredited",
         )
         db.add(candidate)

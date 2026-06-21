@@ -50,7 +50,7 @@ def test_institutional_pilot_recipe_from_official_imports_to_certificate() -> No
                     "name": "Centre Pilote Institutionnel",
                     "city": "Conakry",
                     "address": "Kaloum",
-                    "capacity": 40,
+                    "capacity": 35,
                     "status": "accredited",
                 }
             ],
@@ -119,7 +119,7 @@ def test_institutional_pilot_recipe_from_official_imports_to_certificate() -> No
             json={
                 "center_id": center["id"],
                 "starts_at": (datetime.now(UTC) + timedelta(days=7)).isoformat(),
-                "capacity": 40,
+                "capacity": 35,
             },
         )
         assert session_response.status_code == 201

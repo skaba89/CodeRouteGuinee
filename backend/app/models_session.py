@@ -18,6 +18,6 @@ class ExamSession(Base):
     reference: Mapped[str] = mapped_column(String(50), unique=True, index=True, nullable=False)
     center_id: Mapped[str] = mapped_column(ForeignKey("centers.id"), nullable=False)
     starts_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
-    capacity: Mapped[int] = mapped_column(Integer, default=20, nullable=False)
+    capacity: Mapped[int] = mapped_column(Integer, default=35, nullable=False)  # Max 35 par session (DNTT)
     status: Mapped[str] = mapped_column(String(50), default="planned", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC).replace(tzinfo=None), nullable=False)

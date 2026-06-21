@@ -1,12 +1,48 @@
 <!doctype html>
-<html lang="fr">
+<html lang="fr" dir="ltr">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>CodeRoute Guinee</title>
+    <meta name="description" content="Plateforme nationale d'examen du code de la route — République de Guinée. Inscrivez-vous, payez et passez votre examen en ligne." />
+    <meta name="theme-color" content="#0A2540" />
+    <meta name="robots" content="index, follow" />
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="CodeRoute Guinée — Examen Code de la Route" />
+    <meta property="og:description" content="Plateforme officielle DNTT — Ministère des Transports de la République de Guinée" />
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="fr_GN" />
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/icon-192.png" />
+
+    <!-- PWA manifest -->
+    <link rel="manifest" href="/manifest.json" />
+
+    <title>CodeRoute Guinée — Examen Code de la Route</title>
   </head>
   <body>
+    <!-- Lien d'évitement pour lecteurs d'écran (WCAG 2.4.1) -->
+    <a href="#main-content" style="
+      position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden;
+      background:#0A2540;color:#fff;padding:8px 16px;font-size:14px;border-radius:4px;
+      z-index:9999;text-decoration:none;
+    " onfocus="this.style.left='8px';this.style.top='8px';this.style.width='auto';this.style.height='auto'"
+       onblur="this.style.left='-9999px'">
+      Aller au contenu principal
+    </a>
+
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+
+    <!-- Service Worker (PWA) -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js').catch(() => {});
+        });
+      }
+    </script>
   </body>
 </html>

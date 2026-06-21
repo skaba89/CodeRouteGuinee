@@ -23,6 +23,7 @@ def _seed_exam_context() -> tuple[str, str]:
             city="Conakry",
             address="Corniche",
             capacity=20,
+            max_sessions_per_week=3,
             status="accredited",
         )
         db.add(center)

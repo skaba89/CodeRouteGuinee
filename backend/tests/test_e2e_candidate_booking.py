@@ -21,6 +21,7 @@ def _seed_center_and_session() -> tuple[str, str, str]:
             city="Conakry",
             address="Route Le Prince",
             capacity=20,
+            max_sessions_per_week=3,
             status="accredited",
         )
         db.add(center)

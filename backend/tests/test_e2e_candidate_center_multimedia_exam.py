@@ -75,7 +75,7 @@ def test_candidate_registration_center_booking_and_40_question_multimedia_exam_t
                     "name": "Centre Multimedia Pilote",
                     "city": "Conakry",
                     "address": "Route Le Prince",
-                    "capacity": 40,
+                    "capacity": 35,
                     "status": "accredited",
                 }
             ],
@@ -133,7 +133,7 @@ def test_candidate_registration_center_booking_and_40_question_multimedia_exam_t
             json={
                 "center_id": center["id"],
                 "starts_at": (datetime.now(UTC) + timedelta(days=10)).isoformat(),
-                "capacity": 40,
+                "capacity": 35,
             },
         )
         assert session_response.status_code == 201

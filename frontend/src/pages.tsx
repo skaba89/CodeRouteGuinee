@@ -69,7 +69,7 @@ export function HomePage() {
   const isCandidate = role === 'candidate';
 
   return (
-    <section className="screen">
+    <section className="screen" role="main" aria-label="Contenu principal">
       <div className="dash-hero">
         <div>
           <span className="eyebrow" style={{ color: 'rgba(255,255,255,.6)' }}>Plateforme nationale</span>
@@ -205,7 +205,7 @@ export function CandidatePage() {
   }
 
   return (
-    <section className="screen">
+    <section className="screen" role="main" aria-label="Contenu principal">
       <div className="page-header">
         <span className="eyebrow">Espace candidat</span>
         <h1>Mon dossier</h1>
@@ -413,7 +413,7 @@ export function CenterPage() {
   }
 
   return (
-    <section className="screen">
+    <section className="screen" role="main" aria-label="Contenu principal">
       <div className="page-header">
         <span className="eyebrow">Espace centre</span>
         <h1>Gestion des examens</h1>
@@ -603,7 +603,7 @@ export function AdminPage() {
   ] as const;
 
   return (
-    <section className="screen">
+    <section className="screen" role="main" aria-label="Contenu principal">
       <div className="page-header">
         <span className="eyebrow">Administration</span>
         <h1>Tableau de bord national</h1>
@@ -815,7 +815,7 @@ function MonitoringPanel({ canAdmin }: { canAdmin: boolean }) {
       <div className="card">
         <div className="card-header">
           <span className="card-title">🔍 Résumés de monitoring ({summaries.length})</span>
-          <button className="secondary-button btn-sm" onClick={() => getExamMonitoringSummaries({ limit: 20 }).then(setSummaries).catch(() => undefined)}>Actualiser</button>
+          <button className="secondary-button btn-sm" aria-label="Actualiser le monitoring" onClick={() => getExamMonitoringSummaries({ limit: 20 }).then(setSummaries).catch(() => undefined)}>Actualiser</button>
         </div>
         {loading ? <p className="text-muted" style={{ padding: 16 }}>Chargement…</p> :
           summaries.length === 0 ? <div style={{ padding: '24px', textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>Aucune anomalie détectée ✅</div> :
@@ -844,7 +844,7 @@ function MonitoringPanel({ canAdmin }: { canAdmin: boolean }) {
       <div className="card">
         <div className="card-header">
           <span className="card-title">⚡ Événements récents ({events.length})</span>
-          <button className="secondary-button btn-sm" onClick={() => downloadExamAttemptsCsv().catch(() => undefined)}>⬇ Export</button>
+          <button className="secondary-button btn-sm" aria-label="Télécharger export CSV" onClick={() => downloadExamAttemptsCsv().catch(() => undefined)}>⬇ Export</button>
         </div>
         {loading ? <p className="text-muted" style={{ padding: 16 }}>Chargement…</p> :
           events.length === 0 ? <div style={{ padding: '24px', textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>Aucun événement récent</div> :
@@ -999,7 +999,7 @@ export function InstitutionalDossierPage() {
   }, [canAdmin]);
 
   return (
-    <section className="screen">
+    <section className="screen" role="main" aria-label="Contenu principal">
       <div className="page-header">
         <span className="eyebrow">Institutionnel</span>
         <h1>Dossier d'État</h1>
@@ -1304,7 +1304,7 @@ export function ExamPage() {
 
   // ── Setup ──────────────────────────────────────────────────────
   if (phase === 'setup') return (
-    <section className="screen">
+    <section className="screen" role="main" aria-label="Contenu principal">
       <div style={{ maxWidth: 520, margin: '0 auto' }}>
         <div style={{ background: 'linear-gradient(135deg,var(--navy),var(--navy2))', borderRadius: 20, padding: 28, color: '#fff', marginBottom: 20, textAlign: 'center' }}>
           <div style={{ fontSize: 48, marginBottom: 8 }}>🇬🇳</div>
@@ -1339,7 +1339,7 @@ export function ExamPage() {
       filter === 'all' ? true : filter === 'ok' ? q2.is_correct : !q2.is_correct
     );
     return (
-      <section className="screen">
+      <section className="screen" role="main" aria-label="Contenu principal">
         <div style={{ maxWidth: 720, margin: '0 auto', display: 'grid', gap: 18 }}>
           <div style={{ background: `linear-gradient(135deg,${result.passed ? 'var(--green)' : 'var(--navy)'},${result.passed ? '#006b47' : 'var(--navy2)'})`, borderRadius: 20, padding: 28, color: '#fff', textAlign: 'center' }}>
             <div style={{ fontSize: 48 }}>{result.passed ? '🏆' : '📋'}</div>
@@ -1386,7 +1386,7 @@ export function ExamPage() {
   if (phase === 'review') {
     const unanswered = questions.filter((_, i) => answers[i] === undefined);
     return (
-      <section className="screen">
+      <section className="screen" role="main" aria-label="Contenu principal">
         <div style={{ maxWidth: 520, margin: '0 auto' }} className="card">
           <h2 style={{ marginBottom: 12 }}>Vérification avant soumission</h2>
           <p style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 16 }}>
@@ -1512,7 +1512,7 @@ export function ResultsPage() {
   ) ?? [];
 
   return (
-    <section className="screen">
+    <section className="screen" role="main" aria-label="Contenu principal">
       <div className="page-header">
         <span className="eyebrow">Résultats</span>
         <h1>Résultats & Certificats</h1>
@@ -1683,7 +1683,7 @@ export function TrainingPage() {
 
   // ── Menu ──────────────────────────────────────────────────────
   if (mode === 'menu') return (
-    <section className="screen">
+    <section className="screen" role="main" aria-label="Contenu principal">
       <div className="page-header">
         <span className="eyebrow">Module Entraînement</span>
         <h1>Préparez-vous à l'examen</h1>
@@ -1747,7 +1747,7 @@ export function TrainingPage() {
       .filter(([, v]) => v.ok / v.total < .7)
       .sort(([, a], [, b]) => (a.ok/a.total) - (b.ok/b.total));
     return (
-      <section className="screen">
+      <section className="screen" role="main" aria-label="Contenu principal">
         <div style={{ maxWidth: 640, margin: '0 auto', display: 'grid', gap: 16 }}>
           <div style={{ background: `linear-gradient(135deg,${pct>=70?'var(--green)':'var(--navy)'},${pct>=70?'#006b47':'var(--navy2)'})`, borderRadius: 20, padding: '24px 28px', color: '#fff', textAlign: 'center' }}>
             <div style={{ fontSize: 44 }}>{pct >= 80 ? '🏆' : pct >= 60 ? '📈' : '📚'}</div>
@@ -1795,7 +1795,7 @@ export function TrainingPage() {
   // ── Question en cours ─────────────────────────────────────────
   const isCorrect = answers[qi] === q.correct_answer;
   return (
-    <section className="screen">
+    <section className="screen" role="main" aria-label="Contenu principal">
       <div style={{ maxWidth: 680, margin: '0 auto' }}>
         {/* Progression */}
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12, fontSize: 13, color: 'var(--muted)' }}>
@@ -1880,7 +1880,7 @@ export function DrivingSchoolPage() {
   const risque = MOCK_STUDENTS.filter(s=>s.status==='risque').length;
 
   return (
-    <section className="screen">
+    <section className="screen" role="main" aria-label="Contenu principal">
       <div className="page-header">
         <span className="eyebrow">Portail Auto-École</span>
         <h1>Tableau de bord pédagogique</h1>
@@ -2132,7 +2132,7 @@ export function MinisterialPage() {
   ] as const;
 
   return (
-    <section className="screen">
+    <section className="screen" role="main" aria-label="Contenu principal">
       <div className="page-header">
         <span className="eyebrow">Portail ministériel</span>
         <h1>Tableau de bord national — DNTT</h1>
@@ -2244,7 +2244,7 @@ export function MinisterialPage() {
             <form onSubmit={handleImport} style={{ display:'grid', gap:14 }}>
               <label>
                 Type d'import
-                <select value={importType} onChange={e => setImportType(e.target.value as typeof importType)}>
+                <select value={importType} onChange={e => setImportType(e.target.value as typeof importType)} aria-label="Type d'import">
                   <option value="candidates">Candidats</option>
                   <option value="centers">Centres agréés</option>
                   <option value="questions">Questions banque</option>
