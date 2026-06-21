@@ -39,7 +39,7 @@ from app.models_payment import Payment
 from app.models_question import Question
 from app.models_session import ExamSession
 from app.models_user import User
-from app.question_bank_gn import QUESTIONS_GN
+from app.question_bank_gn import QUESTIONS_GN, QUESTIONS_TRAINING_FULL
 from app.security import get_password_hash
 
 SEED_PASSWORD = "CodeRoute2026!"
@@ -1856,13 +1856,51 @@ def seed_centers(db) -> dict[str, Center]:
 # ── QUESTIONS ─────────────────────────────────────────────────────────────
 
 def seed_questions(db) -> list[Question]:
+    """
+    Charge les 200 questions dans la base de données.
+
+    Répartition :
+      40 questions officielles (QUESTIONS_GN) : pool examen DNTT
+     160 questions entraînement (QUESTIONS_TRAINING_FULL) : mode entraînement libre
+
+    L'exam_engine tire toujours 40 questions parmi les 200 actives,
+    selon la répartition officielle par catégorie (CATEGORY_DISTRIBUTION).
+    Avec 200 questions en banque, chaque examen est vraiment unique.
+    """
     existing = db.scalars(select(Question).where(Question.is_active.is_(True))).all()
-    if len(existing) >= 40:
-        print(f"  ✅ {len(existing)} questions (déjà présentes)")
+    if len(existing) >= 200:
+        print(f"  ✅ {len(existing)} questions en banque (200 déjà présentes)")
         return list(existing)
 
+    # Désactiver les anciennes questions si migration depuis 40 → 200
+    if 0 < len(existing) < 200:
+        print(f"  ↳ Migration banque : {len(existing)} → 200 questions")
+        # Conserver les anciennes actives, ajouter les manquantes
+        existing_texts = {q.text for q in existing}
+        all_bank = QUESTIONS_GN + QUESTIONS_TRAINING_FULL
+        to_add = [q for q in all_bank if q["text"] not in existing_texts]
+        questions_out = list(existing)
+        for q in to_add:
+            obj = Question(
+                category=q["category"],
+                text=q["text"],
+                options=q["options"],
+                correct_answer=q["correct_answer"],
+                explanation=q.get("explanation", ""),
+                is_active=True,
+            )
+            db.add(obj)
+            questions_out.append(obj)
+        db.commit()
+        for q in questions_out:
+            db.refresh(q)
+        print(f"  ✅ {len(questions_out)} questions en banque ({len(to_add)} ajoutées)")
+        return questions_out
+
+    # Premier seed : charger toutes les 200 questions
+    all_bank = QUESTIONS_GN + QUESTIONS_TRAINING_FULL  # 200 questions
     questions = []
-    for q in QUESTIONS_GN:
+    for q in all_bank:
         obj = Question(
             category=q["category"],
             text=q["text"],
@@ -1874,10 +1912,9 @@ def seed_questions(db) -> list[Question]:
         db.add(obj)
         questions.append(obj)
     db.commit()
-    # Rafraîchir pour récupérer les IDs
     for q in questions:
         db.refresh(q)
-    print(f"  ✅ {len(questions)} questions créées")
+    print(f"  ✅ {len(questions)} questions créées (40 officielles + 160 entraînement)")
     return questions
 
 

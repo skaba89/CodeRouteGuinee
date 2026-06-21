@@ -1,6 +1,15 @@
 /**
- * Banque de 40 questions illustrées — CodeRoute Guinée Catégorie B
- * Données séparées du composant pour éviter les problèmes d'échappement.
+ * Questions de démonstration — CodeRoute Guinée Catégorie B
+ *
+ * Ces 40 questions illustrées servent à la démonstration frontend (mode présentation).
+ *
+ * En conditions réelles :
+ *   - La banque officielle contient 200 questions stockées en PostgreSQL
+ *   - L'exam_engine tire 40 questions selon la répartition officielle DNTT :
+ *       signalisation: 10, priorités: 6, vitesse: 5, dépassement: 5,
+ *       sécurité_passive: 4, urgence: 4, alcool_drogues: 3, premiers_secours: 3
+ *   - Chaque examen est unique grâce au pool de 200 (5e combinaisons possibles)
+ *   - Les questions sélectionnées sont tracées par hash SHA-256 pour l'audit
  */
 
 export interface ExamQuestionData {

@@ -17,7 +17,7 @@ from pydantic import BaseModel
 
 from app.deps import get_current_user
 from app.models_user import User
-from app.question_bank_gn import QUESTIONS_ALL, QUESTIONS_GN
+from app.question_bank_gn import QUESTIONS_200
 
 router = APIRouter(prefix="/training", tags=["training"])
 
@@ -49,7 +49,7 @@ def get_training_categories(
 ) -> list[dict]:
     """Liste des catégories avec nombre de questions disponibles."""
     from collections import Counter
-    cat_count = Counter(q["category"] for q in QUESTIONS_ALL)
+    cat_count = Counter(q["category"] for q in QUESTIONS_200)
     return [
         {"category": cat, "total": count, "display_name": _cat_label(cat)}
         for cat, count in sorted(cat_count.items())
@@ -67,7 +67,7 @@ def get_training_questions(
     Retourne des questions pour l'entraînement.
     Contrairement à l'examen, les bonnes réponses et explications sont incluses.
     """
-    pool = [q for q in QUESTIONS_ALL if not category or q["category"] == category]
+    pool = [q for q in QUESTIONS_200 if not category or q["category"] == category]
 
     if shuffle:
         pool = random.sample(pool, min(limit, len(pool)))
@@ -98,8 +98,29 @@ def get_mock_exam(
     Les bonnes réponses sont masquées (comme l'examen réel).
     """
 
-    # Utiliser la banque embarquée pour le mode entraînement
-    questions = random.sample(QUESTIONS_GN, min(40, len(QUESTIONS_GN)))
+    # Tirer 40 questions sur les 200 selon la répartition officielle DNTT
+    # (identique à l'examen réel — sauf que c'est côté client, sans DB)
+    DIST = {
+        "signalisation": 10, "priorites": 6, "vitesse": 5, "depassement": 5,
+        "securite_passive": 4, "urgence": 4, "alcool_drogues": 3, "premiers_secours": 3,
+    }
+    from collections import defaultdict as _dd
+    by_cat = _dd(list)
+    for q in QUESTIONS_200:
+        by_cat[q["category"]].append(q)
+
+    questions = []
+    for cat, count in DIST.items():
+        pool_cat = by_cat.get(cat, [])
+        take = min(count, len(pool_cat))
+        questions.extend(random.sample(pool_cat, take))
+
+    # Compléter si manque (ne devrait pas arriver avec 200 questions)
+    if len(questions) < 40:
+        already = {q["text"] for q in questions}
+        spare = [q for q in QUESTIONS_200 if q["text"] not in already]
+        questions.extend(random.sample(spare, min(40 - len(questions), len(spare))))
+
     random.shuffle(questions)
 
     return {
@@ -133,7 +154,7 @@ def check_answer(
     Vérifie une réponse et retourne l'explication immédiatement.
     Cœur du mode entraînement — feedback pédagogique instantané.
     """
-    pool = [q for q in QUESTIONS_ALL if not category or q["category"] == category]
+    pool = [q for q in QUESTIONS_200 if not category or q["category"] == category]
 
     if request.question_index >= len(pool):
         return {"error": "Question introuvable"}

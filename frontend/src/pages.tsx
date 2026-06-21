@@ -152,7 +152,7 @@ export function HomePage() {
         <div className="card">
           <div className="card-header"><span className="card-title">📋 Examen code de la route</span></div>
           <div style={{ display: 'grid', gap: 8, fontSize: 13, color: 'var(--ink2)', marginBottom: 14 }}>
-            <div>⏱ 30 minutes • 40 questions officielles</div>
+            <div>⏱ 30 minutes • 40 questions tirées sur 200</div>
             <div>✅ Seuil d'admission : 35/40 (87,5 %)</div>
             <div>📱 Questions illustrées par catégorie</div>
           </div>
@@ -336,7 +336,7 @@ export function CandidatePage() {
             <li>Apportez votre <strong>pièce d'identité originale</strong></li>
             <li>Présentez la convocation PDF (QR code) à l'entrée</li>
             <li>Seuil d'admission : <strong>35/40</strong> (87,5 %)</li>
-            <li>Durée : <strong>30 minutes</strong> — 40 questions</li>
+            <li>Durée : <strong>30 minutes</strong> — 40 questions tirées aléatoirement</li>
           </ul>
         </div>
       </div>
@@ -1702,7 +1702,7 @@ export function TrainingPage() {
       <div className="page-header">
         <span className="eyebrow">Module Entraînement</span>
         <h1>Préparez-vous à l'examen</h1>
-        <p>200 questions classées par catégorie. Explication immédiate après chaque réponse.</p>
+        <p>200 questions en banque. L'examen officiel en tire 40 aléatoirement — entraînez-vous sur toutes les catégories.</p>
       </div>
 
       <div style={{ maxWidth: 700 }}>
