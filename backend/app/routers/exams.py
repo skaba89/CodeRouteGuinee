@@ -389,6 +389,26 @@ def submit_exam(
     ))
     db.commit()
     db.refresh(attempt)
+
+    # Email de résultat — best effort
+    try:
+        if candidate and candidate.email:
+            cert_url = None
+            if result["passed"]:
+                cert_url = f"https://api.coderoute.gov.gn/api/v1/exams/{attempt.id}/certificate/verify"
+            from app.email_service import send_exam_result
+            send_exam_result(
+                to_email       = candidate.email,
+                candidate_name = f"{candidate.first_name} {candidate.last_name}",
+                booking_reference = attempt.booking_reference if hasattr(attempt, "booking_reference") else attempt.id,
+                passed         = result["passed"],
+                score          = result["correct_answers"],
+                total          = result["total_questions"],
+                certificate_url = cert_url,
+            )
+    except Exception:
+        pass  # Email non bloquant
+
     return attempt
 
 

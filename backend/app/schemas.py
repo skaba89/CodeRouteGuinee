@@ -61,6 +61,7 @@ class CandidateCreate(BaseModel):
     last_name: str
     identity_number: str
     phone: str
+    email: str | None = None
     permit_category: str = "B"
 
 

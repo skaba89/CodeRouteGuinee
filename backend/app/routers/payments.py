@@ -102,6 +102,8 @@ def create_payment(
                 raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Payment already recorded for this booking")
     provider_result = simulate_mobile_money_payment(payload.provider, payload.phone, payload.amount_gnf)
     reference = build_payment_reference(db.query(Payment).count() + 1)
+    from datetime import UTC
+    from datetime import datetime as _dt
     payment = Payment(
         reference=reference,
         booking_reference=payload.booking_reference,
@@ -110,6 +112,8 @@ def create_payment(
         phone=payload.phone,
         status=provider_result.status,
         receipt_number=build_receipt_number(reference),
+        external_reference=provider_result.external_reference,
+        paid_at=_dt.now(UTC).replace(tzinfo=None) if provider_result.status == "paid" else None,
     )
     db.add(payment)
     db.add(
@@ -130,14 +134,35 @@ def create_payment(
     )
     db.commit()
     db.refresh(payment)
+
+    # Email de confirmation de paiement — best effort
+    try:
+        booking = db.scalar(select(Booking).where(Booking.reference == payload.booking_reference))
+        if booking:
+            candidate = db.scalar(select(Candidate).where(Candidate.id == booking.candidate_id))
+            if candidate and candidate.email:
+                from app.email_service import send_payment_confirmation
+                send_payment_confirmation(
+                    to_email          = candidate.email,
+                    candidate_name    = f"{candidate.first_name} {candidate.last_name}",
+                    booking_reference = payload.booking_reference,
+                    amount_gnf        = payload.amount_gnf,
+                    provider          = provider_result.provider,
+                    receipt_number    = payment.receipt_number,
+                )
+    except Exception:
+        pass  # Email non bloquant
+
     return {
+        "id": payment.id,
         "reference": payment.reference,
         "booking_reference": payment.booking_reference,
         "amount_gnf": payment.amount_gnf,
         "provider": payment.provider,
         "status": payment.status,
         "receipt_number": payment.receipt_number,
-        "external_reference": provider_result.external_reference,
+        "external_reference": payment.external_reference,
+        "paid_at": payment.paid_at.isoformat() if payment.paid_at else None,
         "message": provider_result.message,
     }
 

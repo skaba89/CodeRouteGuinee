@@ -20,6 +20,7 @@ class Candidate(Base):
     last_name: Mapped[str] = mapped_column(String(120), nullable=False)
     identity_number: Mapped[str] = mapped_column(String(120), index=True, nullable=False)
     phone: Mapped[str] = mapped_column(String(50), nullable=False)
+    email: Mapped[str | None] = mapped_column(String(200), nullable=True, index=True)
     permit_category: Mapped[str] = mapped_column(String(10), default="B", nullable=False)
     status: Mapped[str] = mapped_column(String(50), default="registered", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC).replace(tzinfo=None), nullable=False)

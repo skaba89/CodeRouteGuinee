@@ -22,4 +22,6 @@ class Payment(Base):
     phone: Mapped[str] = mapped_column(String(50), nullable=False)
     status: Mapped[str] = mapped_column(String(50), default="paid", nullable=False)
     receipt_number: Mapped[str] = mapped_column(String(100), unique=True, index=True, nullable=False)
+    external_reference: Mapped[str | None] = mapped_column(String(200), nullable=True, index=True)
+    paid_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC).replace(tzinfo=None), nullable=False)

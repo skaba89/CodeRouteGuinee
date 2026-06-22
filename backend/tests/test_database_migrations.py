@@ -43,6 +43,7 @@ def test_alembic_initial_migration_is_available() -> None:
     assert (backend_root / "alembic" / "versions" / "20260618_0002_question_media_fields.py").exists()
     assert (backend_root / "alembic" / "versions" / "20260619_0003_explicit_ddl_and_rate_limit_table.py").exists()
     assert (backend_root / "alembic" / "versions" / "20260620_0004_session_capacity_rules.py").exists()
+    assert (backend_root / "alembic" / "versions" / "20260623_0005_payment_external_reference.py").exists()
 
 
 def test_question_metadata_includes_multimedia_fields() -> None:
@@ -71,7 +72,7 @@ def test_alembic_upgrade_head_from_empty_sqlite_database(tmp_path, monkeypatch) 
         assert {"media_type", "media_url", "media_alt"}.issubset(question_columns)
         with engine.connect() as connection:
             version_rows = connection.exec_driver_sql("SELECT version_num FROM alembic_version").fetchall()
-        assert version_rows == [("20260620_0004",)]
+        assert version_rows == [("20260623_0005",)]
     finally:
         engine.dispose()
         get_settings.cache_clear()
