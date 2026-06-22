@@ -89,6 +89,10 @@ def _sqlite_add_columns_if_missing() -> None:
         ("centers", "longitude", "FLOAT"),
         ("centers", "max_sessions_per_week", "INTEGER DEFAULT 3 NOT NULL"),
         ("exam_sessions", "capacity", None),
+        # Sprint 83 — nouvelles colonnes production
+        ("candidates", "email", "VARCHAR(200)"),
+        ("payments",   "external_reference", "VARCHAR(200)"),
+        ("payments",   "paid_at", "DATETIME"),
     ]
     with engine.connect() as conn:
         for table, col, col_type in migrations:

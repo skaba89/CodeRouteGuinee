@@ -60,6 +60,25 @@ def create_booking(
     db.add(booking)
     db.commit()
     db.refresh(booking)
+
+    # Notification email — best effort (n'empêche pas la création si ça échoue)
+    try:
+        candidate = db.get(Candidate, booking.candidate_id)
+        session   = db.get(ExamSession, booking.session_id)
+        center    = db.get(Center, session.center_id) if session else None
+        if candidate and candidate.email and session and center:
+            from app.email_service import send_booking_confirmation
+            send_booking_confirmation(
+                to_email          = candidate.email,
+                candidate_name    = f"{candidate.first_name} {candidate.last_name}",
+                booking_reference = booking.reference,
+                session_date      = session.starts_at.strftime("%d/%m/%Y à %Hh%M"),
+                center_name       = center.name,
+                verification_code = booking.verification_code,
+            )
+    except Exception:
+        pass  # Email non bloquant
+
     return booking
 
 

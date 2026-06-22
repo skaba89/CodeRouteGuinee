@@ -1,2 +1,11 @@
-// Réexporte depuis pages.tsx — toutes les pages sont définies dans ce fichier unique
-export { AdminPage, CandidatePage, CenterPage, ExamPage, HomePage, InstitutionalDossierPage, ResultsPage } from '../pages';
+// Pages — index
+export { HomePage } from './home';
+export { CandidatePage } from './candidate';
+export { CenterPage } from './center';
+export { AdminPage } from './admin';
+export { InstitutionalDossierPage } from './institutional-dossier';
+export { ExamPage } from './exam';
+export { ResultsPage } from './results';
+export { TrainingPage } from './training';
+export { DrivingSchoolPage } from './driving-school';
+export { MinisterialPage } from './ministerial';
