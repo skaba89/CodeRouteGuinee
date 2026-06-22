@@ -1,15 +1,45 @@
+# docker-compose.prod.yml — CodeRoute Guinée
+# Optimisé pour la montée en charge (1 000+ utilisateurs simultanés)
+#
+# Variables d'environnement à définir dans .env :
+#   POSTGRES_DB / POSTGRES_USER / POSTGRES_PASSWORD
+#   WEB_CONCURRENCY  — nb workers Gunicorn (défaut : 2×CPU+1)
+#   DB_POOL_SIZE     — connexions permanentes par worker (défaut : 20)
+#   DB_MAX_OVERFLOW  — connexions supplémentaires en pic (défaut : 30)
+#
+# Calcul de dimensionnement :
+#   Si WEB_CONCURRENCY=9 et DB_POOL_SIZE=20, DB_MAX_OVERFLOW=30 :
+#   → 9 × 50 = 450 connexions DB max → PG_MAX_CONNECTIONS doit être ≥ 460
+
 services:
+
+  # ── PostgreSQL ─────────────────────────────────────────────────────────────
   postgres:
     image: postgres:16-alpine
     container_name: coderoute-postgres-prod
     environment:
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_DB:       ${POSTGRES_DB}
+      POSTGRES_USER:     ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     expose:
       - "5432"
     volumes:
       - postgres_data_prod:/var/lib/postgresql/data
+    # Tuning PostgreSQL pour la charge — adapté à 4 Go RAM
+    command: >
+      postgres
+        -c max_connections=500
+        -c shared_buffers=512MB
+        -c effective_cache_size=1536MB
+        -c work_mem=8MB
+        -c maintenance_work_mem=128MB
+        -c wal_buffers=16MB
+        -c checkpoint_completion_target=0.9
+        -c random_page_cost=1.1
+        -c effective_io_concurrency=200
+        -c min_wal_size=256MB
+        -c max_wal_size=1GB
+        -c default_statistics_target=100
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 10s
@@ -19,6 +49,7 @@ services:
     networks:
       - coderoute-internal
 
+  # ── Backend FastAPI + Gunicorn ─────────────────────────────────────────────
   backend:
     build:
       context: ./backend
@@ -27,26 +58,48 @@ services:
     env_file:
       - .env
     environment:
-      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      DATABASE_URL:     "postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}"
       AUTO_CREATE_TABLES: "false"
-      ENVIRONMENT: "production"
-      ENABLE_API_DOCS: "false"
-    command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2"
+      ENVIRONMENT:      "production"
+      ENABLE_API_DOCS:  "false"
+      # Pool DB — ajustez selon WEB_CONCURRENCY × (DB_POOL_SIZE + DB_MAX_OVERFLOW) ≤ 490
+      DB_POOL_SIZE:     "${DB_POOL_SIZE:-20}"
+      DB_MAX_OVERFLOW:  "${DB_MAX_OVERFLOW:-30}"
+      DB_POOL_TIMEOUT:  "30"
+      DB_POOL_RECYCLE:  "1800"
+      # Workers — 2×CPU+1 par défaut ; surcharger avec WEB_CONCURRENCY=N
+      WEB_CONCURRENCY:  "${WEB_CONCURRENCY:-}"
+    command: >
+      sh -c "
+        alembic upgrade head &&
+        gunicorn app.main:app
+          -c gunicorn.conf.py
+      "
     expose:
       - "8000"
     depends_on:
       postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)\" || exit 1"]
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5)\" || exit 1"]
       interval: 15s
-      timeout: 5s
+      timeout: 10s
       retries: 8
-      start_period: 30s
+      start_period: 45s
     restart: unless-stopped
     networks:
       - coderoute-internal
+    # Limites ressources — ajuster selon la machine cible
+    deploy:
+      resources:
+        limits:
+          cpus:   "4"
+          memory: "2G"
+        reservations:
+          cpus:   "1"
+          memory: "512M"
 
+  # ── Frontend Vite/React ────────────────────────────────────────────────────
   frontend:
     build:
       context: ./frontend
@@ -60,7 +113,13 @@ services:
     restart: unless-stopped
     networks:
       - coderoute-internal
+    deploy:
+      resources:
+        limits:
+          cpus:   "0.5"
+          memory: "256M"
 
+  # ── Nginx reverse-proxy ────────────────────────────────────────────────────
   nginx:
     image: nginx:1.27-alpine
     container_name: coderoute-nginx
@@ -76,6 +135,11 @@ services:
     restart: unless-stopped
     networks:
       - coderoute-internal
+    deploy:
+      resources:
+        limits:
+          cpus:   "1"
+          memory: "256M"
 
 volumes:
   postgres_data_prod:

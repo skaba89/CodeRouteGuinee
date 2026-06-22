@@ -7,8 +7,10 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app.core.config import get_settings
+from app.core.config import get_settings as _get_settings
 from app.db.session import init_db
 from app.logging_config import setup_logging
+from app.middleware import RequestIDMiddleware, ResponseCacheMiddleware, TimingMiddleware
 from app.monitoring import init_sentry
 from app.routers import (
     audit,
@@ -69,6 +71,13 @@ app = FastAPI(
     redoc_url="/redoc" if settings.enable_api_docs else None,
     openapi_url="/openapi.json" if settings.enable_api_docs else None,
 )
+
+# ── Middleware — ordre : externe → interne ────────────────────────────────────
+# L'ordre d'enregistrement est inversé : le dernier ajouté s'exécute en premier
+_settings = _get_settings()
+app.add_middleware(ResponseCacheMiddleware, environment=_settings.environment)
+app.add_middleware(TimingMiddleware)
+app.add_middleware(RequestIDMiddleware)
 
 app.add_middleware(
     TrustedHostMiddleware,
