@@ -1,5 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
@@ -12,12 +12,35 @@ from app.schemas import CenterCreate, CenterOfficialImportRequest, CenterOfficia
 router = APIRouter(prefix="/centers", tags=["centers"])
 
 
-@router.get("", response_model=list[CenterRead])
+@router.get("", response_model=dict)
 def list_centers(
+    limit: int = Query(default=20, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    search: str | None = Query(default=None, max_length=100),
+    status_filter: str | None = Query(default=None, alias="status"),
+    prefecture: str | None = Query(default=None),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("admin", "super_admin", "center", "candidate")),
 ) -> list[Center]:
-    return list(db.scalars(select(Center).order_by(Center.created_at.desc())).all())
+    q = select(Center).order_by(Center.name.asc())
+    if search:
+        term = f"%{search.strip()}%"
+        q = q.where(
+            or_(
+                Center.name.ilike(term),
+                Center.code.ilike(term),
+                Center.city.ilike(term),
+                Center.commune.ilike(term),
+            )
+        )
+    if status_filter:
+        q = q.where(Center.status == status_filter)
+    if prefecture:
+        q = q.where(Center.prefecture.ilike(f"%{prefecture}%"))
+    total = db.scalar(select(func.count()).select_from(q.subquery()))
+    raw_items = list(db.scalars(q.offset(offset).limit(limit)).all())
+    items = [CenterRead.model_validate(x) for x in raw_items]
+    return {"items": items, "total": total, "limit": limit, "offset": offset, "search": search}
 
 
 @router.post("", response_model=CenterRead, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_roles("admin", "super_admin"))])

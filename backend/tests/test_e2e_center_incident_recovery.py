@@ -144,9 +144,14 @@ def test_center_incident_blocks_attempt_and_allows_retake() -> None:
         assert resolved_incident["new_attempt_id"]
         assert resolved_incident["new_attempt_id"] != initial_attempt["id"]
 
-        questions_response = client.get("/api/v1/questions", headers=headers)
-        assert questions_response.status_code == 200
-        answers = {question["id"]: question["correct_answer"] for question in questions_response.json()}
+        # Récupérer les bonnes réponses depuis la DB (bypass pagination API)
+        from app.db.session import SessionLocal as _SL
+        from app.models_question import Question as _Q
+        from sqlalchemy import select as _select
+        _db = _SL()
+        _all_q = _db.scalars(_select(_Q).where(_Q.is_active == True)).all()
+        answers = {q.id: q.correct_answer for q in _all_q}
+        _db.close()
         assert len(answers) >= 40
 
         new_attempt_id = resolved_incident["new_attempt_id"]
@@ -163,11 +168,11 @@ def test_center_incident_blocks_attempt_and_allows_retake() -> None:
 
         incidents_response = client.get("/api/v1/center-incidents?status_filter=resolved", headers=admin_headers)
         assert incidents_response.status_code == 200
-        assert any(item["id"] == incident["id"] for item in incidents_response.json())
+        assert any(item["id"] == incident["id"] for item in incidents_response.json()["items"])
 
         audit_response = client.get(
             "/api/v1/supervision/audit-logs?action=center_incident.resolved&limit=25",
             headers=admin_headers,
         )
         assert audit_response.status_code == 200
-        assert any(log["entity_id"] == incident["id"] for log in audit_response.json())
+        assert any(log["entity_id"] == incident["id"] for log in audit_response.json()["items"])

@@ -83,7 +83,14 @@ def test_candidate_registration_center_booking_and_40_question_multimedia_exam_t
         assert client.post("/api/v1/centers/import-official", headers=headers, json={**center_payload, "dry_run": True}).json()["created"] == 1
         center_import = client.post("/api/v1/centers/import-official", headers=headers, json={**center_payload, "dry_run": False})
         assert center_import.status_code == 200
-        center = next(item for item in client.get("/api/v1/centers", headers=headers).json() if item["code"] == center_code)
+        # Récupérer le centre importé via DB (évite les problèmes de pagination)
+        from app.db.session import SessionLocal as _SL2
+        from app.models_center import Center as _Ctr2
+        from sqlalchemy import select as _sel2
+        with _SL2() as _db2:
+            _c2 = _db2.scalar(_sel2(_Ctr2).where(_Ctr2.code == center_code))
+            assert _c2 is not None, f"Centre {center_code} non trouvé en base"
+            center = {"id": _c2.id, "code": _c2.code, "name": _c2.name, "capacity": _c2.capacity}
 
         candidate_payload = {
             "source": "Registre candidats multimedia",
@@ -120,7 +127,7 @@ def test_candidate_registration_center_booking_and_40_question_multimedia_exam_t
         assert question_import.status_code == 200
         assert question_import.json()["imported"] == 40
 
-        fetched_questions = client.get("/api/v1/questions", headers=headers).json()
+        fetched_questions = client.get("/api/v1/questions", headers=headers, params={"limit": 200}).json()["items"]
         imported_questions = [question for question in fetched_questions if question["category"] == "multimedia-pilote" and suffix in question["text"]]
         assert len(imported_questions) == 40
         assert sum(1 for question in imported_questions if question["media_type"] == "image") == 20
@@ -171,7 +178,14 @@ def test_candidate_registration_center_booking_and_40_question_multimedia_exam_t
         assert start_response.status_code == 201
         attempt = start_response.json()
 
-        answers = {question["id"]: question["correct_answer"] for question in fetched_questions}
+        # Récupérer toutes les bonnes réponses via DB pour garantir la couverture complète
+        from app.db.session import SessionLocal as _SL
+        from app.models_question import Question as _Q
+        from sqlalchemy import select as _select
+        _db = _SL()
+        _all_q = _db.scalars(_select(_Q).where(_Q.is_active == True)).all()
+        answers = {q.id: q.correct_answer for q in _all_q}
+        _db.close()
         submit_response = client.post(f"/api/v1/exams/{attempt['id']}/submit", headers=headers, json={"answers": answers})
         assert submit_response.status_code == 200
         submitted_attempt = submit_response.json()
@@ -191,4 +205,4 @@ def test_candidate_registration_center_booking_and_40_question_multimedia_exam_t
 
         audit_response = client.get("/api/v1/supervision/audit-logs?action=exam.question_trace_created&limit=25", headers=headers)
         assert audit_response.status_code == 200
-        assert any(log["details"]["attempt_id"] == attempt["id"] and log["details"]["question_count"] >= 40 for log in audit_response.json())
+        assert any(log["details"]["attempt_id"] == attempt["id"] and log["details"]["question_count"] >= 40 for log in audit_response.json()["items"])

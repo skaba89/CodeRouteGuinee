@@ -151,5 +151,5 @@ def test_manual_review_decision_updates_attempt_and_audit_log() -> None:
             headers=admin_headers,
         )
         assert audit_response.status_code == 200
-        audit_logs = audit_response.json()
+        audit_logs = audit_response.json()["items"]
         assert any(log["details"]["attempt_id"] == attempt["id"] for log in audit_logs)

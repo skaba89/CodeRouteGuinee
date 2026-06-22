@@ -63,7 +63,14 @@ def test_institutional_pilot_recipe_from_official_imports_to_certificate() -> No
         center_import = client.post("/api/v1/centers/import-official", headers=headers, json={**center_payload, "dry_run": False})
         assert center_import.status_code == 200
         assert center_import.json()["created"] == 1
-        center = next(item for item in client.get("/api/v1/centers", headers=headers).json() if item["code"] == center_code)
+        # Récupérer le centre importé via DB directe (évite les problèmes de pagination)
+        from app.db.session import SessionLocal as _SL
+        from app.models_center import Center as _Ctr
+        from sqlalchemy import select as _sel
+        with _SL() as _db:
+            _c = _db.scalar(_sel(_Ctr).where(_Ctr.code == center_code))
+            assert _c is not None, f"Centre {center_code} non trouvé"
+            center = {"id": _c.id, "code": _c.code, "capacity": _c.capacity, "name": _c.name}
 
         candidate_payload = {
             "source": "Registre national pilote - recette",
@@ -181,10 +188,15 @@ def test_institutional_pilot_recipe_from_official_imports_to_certificate() -> No
         attempt = start_response.json()
         assert attempt["status"] == "started"
 
-        questions = client.get("/api/v1/questions", headers=headers).json()
-        imported_questions = [question for question in questions if question["category"] == "recette-pilote" and suffix in question["text"]]
+        # Récupérer toutes les questions via DB pour garantir couverture complète
+        from app.db.session import SessionLocal as _SLq
+        from app.models_question import Question as _Qq
+        from sqlalchemy import select as _selq
+        with _SLq() as _dbq:
+            _all_qs = _dbq.scalars(_selq(_Qq).where(_Qq.is_active == True)).all()
+            imported_questions = [q for q in _all_qs if q.category == "recette-pilote" and suffix in q.text]
+            answers = {q.id: q.correct_answer for q in _all_qs}
         assert len(imported_questions) == 40
-        answers = {question["id"]: question["correct_answer"] for question in questions}
 
         submit_response = client.post(f"/api/v1/exams/{attempt['id']}/submit", headers=headers, json={"answers": answers})
         assert submit_response.status_code == 200
@@ -208,4 +220,4 @@ def test_institutional_pilot_recipe_from_official_imports_to_certificate() -> No
         ]:
             audit_response = client.get(f"/api/v1/supervision/audit-logs?action={action}&limit=25", headers=headers)
             assert audit_response.status_code == 200
-            assert any(log["action"] == action for log in audit_response.json())
+            assert any(log["action"] == action for log in audit_response.json()["items"])

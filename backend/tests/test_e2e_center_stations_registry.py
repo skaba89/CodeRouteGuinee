@@ -164,5 +164,5 @@ def test_center_station_registry_flags_unknown_device_keys() -> None:
             headers=admin_headers,
         )
         assert audit_response.status_code == 200
-        logs = audit_response.json()
+        logs = audit_response.json()["items"]
         assert any(log["details"]["device_key"] == unknown_device_key for log in logs)

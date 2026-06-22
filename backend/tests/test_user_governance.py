@@ -38,7 +38,7 @@ def test_admin_can_list_users() -> None:
         response = client.get("/api/v1/users", headers={"Authorization": f"Bearer {token}"})
 
     assert response.status_code == 200
-    assert any(user["email"] == admin["email"] for user in response.json())
+    assert any(user["email"] == admin["email"] for user in response.json()["items"])
 
 
 def test_super_admin_can_create_institutional_user_with_audit_log() -> None:

@@ -19,6 +19,42 @@ export type Center = {
   created_at: string;
 };
 
+// ── Pagination & recherche ──────────────────────────────────────
+
+export type PagedResponse<T> = {
+  items: T[];
+  total: number;
+  limit: number;
+  offset: number;
+  search?: string | null;
+};
+
+
+export type PaginationParams = {
+  limit?: number;
+  offset?: number;
+  search?: string;
+};
+
+export type CandidateFilters = PaginationParams;
+
+export type CenterFilters = PaginationParams & {
+  status?: string;
+  prefecture?: string;
+};
+
+export type QuestionFilters = PaginationParams & {
+  category?: string;
+  is_active?: boolean;
+};
+
+export type UserFilters = PaginationParams & {
+  role?: string;
+  is_active?: boolean;
+};
+
+// ── Types données ────────────────────────────────────────────────
+
 export type Candidate = {
   id: string;
   reference: string;
@@ -631,6 +667,14 @@ async function downloadProtectedCsv(url: string, filename: string): Promise<void
   return downloadProtectedFile(url, filename);
 }
 
+// ── Helper de construction de query string ──────────────────────
+
+function buildQuery(params: Record<string, unknown>): string {
+  const entries = Object.entries(params).filter(([, v]) => v !== undefined && v !== null && v !== '');
+  if (!entries.length) return '';
+  return '?' + entries.map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`).join('&');
+}
+
 export function getDashboard(): Promise<DashboardData> {
   return getPrivateJson<DashboardData>('/api/v1/dashboard');
 }
@@ -639,12 +683,14 @@ export function getOperationalReadiness(): Promise<OperationalReadiness> {
   return getJson<OperationalReadiness>('/health/readiness');
 }
 
-export function getCenters(): Promise<Center[]> {
-  return getPrivateJson<Center[]>('/api/v1/centers');
+export function getCenters(params: CenterFilters = {}): Promise<PagedResponse<Center>> {
+  const q = buildQuery(params);
+  return getPrivateJson<PagedResponse<Center>>(`/api/v1/centers${q}`);
 }
 
-export function getCandidates(): Promise<Candidate[]> {
-  return getJson<Candidate[]>('/api/v1/candidates');
+export function getCandidates(params: CandidateFilters = {}): Promise<PagedResponse<Candidate>> {
+  const q = buildQuery(params);
+  return getJson<PagedResponse<Candidate>>(`/api/v1/candidates${q}`);
 }
 
 export function updateCenterStatus(centerId: string, status: string, reason: string): Promise<Center> {
@@ -695,8 +741,9 @@ export function getAuditLogs(filters: AuditLogFilters = {}): Promise<AuditLogEnt
   return getPrivateJson<AuditLogEntry[]>(`/api/v1/supervision/audit-logs${buildAuditQuery({ ...filters, limit: filters.limit ?? 25 })}`);
 }
 
-export function getInstitutionalUsers(): Promise<InstitutionalUser[]> {
-  return getPrivateJson<InstitutionalUser[]>('/api/v1/users?limit=50');
+export function getInstitutionalUsers(params: UserFilters = {}): Promise<InstitutionalUser[]> {
+  const q = buildQuery(params);
+  return getPrivateJson<InstitutionalUser[]>(`/api/v1/users${q}`);
 }
 
 export function createInstitutionalUser(payload: InstitutionalUserCreatePayload): Promise<InstitutionalUser> {
@@ -783,8 +830,15 @@ export function importOfficialQuestions(source: string, reason: string, question
   return postPrivateJson<QuestionOfficialImportResult>('/api/v1/questions/import-official', { source, reason, dry_run: dryRun, questions });
 }
 
-export function getInstitutionalAuthorizations(): Promise<InstitutionalAuthorization[]> {
-  return getPrivateJson<InstitutionalAuthorization[]>('/api/v1/institutional-authorizations?limit=25');
+export function getInstitutionalAuthorizations(
+  params: { statusFilter?: string; limit?: number; offset?: number; search?: string } = {}
+): Promise<PagedResponse<InstitutionalAuthorization>> {
+  const q = new URLSearchParams();
+  if (params.statusFilter) q.set('status_filter', params.statusFilter);
+  q.set('limit', String(params.limit ?? 20));
+  q.set('offset', String(params.offset ?? 0));
+  if (params.search) q.set('search', params.search);
+  return getPrivateJson<PagedResponse<InstitutionalAuthorization>>(`/api/v1/institutional-authorizations?${q}`);
 }
 
 export function createInstitutionalAuthorization(payload: InstitutionalAuthorizationPayload): Promise<InstitutionalAuthorization> {
@@ -885,8 +939,9 @@ export function getExamSummary(): Promise<ExamSummary> {
   return getJson<ExamSummary>('/api/v1/exams/summary');
 }
 
-export function getQuestions(): Promise<ExamQuestion[]> {
-  return getJson<ExamQuestion[]>('/api/v1/questions');
+export function getQuestions(params: QuestionFilters = {}): Promise<PagedResponse<ExamQuestion>> {
+  const q = buildQuery(params);
+  return getJson<PagedResponse<ExamQuestion>>(`/api/v1/questions${q}`);
 }
 
 export function startExamFromBooking(bookingReference: string, deviceKey?: string, deviceLabel?: string): Promise<ExamAttempt> {
@@ -934,11 +989,16 @@ export function reportCenterIncident(payload: CenterIncidentPayload): Promise<Ce
   return postPrivateJson<CenterIncident>('/api/v1/center-incidents', payload);
 }
 
-export function getCenterIncidents(statusFilter = 'open', limit = 25): Promise<CenterIncident[]> {
-  const query = new URLSearchParams();
-  if (statusFilter) query.set('status_filter', statusFilter);
-  query.set('limit', String(limit));
-  return getPrivateJson<CenterIncident[]>(`/api/v1/center-incidents?${query.toString()}`);
+export function getCenterIncidents(
+  params: { statusFilter?: string; centerId?: string; limit?: number; offset?: number; search?: string } = {}
+): Promise<PagedResponse<CenterIncident>> {
+  const q = new URLSearchParams();
+  if (params.statusFilter) q.set('status_filter', params.statusFilter);
+  if (params.centerId) q.set('center_id', params.centerId);
+  q.set('limit', String(params.limit ?? 20));
+  q.set('offset', String(params.offset ?? 0));
+  if (params.search) q.set('search', params.search);
+  return getPrivateJson<PagedResponse<CenterIncident>>(`/api/v1/center-incidents?${q}`);
 }
 
 export function resolveCenterIncident(incidentId: string, resolutionNotes: string, allowRetake: boolean): Promise<CenterIncident> {

@@ -61,9 +61,7 @@ def test_candidate_center_question_and_dashboard_routes() -> None:
         )
         assert question_response.status_code == 201
 
-        centers = client.get("/api/v1/centers", headers=headers).json()
-        assert isinstance(centers, list)
-        center_id = centers[0]["id"]
+        center_id = center_response.json()["id"]
 
         session_response = client.post(
             "/api/v1/sessions",

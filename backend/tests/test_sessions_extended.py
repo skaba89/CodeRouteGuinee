@@ -119,7 +119,7 @@ class TestSessionListing:
             h = get_admin_headers(client)
             r = client.get("/api/v1/sessions", headers=h)
             assert r.status_code == 200
-            assert isinstance(r.json(), list)
+            assert isinstance(r.json(), dict); assert "items" in r.json()
 
     def test_list_sessions_filter_by_center(self):
         center = _make_center("ListTestCommune")
@@ -129,7 +129,7 @@ class TestSessionListing:
             _create_session(client, h, center.id, tuesday)
             r = client.get(f"/api/v1/sessions?center_id={center.id}", headers=h)
             assert r.status_code == 200
-            data = r.json()
+            data = r.json()['items']
             assert all(s["center_id"] == center.id for s in data)
 
     def test_list_available_sessions(self):

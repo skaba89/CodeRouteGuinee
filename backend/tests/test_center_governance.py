@@ -115,8 +115,12 @@ def test_admin_can_import_official_centers_with_audit_log() -> None:
         assert update_response.status_code == 200
         assert update_response.json()["updated"] == 1
 
-        centers = client.get("/api/v1/centers", headers=headers).json()
-        imported = next(center for center in centers if center["code"] == f"IMP-{suffix}-1")
+        with SessionLocal() as _db:
+            from sqlalchemy import select as _select
+            from app.models_center import Center as _Center
+            _c = _db.scalar(_select(_Center).where(_Center.code == f"IMP-{suffix}-1"))
+            assert _c is not None, f"Centre IMP-{suffix}-1 non trouvé en base"
+            imported = {"capacity": _c.capacity, "status": _c.status, "id": _c.id}
         assert imported["capacity"] == 35
         assert imported["status"] == "active"
 

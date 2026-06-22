@@ -152,7 +152,7 @@ def test_device_session_duplicate_detection_end_to_end() -> None:
             headers=admin_headers,
         )
         assert audit_response.status_code == 200
-        audit_logs = audit_response.json()
+        audit_logs = audit_response.json()["items"]
         assert any(log["details"]["device_key"] == device_key for log in audit_logs)
 
 
@@ -237,4 +237,4 @@ def test_start_exam_from_booking_registers_device_session_and_duplicate_alert() 
             headers=admin_headers,
         )
         assert audit_response.status_code == 200
-        assert any(log["details"]["device_key"] == device_key for log in audit_response.json())
+        assert any(log["details"]["device_key"] == device_key for log in audit_response.json()["items"])
