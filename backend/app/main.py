@@ -15,6 +15,7 @@ from app.logging_config import setup_logging
 from app.middleware import RequestIDMiddleware, ResponseCacheMiddleware, TimingMiddleware
 from app.monitoring import init_sentry
 from app.routers import (
+    audio,
     audit,
     auth,
     bookings,
@@ -115,6 +116,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 app.add_middleware(SecurityHeadersMiddleware)
 
 
+app.include_router(audio.router, prefix=settings.api_v1_prefix)
 app.include_router(health.router)
 app.include_router(auth.router, prefix=settings.api_v1_prefix)
 app.include_router(candidates.router, prefix=settings.api_v1_prefix)
