@@ -1,7 +1,7 @@
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
@@ -77,11 +77,13 @@ def report_center_incident(
     return incident
 
 
-@router.get("", response_model=list[CenterIncidentRead])
+@router.get("", response_model=dict)
 def list_center_incidents(
     status_filter: str | None = None,
     center_id: str | None = None,
-    limit: int = 100,
+    limit: int = Query(default=20, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    search: str | None = Query(default=None, max_length=100),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("admin", "super_admin")),
 ) -> list[CenterIncident]:
@@ -90,8 +92,15 @@ def list_center_incidents(
         query = query.where(CenterIncident.status == status_filter)
     if center_id:
         query = query.where(CenterIncident.center_id == center_id)
-    query = query.order_by(CenterIncident.created_at.desc()).limit(limit)
-    return list(db.scalars(query).all())
+    query = query.order_by(CenterIncident.created_at.desc())
+    if search:
+        query = query.where(
+            CenterIncident.incident_type.ilike(f"%{search}%")
+        )
+    total = db.scalar(select(func.count()).select_from(query.subquery()))
+    raw_items = list(db.scalars(query.offset(offset).limit(limit)).all())
+    items = [CenterIncidentRead.model_validate(x) for x in raw_items]
+    return {"items": items, "total": total, "limit": limit, "offset": offset, "search": search}
 
 
 @router.post("/{incident_id}/resolve", response_model=CenterIncidentRead)

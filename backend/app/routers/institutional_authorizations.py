@@ -1,7 +1,7 @@
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -15,10 +15,12 @@ from app.schemas import InstitutionalAuthorizationCreate, InstitutionalAuthoriza
 router = APIRouter(prefix="/institutional-authorizations", tags=["institutional-authorizations"])
 
 
-@router.get("", response_model=list[InstitutionalAuthorizationRead])
+@router.get("", response_model=dict)
 def list_authorizations(
     status_filter: str | None = None,
-    limit: int = 100,
+    limit: int = Query(default=20, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    search: str | None = Query(default=None, max_length=100),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("admin", "super_admin")),
 ) -> list[InstitutionalAuthorization]:
@@ -26,7 +28,18 @@ def list_authorizations(
     if status_filter:
         query = query.where(InstitutionalAuthorization.status == status_filter)
     query = query.order_by(InstitutionalAuthorization.created_at.desc()).limit(max(1, min(limit, 200)))
-    return list(db.scalars(query).all())
+    if search:
+        from sqlalchemy import or_
+        query = query.where(
+            or_(
+                InstitutionalAuthorization.authority.ilike(f"%{search}%"),
+                InstitutionalAuthorization.title.ilike(f"%{search}%"),
+            )
+        )
+    total = db.scalar(select(func.count()).select_from(query.subquery()))
+    raw_items = list(db.scalars(query.offset(offset).limit(max(1, min(limit, 200)))).all())
+    items = [InstitutionalAuthorizationRead.model_validate(x) for x in raw_items]
+    return {"items": items, "total": total, "limit": limit, "offset": offset, "search": search}
 
 
 @router.post("", response_model=InstitutionalAuthorizationRead, status_code=status.HTTP_201_CREATED)

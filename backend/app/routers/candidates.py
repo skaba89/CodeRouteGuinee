@@ -1,7 +1,7 @@
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
@@ -19,12 +19,29 @@ def build_candidate_reference(db: Session) -> str:
     return f"GN-CODE-{datetime.now(UTC).year}-{count:06d}"
 
 
-@router.get("", response_model=list[CandidateRead])
+@router.get("", response_model=dict)
 def list_candidates(
+    limit: int = Query(default=20, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    search: str | None = Query(default=None, max_length=100),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("admin", "super_admin", "center")),
 ) -> list[Candidate]:
-    return list(db.scalars(select(Candidate).order_by(Candidate.created_at.desc())).all())
+    q = select(Candidate).order_by(Candidate.created_at.desc())
+    if search:
+        term = f"%{search.strip()}%"
+        q = q.where(
+            or_(
+                Candidate.first_name.ilike(term),
+                Candidate.last_name.ilike(term),
+                Candidate.identity_number.ilike(term),
+                Candidate.reference.ilike(term),
+            )
+        )
+    total = db.scalar(select(func.count()).select_from(q.subquery()))
+    raw_items = list(db.scalars(q.offset(offset).limit(limit)).all())
+    items = [CandidateRead.model_validate(x) for x in raw_items]
+    return {"items": items, "total": total, "limit": limit, "offset": offset, "search": search}
 
 
 @router.post("", response_model=CandidateRead, status_code=status.HTTP_201_CREATED)

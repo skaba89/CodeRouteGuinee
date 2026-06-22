@@ -11,6 +11,13 @@ import {
   CsvExportsPanel,
   OfficialPaymentsImportPanel,
 } from './components/AdminExtras';
+import { Pagination, SearchBar, PaginationBar, PageSizeSelector } from './components/Pagination';
+import {
+  type CandidateFilters,
+  type CenterFilters,
+  type QuestionFilters,
+  type UserFilters,
+} from './api';
 import { isAudioLocale, speakFeedback, stop as stopAudio } from './audio';
 import { type Locale } from './i18n';
 import { type AuthUser } from './authClient';
@@ -391,8 +398,8 @@ export function CenterPage() {
   const [reporting, setReporting] = useState(false);
 
   useEffect(() => {
-    getCenters().then(setCenters).catch(() => undefined);
-    getCenterIncidents('open', 10).then(setIncidents).catch(() => undefined);
+    getCenters().then(r => setCenters(r.items)).catch(() => undefined);
+    getCenterIncidents({ statusFilter: 'open', limit: 10 }).then(r => setIncidents(r.items)).catch(() => undefined);
   }, []);
 
   async function handleEntry(e: FormEvent) {
@@ -426,7 +433,7 @@ export function CenterPage() {
     try {
       await reportCenterIncident({ center_id: center.id, incident_type: incType, severity: incSev, description: incDesc });
       setIncErr(null); setIncDesc('');
-      getCenterIncidents('open', 10).then(setIncidents).catch(() => undefined);
+      getCenterIncidents({ statusFilter: 'open', limit: 10 }).then(r => setIncidents(r.items)).catch(() => undefined);
       alert('Incident déclaré avec succès.');
     } catch (err) {
       setIncErr(errMsg(err, 'Déclaration échouée.'));
@@ -533,7 +540,7 @@ export function CenterPage() {
         <div className="card">
           <div className="card-header">
             <span className="card-title">📋 Incidents ouverts ({incidents.length})</span>
-            <button className="btn-sm secondary-button" onClick={() => getCenterIncidents('open', 10).then(setIncidents).catch(() => undefined)}>
+            <button className="btn-sm secondary-button" onClick={() => getCenterIncidents({ statusFilter: 'open', limit: 25 }).then(r => setIncidents(r.items)).catch(() => undefined)}>
               Actualiser
             </button>
           </div>
@@ -584,7 +591,16 @@ export function AdminPage() {
   const [dashboard, setDashboard] = useState<DashboardData | null>(null);
   const [examSum, setExamSum] = useState<ExamSummary | null>(null);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
+  const [candidatesTotal, setCandidatesTotal] = useState(0);
+  const [candidatesLoading, setCandidatesLoading] = useState(false);
+  const [candPage, setCandPage] = useState(0);
+  const [candLimit, setCandLimit] = useState(20);
+  const [candSearch, setCandSearch] = useState('');
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
+  const [auditTotal, setAuditTotal] = useState(0);
+  const [auditLoading, setAuditLoading] = useState(false);
+  const [auditPage, setAuditPage] = useState(0);
+  const [auditSearch, setAuditSearch] = useState('');
   const [users, setUsers] = useState<InstitutionalUser[]>([]);
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -602,10 +618,22 @@ export function AdminPage() {
   }, []);
 
   useEffect(() => {
-    if (tab === 'candidates') getCandidates().then(setCandidates).catch(() => undefined);
-    if (tab === 'audit') getAuditLogs().then(setAuditLogs).catch(() => undefined);
+    if (tab === 'candidates') {
+      setCandidatesLoading(true);
+      getCandidates({ limit: candLimit, offset: candPage * candLimit, search: candSearch })
+        .then(data => { setCandidates(data.items); setCandidatesTotal(data.total); })
+        .catch(() => undefined)
+        .finally(() => setCandidatesLoading(false));
+    }
+    if (tab === 'audit') {
+      setAuditLoading(true);
+      getAuditLogs({ limit: 100, action: undefined, entity: undefined })
+        .then(data => { setAuditLogs(data); setAuditTotal(data.length); })
+        .catch(() => undefined)
+        .finally(() => setAuditLoading(false));
+    }
     if (tab === 'users') getInstitutionalUsers().then(setUsers).catch(() => undefined);
-  }, [tab]);
+  }, [tab, candPage, candLimit, candSearch]);
 
   async function handleCreateUser(e: FormEvent) {
     e.preventDefault();
@@ -691,8 +719,13 @@ export function AdminPage() {
       {tab === 'candidates' && (
         <div className="card">
           <div className="card-header">
-            <span className="card-title">👥 Candidats ({candidates.length})</span>
-            <button className="secondary-button btn-sm" onClick={() => getCandidates().then(setCandidates).catch(() => undefined)}>Actualiser</button>
+            <span className="card-title">👥 Candidats</span>
+            <SearchBar
+              value={candSearch}
+              onChange={s => { setCandSearch(s); }}
+              placeholder="Rechercher un candidat…"
+            />
+            <button className="secondary-button btn-sm" onClick={() => getCandidates({ limit: candLimit, offset: candPage * candLimit, search: candSearch }).then(r => { setCandidates(r.items); setCandidatesTotal(r.total); }).catch(() => undefined)}>Actualiser</button>
           </div>
           {candidates.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '32px', color: 'var(--muted)' }}>
@@ -703,7 +736,7 @@ export function AdminPage() {
               <table>
                 <thead><tr><th>Référence</th><th>Nom</th><th>Prénom</th><th>Téléphone</th><th>Catégorie</th><th>Statut</th></tr></thead>
                 <tbody>
-                  {candidates.slice(0, 50).map(c => (
+                  {candidates.map(c => (
                     <tr key={c.id}>
                       <td><code style={{ fontSize: 11 }}>{c.reference}</code></td>
                       <td>{c.last_name}</td>
@@ -717,6 +750,17 @@ export function AdminPage() {
               </table>
             </div>
           )}
+          <PaginationBar
+            total={candidatesTotal || candidates.length}
+            limit={candLimit}
+            offset={candPage * candLimit}
+            search={candSearch}
+            onPage={(off) => setCandPage(Math.floor(off / candLimit))}
+            onSearch={(s) => { setCandSearch(s); setCandPage(0); }}
+            onLimit={(l) => { setCandLimit(l); setCandPage(0); }}
+            loading={candidatesLoading}
+            searchPlaceholder="Rechercher un candidat…"
+          />
         </div>
       )}
 
@@ -727,8 +771,15 @@ export function AdminPage() {
       {tab === 'audit' && (
         <div className="card">
           <div className="card-header">
-            <span className="card-title">📋 Audit logs ({auditLogs.length})</span>
-            <button className="secondary-button btn-sm" onClick={() => downloadAuditLogsCsv().catch(() => undefined)}>⬇ CSV</button>
+            <span className="card-title">📋 Audit logs</span>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <SearchBar
+                value={auditSearch}
+                onChange={s => setAuditSearch(s)}
+                placeholder="Filtrer les logs…"
+              />
+              <button className="secondary-button btn-sm" onClick={() => downloadAuditLogsCsv().catch(() => undefined)}>⬇ CSV</button>
+            </div>
           </div>
           {auditLogs.length === 0 ? (
             <div style={{ textAlign: 'center', padding: 32, color: 'var(--muted)' }}>
@@ -739,7 +790,7 @@ export function AdminPage() {
               <table>
                 <thead><tr><th>Date</th><th>Action</th><th>Entité</th><th>Détails</th></tr></thead>
                 <tbody>
-                  {auditLogs.slice(0, 100).map((log, i) => (
+                  {auditLogs.slice(auditPage * 25, auditPage * 25 + 25).map((log, i) => (
                     <tr key={i}>
                       <td style={{ whiteSpace: 'nowrap' }}>{fmtDate(log.created_at)}</td>
                       <td><code style={{ fontSize: 11 }}>{log.action}</code></td>
@@ -751,6 +802,13 @@ export function AdminPage() {
                   ))}
                 </tbody>
               </table>
+              <Pagination
+                total={auditLogs.length}
+                limit={25}
+                offset={auditPage * 25}
+                onPage={(off) => setAuditPage(Math.floor(off / 25))}
+                loading={auditLoading}
+              />
             </div>
           )}
         </div>
@@ -1023,7 +1081,9 @@ export function InstitutionalDossierPage() {
   const { currentUser, isPresentationMode } = useAuthSession();
   const canAdmin = canUseProtectedActions(currentUser, isPresentationMode, ['admin','super_admin']);
   const [identityChecks, setIdentityChecks] = useState<CandidateIdentityCheck[]>([]);
+  const [identityPage, setIdentityPage] = useState(0);
   const [submissions, setSubmissions] = useState<CandidateSubmission[]>([]);
+  const [submissionsPage, setSubmissionsPage] = useState(0);
 
   useEffect(() => {
     if (!canAdmin) return;

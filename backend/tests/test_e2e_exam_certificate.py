@@ -82,9 +82,14 @@ def test_exam_scoring_certificate_and_public_verification_end_to_end() -> None:
         attempt = start_response.json()
         assert attempt["status"] == "started"
 
-        questions_response = client.get("/api/v1/questions", headers=admin_headers)
-        assert questions_response.status_code == 200
-        answers = {question["id"]: question["correct_answer"] for question in questions_response.json()}
+        # Récupérer les bonnes réponses depuis la DB (bypass pagination API)
+        from app.db.session import SessionLocal as _SL
+        from app.models_question import Question as _Q
+        from sqlalchemy import select as _select
+        _db = _SL()
+        _all_q = _db.scalars(_select(_Q).where(_Q.is_active == True)).all()
+        answers = {q.id: q.correct_answer for q in _all_q}
+        _db.close()
         assert len(answers) >= 40
 
         submit_response = client.post(

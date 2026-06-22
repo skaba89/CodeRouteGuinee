@@ -413,3 +413,26 @@ class AuditLogRead(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+# ── Pagination ──────────────────────────────────────────────────────────────
+
+class PagedResponse[T](BaseModel):
+    """
+    Réponse paginée standard CodeRoute Guinée.
+
+    Tous les endpoints de liste retournent ce format :
+      items  : liste des objets de la page courante
+      total  : nombre total d'éléments (pour calculer le nb de pages)
+      limit  : taille de la page demandée
+      offset : décalage appliqué
+      search : terme de recherche actif (optionnel)
+    """
+
+    items: list  # type: ignore[type-arg]
+    total: int
+    limit: int
+    offset: int
+    search: str | None = None
+
+    model_config = {"from_attributes": True}

@@ -122,9 +122,14 @@ def test_exam_question_trace_is_created_and_used_for_scoring() -> None:
         # proviennent bien de la banque active.
         assert len(trace["question_ids"]) > 0  # Au moins une question sélectionnée
 
-        active_questions_response = client.get("/api/v1/questions", headers=headers)
-        assert active_questions_response.status_code == 200
-        active_answer_key = {question["id"]: question["correct_answer"] for question in active_questions_response.json()}
+        # Récupérer les bonnes réponses depuis la DB (bypass pagination API)
+        from app.db.session import SessionLocal as _SL
+        from app.models_question import Question as _Q
+        from sqlalchemy import select as _select
+        _db = _SL()
+        _all_q = _db.scalars(_select(_Q).where(_Q.is_active == True)).all()
+        active_answer_key = {q.id: q.correct_answer for q in _all_q}
+        _db.close()
         answers = {question_id: active_answer_key.get(question_id, "A") for question_id in trace["question_ids"]}
         submit_response = client.post(
             f"/api/v1/exams/{attempt['id']}/submit",
@@ -142,5 +147,5 @@ def test_exam_question_trace_is_created_and_used_for_scoring() -> None:
             headers=admin_headers,
         )
         assert audit_response.status_code == 200
-        logs = audit_response.json()
+        logs = audit_response.json()["items"]
         assert any(log["details"]["attempt_id"] == attempt["id"] for log in logs)

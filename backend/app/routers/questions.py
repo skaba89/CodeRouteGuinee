@@ -1,5 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
@@ -12,12 +12,28 @@ from app.schemas import QuestionCreate, QuestionOfficialImportRequest, QuestionO
 router = APIRouter(prefix="/questions", tags=["questions"])
 
 
-@router.get("", response_model=list[QuestionRead])
+@router.get("", response_model=dict)
 def list_questions(
+    limit: int = Query(default=20, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    search: str | None = Query(default=None, max_length=200),
+    category: str | None = Query(default=None),
+    is_active: bool | None = Query(default=True),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("admin", "super_admin", "center")),
 ) -> list[Question]:
-    return list(db.scalars(select(Question).where(Question.is_active.is_(True))).all())
+    q = select(Question).order_by(Question.category.asc(), Question.created_at.desc())
+    if is_active is not None:
+        q = q.where(Question.is_active.is_(is_active))
+    if category:
+        q = q.where(Question.category == category)
+    if search:
+        term = f"%{search.strip()}%"
+        q = q.where(Question.text.ilike(term))
+    total = db.scalar(select(func.count()).select_from(q.subquery()))
+    raw_items = list(db.scalars(q.offset(offset).limit(limit)).all())
+    items = [QuestionRead.model_validate(x) for x in raw_items]
+    return {"items": items, "total": total, "limit": limit, "offset": offset, "search": search}
 
 
 @router.post("", response_model=QuestionRead, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_roles("admin", "super_admin"))])

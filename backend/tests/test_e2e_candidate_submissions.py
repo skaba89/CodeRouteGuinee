@@ -133,5 +133,5 @@ def test_candidate_submission_lifecycle_and_admin_handling() -> None:
             headers=admin_headers,
         )
         assert audit_response.status_code == 200
-        logs = audit_response.json()
+        logs = audit_response.json()["items"]
         assert any(log["details"]["attempt_id"] == attempt["id"] for log in logs)

@@ -1,6 +1,6 @@
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -130,12 +130,14 @@ def create_monitoring_event(
     return event
 
 
-@router.get("/events", response_model=list[ExamMonitoringEventRead])
+@router.get("/events", response_model=dict)
 def list_monitoring_events(
     attempt_id: str | None = None,
     session_id: str | None = None,
     severity: str | None = None,
-    limit: int = 100,
+    limit: int = Query(default=20, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    search: str | None = Query(default=None),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("admin", "super_admin")),
 ) -> list[ExamMonitoringEvent]:
@@ -146,8 +148,13 @@ def list_monitoring_events(
         query = query.where(ExamMonitoringEvent.session_id == session_id)
     if severity:
         query = query.where(ExamMonitoringEvent.severity == normalize_severity(severity))
-    query = query.order_by(ExamMonitoringEvent.occurred_at.desc()).limit(limit)
-    return list(db.scalars(query).all())
+    query = query.order_by(ExamMonitoringEvent.occurred_at.desc())
+    if search:
+        query = query.where(ExamMonitoringEvent.event_type.ilike(f"%{search}%"))
+    total = db.scalar(select(func.count()).select_from(query.subquery()))
+    raw_items = list(db.scalars(query.offset(offset).limit(limit)).all())
+    items = [ExamMonitoringEventRead.model_validate(x) for x in raw_items]
+    return {"items": items, "total": total, "limit": limit, "offset": offset, "search": search}
 
 
 @router.get("/attempts/{attempt_id}/summary", response_model=ExamMonitoringSummary)

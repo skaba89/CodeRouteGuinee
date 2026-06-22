@@ -1,5 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException, Response, status
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.booking_service import build_booking_reference, build_verification_code
@@ -15,6 +15,32 @@ from app.qr_service import generate_qr_svg
 from app.schemas import BookingCreate, BookingRead, BookingVerificationRead
 
 router = APIRouter(prefix="/bookings", tags=["bookings"])
+
+
+@router.get("", response_model=dict)
+def list_bookings(
+    candidate_id: str | None = Query(default=None, description="Filtrer par candidat"),
+    session_id: str | None = Query(default=None, description="Filtrer par session"),
+    booking_status: str | None = Query(default=None, alias="status", description="Statut : pending | confirmed | cancelled"),
+    search: str | None = Query(default=None, description="Recherche sur la référence"),
+    limit: int = Query(default=20, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "super_admin", "center")),
+) -> list[Booking]:
+    q = select(Booking).order_by(Booking.created_at.desc())
+    if candidate_id:
+        q = q.where(Booking.candidate_id == candidate_id)
+    if session_id:
+        q = q.where(Booking.session_id == session_id)
+    if booking_status:
+        q = q.where(Booking.status == booking_status)
+    if search:
+        q = q.where(Booking.reference.ilike(f"%{search}%"))
+    total = db.scalar(select(func.count()).select_from(q.subquery()))
+    raw_items = list(db.scalars(q.offset(offset).limit(limit)).all())
+    items = [BookingRead.model_validate(x) for x in raw_items]
+    return {"items": items, "total": total, "limit": limit, "offset": offset, "search": search}
 
 
 @router.post("", response_model=BookingRead, status_code=status.HTTP_201_CREATED)

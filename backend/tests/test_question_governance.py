@@ -243,7 +243,7 @@ def test_admin_can_suspend_and_republish_question_with_audit_log() -> None:
         assert suspended.json()["latest_status"] == "suspended"
         assert suspended.json()["is_active"] is False
 
-        active_questions = client.get("/api/v1/questions", headers=headers).json()
+        active_questions = client.get("/api/v1/questions", headers=headers).json()["items"]
         assert all(item["id"] != question["id"] for item in active_questions)
 
         published = client.post(

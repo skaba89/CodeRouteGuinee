@@ -60,7 +60,7 @@ def test_admin_can_create_and_approve_institutional_authorization_with_audit_log
 
         listed = client.get("/api/v1/institutional-authorizations?status_filter=approved", headers=headers)
         assert listed.status_code == 200
-        assert any(item["id"] == authorization["id"] for item in listed.json())
+        assert any(item["id"] == authorization["id"] for item in listed.json()["items"])
 
         with SessionLocal() as db:
             audit_log = db.scalar(

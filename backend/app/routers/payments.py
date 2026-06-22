@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from pydantic import BaseModel, Field
-from sqlalchemy import Select, select
+from sqlalchemy import Select, func, select
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
@@ -180,6 +180,46 @@ def get_admin_payment_summary(
     )
     db.commit()
     return summary
+
+
+@router.get("/admin/list")
+def get_admin_payment_list(
+    provider: str | None = Query(default=None),
+    payment_status: str | None = Query(default=None, alias="status"),
+    date_from: str | None = Query(default=None),
+    date_to: str | None = Query(default=None),
+    search: str | None = Query(default=None, description="Recherche sur référence ou numéro reçu"),
+    limit: int = Query(default=20, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "super_admin")),
+) -> dict:
+    q = _filtered_payments_query(provider, payment_status, date_from, date_to)
+    if search:
+        from sqlalchemy import or_
+        q = q.where(or_(
+            Payment.receipt_number.ilike(f"%{search}%"),
+            Payment.booking_reference.ilike(f"%{search}%"),
+        ))
+    total = db.scalar(select(func.count()).select_from(q.subquery()))
+    items = db.scalars(q.order_by(Payment.created_at.desc()).offset(offset).limit(limit)).all()
+    return {
+        "total": total or 0,
+        "limit": limit,
+        "offset": offset,
+        "items": [
+            {
+                "id": p.id,
+                "booking_reference": p.booking_reference,
+                "receipt_number": p.receipt_number,
+                "amount_gnf": p.amount_gnf,
+                "provider": p.provider,
+                "status": p.status,
+                "created_at": p.created_at.isoformat(),
+            }
+            for p in items
+        ],
+    }
 
 
 @router.get("/admin/export.csv")

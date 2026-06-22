@@ -133,7 +133,7 @@ def test_exam_monitoring_events_risk_summary_and_audit_log() -> None:
             headers=admin_headers,
         )
         assert events_response.status_code == 200
-        events = events_response.json()
+        events = events_response.json()["items"]
         assert len(events) == 2
         assert any(event["event_type"] == "fullscreen_exit" for event in events)
 
@@ -142,5 +142,5 @@ def test_exam_monitoring_events_risk_summary_and_audit_log() -> None:
             headers=admin_headers,
         )
         assert audit_response.status_code == 200
-        audit_logs = audit_response.json()
+        audit_logs = audit_response.json()["items"]
         assert any(log["details"]["attempt_id"] == attempt["id"] for log in audit_logs)

@@ -1,5 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
@@ -37,22 +37,34 @@ def audit_user_decision(
     )
 
 
-@router.get("", response_model=list[UserRead])
+@router.get("", response_model=dict)
 def list_users(
-    limit: int = 50,
-    role: str | None = None,
-    is_active: bool | None = None,
+    limit: int = Query(default=20, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    search: str | None = Query(default=None, max_length=100),
+    role: str | None = Query(default=None),
+    is_active: bool | None = Query(default=None),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("admin", "super_admin")),
-) -> list[User]:
-    safe_limit = max(1, min(limit, 200))
+) -> dict:
     query = select(User)
     if role:
         query = query.where(User.role == role)
     if is_active is not None:
         query = query.where(User.is_active == is_active)
-    query = query.order_by(User.created_at.desc()).limit(safe_limit)
-    return list(db.scalars(query).all())
+    if search:
+        term = f"%{search.strip()}%"
+        query = query.where(
+            or_(
+                User.email.ilike(term),
+                User.full_name.ilike(term),
+            )
+        )
+    query = query.order_by(User.created_at.desc())
+    total = db.scalar(select(func.count()).select_from(query.subquery()))
+    raw_items = list(db.scalars(query.offset(offset).limit(limit)).all())
+    items = [UserRead.model_validate(u) for u in raw_items]
+    return {"items": items, "total": total, "limit": limit, "offset": offset, "search": search}
 
 
 @router.post("", response_model=UserRead, status_code=status.HTTP_201_CREATED)

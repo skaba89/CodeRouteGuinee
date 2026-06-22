@@ -124,5 +124,5 @@ def test_admin_finance_reconciliation_end_to_end() -> None:
             headers=headers,
         )
         assert audit_response.status_code == 200
-        audit_logs = audit_response.json()
+        audit_logs = audit_response.json()["items"]
         assert any(log["action"] == "payments.export_csv" for log in audit_logs)

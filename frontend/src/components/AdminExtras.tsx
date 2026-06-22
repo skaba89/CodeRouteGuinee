@@ -78,13 +78,13 @@ export function InstitutionalAuthsPanel({ canAdmin }: { canAdmin: boolean }) {
       getInstitutionalAuthorizations(),
       getOperationalReadiness(),
     ]).then(([a, r]) => {
-      if (a.status === 'fulfilled') setAuths(a.value);
+      if (a.status === 'fulfilled') setAuths(a.value.items);
       if (r.status === 'fulfilled') setReadiness(r.value);
     }).finally(() => setLoading(false));
   }, [canAdmin]);
 
   function reload() {
-    getInstitutionalAuthorizations().then(setAuths).catch(() => undefined);
+    getInstitutionalAuthorizations().then(r => setAuths(r.items)).catch(() => undefined);
   }
 
   async function handleCreate(e: FormEvent) {
@@ -469,7 +469,7 @@ export function QuestionsAdminPanel({ canAdmin }: { canAdmin: boolean }) {
   useEffect(() => {
     if (!canAdmin) { setLoading(false); return; }
     getQuestions()
-      .then(setQuestions)
+      .then(r => setQuestions(r.items))
       .catch(() => undefined)
       .finally(() => setLoading(false));
   }, [canAdmin]);

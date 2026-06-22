@@ -1,9 +1,9 @@
 import csv
 from io import StringIO
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from fastapi.responses import Response
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
@@ -15,9 +15,11 @@ from app.schemas import AuditLogRead
 router = APIRouter(prefix="/supervision", tags=["supervision"])
 
 
-@router.get("/audit-logs", response_model=list[AuditLogRead])
+@router.get("/audit-logs", response_model=dict)
 def list_audit_logs(
-    limit: int = 50,
+    limit: int = Query(default=20, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    search: str | None = Query(default=None, max_length=100),
     action: str | None = None,
     entity: str | None = None,
     db: Session = Depends(get_db),
@@ -30,7 +32,14 @@ def list_audit_logs(
     if entity:
         query = query.where(AuditLog.entity == entity)
     query = query.order_by(AuditLog.created_at.desc()).limit(safe_limit)
-    return list(db.scalars(query).all())
+    if search:
+        query = query.where(
+            AuditLog.action.ilike(f"%{search}%")
+        )
+    total = db.scalar(select(func.count()).select_from(query.subquery()))
+    raw_items = list(db.scalars(query.offset(offset)).all())
+    items = [AuditLogRead.model_validate(x) for x in raw_items]
+    return {"items": items, "total": total, "limit": limit, "offset": offset, "search": search}
 
 
 @router.get("/audit-logs/export.csv")
