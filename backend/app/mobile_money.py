@@ -40,6 +40,7 @@ class ProviderResult:
     status: str
     external_reference: str
     message: str
+    checkout_url: str = ""  # URL redirection Wave/PayDunya (vide pour les autres)
 
 
 # ── Normalisation provider ────────────────────────────────────────────────
@@ -396,11 +397,13 @@ def _wave_payment(phone: str, amount_gnf: int) -> ProviderResult:
         )
         if resp.status_code in (200, 201):
             data = resp.json()
+            checkout_url = data.get("wave_launch_url", "")
             return ProviderResult(
                 provider="wave",
                 status="pending",  # Wave = asynchrone, le webhook confirme
                 external_reference=data.get("id", f"WAVE-{uuid.uuid4().hex[:12].upper()}"),
-                message=f"Paiement Wave initié — URL: {data.get('wave_launch_url', '')}",
+                message="Paiement Wave initié — en attente de confirmation",
+                checkout_url=checkout_url,
             )
         return ProviderResult(
             provider="wave",

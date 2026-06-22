@@ -164,6 +164,7 @@ def create_payment(
         "external_reference": payment.external_reference,
         "paid_at": payment.paid_at.isoformat() if payment.paid_at else None,
         "message": provider_result.message,
+        "checkout_url": provider_result.checkout_url,
     }
 
 
