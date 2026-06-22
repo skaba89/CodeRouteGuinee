@@ -4,7 +4,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   getAudioEnabled, isAudioLocale, isTTSAvailable,
-  preloadVoices, setAudioEnabled, speak, speakQuestion, stop,
+  playQuestionAudio, preloadVoices, setAudioEnabled, speak, speakQuestion, stop,
 } from '../audio';
 import { useLocale, SUPPORTED_LOCALES, type Locale } from '../i18n';
 
@@ -15,9 +15,13 @@ interface PlayButtonProps {
   options?: string[];
   size?: number;
   rate?: number;
+  /** ID de la question pour chercher un MP3 pré-enregistré */
+  questionId?: string;
+  /** Locale pour le fichier MP3 (/audio/{locale}/{questionId}.mp3) */
+  locale?: string;
 }
 
-export function PlayButton({ text, options = [], size = 36, rate }: PlayButtonProps) {
+export function PlayButton({ text, options = [], size = 36, rate, questionId, locale }: PlayButtonProps) {
   const [playing, setPlaying] = useState(false);
 
   function handleClick() {
@@ -27,18 +31,21 @@ export function PlayButton({ text, options = [], size = 36, rate }: PlayButtonPr
       return;
     }
     setPlaying(true);
+    const ms = Math.max(4000, (text.length + options.join('').length) * 75);
+    setTimeout(() => setPlaying(false), ms);
+
+    // Priorité 1 : MP3 pré-enregistré si questionId + locale fournis
+    if (questionId && locale) {
+      playQuestionAudio(questionId, locale as import('../i18n').Locale, text, options)
+        .catch(() => {});
+      return;
+    }
+    // Priorité 2 : TTS (fallback universel)
     if (options.length > 0) {
       speakQuestion(text, options, { rate });
     } else {
-      speak(text, {
-        rate: rate ?? 0.88,
-        priority: true,
-        onEnd: () => setPlaying(false),
-      });
+      speak(text, { rate: rate ?? 0.88, priority: true, onEnd: () => setPlaying(false) });
     }
-    // Sécurité : reset après durée max estimée
-    const ms = Math.max(4000, (text.length + options.join('').length) * 75);
-    setTimeout(() => setPlaying(false), ms);
   }
 
   if (!isTTSAvailable()) return null;
