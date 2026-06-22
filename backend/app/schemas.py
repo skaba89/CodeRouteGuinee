@@ -402,6 +402,17 @@ class DashboardRead(BaseModel):
     exam_sessions: int
     questions: int
     fraud_alerts: int = 0
+    # KPIs opérationnels
+    candidates_passed: int = 0
+    candidates_failed: int = 0
+    pass_rate_pct: float = 0.0
+    # KPIs financiers
+    payments_total: int = 0
+    revenue_gnf: int = 0
+    # Activité récente
+    sessions_this_week: int = 0
+    sessions_available: int = 0
+    bookings_pending: int = 0
 
 
 class AuditLogRead(BaseModel):
