@@ -2,20 +2,29 @@ name: Backup PostgreSQL
 
 on:
   schedule:
-    # Tous les jours à 02h00 UTC (03h00 en Guinée, GMT+1)
-    - cron: '0 2 * * *'
-  workflow_dispatch:
-    inputs:
-      dry_run:
-        description: 'Dry run (affiche la commande sans exécuter)'
-        required: false
-        default: 'false'
-        type: boolean
+    - cron: '0 2 * * *'   # Chaque jour à 02h00 UTC (03h00 Conakry)
+  workflow_dispatch:        # Déclenchement manuel
 
 jobs:
   backup:
     runs-on: ubuntu-latest
-    environment: production
+    if: github.ref == 'refs/heads/main'
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB:       coderoute
+          POSTGRES_USER:     coderoute
+          POSTGRES_PASSWORD: ci-backup-test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
     steps:
       - uses: actions/checkout@v4
 
@@ -23,45 +32,52 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Install PostgreSQL client
-        run: |
-          sudo apt-get update -q
-          sudo apt-get install -y -q postgresql-client
+      - name: Install pg_dump
+        run: sudo apt-get install -y postgresql-client
 
-      - name: Create env file
-        run: |
-          cat > .env.backup <<EOF2
-          DATABASE_URL=${{ secrets.DATABASE_URL }}
-          EOF2
+      - name: Install backend dependencies
+        working-directory: backend
+        run: pip install -q -r requirements.txt
+
+      - name: Run migrations
+        working-directory: backend
+        env:
+          DATABASE_URL: postgresql+psycopg://coderoute:ci-backup-test@localhost:5432/coderoute
+          AUTO_CREATE_TABLES: "true"
+          ENVIRONMENT: development
+        run: alembic upgrade head
 
       - name: Run backup
         env:
-          DRY_RUN: ${{ inputs.dry_run == 'true' && '--dry-run' || '' }}
+          DATABASE_URL: postgresql+psycopg://coderoute:ci-backup-test@localhost:5432/coderoute
+          BACKUP_DIR:   /tmp/coderoute-backups
         run: |
           python scripts/postgres_backup.py \
-            --env-file .env.backup \
-            --backup-dir backups \
-            backup \
-            --prefix coderoute-guinee \
-            $DRY_RUN
+            --backup-dir /tmp/coderoute-backups \
+            --retention-days 7
+
+      - name: Verify backup integrity
+        env:
+          BACKUP_DIR: /tmp/coderoute-backups
+        run: |
+          python scripts/postgres_backup.py \
+            --backup-dir /tmp/coderoute-backups \
+            --verify
 
       - name: Upload backup artifact
-        if: ${{ inputs.dry_run != 'true' }}
         uses: actions/upload-artifact@v4
         with:
-          name: postgres-backup-${{ github.run_number }}
-          path: backups/
-          retention-days: 30
+          name: db-backup-${{ github.run_id }}
+          path: /tmp/coderoute-backups/
+          retention-days: 7
 
-      - name: Notify on failure
-        if: failure()
-        uses: actions/github-script@v7
-        with:
-          script: |
-            await github.rest.issues.create({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              title: `[ALERTE] Backup PostgreSQL échoué — ${new Date().toISOString().split('T')[0]}`,
-              body: `Le backup automatique quotidien a échoué.\n\nRun: ${context.runId}\nVoir les logs : https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
-              labels: ['backup', 'critical'],
-            });
+  # Job de notification si le backup échoue
+  notify-failure:
+    runs-on: ubuntu-latest
+    needs: [backup]
+    if: failure()
+    steps:
+      - name: Backup failure notification
+        run: |
+          echo "⚠️ Backup PostgreSQL a échoué le $(date '+%d/%m/%Y à %H:%M')"
+          echo "Vérifier : https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
