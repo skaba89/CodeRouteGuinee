@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
@@ -114,6 +115,21 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
 
 app.add_middleware(SecurityHeadersMiddleware)
+
+
+# ── Middleware CSRF — actif uniquement en production ──────────────────────────
+if os.environ.get("ENVIRONMENT", "development").lower() == "production":
+    from app.csrf import check_csrf as _check_csrf
+
+    class _CsrfMiddleware(BaseHTTPMiddleware):
+        async def dispatch(self, request, call_next):
+            try:
+                _check_csrf(request)
+            except Exception as exc:
+                return JSONResponse({"detail": str(exc)}, status_code=403)
+            return await call_next(request)
+
+    app.add_middleware(_CsrfMiddleware)
 
 
 app.include_router(audio.router, prefix=settings.api_v1_prefix)

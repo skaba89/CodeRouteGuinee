@@ -492,6 +492,20 @@ def submit_exam(
     except Exception:
         pass  # Email non bloquant
 
+    # SMS de résultat — best effort
+    try:
+        if candidate and candidate.phone:
+            from app.orange_sms import send_exam_result_sms
+            send_exam_result_sms(
+                phone          = candidate.phone,
+                candidate_name = f"{candidate.first_name} {candidate.last_name}",
+                passed         = result["passed"],
+                score          = result["correct_answers"],
+                total          = result["total_questions"],
+            )
+    except Exception:
+        pass  # SMS non bloquant
+
     return attempt
 
 
