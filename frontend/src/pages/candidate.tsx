@@ -1,4 +1,3 @@
-// CandidatePage — CodeRoute Guinée
 import { type FormEvent, useEffect, useRef, useCallback, useState } from 'react';
 import { AudioModeBanner, LocaleAudioSwitcher, PlayButton, AudioToggle } from '../components/AudioButton';
 import {
@@ -40,6 +39,7 @@ import {
   resetInstitutionalUserPassword,
   validateEntry, reportCenterIncident, getCenterIncidents, resolveCenterIncident,
   createPayment, getConvocationPdfUrl, verifyExamCertificate,
+  getMyCandidateProfile, getMyBookings, type MyBooking,
   downloadExamCertificatePdf, getExamResults,
   startExamFromBooking, submitExamAttempt, getExamLiveStatus,
   getCandidateIdentityChecks, getCandidateSubmissions,
@@ -82,6 +82,7 @@ function errMsg(e: unknown, fallback = 'Erreur inattendue'): string {
 
 export function CandidatePage() {
   const { currentUser, isPresentationMode } = useAuthSession();
+
   const canAct = canUseProtectedActions(currentUser, isPresentationMode, ['candidate','admin','super_admin']);
 
   const [bookRef, setBookRef] = useState('');
@@ -93,6 +94,17 @@ export function CandidatePage() {
   const [payErr, setPayErr] = useState<string | null>(null);
 
   const [certId, setCertId] = useState('');
+  const [myBookings, setMyBookings] = useState<MyBooking[]>([]);
+  const [myBookingsLoaded, setMyBookingsLoaded] = useState(false);
+
+  // Charger les réservations du candidat connecté
+  useEffect(() => {
+    if (currentUser?.role === 'candidate' && !myBookingsLoaded) {
+      getMyBookings()
+        .then(bks => { setMyBookings(bks); setMyBookingsLoaded(true); })
+        .catch(() => setMyBookingsLoaded(true));
+    }
+  }, [currentUser, myBookingsLoaded]);
   const [cert, setCert] = useState<ExamCertificateVerification | null>(null);
   const [certErr, setCertErr] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
@@ -188,6 +200,9 @@ export function CandidatePage() {
             {payResult && (
               <div className="alert as">
                 ✅ Paiement <strong>{payResult.status === 'paid' ? 'confirmé' : payResult.status}</strong> — Réf. {payResult.reference}
+                {payResult.checkout_url && (
+                  <span> — <a href={payResult.checkout_url} target="_blank" rel="noopener noreferrer" style={{ color: '#004085', fontWeight: 600 }}>Finaliser Wave →</a></span>
+                )}
               </div>
             )}
             <button type="submit" className="btn-success btn-block" disabled={paying}>

@@ -104,7 +104,9 @@ def test_exam_questions_endpoint() -> None:
         # GET /questions
         q_resp = client.get(f"/api/v1/exams/{attempt['id']}/questions", headers=admin_headers)
         assert q_resp.status_code == 200
-        questions = q_resp.json()
+        resp_data = q_resp.json()
+        # Endpoint retourne ExamQuestionsRead avec champ "questions"
+        questions = resp_data["questions"] if isinstance(resp_data, dict) else resp_data
         assert isinstance(questions, list)
         assert len(questions) > 0
 
@@ -138,9 +140,10 @@ def test_exam_results_endpoint() -> None:
         }).json()
 
         # GET /questions pour récupérer les IDs
-        questions = client.get(
+        q_data = client.get(
             f"/api/v1/exams/{attempt['id']}/questions", headers=admin_headers
         ).json()
+        questions = q_data["questions"] if isinstance(q_data, dict) else q_data
 
         # Soumettre les réponses (première option pour chaque question)
         answers = {q["id"]: q["options"][0] for q in questions}
@@ -215,10 +218,11 @@ def test_exam_questions_blocked_after_submission() -> None:
             "candidate_id": cand["id"], "session_id": session_id,
         }).json()
 
-        questions = client.get(
+        q_resp3 = client.get(
             f"/api/v1/exams/{attempt['id']}/questions", headers=admin_headers
         ).json()
-        answers = {q["id"]: q["options"][0] for q in questions}
+        questions3 = q_resp3["questions"] if isinstance(q_resp3, dict) else q_resp3
+        answers = {q["id"]: q["options"][0] for q in questions3}
         client.post(
             f"/api/v1/exams/{attempt['id']}/submit",
             headers=center_headers,

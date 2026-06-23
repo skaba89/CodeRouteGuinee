@@ -144,19 +144,6 @@ export type ExamSummary = {
   average_score: number;
 };
 
-export type ExamQuestion = {
-  id: string;
-  category: string;
-  text: string;
-  options: string[];
-  correct_answer: string;
-  explanation?: string | null;
-  media_type?: 'image' | 'video' | null;
-  media_url?: string | null;
-  media_alt?: string | null;
-  is_active: boolean;
-  created_at: string;
-};
 
 export type ExamAttempt = {
   id: string;
@@ -697,6 +684,24 @@ export function getCandidates(params: CandidateFilters = {}): Promise<PagedRespo
   return getJson<PagedResponse<Candidate>>(`/api/v1/candidates${q}`);
 }
 
+export function getMyCandidateProfile(): Promise<Candidate | null> {
+  return getPrivateJson<Candidate | null>('/api/v1/candidates/me');
+}
+
+export type MyBooking = {
+  reference: string;
+  status: string;
+  verification_code: string;
+  session_date: string | null;
+  center_name: string | null;
+  center_city: string | null;
+};
+
+export function getMyBookings(): Promise<MyBooking[]> {
+  return getPrivateJson<MyBooking[]>('/api/v1/bookings/my');
+}
+
+
 export function updateCenterStatus(centerId: string, status: string, reason: string): Promise<Center> {
   return patchPrivateJson<Center>(`/api/v1/centers/${encodeURIComponent(centerId)}/status`, { status, reason });
 }
@@ -958,6 +963,29 @@ export function startExamFromBooking(bookingReference: string, deviceKey?: strin
 
 export function submitExamAttempt(attemptId: string, answers: Record<string, string>): Promise<ExamAttempt> {
   return postJson<ExamAttempt>(`/api/v1/exams/${encodeURIComponent(attemptId)}/submit`, { answers });
+}
+
+export type ExamQuestion = {
+  id: string;
+  number: number;
+  category: string;
+  text: string;
+  options: string[];
+  correct_answer?: string;
+  is_active?: boolean;
+  media_url?: string | null;
+  media_type?: string | null;  // 'sign' | 'scene' | null
+};
+
+export type ExamQuestionsResponse = {
+  attempt_id: string;
+  questions: ExamQuestion[];
+  duration_seconds: number;
+  threshold: number;
+};
+
+export function getExamQuestions(attemptId: string): Promise<ExamQuestionsResponse> {
+  return getPrivateJson<ExamQuestionsResponse>(`/api/v1/exams/${encodeURIComponent(attemptId)}/questions`);
 }
 
 export function getExamMonitoringSummaries(filters: ExamMonitoringFilters = {}): Promise<ExamMonitoringSummary[]> {

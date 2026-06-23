@@ -3,6 +3,7 @@ import io
 from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
+from pydantic import BaseModel as _BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -28,6 +29,24 @@ from app.models_session import ExamSession
 from app.models_user import User
 from app.pdf_service import build_result_certificate_pdf
 from app.schemas import ExamAttemptRead, ExamCertificateVerificationRead, ExamStartFromBookingRequest, ExamStartRequest, ExamSubmitRequest
+
+
+class ExamQuestionItem(_BaseModel):
+    """Question telle que vue par le candidat — sans la réponse correcte."""
+    id: str
+    number: int
+    category: str
+    text: str
+    options: list[str]
+    media_url: str | None = None
+    media_type: str | None = None  # 'sign' | 'scene' | None
+
+
+class ExamQuestionsRead(_BaseModel):
+    attempt_id: str
+    questions: list[ExamQuestionItem]
+    duration_seconds: int = 1800   # 30 min par défaut
+    threshold: int = 35
 
 router = APIRouter(prefix="/exams", tags=["exams"])
 
@@ -228,6 +247,70 @@ def start_exam_from_booking(
     db.commit()
     db.refresh(attempt)
     return attempt
+
+
+@router.get("/{attempt_id}/questions", response_model=ExamQuestionsRead)
+def get_exam_questions(
+    attempt_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("center", "candidate", "admin", "super_admin")),
+) -> ExamQuestionsRead:
+    """
+    Retourne les questions de l'examen pour un attempt donné.
+    Les réponses correctes ne sont PAS incluses (sécurité).
+    Accessible au candidat propriétaire ou à un agent de centre.
+    """
+    attempt = db.scalar(select(ExamAttempt).where(ExamAttempt.id == attempt_id))
+    if not attempt:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Attempt not found")
+
+    # Bloquer après soumission — les questions ne sont plus accessibles
+    if attempt.status in ("submitted", "passed", "failed", "cancelled"):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Exam already {attempt.status} — questions no longer accessible",
+        )
+
+    # Vérifier que le candidat peut accéder à SES questions
+    if current_user.role == "candidate":
+        candidate = db.scalar(select(Candidate).where(Candidate.id == attempt.candidate_id))
+        if not candidate or candidate.id != attempt.candidate_id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+
+    # Récupérer le trace pour connaître les question_ids sélectionnés
+    trace = db.scalar(select(ExamQuestionTrace).where(ExamQuestionTrace.attempt_id == attempt_id))
+    if trace and trace.question_ids:
+        questions = list(db.scalars(
+            select(Question).where(Question.id.in_(trace.question_ids))
+        ).all())
+        # Respecter l'ordre d'origine
+        id_order = {qid: i for i, qid in enumerate(trace.question_ids)}
+        questions.sort(key=lambda q: id_order.get(q.id, 999))
+    else:
+        # Fallback : 40 questions actives aléatoires
+        questions = list(db.scalars(
+            select(Question).where(Question.is_active.is_(True)).limit(40)
+        ).all())
+
+    items = [
+        ExamQuestionItem(
+            id=q.id,
+            number=i + 1,
+            category=q.category,
+            text=q.text,
+            options=q.options if isinstance(q.options, list) else [],
+            media_url=getattr(q, "media_url", None),
+            media_type=getattr(q, "media_type", None),
+        )
+        for i, q in enumerate(questions)
+    ]
+
+    return ExamQuestionsRead(
+        attempt_id=attempt_id,
+        questions=items,
+        duration_seconds=1800,
+        threshold=35,
+    )
 
 
 @router.get("/summary")
@@ -454,50 +537,6 @@ def get_exam_status(
         "passed": attempt.passed if attempt.status == "submitted" else None,
         "expired": is_expired or attempt.status == "expired",
     }
-
-
-@router.get("/{attempt_id}/questions")
-def get_exam_questions(
-    attempt_id: str,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-) -> list[dict]:
-    """
-    Retourne les 40 questions de l'examen (sans les bonnes réponses).
-    Accessible uniquement si l'examen est en cours.
-    """
-    attempt = db.get(ExamAttempt, attempt_id)
-    if not attempt:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Exam attempt not found")
-    if attempt.status not in ("started",):
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Questions uniquement accessibles pendant un examen en cours",
-        )
-
-    trace = db.scalar(select(ExamQuestionTrace).where(ExamQuestionTrace.attempt_id == attempt.id))
-    if not trace or not trace.question_ids:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Trace d'examen introuvable")
-
-    questions = list(db.scalars(select(Question).where(Question.id.in_(trace.question_ids))).all())
-    # Trier dans l'ordre de sélection original
-    order_map = {qid: i for i, qid in enumerate(trace.question_ids)}
-    questions.sort(key=lambda q: order_map.get(q.id, 9999))
-
-    return [
-        {
-            "id": q.id,
-            "number": i + 1,
-            "category": q.category,
-            "text": q.text,
-            "options": q.options,
-            "media_type": q.media_type,
-            "media_url": q.media_url,
-            "media_alt": q.media_alt,
-            # NE PAS exposer correct_answer ni explanation pendant l'examen
-        }
-        for i, q in enumerate(questions)
-    ]
 
 
 @router.get("/{attempt_id}/results")

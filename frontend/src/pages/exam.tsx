@@ -41,7 +41,7 @@ import {
   validateEntry, reportCenterIncident, getCenterIncidents, resolveCenterIncident,
   createPayment, getConvocationPdfUrl, verifyExamCertificate,
   downloadExamCertificatePdf, getExamResults,
-  startExamFromBooking, submitExamAttempt, getExamLiveStatus,
+  startExamFromBooking, submitExamAttempt, getExamLiveStatus, getExamQuestions,
   getCandidateIdentityChecks, getCandidateSubmissions,
   getExamMonitoringSummaries, getExamMonitoringEvents,
   getQuestionGovernanceItems, decideQuestionGovernance,
@@ -75,6 +75,7 @@ function errMsg(e: unknown, fallback = 'Erreur inattendue'): string {
   if (typeof e === 'object' && e !== null && 'detail' in e) return String((e as { detail: unknown }).detail);
   return fallback;
 }
+import { ExamQuestion } from '../api';
 import { QData, Timer, QGrid, SignSvg, SceneSvg } from './shared-exam-components';
 
 // ══════════════════════════════════════════════════════════════════
@@ -86,21 +87,35 @@ export function ExamPage() {
   const isAuth = !isPresentationMode && currentUser !== null;
   const SECS = 30 * 60;
 
-  const questions: QData[] = DEMO_QUESTIONS.map((q: import('./examQuestions').ExamQuestionData) => ({
-    id: q.id, number: q.number, category: q.category, text: q.text,
-    options: q.options, correct: q.correct_answer,
-    media: q.media_url ?? undefined,
-    mediaType: q.media_url ? (q.media_url.startsWith('intersection') || q.media_url.startsWith('situation') ? 'scene' : 'sign') : undefined,
-    expl: q.explanation ?? '',
-  }));
-
   const [phase, setPhase] = useState<'setup'|'running'|'review'|'done'>('setup');
   const [idx, setIdx] = useState(0);
   const [answers, setAnswers] = useState<Record<number,string>>({});
   const [bookRef, setBookRef] = useState('');
+  const [attemptId, setAttemptId] = useState<string | null>(null);
+  const [liveQuestions, setLiveQuestions] = useState<ExamQuestion[] | null>(null);
   const [result, setResult] = useState<ExamDetailedResult | null>(null);
   const [filter, setFilter] = useState<'all'|'ok'|'ko'>('all');
   const [reveal, setReveal] = useState(false);
+  const [startErr, setStartErr] = useState('');
+
+  // eslint-disable-next-line @typescript-eslint/no-use-before-define
+  // Utiliser les questions du backend si disponibles, sinon fallback local
+  const questions: QData[] = (liveQuestions ?? []).length > 0
+    ? (liveQuestions!).map((q, i) => ({
+        id: q.id, number: q.number, category: q.category, text: q.text,
+        options: q.options, correct: undefined,  // réponse correcte masquée
+        media: q.media_url ?? undefined,
+        mediaType: q.media_type as 'sign' | 'scene' | undefined,
+        expl: '',
+      }))
+    : DEMO_QUESTIONS.map((q: import('./examQuestions').ExamQuestionData) => ({
+        id: q.id, number: q.number, category: q.category, text: q.text,
+        options: q.options, correct: q.correct_answer,
+        media: q.media_url ?? undefined,
+        mediaType: q.media_url ? (q.media_url.startsWith('intersection') || q.media_url.startsWith('situation') ? 'scene' : 'sign') : undefined,
+        expl: q.explanation ?? '',
+      }));
+
 
   const q = questions[idx];
   const answered = Object.keys(answers).length;
@@ -112,6 +127,27 @@ export function ExamPage() {
   }
 
   async function submitExam() {
+    // Si examen réel (avec attemptId), soumettre au backend
+    if (attemptId && isAuth && liveQuestions) {
+      try {
+        const answersById: Record<string, string> = {};
+        questions.forEach((q, i) => { if (answers[i]) answersById[q.id] = answers[i]; });
+        const attempt = await submitExamAttempt(attemptId, answersById);
+        setResult({
+          attempt_id: attempt.id,
+          candidate_name: currentUser?.full_name ?? 'Candidat',
+          score: attempt.score ?? 0,
+          total: questions.length,
+          score_percent: attempt.score ? Math.round(attempt.score / questions.length * 1000) / 10 : 0,
+          passed: attempt.passed ?? false,
+          threshold: 35,
+          submitted_at: attempt.submitted_at ?? new Date().toISOString(),
+          questions: [],
+        });
+        setPhase('done');
+        return;
+      } catch { /* fallback au calcul local */ }
+    }
     // Calcul local pour la démo
     const score = questions.filter((q2, i) => answers[i] === q2.correct).length;
     const passed = score >= 35;

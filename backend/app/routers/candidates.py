@@ -44,6 +44,25 @@ def list_candidates(
     return {"items": items, "total": total, "limit": limit, "offset": offset, "search": search}
 
 
+@router.get("/me", response_model=CandidateRead | None)
+def get_my_candidate_profile(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("candidate", "admin", "super_admin")),
+) -> Candidate | None:
+    """
+    Retourne le profil candidat associé à l'email de l'utilisateur connecté.
+    Utilisé par les candidats pour accéder à leurs propres données.
+    """
+    candidate = db.scalar(
+        select(Candidate).where(Candidate.email == current_user.email)
+    )
+    if not candidate:
+        # Essayer par numéro d'identité si l'email est dans le champ phone
+        # (certains candidats enregistrés avant l'ajout du champ email)
+        return None
+    return candidate
+
+
 @router.post("", response_model=CandidateRead, status_code=status.HTTP_201_CREATED)
 def create_candidate(
     payload: CandidateCreate,
