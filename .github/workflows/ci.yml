@@ -75,6 +75,16 @@ jobs:
             test_file: tests/test_candidate_official_import.py
           - name: payment-official-import
             test_file: tests/test_payment_official_import.py
+          - name: coverage-middleware
+            test_file: tests/test_middleware_coverage.py
+          - name: coverage-v2
+            test_file: tests/test_coverage_v2.py
+          - name: coverage-v3
+            test_file: tests/test_coverage_v3.py
+          - name: coverage-v4
+            test_file: tests/test_coverage_v4.py
+          - name: seed-dashboard
+            test_file: tests/test_seed_and_dashboard_kpis.py
     name: backend-tests (${{ matrix.name }})
     steps:
       - uses: actions/checkout@v4
@@ -163,7 +173,11 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Run Playwright smoke tests
         working-directory: frontend
-        run: npm run test:e2e
+        env:
+          # Mode présentation — pas de backend requis pour les smoke tests UI
+          VITE_API_BASE_URL: "http://localhost:8000"
+          CI: "true"
+        run: npm run test:e2e -- --timeout=30000 --retries=2
       - name: Upload Playwright report
         if: always()
         uses: actions/upload-artifact@v4
