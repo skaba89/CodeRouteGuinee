@@ -17,6 +17,43 @@ from app.schemas import BookingCreate, BookingRead, BookingVerificationRead
 router = APIRouter(prefix="/bookings", tags=["bookings"])
 
 
+@router.get("/my", response_model=list[dict])
+def get_my_bookings(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("candidate", "admin", "super_admin")),
+) -> list[dict]:
+    """
+    Retourne les réservations du candidat connecté (role=candidate).
+    Identifié via l'email du compte → Candidate.email.
+    """
+    from app.models_candidate import Candidate
+    candidate = db.scalar(
+        select(Candidate).where(Candidate.email == current_user.email)
+    )
+    if not candidate:
+        return []
+
+    bookings = db.scalars(
+        select(Booking).where(Booking.candidate_id == candidate.id)
+        .order_by(Booking.created_at.desc())
+        .limit(20)
+    ).all()
+
+    result = []
+    for bk in bookings:
+        session = db.get(ExamSession, bk.session_id)
+        center = db.get(Center, session.center_id) if session else None
+        result.append({
+            "reference":         bk.reference,
+            "status":            bk.status,
+            "verification_code": bk.verification_code,
+            "session_date":      session.starts_at.isoformat() if session else None,
+            "center_name":       center.name if center else None,
+            "center_city":       center.city if center else None,
+        })
+    return result
+
+
 @router.get("", response_model=dict)
 def list_bookings(
     candidate_id: str | None = Query(default=None, description="Filtrer par candidat"),
