@@ -88,15 +88,60 @@ class InstitutionalActionCenterRead(BaseModel):
 
 
 def _build_dashboard(db: Session) -> DashboardRead:
+    from datetime import UTC, datetime, timedelta
+
+    from app.models_booking import Booking
+    from app.models_exam_attempt import ExamAttempt
+    from app.models_payment import Payment
+
     fraud_alerts = db.query(CenterIncident).filter(CenterIncident.status == "open").count()
     fraud_alerts += db.query(DeviceSession).filter(DeviceSession.status == "suspicious").count()
     fraud_alerts += db.query(ExamMonitoringEvent).filter(ExamMonitoringEvent.severity.in_(["high", "critical"])).count()
+
+    # KPIs examens
+    passed = db.query(ExamAttempt).filter(ExamAttempt.passed.is_(True)).count()
+    failed = db.query(ExamAttempt).filter(ExamAttempt.passed.is_(False)).count()
+    total_attempts = passed + failed
+    pass_rate = round(passed / total_attempts * 100, 1) if total_attempts > 0 else 0.0
+
+    # KPIs financiers
+    payments_total = db.query(Payment).filter(Payment.status == "paid").count()
+    revenue_row = db.execute(
+        select(func.coalesce(func.sum(Payment.amount_gnf), 0))
+        .where(Payment.status == "paid")
+    ).scalar()
+    revenue_gnf = int(revenue_row or 0)
+
+    # Sessions de la semaine
+    now = datetime.now(UTC).replace(tzinfo=None)
+    week_start = now - timedelta(days=now.weekday())
+    week_end   = week_start + timedelta(days=7)
+    sessions_week = db.query(ExamSession).filter(
+        ExamSession.starts_at >= week_start,
+        ExamSession.starts_at < week_end,
+    ).count()
+    sessions_available = db.query(ExamSession).filter(
+        ExamSession.status == "open",
+        ExamSession.starts_at > now,
+    ).count()
+
+    # Réservations en attente
+    bookings_pending = db.query(Booking).filter(Booking.status == "confirmed").count()
+
     return DashboardRead(
         candidates=db.query(Candidate).count(),
         accredited_centers=db.query(Center).filter(Center.status.in_(["active", "accredited"])).count(),
         exam_sessions=db.query(ExamSession).count(),
         questions=db.query(Question).count(),
         fraud_alerts=fraud_alerts,
+        candidates_passed=passed,
+        candidates_failed=failed,
+        pass_rate_pct=pass_rate,
+        payments_total=payments_total,
+        revenue_gnf=revenue_gnf,
+        sessions_this_week=sessions_week,
+        sessions_available=sessions_available,
+        bookings_pending=bookings_pending,
     )
 
 
