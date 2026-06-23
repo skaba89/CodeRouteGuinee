@@ -46,6 +46,8 @@ from app.routers import (
     training,
     users,
 )
+from app.routers.tarifs import router_admin as tarifs_admin_router
+from app.routers.tarifs import router_public as tarifs_public_router
 
 settings = get_settings()
 
@@ -161,3 +163,6 @@ app.include_router(audit.router, prefix=settings.api_v1_prefix)
 app.include_router(training.router, prefix=settings.api_v1_prefix)
 app.include_router(supervision.router, prefix=settings.api_v1_prefix)
 app.include_router(users.router, prefix=settings.api_v1_prefix)
+
+app.include_router(tarifs_public_router, prefix=settings.api_v1_prefix)
+app.include_router(tarifs_admin_router,  prefix=settings.api_v1_prefix)
