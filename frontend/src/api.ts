@@ -543,6 +543,40 @@ function normalizeApiBaseUrl(value: string): string {
 
 const API_BASE_URL = normalizeApiBaseUrl(import.meta.env.VITE_API_BASE_URL ?? import.meta.env.VITE_API_URL ?? 'http://localhost:8000');
 
+// ── CSRF Token management ──────────────────────────────────────────────────
+let _csrfToken: string | null = null;
+
+/** Récupère (et met en cache) le token CSRF depuis le cookie ou l'API. */
+async function getCsrfToken(): Promise<string> {
+  // Lire depuis le cookie d'abord (posé par le backend)
+  const fromCookie = document.cookie
+    .split('; ')
+    .find(row => row.startsWith('csrf_token='))
+    ?.split('=')[1];
+  if (fromCookie) {
+    _csrfToken = fromCookie;
+    return fromCookie;
+  }
+  // Fallback : appel API pour générer le token
+  if (!_csrfToken) {
+    try {
+      const r = await fetch(`${API_BASE_URL}/api/v1/auth/csrf-token`, {
+        credentials: 'include',
+      });
+      if (r.ok) {
+        const data = await r.json();
+        _csrfToken = data.csrf_token;
+      }
+    } catch { /* silencieux */ }
+  }
+  return _csrfToken ?? '';
+}
+
+/** Invalide le cache du token CSRF (à appeler après logout). */
+export function clearCsrfToken(): void {
+  _csrfToken = null;
+}
+
 export class ApiError extends Error {
   status: number;
 

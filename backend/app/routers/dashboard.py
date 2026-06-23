@@ -460,6 +460,28 @@ def anti_fraud_dashboard(
     )
 
 
+
+@router.post("/notifications/run-job", tags=["notifications"])
+def run_notification_job(
+    job: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "super_admin")),
+) -> dict:
+    """
+    Déclenche manuellement un job de notification.
+    Jobs disponibles : exam_reminder_24h, exam_reminder_2h, payment_pending_7d
+    """
+    from app.scheduled_notifications import JOBS, run_job
+    if job not in JOBS:
+        from fastapi import HTTPException
+        raise HTTPException(
+            status_code=400,
+            detail=f"Job inconnu : {job}. Disponibles : {list(JOBS.keys())}"
+        )
+    result = run_job(job)
+    return result.to_dict()
+
+
 @router.get("/export.csv")
 def export_dashboard_csv(
     db: Session = Depends(get_db),

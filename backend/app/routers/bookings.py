@@ -116,6 +116,23 @@ def create_booking(
     except Exception:
         pass  # Email non bloquant
 
+    # SMS de confirmation — best effort (pour candidats sans email)
+    try:
+        candidate = db.get(Candidate, booking.candidate_id)
+        session   = db.get(ExamSession, booking.session_id)
+        center    = db.get(Center, session.center_id) if session else None
+        if candidate and candidate.phone and session and center:
+            from app.orange_sms import send_booking_confirmation_sms
+            send_booking_confirmation_sms(
+                phone          = candidate.phone,
+                candidate_name = f"{candidate.first_name} {candidate.last_name}",
+                booking_ref    = booking.reference,
+                session_date   = session.starts_at.strftime("%d/%m/%Y %Hh%M"),
+                center_name    = center.name,
+            )
+    except Exception:
+        pass  # SMS non bloquant
+
     return booking
 
 

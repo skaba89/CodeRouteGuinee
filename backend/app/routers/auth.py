@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response, status
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel
 from sqlalchemy import select
@@ -6,12 +6,14 @@ from sqlalchemy.orm import Session
 
 from app.auth_guard import LoginRateLimiter
 from app.core.config import get_settings
+from app.csrf import generate_csrf_token, set_csrf_cookie
 from app.db.session import get_db
-from app.deps import get_current_user
+from app.deps import get_current_user, require_roles
 from app.models_audit import AuditLog
 from app.models_user import User
 from app.schemas import PasswordChangeRequest, Token, UserCreate, UserRead
 from app.security import create_access_token, create_refresh_token, decode_refresh_token, get_password_hash, verify_password
+from app.two_factor import activate_2fa, check_2fa, disable_2fa, is_2fa_enabled, setup_2fa
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 settings = get_settings()
@@ -139,6 +141,20 @@ class RefreshRequest(BaseModel):
 
 
 
+
+@router.get("/csrf-token", tags=["auth"])
+def get_csrf_token(response: Response) -> dict:
+    """
+    Génère et retourne un token CSRF.
+    Le token est aussi posé en cookie (X-CSRF-Token).
+    Le frontend doit appeler cet endpoint au démarrage et inclure
+    le token dans le header X-CSRF-Token de toutes les requêtes mutatives.
+    """
+    token = generate_csrf_token()
+    set_csrf_cookie(response, token)
+    return {"csrf_token": token, "header_name": "X-CSRF-Token"}
+
+
 @router.post("/refresh", response_model=Token)
 def refresh_token(
     payload_in: RefreshRequest,
@@ -154,3 +170,83 @@ def refresh_token(
         access_token=create_access_token(user.id, user.role),
         refresh_token=create_refresh_token(user.id),
     )
+
+
+# ── 2FA TOTP Endpoints ──────────────────────────────────────────────────────
+
+@router.post("/2fa/setup", tags=["auth"])
+def setup_two_factor(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "super_admin", "center", "candidate")),
+) -> dict:
+    """
+    Initialise la configuration 2FA pour l'utilisateur connecté.
+    Retourne un QR code URI à scanner dans Google Authenticator.
+    Le 2FA n'est PAS encore activé — il faut appeler /2fa/verify avec le premier code.
+    """
+    return setup_2fa(str(current_user.id), current_user.email, db)
+
+
+@router.post("/2fa/verify", tags=["auth"])
+def verify_and_activate_2fa(
+    payload: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "super_admin", "center", "candidate")),
+) -> dict:
+    """
+    Vérifie le code TOTP et active le 2FA si correct.
+    Payload : {"code": "123456"}
+    """
+    code = payload.get("code", "")
+    if not code:
+        raise HTTPException(status_code=400, detail="Code TOTP requis")
+
+    ok = activate_2fa(str(current_user.id), code, db)
+    if not ok:
+        raise HTTPException(status_code=400, detail="Code TOTP invalide ou 2FA déjà activé")
+
+    return {"activated": True, "message": "2FA activé avec succès"}
+
+
+@router.post("/2fa/check", tags=["auth"])
+def check_two_factor(
+    payload: dict,
+    user_id: str,
+    db: Session = Depends(get_db),
+) -> dict:
+    """
+    Vérifie le code 2FA lors du login (appelé après la validation du mot de passe).
+    Payload : {"code": "123456"}
+    """
+    code = payload.get("code", "")
+    if not code:
+        raise HTTPException(status_code=400, detail="Code 2FA requis")
+
+    ok = check_2fa(user_id, code, db)
+    if not ok:
+        raise HTTPException(
+            status_code=401,
+            detail="Code 2FA invalide"
+        )
+    return {"valid": True}
+
+
+@router.post("/2fa/disable", tags=["auth"])
+def disable_two_factor(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "super_admin", "center", "candidate")),
+) -> dict:
+    """Désactive le 2FA pour l'utilisateur connecté."""
+    disable_2fa(str(current_user.id), db)
+    return {"disabled": True}
+
+
+@router.get("/2fa/status", tags=["auth"])
+def get_2fa_status(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "super_admin", "center", "candidate")),
+) -> dict:
+    """Retourne si le 2FA est activé pour l'utilisateur connecté."""
+    enabled = is_2fa_enabled(str(current_user.id), db)
+    return {"enabled": enabled, "user_id": str(current_user.id)}
+

@@ -11,9 +11,10 @@ Middleware actifs (dans l'ordre d'exécution) :
 import time
 import uuid
 from collections import OrderedDict
+from collections.abc import Callable
 
 from fastapi import Request, Response
-from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
+from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp
 
 # ── 1. X-Request-ID ──────────────────────────────────────────────────────────
@@ -21,7 +22,7 @@ from starlette.types import ASGIApp
 class RequestIDMiddleware(BaseHTTPMiddleware):
     """Injecte un ID unique dans chaque requête pour le tracing distribué."""
 
-    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
+    async def dispatch(self, request: Request, call_next: "Callable") -> Response:
         request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
         request.state.request_id = request_id
         response = await call_next(request)
@@ -34,7 +35,7 @@ class RequestIDMiddleware(BaseHTTPMiddleware):
 class TimingMiddleware(BaseHTTPMiddleware):
     """Ajoute X-Process-Time dans chaque réponse (utile pour le monitoring)."""
 
-    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
+    async def dispatch(self, request: Request, call_next: "Callable") -> Response:
         start = time.perf_counter()
         response = await call_next(request)
         elapsed_ms = (time.perf_counter() - start) * 1000
@@ -112,7 +113,7 @@ class ResponseCacheMiddleware(BaseHTTPMiddleware):
         super().__init__(app)
         self._enabled = environment == "production"
 
-    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
+    async def dispatch(self, request: Request, call_next: "Callable") -> Response:
         # Conditions de mise en cache : GET sans token
         if (
             not self._enabled
