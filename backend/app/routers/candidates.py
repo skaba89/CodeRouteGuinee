@@ -1,6 +1,8 @@
+import csv
+import io
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
@@ -84,6 +86,56 @@ def create_candidate(
     db.commit()
     db.refresh(candidate)
     return candidate
+
+
+@router.get("/export.csv", tags=["candidates"])
+def export_candidates_csv(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "super_admin")),
+    status_filter: str | None = Query(default=None, alias="status"),
+    permit_category: str | None = Query(default=None),
+    city: str | None = Query(default=None),
+) -> Response:
+    """
+    Export CSV de tous les candidats pour le reporting DNTT.
+    Filtres optionnels : status, permit_category, city.
+    """
+    from sqlalchemy import select as _select
+    query = _select(Candidate)
+    if status_filter:
+        query = query.where(Candidate.status == status_filter)
+    if permit_category:
+        query = query.where(Candidate.permit_category == permit_category)
+    if city:
+        query = query.where(Candidate.city == city) if hasattr(Candidate, 'city') else query
+
+    candidates = db.scalars(query.order_by(Candidate.last_name, Candidate.first_name)).all()
+
+    output = io.StringIO()
+    writer = csv.writer(output, delimiter=";")
+    writer.writerow([
+        "reference", "nom", "prenom", "numero_identite",
+        "telephone", "email", "categorie_permis", "statut", "date_inscription",
+    ])
+    for cand in candidates:
+        writer.writerow([
+            cand.reference,
+            cand.last_name,
+            cand.first_name,
+            cand.identity_number,
+            cand.phone,
+            getattr(cand, "email", "") or "",
+            cand.permit_category,
+            cand.status,
+            cand.created_at.strftime("%Y-%m-%d") if cand.created_at else "",
+        ])
+
+    content = output.getvalue()
+    return Response(
+        content=content.encode("utf-8-sig"),   # BOM pour Excel
+        media_type="text/csv; charset=utf-8-sig",
+        headers={"Content-Disposition": "attachment; filename=candidats_coderoute.csv"},
+    )
 
 
 @router.post("/import-official", response_model=CandidateOfficialImportResult)

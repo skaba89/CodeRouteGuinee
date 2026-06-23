@@ -75,7 +75,13 @@ def _build_configuration_check(current_settings) -> dict:
 
 @router.get("/health")
 def health() -> dict:
-    return {"status": "ok", "service": settings.project_name}
+    from app.api import API_VERSION
+    return {
+        "status": "ok",
+        "service": settings.project_name,
+        "version": API_VERSION,
+        "environment": settings.environment,
+    }
 
 
 @router.get("/health/readiness")
