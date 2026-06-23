@@ -100,14 +100,25 @@ def create_payment(
             )
             if existing_payment:
                 raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Payment already recorded for this booking")
-    provider_result = simulate_mobile_money_payment(payload.provider, payload.phone, payload.amount_gnf)
+    # Résoudre le montant via tarifs dynamiques si non spécifié
+    try:
+        from app.models_candidate import Candidate as _Cand
+        from app.tarifs import get_tarif_for_candidate
+        _cand = db.get(_Cand, booking.candidate_id)
+        _cat  = getattr(_cand, "permit_category", "B") if _cand else "B"
+        resolved_amount = get_tarif_for_candidate(_cat, attempt_number=1)
+    except Exception:
+        resolved_amount = payload.amount_gnf
+    final_amount = payload.amount_gnf if payload.amount_gnf != 250000 else resolved_amount
+
+    provider_result = simulate_mobile_money_payment(payload.provider, payload.phone, final_amount)
     reference = build_payment_reference(db.query(Payment).count() + 1)
     from datetime import UTC
     from datetime import datetime as _dt
     payment = Payment(
         reference=reference,
         booking_reference=payload.booking_reference,
-        amount_gnf=payload.amount_gnf,
+        amount_gnf=final_amount,
         provider=provider_result.provider,
         phone=payload.phone,
         status=provider_result.status,
@@ -477,3 +488,75 @@ async def paydunya_webhook(request: Request, db: Session = Depends(get_db)) -> d
             return {"status": "processed", "token": token}
 
     return {"status": "received", "token": token, "payment_status": status}
+
+
+# ── Remboursements ────────────────────────────────────────────────────────────
+
+class RefundRequest(BaseModel):
+    reason: str = "Non spécifié"
+
+
+@router.post("/{reference}/refund", tags=["payments"])
+def refund_payment(
+    reference: str,
+    payload: RefundRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("super_admin")),
+) -> dict:
+    """
+    Marque un paiement comme remboursé (super_admin uniquement).
+    Le remboursement mobile money réel doit être effectué manuellement
+    par un opérateur habilité DNTT.
+
+    Règles :
+      - Statut actuel doit être 'paid' ou 'confirmed'
+      - Une raison est obligatoire pour l'audit
+      - Action irréversible depuis l'API (modifier en base si nécessaire)
+    """
+    payment = db.scalar(select(Payment).where(Payment.reference == reference))
+    if not payment:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail="Paiement introuvable")
+
+    if payment.status not in ("paid", "confirmed"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Remboursement impossible : statut actuel '{payment.status}' "
+                   f"(doit être 'paid' ou 'confirmed')",
+        )
+
+    reason = payload.reason.strip() or "Non spécifié"
+
+    # Mettre à jour le statut
+    payment.status = "refunded"
+    db.flush()
+
+    # Mettre à jour la réservation associée
+    booking = db.scalar(select(Booking).where(Booking.reference == payment.booking_reference))
+    if booking:
+        booking.status = "cancelled"
+        booking.notes  = f"Remboursé — {reason}"
+        db.flush()
+
+    # Audit log
+    db.add(AuditLog(
+        actor_id  = current_user.id,
+        action    = "payment_refunded",
+        entity    = "payment",
+        entity_id = reference,
+        details   = f"Remboursement {payment.amount_gnf:,} GNF par {current_user.email} — {reason}",
+    ))
+    db.commit()
+
+    return {
+        "reference":  reference,
+        "status":     "refunded",
+        "amount_gnf": payment.amount_gnf,
+        "reason":     reason,
+        "refunded_by": current_user.email,
+        "message": (
+            "Paiement marqué comme remboursé. "
+            "Le remboursement Mobile Money doit être effectué manuellement "
+            "par l'opérateur DNTT habilité."
+        ),
+    }
