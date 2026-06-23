@@ -104,6 +104,10 @@ export function CandidatePage() {
     try {
       const r = await createPayment({ booking_reference: bookRef, amount_gnf: amount, provider, phone });
       setPayResult(r);
+      // Pour Wave : ouvrir l'URL de checkout dans un nouvel onglet / deep link
+      if (r.checkout_url && provider === 'wave') {
+        window.open(r.checkout_url, '_blank', 'noopener,noreferrer');
+      }
     } catch (err) {
       setPayErr(errMsg(err, 'Paiement impossible — vérifiez votre réservation et votre solde.'));
     } finally { setPaying(false); }

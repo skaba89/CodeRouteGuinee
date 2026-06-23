@@ -536,6 +536,7 @@ export type PaymentPayload = {
 };
 
 export type PaymentResult = {
+  id?: string;
   reference: string;
   booking_reference: string;
   amount_gnf: number;
@@ -543,7 +544,10 @@ export type PaymentResult = {
   status: string;
   receipt_number: string;
   external_reference?: string;
+  paid_at?: string | null;
   message?: string;
+  /** URL de checkout Wave — ouvrir dans le navigateur ou deep link mobile */
+  checkout_url?: string;
 };
 
 function normalizeApiBaseUrl(value: string): string {

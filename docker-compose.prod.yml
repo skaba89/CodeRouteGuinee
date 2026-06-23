@@ -129,6 +129,7 @@ services:
     volumes:
       - ./nginx/nginx.prod.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/certs:/etc/nginx/certs:ro
+      - /tmp/certbot-webroot:/var/www/certbot:ro
     depends_on:
       - backend
       - frontend
@@ -140,6 +141,35 @@ services:
         limits:
           cpus:   "1"
           memory: "256M"
+
+  # ── PgBouncer (optionnel — activer si > 5 000 utilisateurs simultanés) ──
+  # Décommenter pour activer le pooling de connexions PostgreSQL
+  # pgbouncer:
+  #   image: bitnami/pgbouncer:1.23
+  #   container_name: coderoute-pgbouncer
+  #   environment:
+  #     POSTGRESQL_HOST: postgres
+  #     POSTGRESQL_PORT: 5432
+  #     POSTGRESQL_DATABASE: ${POSTGRES_DB}
+  #     POSTGRESQL_USERNAME: ${POSTGRES_USER}
+  #     POSTGRESQL_PASSWORD: ${POSTGRES_PASSWORD}
+  #     PGBOUNCER_POOL_MODE: transaction
+  #     PGBOUNCER_MAX_CLIENT_CONN: 5000
+  #     PGBOUNCER_DEFAULT_POOL_SIZE: 50
+  #     PGBOUNCER_MIN_POOL_SIZE: 10
+  #     PGBOUNCER_RESERVE_POOL_SIZE: 5
+  #     PGBOUNCER_RESERVE_POOL_TIMEOUT: 5
+  #     PGBOUNCER_SERVER_IDLE_TIMEOUT: 600
+  #   ports:
+  #     - "5433:5432"
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #   restart: unless-stopped
+  #   networks:
+  #     - coderoute-internal
+  # Si PgBouncer activé, changer DATABASE_URL du backend :
+  # DATABASE_URL: "postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@pgbouncer:5432/${POSTGRES_DB}"
 
 volumes:
   postgres_data_prod:
