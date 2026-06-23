@@ -50,6 +50,12 @@ services:
       - coderoute-internal
 
   # ── Backend FastAPI + Gunicorn ─────────────────────────────────────────────
+  # ── ATTENTION ────────────────────────────────────────────────────────────────
+  # docker-compose.prod.yml est pour la PRODUCTION uniquement.
+  # Pour le développement local, utiliser :
+  #   docker compose -f docker-compose.dev.yml up --build
+  # ─────────────────────────────────────────────────────────────────────────────
+
   backend:
     build:
       context: ./backend

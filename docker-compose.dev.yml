@@ -1,0 +1,113 @@
+# docker-compose.dev.yml — Développement local
+# Usage : docker compose -f docker-compose.dev.yml up --build
+#
+# Ce fichier est équivalent au docker-compose.yml mais :
+#  - Utilise .env.dev (pas .env.example)
+#  - Expose Swagger UI sur http://localhost:8000/docs
+#  - Hot-reload activé (backend + frontend)
+#  - Pas de Gunicorn, pas de Nginx — serveurs de dev directs
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: coderoute-postgres-dev
+    environment:
+      POSTGRES_DB: coderoute
+      POSTGRES_USER: coderoute
+      POSTGRES_PASSWORD: coderoute
+    ports:
+      - "5435:5432"
+    volumes:
+      - postgres_data_dev:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U coderoute -d coderoute"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - coderoute-dev
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    container_name: coderoute-backend-dev
+    env_file:
+      - .env.dev
+    environment:
+      # Forcer les valeurs critiques (override .env.dev si nécessaire)
+      DATABASE_URL: postgresql+psycopg://coderoute:coderoute@postgres:5432/coderoute
+      ENVIRONMENT: development
+      ENABLE_API_DOCS: "true"
+      AUTO_CREATE_TABLES: "false"
+    command: >
+      sh -c "alembic upgrade head && uvicorn app.main:app
+             --host 0.0.0.0 --port 8000
+             --reload --reload-dir /app/app"
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+      - /app/.pytest_cache
+      - /app/__pycache__
+      - /app/.mypy_cache
+      - /app/.ruff_cache
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)\" || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - coderoute-dev
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: coderoute-frontend-dev
+    environment:
+      VITE_API_BASE_URL: http://localhost:8000
+      VITE_API_URL: http://localhost:8000/api/v1
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - coderoute-dev
+
+  # Service seed optionnel — lancer avec : docker compose -f docker-compose.dev.yml run --rm seed
+  seed:
+    image: python:3.12-slim
+    working_dir: /app
+    environment:
+      DATABASE_URL: postgresql+psycopg://coderoute:coderoute@postgres:5432/coderoute
+      ALLOW_DEMO_SEED_NON_DEV: "true"
+      ENVIRONMENT: development
+    volumes:
+      - ./backend:/app
+    command: >
+      sh -c "pip install -q -r requirements.txt &&
+             PYTHONPATH=. python -m app.seed_full"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - coderoute-dev
+    profiles:
+      - seed
+
+volumes:
+  postgres_data_dev:
+
+networks:
+  coderoute-dev:
+    driver: bridge
