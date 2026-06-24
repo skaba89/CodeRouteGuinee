@@ -21,7 +21,7 @@ import {
 } from '../api';
 import { isAudioLocale, speakFeedback, stop as stopAudio } from '../audio';
 import { type Locale } from '../i18n';
-import { type AuthUser } from '../authClient';
+import { type AuthUser, getAccessToken } from '../authClient';
 import { type UserRole } from '../auth';
 import { useAuthSession, canUseProtectedActions } from '../authSession';
 import {
@@ -118,7 +118,7 @@ export function TrainingPage() {
       const url = `/api/v1/training/questions?limit=20&shuffle=true${cat ? `&category=${cat}` : ''}`;
       let qs: TrainingQ[] = [];
       if (canUseApi) {
-        const r = await fetch(url, { headers: { 'Authorization': `Bearer ${localStorage.getItem('cr-access-token') ?? ''}` } });
+        const r = await fetch(url, { headers: { 'Authorization': `Bearer ${getAccessToken() ?? ''}` } });
         if (r.ok) qs = await r.json();
       }
       if (qs.length === 0) {

@@ -144,7 +144,7 @@ export function LiveDashboard() {
           {/* Feed activité */}
           {data.feed.length > 0 && (
             <div>
-              <div style={{ fontWeight: 600, fontSize: 13, color: '#444', marginBottom: 8 }}>
+              <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--ink2)', marginBottom: 8 }}>
                 ⚡ Activité récente (15 dernières minutes)
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -182,7 +182,7 @@ export function LiveDashboard() {
         </>
       )}
 
-      <div style={{ fontSize: 11, color: '#aaa', marginTop: 12 }}>
+      <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 12 }}>
         Rafraîchissement automatique toutes les {POLL_INTERVAL / 1000}s
       </div>
     </div>

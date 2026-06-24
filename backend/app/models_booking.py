@@ -16,9 +16,9 @@ class Booking(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     reference: Mapped[str] = mapped_column(String(80), unique=True, index=True, nullable=False)
-    candidate_id: Mapped[str] = mapped_column(ForeignKey("candidates.id"), nullable=False)
-    session_id: Mapped[str] = mapped_column(ForeignKey("exam_sessions.id"), nullable=False)
-    status: Mapped[str] = mapped_column(String(50), default="confirmed", nullable=False)
+    candidate_id: Mapped[str] = mapped_column(ForeignKey("candidates.id"), nullable=False, index=True)
+    session_id: Mapped[str] = mapped_column(ForeignKey("exam_sessions.id"), nullable=False, index=True)
+    status: Mapped[str] = mapped_column(String(50), default="confirmed", nullable=False, index=True)
     verification_code: Mapped[str] = mapped_column(String(120), unique=True, index=True, nullable=False)
     notes:              Mapped[str | None]      = mapped_column(Text, nullable=True)
     cancelled_at:       Mapped[datetime | None]  = mapped_column(DateTime, nullable=True)

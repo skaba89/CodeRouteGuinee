@@ -96,18 +96,18 @@ def _build_dashboard(db: Session) -> DashboardRead:
     from app.models_exam_attempt import ExamAttempt
     from app.models_payment import Payment
 
-    fraud_alerts = db.query(CenterIncident).filter(CenterIncident.status == "open").count()
-    fraud_alerts += db.query(DeviceSession).filter(DeviceSession.status == "suspicious").count()
-    fraud_alerts += db.query(ExamMonitoringEvent).filter(ExamMonitoringEvent.severity.in_(["high", "critical"])).count()
+    fraud_alerts = (db.scalar(select(func.count(CenterIncident.id)).where(CenterIncident.status == "open")) or 0)
+    fraud_alerts += (db.scalar(select(func.count(DeviceSession.id)).where(DeviceSession.status == "suspicious")) or 0)
+    fraud_alerts += (db.scalar(select(func.count(ExamMonitoringEvent.id)).where(ExamMonitoringEvent.severity.in_(["high", "critical"]))) or 0)
 
     # KPIs examens
-    passed = db.query(ExamAttempt).filter(ExamAttempt.passed.is_(True)).count()
-    failed = db.query(ExamAttempt).filter(ExamAttempt.passed.is_(False)).count()
+    passed = (db.scalar(select(func.count(ExamAttempt.id)).where(ExamAttempt.passed.is_(True))) or 0)
+    failed = (db.scalar(select(func.count(ExamAttempt.id)).where(ExamAttempt.passed.is_(False))) or 0)
     total_attempts = passed + failed
     pass_rate = round(passed / total_attempts * 100, 1) if total_attempts > 0 else 0.0
 
     # KPIs financiers
-    payments_total = db.query(Payment).filter(Payment.status == "paid").count()
+    payments_total = (db.scalar(select(func.count(Payment.id)).where(Payment.status == "paid")) or 0)
     revenue_row = db.execute(
         select(func.coalesce(func.sum(Payment.amount_gnf), 0))
         .where(Payment.status == "paid")
@@ -118,23 +118,23 @@ def _build_dashboard(db: Session) -> DashboardRead:
     now = datetime.now(UTC).replace(tzinfo=None)
     week_start = now - timedelta(days=now.weekday())
     week_end   = week_start + timedelta(days=7)
-    sessions_week = db.query(ExamSession).filter(
+    sessions_week = (db.scalar(select(func.count(ExamSession.id)).where(
         ExamSession.starts_at >= week_start,
         ExamSession.starts_at < week_end,
-    ).count()
-    sessions_available = db.query(ExamSession).filter(
+    )) or 0)
+    sessions_available = (db.scalar(select(func.count(ExamSession.id)).where(
         ExamSession.status == "open",
         ExamSession.starts_at > now,
-    ).count()
+    )) or 0)
 
     # Réservations en attente
-    bookings_pending = db.query(Booking).filter(Booking.status == "confirmed").count()
+    bookings_pending = (db.scalar(select(func.count(Booking.id)).where(Booking.status == "confirmed")) or 0)
 
     return DashboardRead(
-        candidates=db.query(Candidate).count(),
-        accredited_centers=db.query(Center).filter(Center.status.in_(["active", "accredited"])).count(),
-        exam_sessions=db.query(ExamSession).count(),
-        questions=db.query(Question).count(),
+        candidates=(db.scalar(select(func.count(Candidate.id))) or 0),
+        accredited_centers=(db.scalar(select(func.count(Center.id)).where(Center.status.in_(["active", "accredited"]))) or 0),
+        exam_sessions=(db.scalar(select(func.count(ExamSession.id))) or 0),
+        questions=(db.scalar(select(func.count(Question.id))) or 0),
         fraud_alerts=fraud_alerts,
         candidates_passed=passed,
         candidates_failed=failed,
@@ -177,16 +177,16 @@ def dashboard(
 
 def _build_action_center(db: Session) -> InstitutionalActionCenterRead:
     soon = datetime.now(UTC).replace(tzinfo=None) + timedelta(days=30)
-    pending_identities = db.query(CandidateIdentityCheck).filter(CandidateIdentityCheck.status.in_(["pending", "needs_review"])).count()
-    centers_to_review = db.query(Center).filter(Center.status.in_(["pending_audit", "suspended"])).count()
-    authorizations_to_sign = db.query(InstitutionalAuthorization).filter(InstitutionalAuthorization.status.in_(["draft", "pending_signature"])).count()
-    expiring_authorizations = db.query(InstitutionalAuthorization).filter(
-        InstitutionalAuthorization.valid_until.is_not(None),
+    pending_identities = (db.scalar(select(func.count(CandidateIdentityCheck.id)).where(CandidateIdentityCheck.status.in_(["pending", "needs_review"]))) or 0)
+    centers_to_review = (db.scalar(select(func.count(Center.id)).where(Center.status.in_(["pending_audit", "suspended"]))) or 0)
+    authorizations_to_sign = (db.scalar(select(func.count(InstitutionalAuthorization.id)).where(InstitutionalAuthorization.status.in_(["draft", "pending_signature"]))) or 0)
+    expiring_authorizations = (db.scalar(select(func.count(InstitutionalAuthorization.id)).where(
+        InstitutionalAuthorization.valid_until.isnot(None),
         InstitutionalAuthorization.valid_until <= soon,
         InstitutionalAuthorization.status.in_(["approved", "pending_signature"]),
-    ).count()
-    questions_to_review = db.query(QuestionGovernanceDecision).filter(QuestionGovernanceDecision.status == "needs_revision").count()
-    open_incidents = db.query(CenterIncident).filter(CenterIncident.status == "open").count()
+    )) or 0)
+    questions_to_review = (db.scalar(select(func.count(QuestionGovernanceDecision.id)).where(QuestionGovernanceDecision.status == "needs_revision")) or 0)
+    open_incidents = (db.scalar(select(func.count(CenterIncident.id)).where(CenterIncident.status == "open")) or 0)
 
     items = [
         _build_action_item("identity_checks", "Identites candidates a traiter", pending_identities, "#identites", warning=1, critical=10),
@@ -206,7 +206,7 @@ def _build_action_center(db: Session) -> InstitutionalActionCenterRead:
 
 def _build_institutional_readiness(db: Session) -> InstitutionalReadinessRead:
     data = _build_dashboard(db)
-    audit_count = db.query(AuditLog).count()
+    audit_count = (db.scalar(select(func.count(AuditLog.id))) or 0)
     active_centers = data.accredited_centers
     has_question_bank = data.questions >= 40
     has_operational_flow = data.candidates > 0 and data.exam_sessions > 0
@@ -262,8 +262,8 @@ def _build_institutional_report(db: Session) -> InstitutionalReportRead:
     identity_checks_by_status = _count_by_status(db, CandidateIdentityCheck, CandidateIdentityCheck.status)
     authorizations_by_status = _count_by_status(db, InstitutionalAuthorization, InstitutionalAuthorization.status)
     question_governance_by_status = _count_by_status(db, QuestionGovernanceDecision, QuestionGovernanceDecision.status)
-    active_questions = db.query(Question).filter(Question.is_active.is_(True)).count()
-    inactive_questions = db.query(Question).filter(Question.is_active.is_(False)).count()
+    active_questions = (db.scalar(select(func.count(Question.id)).where(Question.is_active.is_(True))) or 0)
+    inactive_questions = (db.scalar(select(func.count(Question.id)).where(Question.is_active.is_(False))) or 0)
     questions_by_status = {"active": active_questions, "inactive": inactive_questions, **question_governance_by_status}
     recommendations = [item.next_step for item in readiness.items if item.status != "ready"]
     if not recommendations:
@@ -272,12 +272,12 @@ def _build_institutional_report(db: Session) -> InstitutionalReportRead:
         generated_for="Etat guineen - dossier CodeRoute Guinee",
         readiness_score=readiness.score,
         readiness_label=readiness.label,
-        candidates=db.query(Candidate).count(),
+        candidates=(db.scalar(select(func.count(Candidate.id))) or 0),
         centers_by_status=centers_by_status,
         questions_by_status=questions_by_status,
         identity_checks_by_status=identity_checks_by_status,
         authorizations_by_status=authorizations_by_status,
-        audit_events=db.query(AuditLog).count(),
+        audit_events=(db.scalar(select(func.count(AuditLog.id))) or 0),
         recommendations=recommendations,
     )
 
@@ -405,10 +405,10 @@ def anti_fraud_dashboard(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("admin", "super_admin")),
 ) -> AntiFraudDashboardRead:
-    open_incidents = db.query(CenterIncident).filter(CenterIncident.status == "open").count()
-    suspicious_devices = db.query(DeviceSession).filter(DeviceSession.status == "suspicious").count()
-    high_risk_events = db.query(ExamMonitoringEvent).filter(ExamMonitoringEvent.severity == "high").count()
-    critical_events = db.query(ExamMonitoringEvent).filter(ExamMonitoringEvent.severity == "critical").count()
+    open_incidents = (db.scalar(select(func.count(CenterIncident.id)).where(CenterIncident.status == "open")) or 0)
+    suspicious_devices = (db.scalar(select(func.count(DeviceSession.id)).where(DeviceSession.status == "suspicious")) or 0)
+    high_risk_events = (db.scalar(select(func.count(ExamMonitoringEvent.id)).where(ExamMonitoringEvent.severity == "high")) or 0)
+    critical_events = (db.scalar(select(func.count(ExamMonitoringEvent.id)).where(ExamMonitoringEvent.severity == "critical")) or 0)
     total_monitoring_risk_score = db.scalar(select(func.coalesce(func.sum(ExamMonitoringEvent.risk_score), 0))) or 0
 
     attempt_scores = db.execute(
@@ -419,18 +419,18 @@ def anti_fraud_dashboard(
     ).all()
     manual_review_attempts = sum(1 for _, score in attempt_scores if int(score or 0) >= 10)
 
-    centers = db.query(Center).all()
+    centers = db.scalars(select(Center)).all()
     center_rows: list[AntiFraudCenterRisk] = []
     for center in centers:
-        center_open_incidents = db.query(CenterIncident).filter(
+        center_open_incidents = (db.scalar(select(func.count(CenterIncident.id)).where(
             CenterIncident.center_id == center.id,
             CenterIncident.status == "open",
-        ).count()
-        center_suspicious_devices = db.query(DeviceSession).filter(
+        )) or 0)
+        center_suspicious_devices = (db.scalar(select(func.count(DeviceSession.id)).where(
             DeviceSession.center_id == center.id,
             DeviceSession.status == "suspicious",
-        ).count()
-        center_monitoring_events = db.query(ExamMonitoringEvent).filter(ExamMonitoringEvent.center_id == center.id).count()
+        )) or 0)
+        center_monitoring_events = (db.scalar(select(func.count(ExamMonitoringEvent.id)).where(ExamMonitoringEvent.center_id == center.id)) or 0)
         center_monitoring_risk_score = db.scalar(
             select(func.coalesce(func.sum(ExamMonitoringEvent.risk_score), 0)).where(ExamMonitoringEvent.center_id == center.id)
         ) or 0
@@ -479,20 +479,20 @@ def get_live_kpis(
     last_15m  = now - timedelta(minutes=15)
 
     # ── KPIs calculés live ─────────────────────────────────────────────────
-    total_candidates   = db.query(Candidate).count()
-    bookings_today     = db.query(Booking).filter(Booking.created_at >= now.replace(hour=0, minute=0, second=0)).count()
-    bookings_week      = db.query(Booking).filter(Booking.created_at >= last_7d).count()
-    pending_payments   = db.query(Payment).filter(Payment.status == "pending").count()
-    paid_today         = db.query(Payment).filter(
+    total_candidates   = (db.scalar(select(func.count(Candidate.id))) or 0)
+    bookings_today     = (db.scalar(select(func.count(Booking.id)).where(Booking.created_at >= now.replace(hour=0, minute=0, second=0))) or 0)
+    bookings_week      = (db.scalar(select(func.count(Booking.id)).where(Booking.created_at >= last_7d)) or 0)
+    pending_payments   = (db.scalar(select(func.count(Payment.id)).where(Payment.status == "pending")) or 0)
+    paid_today         = (db.scalar(select(func.count(Payment.id)).where(
         Payment.status == "paid",
-        Payment.created_at >= now.replace(hour=0, minute=0, second=0)
-    ).count()
-    active_sessions    = db.query(ExamSession).filter(
+        Payment.created_at >= now.replace(hour=0, minute=0, second=0, microsecond=0)
+    )) or 0)
+    active_sessions    = (db.scalar(select(func.count(ExamSession.id)).where(
         ExamSession.status == "open",
         ExamSession.starts_at >= now,
-    ).count()
-    confirmed_bookings = db.query(Booking).filter(Booking.status == "confirmed").count()
-    open_incidents     = db.query(CenterIncident).filter(CenterIncident.status == "open").count()         if hasattr(CenterIncident, "status") else 0
+    )) or 0)
+    confirmed_bookings = (db.scalar(select(func.count(Booking.id)).where(Booking.status == "confirmed")) or 0)
+    open_incidents     = (db.scalar(select(func.count(CenterIncident.id)).where(CenterIncident.status == "open")) or 0)         if hasattr(CenterIncident, "status") else 0
     fraud_active       = 0
 
     # ── Feed d'activité récente (15 dernières minutes) ─────────────────────

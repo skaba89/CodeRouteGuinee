@@ -231,7 +231,7 @@ export function ExamPage() {
           )}
           {startErr && (
             <div style={{ padding: '8px 12px', background: 'var(--gold-l, #fff3cd)', borderRadius: 8,
-              fontSize: 13, color: '#856404', marginBottom: 10 }}>
+              fontSize: 13, color: 'var(--gold-dark, #856404)', marginBottom: 10 }}>
               ⚠ {startErr}
             </div>
           )}
@@ -288,7 +288,7 @@ export function ExamPage() {
                 <span>{q2.is_correct ? '✅' : '❌'}</span>
               </div>
               <p style={{ fontWeight: 600, fontSize: 13, color: 'var(--ink)', margin: 0 }}>{q2.text}</p>
-              {!q2.is_correct && q2.given_answer && <p style={{ fontSize: 12, color: '#D32F2F', margin: 0 }}>Votre réponse : <strong>{q2.given_answer}</strong></p>}
+              {!q2.is_correct && q2.given_answer && <p style={{ fontSize: 12, color: 'var(--red, #D32F2F)', margin: 0 }}>Votre réponse : <strong>{q2.given_answer}</strong></p>}
               {!q2.is_correct && <p style={{ fontSize: 12, color: 'var(--green)', margin: 0 }}>Bonne réponse : <strong>{q2.correct_answer}</strong></p>}
               {q2.explanation && <p style={{ fontSize: 12, color: 'var(--muted)', background: 'var(--bg)', padding: '6px 10px', borderRadius: 8, margin: 0 }}>💡 {q2.explanation}</p>}
             </div>
@@ -375,11 +375,11 @@ export function ExamPage() {
             {q.options.map((opt, i) => {
               let bg = 'var(--bg)', border = 'var(--border)', color = 'var(--ink2)';
               if (answers[idx] === opt) { bg = '#dcfce7'; border = '#86efac'; color = '#166534'; }
-              if (reveal && answers[idx] === opt && answers[idx] !== q.correct) { bg = '#fdecea'; border = '#fca5a5'; color = '#D32F2F'; }
+              if (reveal && answers[idx] === opt && answers[idx] !== q.correct) { bg = 'var(--red-l, #fdecea)'; border = '#fca5a5'; color = 'var(--red, #D32F2F)'; }
               return (
                 <button key={i} type="button" onClick={() => pick(opt)}
                   style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', border: `2px solid ${border}`, borderRadius: 'var(--r-lg)', background: bg, cursor: 'pointer', textAlign: 'left', width: '100%', color, fontSize: 13, fontWeight: 500, minHeight: 'unset', transition: 'all .15s' }}>
-                  <span style={{ width: 26, height: 26, borderRadius: 7, background: answers[idx] === opt ? (answers[idx] === q.correct || !reveal ? 'var(--green)' : '#D32F2F') : '#e2e8f0', color: answers[idx] === opt ? '#fff' : 'var(--muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 900, flexShrink: 0 }}>
+                  <span style={{ width: 26, height: 26, borderRadius: 7, background: answers[idx] === opt ? (answers[idx] === q.correct || !reveal ? 'var(--green)' : 'var(--red, #D32F2F)') : 'var(--border, #e2e8f0)', color: answers[idx] === opt ? '#fff' : 'var(--muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 900, flexShrink: 0 }}>
                     {String.fromCharCode(65 + i)}
                   </span>
                   <span style={{ flex: 1 }}>{opt}</span>

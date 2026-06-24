@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -59,18 +59,22 @@ class UserPasswordReset(BaseModel):
 
 
 class CandidateCreate(BaseModel):
-    first_name: str
-    last_name: str
-    identity_number: str
-    phone: str
+    first_name: str = Field(min_length=2, max_length=120)
+    last_name: str = Field(min_length=2, max_length=120)
+    identity_number: str = Field(min_length=3, max_length=120)
+    phone: str = Field(min_length=8, max_length=30)
     email: str | None = None
-    permit_category: str = "B"
+    permit_category: str = Field(default="B", pattern=r"^[ABCDE]$")
+    city: str | None = None
+    date_of_birth: date | None = None
+    address: str | None = None
 
 
 class CandidateRead(CandidateCreate):
     id: str
     reference: str
     status: str
+    attempt_count: int = 0
     created_at: datetime
 
     model_config = {"from_attributes": True}

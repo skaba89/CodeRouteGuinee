@@ -2,9 +2,11 @@ import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError as _ValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse as _JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
@@ -135,6 +137,42 @@ if os.environ.get("ENVIRONMENT", "development").lower() == "production":
             return await call_next(request)
 
     app.add_middleware(_CsrfMiddleware)
+
+
+
+# ── Handler d'erreur global 500 ────────────────────────────────────────────
+
+
+@app.exception_handler(Exception)
+async def global_exception_handler(_req: Request, exc: Exception) -> _JSONResponse:
+    """Capture toutes les erreurs 500 non gérées — envoie à Sentry, retourne JSON propre."""
+    from app.sentry import capture_exception as _sentry_cap
+    _sentry_cap(exc, context={
+        "method": _req.method,
+        "url":    str(_req.url),
+        "path":   _req.url.path,
+    })
+    import logging as _log
+    _log.getLogger("coderoute.errors").error(
+        "Erreur 500 non gérée %s %s : %s", _req.method, _req.url.path, exc, exc_info=True
+    )
+    return _JSONResponse(
+        status_code=500,
+        content={"detail": "Erreur interne du serveur. L'équipe technique a été notifiée."},
+    )
+
+
+@app.exception_handler(_ValidationError)
+async def validation_exception_handler(_req: Request, exc: _ValidationError) -> _JSONResponse:
+    """Retourne un JSON lisible pour les erreurs de validation (422)."""
+    errors = []
+    for err in exc.errors():
+        field = " → ".join(str(loc) for loc in err.get("loc", []))
+        errors.append({"field": field, "message": err.get("msg", "Valeur invalide")})
+    return _JSONResponse(
+        status_code=422,
+        content={"detail": "Données invalides", "errors": errors},
+    )
 
 
 app.include_router(audio.router, prefix=settings.api_v1_prefix)

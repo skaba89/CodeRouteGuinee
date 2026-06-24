@@ -81,7 +81,7 @@ export function InstallPWA() {
       <button
         onClick={handleInstall}
         style={{
-          background: '#FCD116', color: '#000', border: 'none',
+          background: 'var(--gold, #FCD116)', color: 'var(--ink, #000)', border: 'none',
           borderRadius: 8, padding: '8px 14px', fontWeight: 700,
           fontSize: 13, cursor: 'pointer', flexShrink: 0,
         }}

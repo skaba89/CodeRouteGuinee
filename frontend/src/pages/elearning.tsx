@@ -98,7 +98,7 @@ export function ELearningPage() {
         {/* Vidéo */}
         {lesson.video_url && (
           <div style={{ marginBottom: 20, borderRadius: 10, overflow: 'hidden',
-            background: '#000', aspectRatio: '16/9' }}>
+            background: 'var(--ink, #000)', aspectRatio: '16/9' }}>
             <video
               src={lesson.video_url}
               controls
@@ -195,7 +195,7 @@ export function ELearningPage() {
                     {pct}%
                   </div>
                 )}
-                <span style={{ color: '#ccc' }}>›</span>
+                <span style={{ color: 'var(--border)' }}>›</span>
               </div>
             );
           })}
@@ -218,7 +218,7 @@ export function ELearningPage() {
         <div className="card" style={{ textAlign: 'center', padding: 40 }}>
           <div style={{ fontSize: 40, marginBottom: 12 }}>📖</div>
           <p style={{ color: 'var(--muted)' }}>Aucun cours disponible pour le moment.</p>
-          <p style={{ fontSize: 13, color: '#aaa' }}>
+          <p style={{ fontSize: 13, color: 'var(--muted)' }}>
             Les modules de cours seront publiés prochainement.
           </p>
         </div>

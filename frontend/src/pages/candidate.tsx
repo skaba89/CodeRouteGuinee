@@ -201,7 +201,7 @@ export function CandidatePage() {
               <div className="alert as">
                 ✅ Paiement <strong>{payResult.status === 'paid' ? 'confirmé' : payResult.status}</strong> — Réf. {payResult.reference}
                 {payResult.checkout_url && (
-                  <span> — <a href={payResult.checkout_url} target="_blank" rel="noopener noreferrer" style={{ color: '#004085', fontWeight: 600 }}>Finaliser Wave →</a></span>
+                  <span> — <a href={payResult.checkout_url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--blue-dark, #004085)', fontWeight: 600 }}>Finaliser Wave →</a></span>
                 )}
               </div>
             )}

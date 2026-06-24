@@ -309,7 +309,7 @@ function Timer({ secs, total, onExpire }: { secs: number; total: number; onExpir
   const m = Math.floor(rem / 60), s = rem % 60;
   const pct = (rem / total * 100).toFixed(1) + '%';
   const urgent = rem <= 300, crit = rem <= 60;
-  const color = crit ? '#D32F2F' : urgent ? '#F5A623' : '#00875A';
+  const color = crit ? 'var(--red, #D32F2F)' : urgent ? 'var(--gold, #F5A623)' : 'var(--green, #00875A)';
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
       <div style={{ width: 90, height: 90, borderRadius: '50%', background: `conic-gradient(${color} ${pct}, #E4E7EC 0)`, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
@@ -319,7 +319,7 @@ function Timer({ secs, total, onExpire }: { secs: number; total: number; onExpir
           </span>
         </div>
       </div>
-      <p style={{ fontSize: 11, color: crit ? '#D32F2F' : 'var(--muted)', fontWeight: crit ? 700 : 500 }}>
+      <p style={{ fontSize: 11, color: crit ? 'var(--red, #D32F2F)' : 'var(--muted)', fontWeight: crit ? 700 : 500 }}>
         {crit ? '⚠️ Temps critique !' : urgent ? '⏳ < 5 min' : 'Temps restant'}
       </p>
     </div>

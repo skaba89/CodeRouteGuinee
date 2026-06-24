@@ -88,7 +88,7 @@ def create_booking(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("admin", "super_admin", "center")),
 ) -> Booking:
-    sequence_number = db.query(Booking).count() + 1
+    sequence_number = (db.scalar(select(func.count(Booking.id))) or 0) + 1
     reference = build_booking_reference(sequence_number)
     booking = Booking(
         reference=reference,

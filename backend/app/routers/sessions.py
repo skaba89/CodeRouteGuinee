@@ -30,7 +30,7 @@ SESSION_DURATION_HOURS = 2 # Durée d'une session (préparation + 30min examen +
 
 
 def build_session_reference(db: Session) -> str:
-    count = db.query(ExamSession).count() + 1
+    count = (db.scalar(select(func.count(ExamSession.id))) or 0) + 1
     return f"GN-SESSION-{datetime.now(UTC).year}-{count:06d}"
 
 

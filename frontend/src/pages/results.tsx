@@ -185,7 +185,7 @@ export function ResultsPage() {
                 <span>{q.is_correct ? '✅' : '❌'}</span>
               </div>
               <p style={{ fontWeight: 600, fontSize: 13, margin: 0 }}>{q.text}</p>
-              {!q.is_correct && q.given_answer && <p style={{ fontSize: 12, color: '#D32F2F', margin: 0 }}>Votre réponse : <strong>{q.given_answer}</strong></p>}
+              {!q.is_correct && q.given_answer && <p style={{ fontSize: 12, color: 'var(--red, #D32F2F)', margin: 0 }}>Votre réponse : <strong>{q.given_answer}</strong></p>}
               {!q.is_correct && <p style={{ fontSize: 12, color: 'var(--green)', margin: 0 }}>Bonne réponse : <strong>{q.correct_answer}</strong></p>}
               {q.explanation && <p style={{ fontSize: 12, color: 'var(--muted)', background: 'var(--bg)', padding: '6px 10px', borderRadius: 8, margin: 0 }}>💡 {q.explanation}</p>}
             </div>

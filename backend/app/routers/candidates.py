@@ -17,7 +17,7 @@ router = APIRouter(prefix="/candidates", tags=["candidates"])
 
 
 def build_candidate_reference(db: Session) -> str:
-    count = db.query(Candidate).count() + 1
+    count = (db.scalar(select(func.count(Candidate.id))) or 0) + 1
     return f"GN-CODE-{datetime.now(UTC).year}-{count:06d}"
 
 
@@ -109,7 +109,12 @@ def export_candidates_csv(
     if city:
         query = query.where(Candidate.city == city) if hasattr(Candidate, 'city') else query
 
-    candidates = db.scalars(query.order_by(Candidate.last_name, Candidate.first_name)).all()
+    # Limite de sécurité pour éviter les OOM avec de gros volumes
+    MAX_EXPORT_ROWS = 5_000
+    total_rows = db.scalar(__import__("sqlalchemy").select(__import__("sqlalchemy").func.count()).select_from(query.subquery())) or 0
+    candidates = db.scalars(
+        query.order_by(Candidate.last_name, Candidate.first_name).limit(MAX_EXPORT_ROWS)
+    ).all()
 
     output = io.StringIO()
     writer = csv.writer(output, delimiter=";")
@@ -131,10 +136,18 @@ def export_candidates_csv(
         ])
 
     content = output.getvalue()
+    headers = {
+        "Content-Disposition": "attachment; filename=candidats_coderoute.csv",
+        "X-Total-Count":   str(total_rows),
+        "X-Exported-Count": str(len(candidates)),
+        "X-Max-Rows":       str(MAX_EXPORT_ROWS),
+    }
+    if total_rows > MAX_EXPORT_ROWS:
+        headers["X-Truncated"] = "true"
     return Response(
         content=content.encode("utf-8-sig"),   # BOM pour Excel
         media_type="text/csv; charset=utf-8-sig",
-        headers={"Content-Disposition": "attachment; filename=candidats_coderoute.csv"},
+        headers=headers,
     )
 
 

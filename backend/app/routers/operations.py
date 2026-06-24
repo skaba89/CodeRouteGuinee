@@ -80,16 +80,16 @@ def _count_payment_alerts(db: Session) -> int:
 def _build_operations_summary(db: Session) -> OperationsSummaryRead:
     now = datetime.now(UTC).replace(tzinfo=None)
     since_24h = now - timedelta(hours=24)
-    open_incidents = db.query(CenterIncident).filter(CenterIncident.status == "open").count()
-    critical_incidents = db.query(CenterIncident).filter(
+    open_incidents = (db.scalar(select(func.count(CenterIncident.id)).where(CenterIncident.status == "open")) or 0)
+    critical_incidents = (db.scalar(select(func.count(CenterIncident.id)).where(
         CenterIncident.status == "open",
         CenterIncident.severity.in_(["high", "critical"]),
-    ).count()
-    high_risk_exam_events = db.query(ExamMonitoringEvent).filter(ExamMonitoringEvent.severity == "high").count()
-    critical_exam_events = db.query(ExamMonitoringEvent).filter(ExamMonitoringEvent.severity == "critical").count()
-    suspicious_devices = db.query(DeviceSession).filter(DeviceSession.status == "suspicious").count()
+    )) or 0)
+    high_risk_exam_events = (db.scalar(select(func.count(ExamMonitoringEvent.id)).where(ExamMonitoringEvent.severity == "high")) or 0)
+    critical_exam_events = (db.scalar(select(func.count(ExamMonitoringEvent.id)).where(ExamMonitoringEvent.severity == "critical")) or 0)
+    suspicious_devices = (db.scalar(select(func.count(DeviceSession.id)).where(DeviceSession.status == "suspicious")) or 0)
     payment_alerts = _count_payment_alerts(db)
-    audit_events_24h = db.query(AuditLog).filter(AuditLog.created_at >= since_24h).count()
+    audit_events_24h = (db.scalar(select(func.count(AuditLog.id)).where(AuditLog.created_at >= since_24h)) or 0)
     last_audit_at = db.scalar(select(func.max(AuditLog.created_at)))
 
     raw_alerts = [

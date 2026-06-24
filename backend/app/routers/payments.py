@@ -116,7 +116,7 @@ def create_payment(
     final_amount = payload.amount_gnf if payload.amount_gnf != 250000 else resolved_amount
 
     provider_result = simulate_mobile_money_payment(payload.provider, payload.phone, final_amount)
-    reference = build_payment_reference(db.query(Payment).count() + 1)
+    reference = build_payment_reference((db.scalar(select(func.count(Payment.id))) or 0) + 1)
     from datetime import UTC
     from datetime import datetime as _dt
     payment = Payment(
@@ -354,7 +354,7 @@ def import_official_payments(
     created = 0
     updated = 0
     references: list[str] = []
-    next_sequence = db.query(Payment).count() + 1
+    next_sequence = (db.scalar(select(func.count(Payment.id))) or 0) + 1
 
     for row in payload.payments:
         receipt_number = row.receipt_number.strip().upper()
@@ -453,9 +453,9 @@ async def wave_webhook(request: Request, db: Session = Depends(get_db)) -> dict:
     if payment_status == "succeeded":
         # Mettre à jour le statut du paiement en base
         from app.models_payment import Payment
-        payment = db.query(Payment).filter(
+        payment = db.scalar(select(Payment).where(
             Payment.external_reference == checkout_id
-        ).first()
+        ))
         if payment and payment.status == "pending":
             payment.status = "paid"
             payment.paid_at = datetime.now(UTC).replace(tzinfo=None)
@@ -483,9 +483,9 @@ async def paydunya_webhook(request: Request, db: Session = Depends(get_db)) -> d
 
     if status == "completed":
         from app.models_payment import Payment
-        payment = db.query(Payment).filter(
+        payment = db.scalar(select(Payment).where(
             Payment.external_reference == token
-        ).first()
+        ))
         if payment and payment.status == "pending":
             payment.status = "paid"
             payment.paid_at = datetime.now(UTC).replace(tzinfo=None)
