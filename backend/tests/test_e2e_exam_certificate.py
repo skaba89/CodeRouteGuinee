@@ -1,15 +1,15 @@
-from datetime import datetime, timedelta, UTC
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
 
 from app.db.session import SessionLocal, init_db
 from app.main import app
-from tests.conftest import get_admin_headers, get_center_headers
 from app.models_candidate import Candidate
 from app.models_center import Center
 from app.models_question import Question
 from app.models_session import ExamSession
+from tests.conftest import get_admin_headers, get_center_headers
 
 
 def _seed_exam_context() -> tuple[str, str]:
@@ -83,11 +83,12 @@ def test_exam_scoring_certificate_and_public_verification_end_to_end() -> None:
         assert attempt["status"] == "started"
 
         # Récupérer les bonnes réponses depuis la DB (bypass pagination API)
+        from sqlalchemy import select as _select
+
         from app.db.session import SessionLocal as _SL
         from app.models_question import Question as _Q
-        from sqlalchemy import select as _select
         _db = _SL()
-        _all_q = _db.scalars(_select(_Q).where(_Q.is_active == True)).all()
+        _all_q = _db.scalars(_select(_Q).where(_Q.is_active)).all()
         answers = {q.id: q.correct_answer for q in _all_q}
         _db.close()
         assert len(answers) >= 40

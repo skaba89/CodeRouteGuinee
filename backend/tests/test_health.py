@@ -1,5 +1,6 @@
-from fastapi.testclient import TestClient
 from types import SimpleNamespace
+
+from fastapi.testclient import TestClient
 
 from app.main import app
 from app.routers.health import _build_configuration_check

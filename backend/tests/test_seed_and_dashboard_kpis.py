@@ -1,7 +1,6 @@
 """
 Tests seed_full.py + KPIs dashboard enrichis.
 """
-import uuid
 import pytest
 from fastapi.testclient import TestClient
 
@@ -21,8 +20,9 @@ class TestSeedFull:
         except Exception as e:
             pytest.skip(f"seed_full.run_seed a échoué : {e}")
 
-        from app.models_user import User
         from sqlalchemy import select
+
+        from app.models_user import User
         db = SessionLocal()
         try:
             count = db.scalar(select(User))
@@ -32,8 +32,9 @@ class TestSeedFull:
 
     def test_seed_questions_exist_after_seed(self):
         """Après seed, il doit y avoir des questions."""
+        from sqlalchemy import func, select
+
         from app.models_question import Question
-        from sqlalchemy import select, func
         db = SessionLocal()
         try:
             count = db.scalar(select(func.count()).select_from(Question))
@@ -43,8 +44,9 @@ class TestSeedFull:
 
     def test_seed_guard_exists_and_callable(self):
         """_guard doit être importable et appelable en environnement de dev."""
-        from app.seed_full import _guard
         import os
+
+        from app.seed_full import _guard
         # En dev, _guard ne lève pas d'exception
         with __import__('unittest.mock', fromlist=['patch']).patch.dict(
             os.environ, {'ENVIRONMENT': 'development'}

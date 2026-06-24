@@ -2,9 +2,7 @@
 Tests pour le mobile money sandbox (couverture 26% → 70%+).
 Uniquement les chemins sandbox — pas d'appels réseau réels.
 """
-import os
 
-import pytest
 
 from app.mobile_money import (
     ProviderResult,

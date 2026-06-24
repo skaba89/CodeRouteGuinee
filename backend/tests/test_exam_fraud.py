@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, UTC
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
 from app.models_audit import AuditLog

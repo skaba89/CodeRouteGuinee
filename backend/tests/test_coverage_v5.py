@@ -19,9 +19,7 @@ from app.main import app
 from app.models_center import Center
 from app.models_session import ExamSession
 from app.models_user import User
-from app.security import get_password_hash
 from tests.conftest import get_admin_headers
-
 
 # ══════════════════════════════════════════════════════════════════
 # 1. auth_guard.py — opérations DB internes
@@ -203,7 +201,7 @@ class TestSeedFull:
         """seed_users doit créer au moins un utilisateur admin."""
         from app.seed_full import seed_users
         init_db()
-        from sqlalchemy import select, func
+        from sqlalchemy import func, select
         db = SessionLocal()
         try:
             before = db.scalar(select(func.count()).select_from(User))
@@ -220,7 +218,7 @@ class TestSeedFull:
         """seed_centers doit créer des centres."""
         from app.seed_full import seed_centers
         init_db()
-        from sqlalchemy import select, func
+        from sqlalchemy import func, select
         db = SessionLocal()
         try:
             try:
@@ -268,9 +266,10 @@ class TestSeedFull:
 
     def test_run_seed_guard_respects_environment(self):
         """run_seed utilise _guard() qui vérifie l'environnement."""
-        from app.seed_full import _guard
         import os
         from unittest.mock import patch
+
+        from app.seed_full import _guard
 
         # En mode development, _guard ne lève pas
         with patch.dict(os.environ, {"ENVIRONMENT": "development"}):
@@ -310,7 +309,8 @@ def _create_session_and_attempt():
             address="Rue Mon", capacity=35, max_sessions_per_week=5,
             status="accredited",
         )
-        db.add(center); db.flush()
+        db.add(center)
+        db.flush()
 
         session = ExamSession(
             center_id=center.id,
@@ -318,7 +318,8 @@ def _create_session_and_attempt():
             capacity=10, status="open",
             reference=f"GN-SESSION-MON-{suffix}",
         )
-        db.add(session); db.flush()
+        db.add(session)
+        db.flush()
         session_id = str(session.id)
         db.commit()
     return session_id
@@ -432,7 +433,8 @@ class TestPaymentsCompleteCoverage:
                 status="paid",
                 receipt_number=f"RCP-REF-{suffix}",
             )
-            db.add(pay); db.commit()
+            db.add(pay)
+            db.commit()
             ref = pay.reference
 
         with TestClient(app) as client:
@@ -481,14 +483,16 @@ class TestPaymentsCompleteCoverage:
                 address="A", capacity=35, max_sessions_per_week=5,
                 status="accredited",
             )
-            db.add(ctr); db.flush()
+            db.add(ctr)
+            db.flush()
             sess = ExamSession(
                 center_id=ctr.id,
                 starts_at=datetime.now(UTC).replace(tzinfo=None) + timedelta(days=5),
                 capacity=10, status="open",
                 reference=f"GN-SESSION-CO-{suffix}",
             )
-            db.add(sess); db.flush()
+            db.add(sess)
+            db.flush()
             cand = Candidate(
                 first_name="Test", last_name="Wave",
                 identity_number=f"GN-CO-{suffix}",
@@ -496,14 +500,16 @@ class TestPaymentsCompleteCoverage:
                 permit_category="B",
                 reference=f"GN-CODE-CO-{suffix}",
             )
-            db.add(cand); db.flush()
+            db.add(cand)
+            db.flush()
             bk = Booking(
                 candidate_id=cand.id, session_id=sess.id,
                 reference=f"GN-BK-CO-{suffix}",
                 status="confirmed",
                 verification_code=f"VC-CO-{suffix}",
             )
-            db.add(bk); db.commit()
+            db.add(bk)
+            db.commit()
             bk_ref = bk.reference
             phone = cand.phone
 
@@ -561,8 +567,9 @@ class TestProviderResultCheckoutUrl:
 
     def test_wave_no_api_key_returns_failed_with_empty_checkout_url(self):
         """Sans WAVE_API_KEY, _wave_payment retourne failed avec checkout_url vide."""
-        from app.mobile_money import _wave_payment
         import os
+
+        from app.mobile_money import _wave_payment
         env = {k: v for k, v in os.environ.items() if k != "WAVE_API_KEY"}
         from unittest.mock import patch
         with patch.dict(os.environ, env, clear=True):
@@ -572,9 +579,10 @@ class TestProviderResultCheckoutUrl:
 
     def test_wave_success_returns_checkout_url(self):
         """Avec API Wave simulée, checkout_url est rempli."""
-        from app.mobile_money import _wave_payment
-        from unittest.mock import MagicMock, patch
         import os
+        from unittest.mock import MagicMock, patch
+
+        from app.mobile_money import _wave_payment
 
         mock_resp = MagicMock()
         mock_resp.status_code = 201

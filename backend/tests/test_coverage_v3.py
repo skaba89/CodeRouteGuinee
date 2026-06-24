@@ -250,7 +250,7 @@ class TestRequestLogger:
 
     def _make_logger(self):
         from app.logging_config import RequestLogger
-        mock_app = MagicMock()
+        MagicMock()
 
         async def mock_app_callable(scope, receive, send):
             if scope["type"] == "http":

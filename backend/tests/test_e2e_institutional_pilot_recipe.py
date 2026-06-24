@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, UTC
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
@@ -64,9 +64,10 @@ def test_institutional_pilot_recipe_from_official_imports_to_certificate() -> No
         assert center_import.status_code == 200
         assert center_import.json()["created"] == 1
         # Récupérer le centre importé via DB directe (évite les problèmes de pagination)
+        from sqlalchemy import select as _sel
+
         from app.db.session import SessionLocal as _SL
         from app.models_center import Center as _Ctr
-        from sqlalchemy import select as _sel
         with _SL() as _db:
             _c = _db.scalar(_sel(_Ctr).where(_Ctr.code == center_code))
             assert _c is not None, f"Centre {center_code} non trouvé"
@@ -189,11 +190,12 @@ def test_institutional_pilot_recipe_from_official_imports_to_certificate() -> No
         assert attempt["status"] == "started"
 
         # Récupérer toutes les questions via DB pour garantir couverture complète
+        from sqlalchemy import select as _selq
+
         from app.db.session import SessionLocal as _SLq
         from app.models_question import Question as _Qq
-        from sqlalchemy import select as _selq
         with _SLq() as _dbq:
-            _all_qs = _dbq.scalars(_selq(_Qq).where(_Qq.is_active == True)).all()
+            _all_qs = _dbq.scalars(_selq(_Qq).where(_Qq.is_active)).all()
             imported_questions = [q for q in _all_qs if q.category == "recette-pilote" and suffix in q.text]
             answers = {q.id: q.correct_answer for q in _all_qs}
         assert len(imported_questions) == 40

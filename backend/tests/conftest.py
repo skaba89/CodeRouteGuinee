@@ -4,11 +4,9 @@ Fournit des helpers d'authentification pour les rôles super_admin, admin, cente
 """
 from uuid import uuid4
 
-import pytest
 from fastapi.testclient import TestClient
 
 from app.db.session import SessionLocal, init_db
-from app.main import app
 from app.models_user import User
 from app.security import get_password_hash
 

@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, UTC
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
@@ -39,7 +39,6 @@ def test_center_incident_blocks_attempt_and_allows_retake() -> None:
     with TestClient(app) as client:
         admin_headers = _auth_headers(client, "admin")
         center_headers = _auth_headers(client, "center")
-        headers = admin_headers
 
         center_response = client.post(
             "/api/v1/centers",
@@ -145,11 +144,12 @@ def test_center_incident_blocks_attempt_and_allows_retake() -> None:
         assert resolved_incident["new_attempt_id"] != initial_attempt["id"]
 
         # Récupérer les bonnes réponses depuis la DB (bypass pagination API)
+        from sqlalchemy import select as _select
+
         from app.db.session import SessionLocal as _SL
         from app.models_question import Question as _Q
-        from sqlalchemy import select as _select
         _db = _SL()
-        _all_q = _db.scalars(_select(_Q).where(_Q.is_active == True)).all()
+        _all_q = _db.scalars(_select(_Q).where(_Q.is_active)).all()
         answers = {q.id: q.correct_answer for q in _all_q}
         _db.close()
         assert len(answers) >= 40

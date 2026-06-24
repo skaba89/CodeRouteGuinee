@@ -1,6 +1,7 @@
 """
 Tests pour les endpoints entries (coverage 61% → 90%+).
 """
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
@@ -10,7 +11,6 @@ from app.main import app
 from app.models_center import Center
 from app.models_session import ExamSession
 from tests.conftest import get_admin_headers, get_center_headers
-from datetime import datetime, timedelta, UTC
 
 
 def _seed() -> tuple[str, str]:

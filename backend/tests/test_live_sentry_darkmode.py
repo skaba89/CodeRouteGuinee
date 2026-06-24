@@ -1,17 +1,11 @@
 """
 Tests — Live dashboard, Sentry wrapper, Dark mode (CSS), Celcom Money.
 """
-import uuid
 
-import pytest
 from fastapi.testclient import TestClient
 
-from app.db.session import SessionLocal, init_db
 from app.main import app
-from app.models_user import User
-from app.security import get_password_hash
 from tests.conftest import get_admin_headers
-
 
 # ── Live Dashboard ────────────────────────────────────────────────────────────
 
@@ -116,8 +110,8 @@ class TestSentryWrapper:
         from app.sentry import capture_exception
         ctx = {"endpoint": "/exams/submit", "attempt_id": "abc", "user_id": "xyz"}
         try:
-            raise IOError("Connexion perdue")
-        except IOError as e:
+            raise OSError("Connexion perdue")
+        except OSError as e:
             capture_exception(e, context=ctx)
 
 
