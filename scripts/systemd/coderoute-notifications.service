@@ -1,0 +1,17 @@
+# /etc/systemd/system/coderoute-notifications.service
+# Service systemd pour les notifications CodeRoute Guinée
+# Copier dans /etc/systemd/system/ puis : systemctl enable coderoute-notifications.timer
+
+[Unit]
+Description=CodeRoute Guinée — Job notifications schedulées
+After=network.target coderoute-backend.service
+
+[Service]
+Type=oneshot
+User=coderoute
+WorkingDirectory=/opt/coderoute/backend
+EnvironmentFile=/opt/coderoute/.env
+ExecStart=/opt/coderoute/scripts/systemd/coderoute-cron.sh %i
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=coderoute-notifications

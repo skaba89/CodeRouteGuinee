@@ -1,0 +1,13 @@
+# /etc/systemd/system/coderoute-payment-pending.timer
+# Alerte paiements en attente — une fois par jour à 09h00
+
+[Unit]
+Description=CodeRoute — Alerte paiements en attente 7j
+Requires=coderoute-notifications@payment_pending_7d.service
+
+[Timer]
+OnCalendar=*-*-* 09:00:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

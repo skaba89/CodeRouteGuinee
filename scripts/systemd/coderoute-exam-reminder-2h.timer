@@ -1,0 +1,13 @@
+# /etc/systemd/system/coderoute-exam-reminder-2h.timer
+# Rappel 2h avant examen — toutes les 30 minutes
+
+[Unit]
+Description=CodeRoute — Rappel examen J-2h (toutes les 30min)
+Requires=coderoute-notifications@exam_reminder_2h.service
+
+[Timer]
+OnCalendar=*-*-* *:00,30:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

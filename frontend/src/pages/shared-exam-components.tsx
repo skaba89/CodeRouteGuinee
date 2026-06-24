@@ -54,6 +54,83 @@ export function SignSvg({ type }: { type: string }) {
       <path d="M30 60 L90 60 M75 45 L90 60 L75 75" stroke="#fff" strokeWidth="8" fill="none" strokeLinecap="round"/>
     </svg>
   );
+  if (type === 'speed_30') return (
+    <svg viewBox="0 0 120 120" width="110" height="110">
+      <circle cx="60" cy="60" r="55" fill="#fff" stroke="#c0392b" strokeWidth="8"/>
+      <text x="60" y="74" textAnchor="middle" fill="#0A2540" fontSize="32" fontWeight="bold">30</text>
+    </svg>
+  );
+  if (type === 'speed_70') return (
+    <svg viewBox="0 0 120 120" width="110" height="110">
+      <circle cx="60" cy="60" r="55" fill="#fff" stroke="#c0392b" strokeWidth="8"/>
+      <text x="60" y="74" textAnchor="middle" fill="#0A2540" fontSize="32" fontWeight="bold">70</text>
+    </svg>
+  );
+  if (type === 'speed_90') return (
+    <svg viewBox="0 0 120 120" width="110" height="110">
+      <circle cx="60" cy="60" r="55" fill="#fff" stroke="#c0392b" strokeWidth="8"/>
+      <text x="60" y="74" textAnchor="middle" fill="#0A2540" fontSize="32" fontWeight="bold">90</text>
+    </svg>
+  );
+  if (type === 'priority') return (
+    <svg viewBox="0 0 120 120" width="110" height="110">
+      <rect x="35" y="10" width="50" height="50" fill="#f1c40f" stroke="#0A2540" strokeWidth="3" transform="rotate(45 60 35)"/>
+      <text x="60" y="70" textAnchor="middle" fill="#0A2540" fontSize="10">PRIORITÉ</text>
+    </svg>
+  );
+  if (type === 'no_overtaking') return (
+    <svg viewBox="0 0 120 120" width="110" height="110">
+      <circle cx="60" cy="60" r="55" fill="#fff" stroke="#c0392b" strokeWidth="8"/>
+      <ellipse cx="45" cy="65" rx="12" ry="18" fill="#0A2540"/>
+      <ellipse cx="75" cy="65" rx="12" ry="18" fill="#c0392b"/>
+      <line x1="15" y1="15" x2="105" y2="105" stroke="#c0392b" strokeWidth="8"/>
+    </svg>
+  );
+  if (type === 'pedestrian_crossing') return (
+    <svg viewBox="0 0 120 120" width="110" height="110">
+      <rect x="5" y="5" width="110" height="110" rx="6" fill="#2980b9"/>
+      <circle cx="60" cy="28" r="10" fill="#fff"/>
+      <line x1="60" y1="38" x2="60" y2="75" stroke="#fff" strokeWidth="7" strokeLinecap="round"/>
+      <line x1="60" y1="55" x2="40" y2="45" stroke="#fff" strokeWidth="6" strokeLinecap="round"/>
+      <line x1="60" y1="55" x2="80" y2="45" stroke="#fff" strokeWidth="6" strokeLinecap="round"/>
+      <line x1="60" y1="75" x2="42" y2="95" stroke="#fff" strokeWidth="6" strokeLinecap="round"/>
+      <line x1="60" y1="75" x2="78" y2="95" stroke="#fff" strokeWidth="6" strokeLinecap="round"/>
+    </svg>
+  );
+  if (type === 'school_zone') return (
+    <svg viewBox="0 0 120 120" width="110" height="110">
+      <polygon points="60,8 112,112 8,112" fill="#f1c40f" stroke="#0A2540" strokeWidth="4"/>
+      <text x="60" y="72" textAnchor="middle" fill="#0A2540" fontSize="10" fontWeight="bold">ÉCOLE</text>
+      <text x="60" y="90" textAnchor="middle" fill="#0A2540" fontSize="9">30 km/h</text>
+    </svg>
+  );
+  if (type === 'parking') return (
+    <svg viewBox="0 0 120 120" width="110" height="110">
+      <rect x="5" y="5" width="110" height="110" rx="6" fill="#2980b9"/>
+      <text x="60" y="80" textAnchor="middle" fill="#fff" fontSize="72" fontWeight="bold">P</text>
+    </svg>
+  );
+  if (type === 'no_parking') return (
+    <svg viewBox="0 0 120 120" width="110" height="110">
+      <circle cx="60" cy="60" r="55" fill="#fff" stroke="#c0392b" strokeWidth="8"/>
+      <text x="60" y="80" textAnchor="middle" fill="#c0392b" fontSize="52" fontWeight="bold">P</text>
+      <line x1="15" y1="15" x2="105" y2="105" stroke="#c0392b" strokeWidth="8"/>
+    </svg>
+  );
+  if (type === 'danger') return (
+    <svg viewBox="0 0 120 120" width="110" height="110">
+      <polygon points="60,8 112,112 8,112" fill="#fff" stroke="#c0392b" strokeWidth="6"/>
+      <text x="60" y="98" textAnchor="middle" fill="#c0392b" fontSize="60" fontWeight="bold">!</text>
+    </svg>
+  );
+  if (type === 'end_restriction') return (
+    <svg viewBox="0 0 120 120" width="110" height="110">
+      <circle cx="60" cy="60" r="55" fill="#fff" stroke="#888" strokeWidth="6"/>
+      <line x1="20" y1="40" x2="100" y2="80" stroke="#888" strokeWidth="6"/>
+      <line x1="20" y1="60" x2="100" y2="100" stroke="#888" strokeWidth="6"/>
+      <line x1="20" y1="80" x2="100" y2="55" stroke="#888" strokeWidth="6"/>
+    </svg>
+  );
   return <svg viewBox="0 0 120 120" width="110" height="110"><circle cx="60" cy="60" r="55" fill="#e2e8f0"/><text x="60" y="68" textAnchor="middle" fontSize="12" fill="#667085">Illustration</text></svg>;
 }
 

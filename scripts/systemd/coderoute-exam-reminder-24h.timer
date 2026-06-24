@@ -1,0 +1,13 @@
+# /etc/systemd/system/coderoute-exam-reminder-24h.timer
+# Rappel 24h avant examen — tourne toutes les 2h pour couvrir toutes les sessions
+
+[Unit]
+Description=CodeRoute — Rappel examen J-24h (toutes les 2h)
+Requires=coderoute-notifications@exam_reminder_24h.service
+
+[Timer]
+OnCalendar=*-*-* 06,08,10,12,14,16,18:00:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

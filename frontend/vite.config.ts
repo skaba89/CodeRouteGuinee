@@ -10,6 +10,8 @@ export default defineConfig({
       includeAssets: ['favicon.ico', 'icons/*.png'],
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        navigateFallback: '/offline.html',
+        navigateFallbackDenylist: [/^\/api/, /\/docs/, /\/openapi/],
         runtimeCaching: [
           {
             // Cache les appels API GET pendant 5 minutes (offline partiel)
