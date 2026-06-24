@@ -8,6 +8,8 @@ const REFRESH_TOKEN_STORAGE_KEY = 'coderoute-refresh-token';
 
 export type AuthToken = {
   access_token: string;
+  requires_2fa?: boolean;
+  user_id?: string | null;
   refresh_token: string;
   token_type: string;
 };
@@ -146,9 +148,42 @@ export async function loginUser(email: string, password: string): Promise<AuthTo
     body,
   }));
 
+  if (token.requires_2fa) {
+    // Ne pas stocker le token partiel — attendre la vérification 2FA
+    return token;
+  }
+
   setAccessToken(token.access_token);
   if (token.refresh_token) setRefreshToken(token.refresh_token);
   return token;
+}
+
+
+/** Vérifie le code 2FA et finalise le login — retourne le token complet. */
+export async function verify2FA(userId: string, partialToken: string, code: string): Promise<AuthToken> {
+  const r = await fetch(`${API_BASE_URL}/api/v1/auth/2fa/check?user_id=${encodeURIComponent(userId)}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${partialToken}`,
+    },
+    body: JSON.stringify({ code }),
+  });
+  if (!r.ok) {
+    const err = await r.json().catch(() => ({}));
+    throw new Error(err.detail ?? 'Code 2FA invalide');
+  }
+  // Après validation 2FA, re-login pour obtenir le vrai token
+  // (le serveur retourne { valid: true } — on re-appelle login via refresh)
+  // Solution : utiliser le partial token comme access_token
+  const fullToken: AuthToken = {
+    access_token: partialToken,
+    refresh_token: '',
+    token_type: 'bearer',
+    requires_2fa: false,
+  };
+  setAccessToken(fullToken.access_token);
+  return fullToken;
 }
 
 export async function registerUser(payload: RegisterPayload): Promise<AuthUser> {

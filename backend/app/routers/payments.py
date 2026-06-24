@@ -106,7 +106,9 @@ def create_payment(
         from app.tarifs import get_tarif_for_candidate
         _cand = db.get(_Cand, booking.candidate_id)
         _cat  = getattr(_cand, "permit_category", "B") if _cand else "B"
-        resolved_amount = get_tarif_for_candidate(_cat, attempt_number=1)
+        # Utiliser attempt_count réel pour les tarifs réinscription/rattrapage
+        _attempts = getattr(_cand, "attempt_count", 0) or 0
+        resolved_amount = get_tarif_for_candidate(_cat, attempt_number=_attempts + 1)
     except Exception:
         resolved_amount = payload.amount_gnf
     final_amount = payload.amount_gnf if payload.amount_gnf != 250000 else resolved_amount

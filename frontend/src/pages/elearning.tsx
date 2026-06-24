@@ -81,7 +81,7 @@ export function ELearningPage() {
     <div className="card"><p>🔐 Connectez-vous pour accéder aux cours.</p></div>
   );
 
-  if (loading) return <div className="card"><p style={{ color: '#888' }}>Chargement…</p></div>;
+  if (loading) return <div className="card"><p style={{ color: 'var(--muted)' }}>Chargement…</p></div>;
 
   // ── Vue leçon ──────────────────────────────────────────────────────────────
   if (view === 'lesson' && lesson && course) return (
@@ -124,13 +124,13 @@ export function ELearningPage() {
 
         {/* Progression */}
         <div style={{ marginTop: 24, display: 'flex', gap: 12, alignItems: 'center' }}>
-          <div style={{ flex: 1, height: 8, background: '#e5e7eb', borderRadius: 4 }}>
+          <div style={{ flex: 1, height: 8, background: 'var(--border, #e5e7eb)', borderRadius: 4 }}>
             <div style={{
               width: `${progress[lesson.id] || 0}%`, height: '100%',
               background: 'var(--primary)', borderRadius: 4, transition: 'width 0.3s',
             }} />
           </div>
-          <span style={{ fontSize: 13, color: '#888' }}>{progress[lesson.id] || 0}%</span>
+          <span style={{ fontSize: 13, color: 'var(--muted)' }}>{progress[lesson.id] || 0}%</span>
           <button
             onClick={() => markComplete(lesson.id)}
             style={{
@@ -158,7 +158,7 @@ export function ELearningPage() {
       </div>
       <div style={{ padding: '16px 0' }}>
         <h2 style={{ fontSize: 22, marginBottom: 6 }}>{course.title}</h2>
-        <p style={{ color: '#888', fontSize: 14, marginBottom: 20 }}>{course.description}</p>
+        <p style={{ color: 'var(--muted)', fontSize: 14, marginBottom: 20 }}>{course.description}</p>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {course.lessons.map((ls, idx) => {
@@ -185,7 +185,7 @@ export function ELearningPage() {
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: 600, fontSize: 14 }}>{ls.title}</div>
-                  <div style={{ fontSize: 12, color: '#888', marginTop: 2 }}>
+                  <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
                     {ls.video_url && '🎬 Vidéo · '}
                     {ls.duration_minutes} min
                   </div>
@@ -208,16 +208,16 @@ export function ELearningPage() {
   return (
     <div>
       <h2 style={{ fontSize: 22, marginBottom: 4 }}>📚 Cours en ligne</h2>
-      <p style={{ color: '#888', fontSize: 14, marginBottom: 20 }}>
+      <p style={{ color: 'var(--muted)', fontSize: 14, marginBottom: 20 }}>
         Préparez-vous avec nos modules de formation officiels DNTT
       </p>
 
-      {error && <p style={{ color: '#c00' }}>⚠ {error}</p>}
+      {error && <p style={{ color: 'var(--red, #c00)' }}>⚠ {error}</p>}
 
       {courses.length === 0 ? (
         <div className="card" style={{ textAlign: 'center', padding: 40 }}>
           <div style={{ fontSize: 40, marginBottom: 12 }}>📖</div>
-          <p style={{ color: '#888' }}>Aucun cours disponible pour le moment.</p>
+          <p style={{ color: 'var(--muted)' }}>Aucun cours disponible pour le moment.</p>
           <p style={{ fontSize: 13, color: '#aaa' }}>
             Les modules de cours seront publiés prochainement.
           </p>
@@ -251,15 +251,15 @@ export function ELearningPage() {
               <div style={{ padding: '0 4px 4px' }}>
                 <span style={{
                   fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 10,
-                  background: '#e8f5e9', color: '#2e7d32', display: 'inline-block', marginBottom: 8,
+                  background: 'var(--primary-light, #e8f5e9)', color: 'var(--primary-dark, #2e7d32)', display: 'inline-block', marginBottom: 8,
                 }}>
                   {CATEGORY_LABELS[c.category] ?? c.category}
                 </span>
                 <h3 style={{ fontSize: 16, marginBottom: 6, lineHeight: 1.3 }}>{c.title}</h3>
-                <p style={{ fontSize: 13, color: '#666', marginBottom: 12, lineHeight: 1.5 }}>
+                <p style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 12, lineHeight: 1.5 }}>
                   {c.description.slice(0, 80)}{c.description.length > 80 ? '…' : ''}
                 </p>
-                <div style={{ fontSize: 12, color: '#888' }}>
+                <div style={{ fontSize: 12, color: 'var(--muted)' }}>
                   📝 {c.lesson_count} leçon{c.lesson_count > 1 ? 's' : ''}
                 </div>
               </div>

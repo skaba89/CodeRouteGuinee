@@ -178,7 +178,7 @@ export function ResultsPage() {
           </div>
 
           {filtered.map(q => (
-            <div key={q.question_id} style={{ background: '#fff', border: `1.5px solid ${q.is_correct ? '#86efac' : '#fca5a5'}`, borderRadius: 12, padding: '14px 16px', display: 'grid', gap: 7 }}>
+            <div key={q.question_id} style={{ background: 'var(--surface, #fff)', border: `1.5px solid ${q.is_correct ? '#86efac' : '#fca5a5'}`, borderRadius: 12, padding: '14px 16px', display: 'grid', gap: 7 }}>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                 <span style={{ background: 'var(--bg)', padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 700 }}>Q{q.number}</span>
                 <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--muted)', flex: 1 }}>{q.category}</span>

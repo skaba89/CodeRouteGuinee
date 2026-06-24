@@ -455,6 +455,13 @@ def submit_exam(
     attempt.status = "submitted"
     attempt.submitted_at = now
     db.add(attempt)
+
+    # Incrémenter le compteur de tentatives du candidat
+    from app.models_candidate import Candidate as _Candidate
+    _cand = db.get(_Candidate, attempt.candidate_id)
+    if _cand and hasattr(_cand, "attempt_count"):
+        _cand.attempt_count = (_cand.attempt_count or 0) + 1
+        db.add(_cand)
     db.add(AuditLog(
         actor_id=current_user.id,
         action="exam.submitted",

@@ -1,4 +1,5 @@
 import React from 'react';
+import { LoginForm } from './components/login-form';
 import { ThemeToggle } from './components/theme-toggle';
 import { ELearningPage } from './pages/elearning';
 import { FormEvent, useEffect, useState } from 'react';
@@ -195,14 +196,13 @@ function LoginPage({
           </div>
         )}
 
-        <form className="login-form" onSubmit={handleSubmit}>
-          <label>Adresse e-mail<input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="agent@coderoute.gov.gn" autoComplete="username" /></label>
-          <label>Mot de passe<input type="password" value={pass} onChange={e => setPass(e.target.value)} placeholder="••••••••••••" autoComplete="current-password" /></label>
-          <button type="submit" className="btn-login" disabled={loading || !email || !pass}>
-            {loading ? 'Connexion…' : 'Se connecter'}
-          </button>
-          {status && <p className={status.startsWith('❌') ? 'form-error' : 'login-status'}>{status}</p>}
-        </form>
+        <LoginForm
+          onSuccess={() => window.location.reload()}
+          onError={(msg) => setStatus(`❌ ${msg}`)}
+        />
+        {status && !status.includes('❌') && (
+          <p className="login-status">{status}</p>
+        )}
 
         <div className="login-sep">Comptes de test disponibles</div>
         <div className="demo-grid">

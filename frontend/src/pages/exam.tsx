@@ -230,7 +230,7 @@ export function ExamPage() {
             </label>
           )}
           {startErr && (
-            <div style={{ padding: '8px 12px', background: '#fff3cd', borderRadius: 8,
+            <div style={{ padding: '8px 12px', background: 'var(--gold-l, #fff3cd)', borderRadius: 8,
               fontSize: 13, color: '#856404', marginBottom: 10 }}>
               ⚠ {startErr}
             </div>
@@ -281,7 +281,7 @@ export function ExamPage() {
           </div>
 
           {filtered.map(q2 => (
-            <div key={q2.question_id} style={{ background: '#fff', border: `1.5px solid ${q2.is_correct ? '#86efac' : '#fca5a5'}`, borderRadius: 'var(--r-lg)', padding: '14px 18px', display: 'grid', gap: 7 }}>
+            <div key={q2.question_id} style={{ background: 'var(--surface, #fff)', border: `1.5px solid ${q2.is_correct ? '#86efac' : '#fca5a5'}`, borderRadius: 'var(--r-lg)', padding: '14px 18px', display: 'grid', gap: 7 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ background: 'var(--bg)', padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 700 }}>Q{q2.number}</span>
                 <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--muted)', flex: 1 }}>{q2.category}</span>
@@ -332,7 +332,7 @@ export function ExamPage() {
     <section className="screen" style={{ padding: '16px 12px' }}>
       <div style={{ display: 'grid', gridTemplateColumns: '240px 1fr', gap: 14, alignItems: 'start', maxWidth: 1100, margin: '0 auto' }}>
         {/* Sidebar */}
-        <div style={{ background: '#fff', border: '1px solid var(--border)', borderRadius: 'var(--r-lg)', padding: 16, display: 'grid', gap: 14, position: 'sticky', top: 76 }}>
+        <div style={{ background: 'var(--surface, #fff)', border: '1px solid var(--border)', borderRadius: 'var(--r-lg)', padding: 16, display: 'grid', gap: 14, position: 'sticky', top: 76 }}>
           <Timer secs={SECS} total={SECS} onExpire={handleExpire} />
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, fontWeight: 700, color: 'var(--muted)' }}>
             <span><strong style={{ color: 'var(--ink)' }}>{answered}</strong> / {questions.length}</span>
@@ -345,7 +345,7 @@ export function ExamPage() {
         </div>
 
         {/* Main */}
-        <div style={{ background: '#fff', border: '1px solid var(--border)', borderRadius: 'var(--r-lg)', padding: '20px 22px', display: 'grid', gap: 16 }}>
+        <div style={{ background: 'var(--surface, #fff)', border: '1px solid var(--border)', borderRadius: 'var(--r-lg)', padding: '20px 22px', display: 'grid', gap: 16 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ background: 'var(--green-l)', color: 'var(--green)', padding: '3px 10px', borderRadius: 999, fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em' }}>{q.category}</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>

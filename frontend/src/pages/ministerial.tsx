@@ -18,6 +18,7 @@ import {
   type CenterFilters,
   type QuestionFilters,
   type UserFilters,
+  getPrivateJson,
 } from '../api';
 import { isAudioLocale, speakFeedback, stop as stopAudio } from '../audio';
 import { type Locale } from '../i18n';
@@ -98,6 +99,29 @@ export function MinisterialPage() {
 
   // Stations
   const [stations, setStations] = useState<import('../api').CenterStation[]>([]);
+  const [liveAlerts, setLiveAlerts] = useState<Array<{sev:string;title:string;desc:string;action:string}>>([]);
+
+  // Charger les alertes réelles depuis le live dashboard
+  useEffect(() => {
+    getPrivateJson<{kpis:{fraud_active:number;pending_payments:number;open_incidents:number}}>('/api/v1/dashboard/live')
+      .then(d => {
+        const alerts: Array<{sev:string;title:string;desc:string;action:string}> = [];
+        if (d.kpis.fraud_active > 0)
+          alerts.push({sev:'high', title:`${d.kpis.fraud_active} alerte(s) fraude active(s)`,
+            desc:'Examens suspects détectés. Revue manuelle requise.', action:'Voir alertes'});
+        if (d.kpis.pending_payments > 5)
+          alerts.push({sev:'medium', title:`${d.kpis.pending_payments} paiements en attente`,
+            desc:'Paiements initiés non confirmés depuis > 24h.', action:'Vérifier paiements'});
+        if (d.kpis.open_incidents > 0)
+          alerts.push({sev:'medium', title:`${d.kpis.open_incidents} incident(s) de centre ouvert(s)`,
+            desc:'Incidents signalés non résolus dans les centres agréés.', action:'Voir incidents'});
+        if (alerts.length === 0)
+          alerts.push({sev:'low', title:'Aucune anomalie détectée',
+            desc:'La plateforme fonctionne normalement.', action:'Rafraîchir'});
+        setLiveAlerts(alerts);
+      })
+      .catch(() => {});
+  }, []);
   const [stLabel, setStLabel] = useState('');
   const [stRoom, setStRoom] = useState('');
   const [stCenter, setStCenter] = useState('');
@@ -417,12 +441,10 @@ export function MinisterialPage() {
               </div>
             ) : (
               <>
-                {/* Alertes simulées representant la réalité du pilote */}
-                {[
-                  { sev:'high', title:'Centre de Kankan — taux de réussite anormal', desc:'98,5 % de réussite sur 30 jours consécutifs. Investigation DNTT recommandée.', action:'Planifier audit' },
-                  { sev:'medium', title:'5 candidats avec résultats en attente > 48h', desc:'Les résultats de la session du 18/06 ne sont pas encore synchronisés.', action:'Vérifier sync' },
-                  { sev:'low', title:'Renouvellement SSL dans 89 jours', desc:'Le certificat TLS de api.coderoute.gov.gn expire le 17/09/2026.', action:'Programmer renouvellement' },
-                ].map((a, i) => (
+                {/* Alertes temps réel depuis le dashboard live */}
+                {(liveAlerts.length > 0 ? liveAlerts : [
+                  { sev:'low', title:'Chargement des alertes…', desc:'', action:'' },
+                ]).map((a, i) => (
                   <div key={i} style={{ background: a.sev==='critical'?'var(--red-l)':a.sev==='medium'?'var(--gold-l)':'var(--blue-l)', border:`1px solid ${a.sev==='critical'?'#fca5a5':a.sev==='medium'?'#fde68a':'#bfdbfe'}`, borderRadius:'var(--r)', padding:'12px 14px', marginBottom:10 }}>
                     <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
                       <span>{a.sev==='critical'?'🔴':a.sev==='medium'?'🟡':'🔵'}</span>

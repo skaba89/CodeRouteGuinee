@@ -57,7 +57,7 @@ function KpiCard({ label, value, icon, alert = false }: {
       <div style={{ fontSize: 26, fontWeight: 800, color: '#006B3F', lineHeight: 1.2 }}>
         {value.toLocaleString('fr-FR')}
       </div>
-      <div style={{ fontSize: 11, color: '#555', marginTop: 2 }}>{label}</div>
+      <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>{label}</div>
     </div>
   );
 }
@@ -117,14 +117,14 @@ export function LiveDashboard() {
             cursor: 'pointer', fontSize: 16, opacity: 0.6 }}
         >🔄</button>
         {lastRefresh && (
-          <span style={{ fontSize: 11, color: '#888' }}>
+          <span style={{ fontSize: 11, color: 'var(--muted)' }}>
             Mis à jour {lastRefresh.toLocaleTimeString('fr-FR')}
           </span>
         )}
       </div>
 
-      {loading && <p style={{ color: '#888', fontSize: 13 }}>Chargement…</p>}
-      {error  && !loading && <p style={{ color: '#c00', fontSize: 13 }}>⚠ {error}</p>}
+      {loading && <p style={{ color: 'var(--muted)', fontSize: 13 }}>Chargement…</p>}
+      {error  && !loading && <p style={{ color: 'var(--red, #c00)', fontSize: 13 }}>⚠ {error}</p>}
 
       {kpis && (
         <>
@@ -151,19 +151,19 @@ export function LiveDashboard() {
                 {data.feed.map((item) => (
                   <div key={item.id} style={{
                     display: 'flex', alignItems: 'center', gap: 10,
-                    background: '#f8faf9', borderRadius: 8, padding: '8px 12px',
+                    background: 'var(--bg, #f8faf9)', borderRadius: 8, padding: '8px 12px',
                     fontSize: 13,
                   }}>
                     <span style={{ fontSize: 16 }}>{TYPE_ICON[item.type] ?? '📌'}</span>
-                    <span style={{ flex: 1, color: '#333' }}>{item.title}</span>
+                    <span style={{ flex: 1, color: 'var(--ink2)' }}>{item.title}</span>
                     <span style={{
                       fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 10,
-                      background: '#e8f5e9',
+                      background: 'var(--primary-light, #e8f5e9)',
                       color: STATUS_COLOR[item.status] ?? '#333',
                     }}>
                       {item.status}
                     </span>
-                    <span style={{ fontSize: 11, color: '#888', minWidth: 60, textAlign: 'right' }}>
+                    <span style={{ fontSize: 11, color: 'var(--muted)', minWidth: 60, textAlign: 'right' }}>
                       {item.timestamp
                         ? new Date(item.timestamp).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
                         : '—'}
@@ -175,7 +175,7 @@ export function LiveDashboard() {
           )}
 
           {data.feed.length === 0 && (
-            <p style={{ fontSize: 13, color: '#888', fontStyle: 'italic' }}>
+            <p style={{ fontSize: 13, color: 'var(--muted)', fontStyle: 'italic' }}>
               Aucune activité dans les 15 dernières minutes.
             </p>
           )}

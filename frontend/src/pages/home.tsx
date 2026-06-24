@@ -1,5 +1,6 @@
 // HomePage — CodeRoute Guinée
 import { type FormEvent, useEffect, useRef, useCallback, useState } from 'react';
+import { getPrivateJson } from '../api';
 import { AudioModeBanner, LocaleAudioSwitcher, PlayButton, AudioToggle } from '../components/AudioButton';
 import {
   InstitutionalAuthsPanel,
@@ -80,8 +81,18 @@ function errMsg(e: unknown, fallback = 'Erreur inattendue'): string {
 // HOME PAGE — Accueil toutes rôles
 // ══════════════════════════════════════════════════════════════════
 
+type TarifPublic = { cle: string; libelle: string; montant_gnf: number; };
+
 export function HomePage() {
   const { currentUser, isPresentationMode, role } = useAuthSession();
+  const [tarifs, setTarifs] = useState<TarifPublic[]>([]);
+
+  useEffect(() => {
+    getPrivateJson<{ tarifs: TarifPublic[] }>('/api/v1/tarifs/current')
+      .then(d => setTarifs(d.tarifs))
+      .catch(() => {});
+  }, []);
+
   const [dashboard, setDashboard] = useState<DashboardData | null>(null);
 
   useEffect(() => {
@@ -176,6 +187,25 @@ export function HomePage() {
             <div>✅ Seuil d'admission : 35/40 (87,5 %)</div>
             <div>📱 Questions illustrées par catégorie</div>
           </div>
+          {tarifs.length > 0 && (
+            <div style={{ marginBottom: 16, padding: '12px 16px',
+              background: 'var(--primary-light, #e8f5e9)', borderRadius: 10 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--primary)',
+                marginBottom: 8 }}>💰 Frais d'examen en vigueur</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                {tarifs
+                  .filter(t => t.cle.startsWith('examen_code_'))
+                  .map(t => (
+                    <span key={t.cle} style={{ fontSize: 12, padding: '3px 10px',
+                      background: 'var(--surface, #fff)', borderRadius: 20,
+                      border: '1px solid var(--border)', color: 'var(--ink2)' }}>
+                      Permis {t.cle.replace('examen_code_', '').toUpperCase()} —{' '}
+                      <strong>{t.montant_gnf.toLocaleString('fr-FR')} GNF</strong>
+                    </span>
+                  ))}
+              </div>
+            </div>
+          )}
           <a href="#/exam"><button className="btn-success">Passer l'examen →</button></a>
         </div>
       </div>

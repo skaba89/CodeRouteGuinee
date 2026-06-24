@@ -190,7 +190,7 @@ export function SceneSvg({ type }: { type: string }) {
       <text x="200" y="41" textAnchor="middle" fill="#fff" fontSize="14" fontWeight="bold">✗</text>
     </svg>
   );
-  return <div style={{ height: 120, background: '#f1f5f9', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)', fontSize: 13 }}>Illustration</div>;
+  return <div style={{ height: 120, background: 'var(--bg, #f1f5f9)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)', fontSize: 13 }}>Illustration</div>;
 }
 
 export function Timer({ secs, total, onExpire }: { secs: number; total: number; onExpire: () => void }) {
@@ -208,7 +208,7 @@ export function Timer({ secs, total, onExpire }: { secs: number; total: number; 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
       <div style={{ width: 90, height: 90, borderRadius: '50%', background: `conic-gradient(${color} ${pct}, #E4E7EC 0)`, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
-        <div style={{ width: 72, height: 72, borderRadius: '50%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ width: 72, height: 72, borderRadius: '50%', background: 'var(--surface, #fff)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <span style={{ fontSize: 20, fontWeight: 900, fontVariantNumeric: 'tabular-nums', color: 'var(--ink)' }}>
             {String(m).padStart(2,'0')}:{String(s).padStart(2,'0')}
           </span>
