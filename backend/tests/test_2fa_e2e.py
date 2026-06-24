@@ -15,7 +15,6 @@ pour simuler ce que ferait Google Authenticator.
 """
 import uuid
 
-import pytest
 from fastapi.testclient import TestClient
 
 from app.db.session import SessionLocal, init_db
@@ -24,17 +23,16 @@ from app.models_user import User
 from app.security import get_password_hash
 from app.two_factor import (
     TOTP_PERIOD,
-    generate_backup_codes,
-    generate_secret,
-    generate_totp,
-    verify_totp,
-    setup_2fa,
     activate_2fa,
     check_2fa,
     disable_2fa,
+    generate_backup_codes,
+    generate_secret,
+    generate_totp,
     is_2fa_enabled,
+    setup_2fa,
+    verify_totp,
 )
-
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -47,7 +45,9 @@ def _make_user(role: str = "admin") -> tuple[str, str, str]:
     with SessionLocal() as db:
         u = User(email=email, full_name=f"2FA E2E {suffix}",
                  password_hash=get_password_hash(pwd), role=role)
-        db.add(u); db.commit(); db.refresh(u)
+        db.add(u)
+        db.commit()
+        db.refresh(u)
         return email, pwd, str(u.id)
 
 
@@ -117,7 +117,7 @@ class TestTotpCoreLogic:
 
     def test_different_secrets_give_different_codes(self):
         s1, s2 = generate_secret(), generate_secret()
-        c1, c2 = generate_totp(s1), generate_totp(s2)
+        _c1, _c2 = generate_totp(s1), generate_totp(s2)
         # Très improbable que 2 secrets différents donnent le même code
         assert s1 != s2  # Les secrets sont différents
 
@@ -204,6 +204,7 @@ class TestTotpDbOperations:
     def test_backup_code_consumed_after_use(self):
         """Un code de secours est à usage unique."""
         import json
+
         from sqlalchemy import text
         init_db()
         email, _, user_id = _make_user()
@@ -317,7 +318,7 @@ class TestTwoFactorEndpoints:
             secret = setup_resp.json()["secret_b32"]
             c.post("/api/v1/auth/2fa/verify", headers=_auth(tok),
                    json={"code": generate_totp(secret)})
-            r = c.post(f"/api/v1/auth/2fa/check",
+            r = c.post("/api/v1/auth/2fa/check",
                        params={"user_id": user_id},
                        headers=_auth(tok),
                        json={"code": generate_totp(secret)})

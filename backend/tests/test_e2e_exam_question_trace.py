@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, UTC
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
@@ -39,7 +39,6 @@ def test_exam_question_trace_is_created_and_used_for_scoring() -> None:
     with TestClient(app) as client:
         admin_headers = _auth_headers(client, "admin")
         center_headers = _auth_headers(client, "center")
-        headers = admin_headers
 
         created_questions = []
         for index in range(3):
@@ -123,11 +122,12 @@ def test_exam_question_trace_is_created_and_used_for_scoring() -> None:
         assert len(trace["question_ids"]) > 0  # Au moins une question sélectionnée
 
         # Récupérer les bonnes réponses depuis la DB (bypass pagination API)
+        from sqlalchemy import select as _select
+
         from app.db.session import SessionLocal as _SL
         from app.models_question import Question as _Q
-        from sqlalchemy import select as _select
         _db = _SL()
-        _all_q = _db.scalars(_select(_Q).where(_Q.is_active == True)).all()
+        _all_q = _db.scalars(_select(_Q).where(_Q.is_active)).all()
         active_answer_key = {q.id: q.correct_answer for q in _all_q}
         _db.close()
         answers = {question_id: active_answer_key.get(question_id, "A") for question_id in trace["question_ids"]}

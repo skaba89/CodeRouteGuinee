@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, UTC
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
@@ -38,7 +38,7 @@ def test_candidate_booking_payment_entry_exam_certificate_flow() -> None:
     suffix = uuid4().hex[:8]
 
     with TestClient(app) as client:
-        admin_headers = get_admin_headers(client)
+        get_admin_headers(client)
         center_headers = get_center_headers(client)
         headers = _admin_headers(client)
 
@@ -157,11 +157,12 @@ def test_candidate_booking_payment_entry_exam_certificate_flow() -> None:
         assert attempt["status"] == "started"
 
         # Récupérer les bonnes réponses depuis la DB (bypass pagination API)
+        from sqlalchemy import select as _select
+
         from app.db.session import SessionLocal as _SL
         from app.models_question import Question as _Q
-        from sqlalchemy import select as _select
         _db = _SL()
-        _all_q = _db.scalars(_select(_Q).where(_Q.is_active == True)).all()
+        _all_q = _db.scalars(_select(_Q).where(_Q.is_active)).all()
         answers = {q.id: q.correct_answer for q in _all_q}
         _db.close()
         assert len(answers) >= 40

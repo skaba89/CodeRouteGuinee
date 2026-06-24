@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, UTC
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
@@ -39,7 +39,6 @@ def test_center_incident_blocks_attempt_and_allows_retake() -> None:
     with TestClient(app) as client:
         admin_headers = _auth_headers(client, "admin")
         center_headers = _auth_headers(client, "center")
-        headers = admin_headers
 
         center_response = client.post(
             "/api/v1/centers",

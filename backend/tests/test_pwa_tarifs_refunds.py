@@ -28,7 +28,8 @@ def _super_admin_headers(client: TestClient) -> dict:
             password_hash=get_password_hash("TestPass123!"),
             role="super_admin",
         )
-        db.add(u); db.commit()
+        db.add(u)
+        db.commit()
     r = client.post("/api/v1/auth/login",
                     data={"username": email, "password": "TestPass123!"})
     return {"Authorization": f"Bearer {r.json()['access_token']}"}
@@ -97,7 +98,9 @@ class TestTarifsAdmin:
     def test_update_tarif_requires_super_admin(self):
         """Un admin simple ne peut pas modifier un tarif (seul super_admin le peut)."""
         import uuid as _uuid
-        from app.db.session import SessionLocal as _SL, init_db as _idb
+
+        from app.db.session import SessionLocal as _SL
+        from app.db.session import init_db as _idb
         _idb()
         suffix = _uuid.uuid4().hex[:8]
         email  = f"admin-only-{suffix}@test.com"
@@ -199,7 +202,8 @@ def _seed_paid_payment() -> tuple[str, str]:
             permit_category="B",
             status="active",
         )
-        db.add(cand); db.flush()
+        db.add(cand)
+        db.flush()
 
         booking = Booking(
             reference=f"BK-REF-{suffix}",
@@ -208,7 +212,8 @@ def _seed_paid_payment() -> tuple[str, str]:
             status="confirmed",
             verification_code=f"VRF-{suffix}",
         )
-        db.add(booking); db.flush()
+        db.add(booking)
+        db.flush()
 
         payment = Payment(
             reference=f"PAY-REF-{suffix}",
@@ -219,7 +224,8 @@ def _seed_paid_payment() -> tuple[str, str]:
             status="paid",
             receipt_number=f"RCT-{suffix}",
         )
-        db.add(payment); db.commit()
+        db.add(payment)
+        db.commit()
         return payment.reference, booking.reference
 
 
@@ -234,7 +240,9 @@ class TestRefunds:
     def test_refund_requires_super_admin(self):
         """Un admin simple (role='admin') ne peut pas rembourser."""
         import uuid as _uuid
-        from app.db.session import SessionLocal as _SL, init_db as _idb
+
+        from app.db.session import SessionLocal as _SL
+        from app.db.session import init_db as _idb
         from app.models_user import User as _U
         from app.security import get_password_hash as _ph
         _idb()
@@ -355,7 +363,8 @@ class TestTwoFactor:
                 password_hash=get_password_hash("TestPass123!"),
                 role="admin",
             )
-            db.add(u); db.commit()
+            db.add(u)
+            db.commit()
         with TestClient(app) as c:
             return c.post("/api/v1/auth/login",
                           data={"username": email, "password": "TestPass123!"}).json()["access_token"]

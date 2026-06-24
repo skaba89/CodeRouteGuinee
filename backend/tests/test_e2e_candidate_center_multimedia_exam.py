@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, UTC
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
@@ -84,9 +84,10 @@ def test_candidate_registration_center_booking_and_40_question_multimedia_exam_t
         center_import = client.post("/api/v1/centers/import-official", headers=headers, json={**center_payload, "dry_run": False})
         assert center_import.status_code == 200
         # Récupérer le centre importé via DB (évite les problèmes de pagination)
+        from sqlalchemy import select as _sel2
+
         from app.db.session import SessionLocal as _SL2
         from app.models_center import Center as _Ctr2
-        from sqlalchemy import select as _sel2
         with _SL2() as _db2:
             _c2 = _db2.scalar(_sel2(_Ctr2).where(_Ctr2.code == center_code))
             assert _c2 is not None, f"Centre {center_code} non trouvé en base"
@@ -188,8 +189,7 @@ def test_candidate_registration_center_booking_and_40_question_multimedia_exam_t
         def _first_opt_mm(q: dict) -> str:
             opts = q.get("options", [])
             return opts[0] if isinstance(opts, list) and opts else "Action securisee"
-        answers = {q["id"]: _first_opt_mm(q) for q in exam_qs}
-        submit_response = client.post(f"/api/v1/exams/{attempt['id']}/submit", headers=headers, json={"answers": answers})
+        answers = {q["id"]: _first_opt_mm(q) for q in exam_qs}        submit_response = client.post(f"/api/v1/exams/{attempt['id']}/submit", headers=headers, json={"answers": answers})
         assert submit_response.status_code == 200
         submitted_attempt = submit_response.json()
         assert submitted_attempt["status"] == "submitted"

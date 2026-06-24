@@ -3,7 +3,6 @@ Tests finaux — export CSV candidats, health enrichi, booking /my, candidates /
 """
 import uuid
 
-import pytest
 from fastapi.testclient import TestClient
 
 from app.db.session import SessionLocal, init_db
@@ -29,7 +28,9 @@ def _make_candidate(email: str | None = None) -> Candidate:
             status="active",
             email=email,
         )
-        db.add(cand); db.commit(); db.refresh(cand)
+        db.add(cand)
+        db.commit()
+        db.refresh(cand)
         return cand
 
 
@@ -144,7 +145,8 @@ class TestCandidateMeEndpoint:
                 password_hash=get_password_hash(password),
                 role="candidate",
             )
-            db.add(user); db.commit()
+            db.add(user)
+            db.commit()
             # Créer un candidat avec le même email
             cand = Candidate(
                 reference=f"GN-ME-{suffix}",
@@ -154,7 +156,8 @@ class TestCandidateMeEndpoint:
                 permit_category="B", status="active",
                 email=email,
             )
-            db.add(cand); db.commit()
+            db.add(cand)
+            db.commit()
         with TestClient(app) as client:
             return client.post("/api/v1/auth/login",
                                data={"username": email, "password": password}).json()["access_token"]
@@ -198,7 +201,8 @@ class TestBookingMyEndpoint:
                 password_hash=get_password_hash("TestPass123!"),
                 role="candidate",
             )
-            db.add(user); db.commit()
+            db.add(user)
+            db.commit()
         with TestClient(app) as client:
             return client.post("/api/v1/auth/login",
                                data={"username": email, "password": "TestPass123!"}).json()["access_token"]

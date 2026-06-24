@@ -6,12 +6,15 @@ Cibles :
   app/routers/center_stations.py (67% → 90%+) — lignes 51, 63, 72, 106-153
   app/auth_guard.py             (71% → 85%+) — lignes 43, 75, 78, 84-158
 """
-import pytest
+import uuid
+
 from fastapi.testclient import TestClient
 
+from app.auth_guard import LoginRateLimiter, _InMemoryFallback
+from app.db.session import SessionLocal, init_db
 from app.main import app
+from app.models_center import Center
 from tests.conftest import get_admin_headers
-
 
 # ══════════════════════════════════════════════════════════════════
 # 1. AUDIT — /api/v1/audit-logs
@@ -107,12 +110,6 @@ class TestAuditLogs:
 # 2. CENTER STATIONS — /api/v1/center-stations
 # ══════════════════════════════════════════════════════════════════
 
-import uuid
-
-from app.db.session import SessionLocal, init_db
-from app.models_center import Center
-
-
 def _make_center() -> Center:
     init_db()
     db = SessionLocal()
@@ -128,7 +125,10 @@ def _make_center() -> Center:
         max_sessions_per_week=3,
         status="accredited",
     )
-    db.add(c); db.commit(); db.refresh(c); db.close()
+    db.add(c)
+    db.commit()
+    db.refresh(c)
+    db.close()
     return c
 
 
@@ -378,8 +378,6 @@ class TestCenterStations:
 # ══════════════════════════════════════════════════════════════════
 # 3. AUTH GUARD — LoginRateLimiter
 # ══════════════════════════════════════════════════════════════════
-
-from app.auth_guard import LoginRateLimiter, _InMemoryFallback
 
 
 class TestInMemoryFallback:
