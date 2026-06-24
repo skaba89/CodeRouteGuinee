@@ -11,7 +11,7 @@ from app.deps import require_roles
 from app.models_audit import AuditLog
 from app.models_candidate import Candidate
 from app.models_user import User
-from app.schemas import CandidateCreate, CandidateOfficialImportRequest, CandidateOfficialImportResult, CandidateRead
+from app.schemas import CandidateCreate, CandidateOfficialImportRequest, CandidateOfficialImportResult, CandidateRead, CandidateUpdate
 
 router = APIRouter(prefix="/candidates", tags=["candidates"])
 
@@ -149,6 +149,40 @@ def export_candidates_csv(
         media_type="text/csv; charset=utf-8-sig",
         headers=headers,
     )
+
+
+@router.get("/{candidate_id}", response_model=CandidateRead)
+def get_candidate(
+    candidate_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "super_admin", "center")),
+) -> CandidateRead:
+    """Récupère un candidat par son ID."""
+    cand = db.get(Candidate, candidate_id)
+    if not cand:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Candidat introuvable")
+    return CandidateRead.model_validate(cand)
+
+
+@router.patch("/{candidate_id}", response_model=CandidateRead)
+def update_candidate(
+    candidate_id: str,
+    payload: CandidateUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "super_admin")),
+) -> CandidateRead:
+    """Met à jour les données d'un candidat."""
+    cand = db.get(Candidate, candidate_id)
+    if not cand:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Candidat introuvable")
+    for field, value in payload.model_dump(exclude_none=True).items():
+        if hasattr(cand, field):
+            setattr(cand, field, value)
+    db.commit()
+    db.refresh(cand)
+    return CandidateRead.model_validate(cand)
+
+
 
 
 @router.post("/import-official", response_model=CandidateOfficialImportResult)

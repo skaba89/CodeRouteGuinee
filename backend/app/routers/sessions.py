@@ -236,6 +236,19 @@ def get_week_schedule(
     }
 
 
+@router.get("/{session_id}", response_model=ExamSessionRead)
+def get_session(
+    session_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "super_admin", "center")),
+) -> ExamSession:
+    """Récupère une session d'examen par son ID."""
+    session = db.get(ExamSession, session_id)
+    if not session:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session introuvable")
+    return session
+
+
 @router.get("/{session_id}/capacity-status", response_model=dict)
 def get_session_capacity(
     session_id: str,

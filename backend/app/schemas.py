@@ -70,6 +70,19 @@ class CandidateCreate(BaseModel):
     address: str | None = None
 
 
+class CandidateUpdate(BaseModel):
+    """Champs modifiables d'un candidat (tous optionnels)."""
+    first_name:      str | None = None
+    last_name:       str | None = None
+    phone:           str | None = None
+    email:           str | None = None
+    permit_category: str | None = Field(default=None, pattern=r"^[ABCDE]$")
+    city:            str | None = None
+    date_of_birth:   date | None = None
+    address:         str | None = None
+    status:          str | None = None
+
+
 class CandidateRead(CandidateCreate):
     id: str
     reference: str
