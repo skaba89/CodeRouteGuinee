@@ -1,5 +1,6 @@
 import React from 'react';
 import { ThemeToggle } from './components/theme-toggle';
+import { ELearningPage } from './pages/elearning';
 import { FormEvent, useEffect, useState } from 'react';
 import { canAccessRoute, demoRoles, navigationItems, type UserRole } from './auth';
 import {
