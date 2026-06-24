@@ -12,6 +12,7 @@ import {
   loginUser,
   logoutUser,
 } from './authClient';
+import { clearCsrfToken } from './api';
 import { LocaleSwitcher } from './components/LocaleSwitcher';
 import { AudioToggle, LocaleAudioSwitcher } from './components/AudioButton';
 import { t } from './i18n';
@@ -269,12 +270,12 @@ export default function App() {
   }
 
   function handleLogout() {
-    logoutUser(); setCurrentUser(null); setIsPres(true); setRole('candidate');
+    clearCsrfToken(); logoutUser(); setCurrentUser(null); setIsPres(true); setRole('candidate');
     window.location.hash = '#/login';
   }
 
   function handleRoleChange(r: UserRole) {
-    logoutUser(); setCurrentUser(null); setIsPres(true); setRole(r);
+    clearCsrfToken(); logoutUser(); setCurrentUser(null); setIsPres(true); setRole(r);
   }
 
   const visibleNav = navigationItems.filter(n => n.roles.includes(role));

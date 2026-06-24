@@ -13,6 +13,7 @@ from app.models_session import ExamSession
 from app.models_user import User
 from app.qr_service import generate_qr_svg
 from app.schemas import BookingCreate, BookingRead, BookingVerificationRead
+from app.sentry import capture_exception as _sentry_capture
 
 router = APIRouter(prefix="/bookings", tags=["bookings"])
 
@@ -113,7 +114,8 @@ def create_booking(
                 center_name       = center.name,
                 verification_code = booking.verification_code,
             )
-    except Exception:
+    except Exception as _sentry_exc:
+        _sentry_capture(_sentry_exc, context={"file": __file__})
         pass  # Email non bloquant
 
     # SMS de confirmation — best effort (pour candidats sans email)

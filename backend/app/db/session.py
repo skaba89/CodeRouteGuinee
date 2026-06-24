@@ -93,15 +93,52 @@ def _sqlite_add_columns_if_missing() -> None:
         ("candidates", "email", "VARCHAR(200)"),
         ("payments",   "external_reference", "VARCHAR(200)"),
         ("payments",   "paid_at", "DATETIME"),
+        ("bookings",   "notes", "TEXT"),
+        ("bookings",   "cancelled_at", "DATETIME"),
+        ("bookings",   "payment_reference", "VARCHAR(80)"),
+        ("candidates", "city", "VARCHAR(100)"),
+        ("candidates", "date_of_birth", "DATE"),
+        ("candidates", "address", "TEXT"),
+        ("candidates", "attempt_count", "INTEGER DEFAULT 0 NOT NULL"),
     ]
+    # Liste blanche explicite pour prévenir toute injection SQL
+    # (même si les valeurs sont hardcodées, on valide explicitement)
+    _ALLOWED_TABLES = {
+        "centers", "exam_sessions", "candidates", "payments",
+        "bookings", "questions", "exam_attempts", "device_sessions",
+        "exam_monitoring_events", "exam_question_traces", "center_incidents",
+    }
+    _SAFE_COL_PATTERN = __import__("re").compile(r"^[a-z_][a-z0-9_]{0,63}$")
+
     with engine.connect() as conn:
         for table, col, col_type in migrations:
             if col_type is None:
                 continue
+            # Validation liste blanche
+            if table not in _ALLOWED_TABLES:
+                import logging as _log
+                _log.getLogger("coderoute.db").warning(
+                    "ALTER TABLE refusé — table non autorisée : %s", table
+                )
+                continue
+            if not _SAFE_COL_PATTERN.match(col):
+                import logging as _log
+                _log.getLogger("coderoute.db").warning(
+                    "ALTER TABLE refusé — colonne invalide : %s", col
+                )
+                continue
             try:
                 existing_cols = [c["name"] for c in inspector.get_columns(table)]
                 if col not in existing_cols:
-                    conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {col} {col_type}"))
+                    # Utiliser un dictionnaire pour le type (pas d'interpolation du type)
+                    _SAFE_TYPES = {
+                        "VARCHAR(120)", "VARCHAR(200)", "VARCHAR(100)", "VARCHAR(80)", "FLOAT", "INTEGER", "DATE",
+                        "INTEGER DEFAULT 3 NOT NULL", "DATETIME", "BOOLEAN",
+                    }
+                    safe_type = col_type if col_type in _SAFE_TYPES else None
+                    if safe_type is None:
+                        continue
+                    conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {col} {safe_type}"))  # noqa: S608
                     conn.commit()
             except Exception:
                 pass

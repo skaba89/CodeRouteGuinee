@@ -8,6 +8,8 @@ class Token(BaseModel):
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
+    requires_2fa: bool = False
+    user_id: str | None = None
 
 
 class UserCreate(BaseModel):

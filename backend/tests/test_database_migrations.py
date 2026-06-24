@@ -72,7 +72,7 @@ def test_alembic_upgrade_head_from_empty_sqlite_database(tmp_path, monkeypatch) 
         assert {"media_type", "media_url", "media_alt"}.issubset(question_columns)
         with engine.connect() as connection:
             version_rows = connection.exec_driver_sql("SELECT version_num FROM alembic_version").fetchall()
-        assert version_rows == [("20260623_0005",)]
+        assert version_rows == [("0006",)]
     finally:
         engine.dispose()
         get_settings.cache_clear()

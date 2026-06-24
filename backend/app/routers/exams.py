@@ -29,6 +29,7 @@ from app.models_session import ExamSession
 from app.models_user import User
 from app.pdf_service import build_result_certificate_pdf
 from app.schemas import ExamAttemptRead, ExamCertificateVerificationRead, ExamStartFromBookingRequest, ExamStartRequest, ExamSubmitRequest
+from app.sentry import capture_exception as _sentry_capture
 
 
 class ExamQuestionItem(_BaseModel):
@@ -489,7 +490,8 @@ def submit_exam(
                 total          = result["total_questions"],
                 certificate_url = cert_url,
             )
-    except Exception:
+    except Exception as _sentry_exc:
+        _sentry_capture(_sentry_exc, context={"file": __file__})
         pass  # Email non bloquant
 
     # SMS de résultat — best effort

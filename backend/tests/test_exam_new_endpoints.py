@@ -43,6 +43,23 @@ def _seed_center_session_question_base():
         db.add(session)
         db.commit()
         db.refresh(session)
+        # Créer au moins 40 questions actives pour pouvoir démarrer un examen
+        from app.models_question import Question
+        import json
+        existing_q = db.query(Question).count() if hasattr(db, 'query') else 0
+        from sqlalchemy import select as _sel, func as _func
+        existing_q = db.scalar(_sel(_func.count(Question.id))) or 0
+        if existing_q < 40:
+            for i in range(40):
+                q = Question(
+                    category=["signalisation","priorites","vitesse","securite"][i % 4],
+                    text=f"Question de test {i+1} ?",
+                    options=json.dumps(["Option A", "Option B", "Option C", "Option D"]),
+                    correct_answer="Option A",
+                    is_active=True,
+                )
+                db.add(q)
+            db.commit()
         return center.id, session.id
     finally:
         db.close()
@@ -146,7 +163,14 @@ def test_exam_results_endpoint() -> None:
         questions = q_data["questions"] if isinstance(q_data, dict) else q_data
 
         # Soumettre les réponses (première option pour chaque question)
-        answers = {q["id"]: q["options"][0] for q in questions}
+        # options peut être une liste ou une string JSON
+        def _first_option(q: dict) -> str:
+            opts = q.get("options", [])
+            if isinstance(opts, str):
+                import json as _json
+                opts = _json.loads(opts)
+            return opts[0] if opts else "A"
+        answers = {q["id"]: _first_option(q) for q in questions}
         submit = client.post(
             f"/api/v1/exams/{attempt['id']}/submit",
             headers=center_headers,
@@ -222,7 +246,12 @@ def test_exam_questions_blocked_after_submission() -> None:
             f"/api/v1/exams/{attempt['id']}/questions", headers=admin_headers
         ).json()
         questions3 = q_resp3["questions"] if isinstance(q_resp3, dict) else q_resp3
-        answers = {q["id"]: q["options"][0] for q in questions3}
+        def _first_opt3(q: dict) -> str:
+            opts = q.get("options", [])
+            if isinstance(opts, str):
+                import json as _j3; opts = _j3.loads(opts)
+            return opts[0] if opts else "A"
+        answers = {q["id"]: _first_opt3(q) for q in questions3}
         client.post(
             f"/api/v1/exams/{attempt['id']}/submit",
             headers=center_headers,

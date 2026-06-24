@@ -499,9 +499,9 @@ def get_live_kpis(
     feed: list[dict] = []
 
     # Réservations récentes
-    recent_bookings = db.query(Booking).filter(
+    recent_bookings = db.scalars(select(Booking).where(
         Booking.created_at >= last_15m
-    ).order_by(Booking.created_at.desc()).limit(5).all()
+    ).order_by(Booking.created_at.desc()).limit(5)).all()
     for bk in recent_bookings:
         feed.append({
             "id":        str(bk.id),
@@ -512,9 +512,9 @@ def get_live_kpis(
         })
 
     # Paiements récents
-    recent_payments = db.query(Payment).filter(
+    recent_payments = db.scalars(select(Payment).where(
         Payment.created_at >= last_15m
-    ).order_by(Payment.created_at.desc()).limit(5).all()
+    ).order_by(Payment.created_at.desc()).limit(5)).all()
     for pay in recent_payments:
         feed.append({
             "id":        str(pay.id) if pay.id else pay.reference,

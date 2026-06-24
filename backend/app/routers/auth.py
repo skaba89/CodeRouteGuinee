@@ -92,9 +92,26 @@ def login(
 
     login_rate_limiter.reset(key, db)
     audit_auth_event(db, "auth.login_success", form.username, request, user)
+
+    # Vérifier si le 2FA est activé pour cet utilisateur
+    from app.two_factor import is_2fa_enabled
+    tfa_enabled = is_2fa_enabled(str(user.id), db)
+
+    if tfa_enabled:
+        # Retourner un token partiel — le frontend doit envoyer le code 2FA
+        # via POST /auth/2fa/check?user_id=... avant d'obtenir le vrai token
+        partial_token = create_access_token(user.id, user.role, expires_minutes=5)
+        return Token(
+            access_token=partial_token,
+            refresh_token="",
+            requires_2fa=True,
+            user_id=str(user.id),
+        )
+
     return Token(
         access_token=create_access_token(user.id, user.role),
         refresh_token=create_refresh_token(user.id),
+        requires_2fa=False,
     )
 
 

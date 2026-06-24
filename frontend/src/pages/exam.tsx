@@ -97,6 +97,7 @@ export function ExamPage() {
   const [filter, setFilter] = useState<'all'|'ok'|'ko'>('all');
   const [reveal, setReveal] = useState(false);
   const [startErr, setStartErr] = useState('');
+  const [startLoading, setStartLoading] = useState(false);
 
   // eslint-disable-next-line @typescript-eslint/no-use-before-define
   // Utiliser les questions du backend si disponibles, sinon fallback local
@@ -174,6 +175,36 @@ export function ExamPage() {
     setPhase('done');
   }
 
+
+  // ── Démarrer l'examen — appel backend si authentifié + bookRef ──────────
+  async function handleStartExam() {
+    setStartErr('');
+    // Mode démonstration : pas d'auth ou pas de référence
+    if (!isAuth || !bookRef.trim()) {
+      setPhase('running');
+      return;
+    }
+    setStartLoading(true);
+    try {
+      const attempt = await startExamFromBooking(bookRef.trim());
+      setAttemptId(attempt.id);
+      const qsResp = await getExamQuestions(attempt.id);
+      setLiveQuestions(qsResp.questions);
+      setPhase('running');
+    } catch (err: unknown) {
+      const msg = errMsg(err, 'Impossible de démarrer l\'examen');
+      // Si 404 (pas de réservation) ou 401 : fallback démo
+      if (msg.includes('404') || msg.includes('401') || msg.includes('not found')) {
+        setStartErr('Référence introuvable — passage en mode démonstration');
+        setTimeout(() => { setStartErr(''); setPhase('running'); }, 2000);
+      } else {
+        setStartErr(msg);
+      }
+    } finally {
+      setStartLoading(false);
+    }
+  }
+
   // ── Setup ──────────────────────────────────────────────────────
   if (phase === 'setup') return (
     <section className="screen" role="main" aria-label="Contenu principal">
@@ -198,8 +229,20 @@ export function ExamPage() {
               <input value={bookRef} onChange={e => setBookRef(e.target.value)} placeholder="GN-CONV-2026-000001" />
             </label>
           )}
-          <button className="btn-success btn-block btn-lg" onClick={() => setPhase('running')}>
-            🚀 {isAuth ? 'Démarrer l\'examen officiel' : 'Commencer la démonstration'}
+          {startErr && (
+            <div style={{ padding: '8px 12px', background: '#fff3cd', borderRadius: 8,
+              fontSize: 13, color: '#856404', marginBottom: 10 }}>
+              ⚠ {startErr}
+            </div>
+          )}
+          <button
+            className="btn-success btn-block btn-lg"
+            onClick={handleStartExam}
+            disabled={startLoading}
+          >
+            {startLoading
+              ? '⏳ Chargement des questions…'
+              : `🚀 ${isAuth && bookRef.trim() ? 'Démarrer l\'examen officiel' : 'Commencer la démonstration'}`}
           </button>
         </div>
       </div>

@@ -1,4 +1,5 @@
 // AdminPage — CodeRoute Guinée
+import { LiveDashboard } from '../components/live-dashboard';
 import { type FormEvent, useEffect, useRef, useCallback, useState } from 'react';
 import { AudioModeBanner, LocaleAudioSwitcher, PlayButton, AudioToggle } from '../components/AudioButton';
 import {
@@ -162,6 +163,11 @@ export function AdminPage() {
         <span className="eyebrow">Administration</span>
         <h1>Tableau de bord national</h1>
         <p>Vue d'ensemble et gestion de la plateforme CodeRoute Guinée.</p>
+      </div>
+
+      {/* Live Dashboard — données temps réel, polling 15s */}
+      <div className="card" style={{ marginBottom: 20 }}>
+        <LiveDashboard />
       </div>
 
       {!canAdmin && (

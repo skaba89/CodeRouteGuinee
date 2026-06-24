@@ -19,8 +19,8 @@ def get_password_hash(password: str) -> str:
     return pwd_context.hash(password)
 
 
-def create_access_token(subject: str, role: str) -> str:
-    expire = datetime.now(UTC) + timedelta(minutes=settings.access_token_expire_minutes)
+def create_access_token(subject: str, role: str, expires_minutes: int | None = None) -> str:
+    expire = datetime.now(UTC) + timedelta(minutes=expires_minutes or settings.access_token_expire_minutes)
     payload = {"sub": subject, "role": role, "exp": expire, "type": "access"}
     return jwt.encode(payload, settings.secret_key, algorithm=settings.algorithm)
 
