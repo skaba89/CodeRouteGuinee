@@ -343,14 +343,16 @@ def _setup_booking_fixtures() -> tuple[str, str, str, str]:
 
     admin = User(email=f"bk-admin-{suffix}@test.com", full_name="Admin BK",
                  password_hash=get_password_hash("TestPass123!"), role="admin")
-    db.add(admin); db.commit()
+    db.add(admin)
+    db.commit()
 
     candidate = Candidate(
         first_name="Mamadou", last_name="Diallo",
         identity_number=f"GN-BK-{suffix}", phone=f"+224620{suffix[:6]}",
         permit_category="B", reference=f"GN-CODE-BK-{suffix}",
     )
-    db.add(candidate); db.commit()
+    db.add(candidate)
+    db.commit()
 
     center = Center(
         code=f"BK-CTR-{suffix}", name=f"Centre BK {suffix}",
@@ -358,7 +360,8 @@ def _setup_booking_fixtures() -> tuple[str, str, str, str]:
         address="Rue BK", capacity=35, max_sessions_per_week=5,
         status="accredited",
     )
-    db.add(center); db.commit()
+    db.add(center)
+    db.commit()
 
     session = ExamSession(
         center_id=center.id,
@@ -366,7 +369,8 @@ def _setup_booking_fixtures() -> tuple[str, str, str, str]:
         capacity=10, status="open",
         reference=f"GN-SESSION-BK-{suffix}",
     )
-    db.add(session); db.commit()
+    db.add(session)
+    db.commit()
 
     ids = (admin.email, str(candidate.id), str(session.id), session.reference)
     db.close()
@@ -529,7 +533,8 @@ def _setup_payment_fixtures() -> tuple[str, str, str]:
     with SessionLocal() as db:
         admin = User(email=f"pay-admin-{suffix}@test.com", full_name="Admin Pay",
                      password_hash=get_password_hash("TestPass123!"), role="admin")
-        db.add(admin); db.flush()
+        db.add(admin)
+        db.flush()
         admin_email = admin.email
 
         candidate = Candidate(
@@ -537,7 +542,8 @@ def _setup_payment_fixtures() -> tuple[str, str, str]:
             identity_number=f"GN-PAY-{suffix}", phone=phone,
             permit_category="B", reference=f"GN-CODE-PAY-{suffix}",
         )
-        db.add(candidate); db.flush()
+        db.add(candidate)
+        db.flush()
 
         center = Center(
             code=f"PAY-CTR-{suffix}", name=f"Centre PAY {suffix}",
@@ -545,7 +551,8 @@ def _setup_payment_fixtures() -> tuple[str, str, str]:
             address="Rue Pay", capacity=35, max_sessions_per_week=5,
             status="accredited",
         )
-        db.add(center); db.flush()
+        db.add(center)
+        db.flush()
 
         exam_session = ExamSession(
             center_id=center.id,
@@ -553,7 +560,8 @@ def _setup_payment_fixtures() -> tuple[str, str, str]:
             capacity=10, status="open",
             reference=f"GN-SESSION-PAY-{suffix}",
         )
-        db.add(exam_session); db.flush()
+        db.add(exam_session)
+        db.flush()
 
         booking = Booking(
             candidate_id=candidate.id,
@@ -583,7 +591,9 @@ class TestPaymentsRouter:
         email = f"pay-hdr-{suffix}@test.com"
         u = _U(email=email, full_name="Pay Admin",
                 password_hash=_ph("TestPass123!"), role="admin")
-        _db.add(u); _db.commit(); _db.close()
+        _db.add(u)
+        _db.commit()
+        _db.close()
         token = client.post("/api/v1/auth/login",
                             data={"username": email, "password": "TestPass123!"}).json()["access_token"]
         return {"Authorization": f"Bearer {token}"}

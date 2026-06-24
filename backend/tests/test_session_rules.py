@@ -12,15 +12,12 @@ Règles testées :
 from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
-import pytest
 from fastapi.testclient import TestClient
 
 from app.db.session import SessionLocal, init_db
 from app.main import app
 from app.models_center import Center
-from app.models_session import ExamSession
 from tests.conftest import get_admin_headers
-
 
 # ── Fixtures ──────────────────────────────────────────────────────────────
 
@@ -270,7 +267,7 @@ def test_13_simultaneous_sessions_conakry() -> None:
         assert schedule.status_code == 200
         data = schedule.json()
         # Vérifier qu'il y a bien des sessions ce lundi
-        lundi_sessions = data["days"]["Lundi"]["sessions"]
+        data["days"]["Lundi"]["sessions"]
         # Il devrait y avoir au moins 13 nouvelles sessions ce lundi
         assert data["days"]["Lundi"]["centers_count"] >= 13, \
             f"Attendu 13+ centres le lundi, trouvé: {data['days']['Lundi']['centers_count']}"
@@ -529,7 +526,7 @@ def test_13_simultaneous_sessions_conakry() -> None:
         assert schedule.status_code == 200
         data = schedule.json()
         # Vérifier qu'il y a bien des sessions ce lundi
-        lundi_sessions = data["days"]["Lundi"]["sessions"]
+        data["days"]["Lundi"]["sessions"]
         # Il devrait y avoir au moins 13 nouvelles sessions ce lundi
         assert data["days"]["Lundi"]["centers_count"] >= 13, \
             f"Attendu 13+ centres le lundi, trouvé: {data['days']['Lundi']['centers_count']}"

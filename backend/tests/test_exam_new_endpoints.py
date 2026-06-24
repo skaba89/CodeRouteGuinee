@@ -4,9 +4,9 @@ Tests E2E pour les nouveaux endpoints examen :
   GET /exams/{id}/questions
   GET /exams/{id}/results
 """
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
-import pytest
 from fastapi.testclient import TestClient
 
 from app.db.session import SessionLocal, init_db
@@ -14,7 +14,6 @@ from app.main import app
 from app.models_center import Center
 from app.models_session import ExamSession
 from tests.conftest import get_admin_headers, get_center_headers
-from datetime import datetime, timedelta, UTC
 
 
 def _seed_center_session_question_base():
@@ -44,10 +43,12 @@ def _seed_center_session_question_base():
         db.commit()
         db.refresh(session)
         # Créer au moins 40 questions actives pour pouvoir démarrer un examen
-        from app.models_question import Question
         import json
+
+        from app.models_question import Question
         existing_q = db.query(Question).count() if hasattr(db, 'query') else 0
-        from sqlalchemy import select as _sel, func as _func
+        from sqlalchemy import func as _func
+        from sqlalchemy import select as _sel
         existing_q = db.scalar(_sel(_func.count(Question.id))) or 0
         if existing_q < 40:
             for i in range(40):
@@ -249,7 +250,8 @@ def test_exam_questions_blocked_after_submission() -> None:
         def _first_opt3(q: dict) -> str:
             opts = q.get("options", [])
             if isinstance(opts, str):
-                import json as _j3; opts = _j3.loads(opts)
+                import json as _j3
+                opts = _j3.loads(opts)
             return opts[0] if opts else "A"
         answers = {q["id"]: _first_opt3(q) for q in questions3}
         client.post(

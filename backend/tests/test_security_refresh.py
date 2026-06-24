@@ -1,7 +1,6 @@
 """
 Tests pour le refresh token JWT et le rate limiter persistant.
 """
-import time
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
@@ -121,7 +120,6 @@ def test_rate_limiter_persistent_resets_on_success() -> None:
 
 def test_decode_refresh_token_rejects_access_type() -> None:
     """decode_refresh_token() refuse les tokens de type 'access'."""
-    from app.security import decode_access_token
     token = create_access_token("user-id-123", "admin")
     # decode_refresh_token doit retourner None pour un access token
     result = decode_refresh_token(token)

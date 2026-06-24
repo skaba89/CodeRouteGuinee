@@ -3,11 +3,11 @@ from uuid import uuid4
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
+from app import main
 from app.db.session import SessionLocal
+from app.main import app
 from app.models_audit import AuditLog
 from app.routers import auth
-from app import main
-from app.main import app
 
 
 def test_register_login_and_me() -> None:

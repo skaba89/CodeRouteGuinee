@@ -7,15 +7,12 @@ Lignes non couvertes : 38-70, 80-91, 108-112, 123-127
 import logging
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from app.monitoring import (
     _filter_expected_errors,
     capture_exception,
     init_sentry,
     set_user_context,
 )
-
 
 # ── init_sentry ───────────────────────────────────────────────────
 
@@ -29,8 +26,9 @@ class TestInitSentry:
         assert result is False
 
     def test_no_dsn_logs_info(self):
+        from unittest.mock import MagicMock, patch
+
         import app.monitoring as mon
-        from unittest.mock import patch, MagicMock
         mock_logger = MagicMock()
         with patch.object(mon, 'logger', mock_logger):
             init_sentry(dsn=None)
@@ -180,8 +178,9 @@ class TestFilterExpectedErrors:
 class TestCaptureException:
     def test_capture_without_sentry_logs_error(self):
         """Sans sentry_sdk, l'exception doit être loguée en ERROR."""
+        from unittest.mock import MagicMock, patch
+
         import app.monitoring as mon
-        from unittest.mock import patch, MagicMock
         mock_logger = MagicMock()
         exc = RuntimeError("test error")
         with patch.object(mon, 'logger', mock_logger):

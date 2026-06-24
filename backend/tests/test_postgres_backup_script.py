@@ -1,5 +1,5 @@
 import importlib.util
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 
@@ -25,7 +25,7 @@ def test_database_url_from_env_normalizes_psycopg_scheme() -> None:
 
 def test_timestamped_backup_path_uses_utc_prefix() -> None:
     backup = load_backup_module()
-    now = datetime(2026, 6, 18, 16, 30, 5, tzinfo=timezone.utc)
+    now = datetime(2026, 6, 18, 16, 30, 5, tzinfo=UTC)
 
     path = backup.timestamped_backup_path("backups/postgres", "coderoute-guinee", now)
 

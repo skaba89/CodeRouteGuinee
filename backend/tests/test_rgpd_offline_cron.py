@@ -13,7 +13,6 @@ from app.models_user import User
 from app.security import get_password_hash
 from tests.conftest import get_admin_headers
 
-
 # ── Module RGPD ───────────────────────────────────────────────────────────────
 
 class TestRgpdModule:
@@ -82,8 +81,8 @@ class TestRgpdModule:
         assert "first_name" in result["erased"]
 
     def test_anonymize_updates_db(self):
+
         from app.rgpd import anonymize_candidate
-        from sqlalchemy import select
         init_db()
         suffix = uuid.uuid4().hex[:8]
         email = f"anon2-{suffix}@test.com"

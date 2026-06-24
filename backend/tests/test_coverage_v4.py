@@ -12,10 +12,8 @@ Cibles :
 import io
 import os
 import uuid
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
 from fastapi.testclient import TestClient
 
 from app.db.session import SessionLocal, init_db
@@ -23,7 +21,6 @@ from app.main import app
 from app.models_user import User
 from app.security import get_password_hash
 from tests.conftest import get_admin_headers
-
 
 # ══════════════════════════════════════════════════════════════════
 # 1. api.py et domain.py — constantes
@@ -206,7 +203,7 @@ class TestEmailServiceProdMode:
         assert result is False
 
     def test_send_calls_brevo_api_url(self):
-        from app.email_service import _send, _BREVO_API_URL
+        from app.email_service import _BREVO_API_URL, _send
         with patch.dict(os.environ, {"BREVO_API_KEY": "xkeysib-test-key"}):
             with patch("httpx.post", return_value=self._mock_success()) as mock_post:
                 _send("test@test.com", "Test", "Subject", "<p>Body</p>")
@@ -272,7 +269,8 @@ class TestAudioRouter:
             u = User(email=email, full_name="SA Audio Test",
                      password_hash=get_password_hash("TestPass123!"),
                      role="super_admin")
-            db.add(u); db.commit()
+            db.add(u)
+            db.commit()
         with TestClient(app) as client:
             token = client.post("/api/v1/auth/login",
                                 data={"username": email, "password": "TestPass123!"}).json()["access_token"]
@@ -445,7 +443,8 @@ class TestAudioRouter:
         with SessionLocal() as db:
             u = User(email=email, full_name="Admin Del",
                      password_hash=get_password_hash("TestPass123!"), role="admin")
-            db.add(u); db.commit()
+            db.add(u)
+            db.commit()
         with TestClient(app) as client:
             token = client.post("/api/v1/auth/login",
                                 data={"username": email, "password": "TestPass123!"}).json()["access_token"]
@@ -562,7 +561,8 @@ class TestDeps:
         with SessionLocal() as db:
             u = User(email=email, full_name="Dep Test",
                      password_hash=get_password_hash(password), role="admin")
-            db.add(u); db.commit()
+            db.add(u)
+            db.commit()
 
         with TestClient(app) as client:
             token = client.post("/api/v1/auth/login",
@@ -585,7 +585,8 @@ class TestDeps:
         with SessionLocal() as db:
             u = User(email=email, full_name="Cand Dep",
                      password_hash=get_password_hash("TestPass123!"), role="candidate")
-            db.add(u); db.commit()
+            db.add(u)
+            db.commit()
 
         with TestClient(app) as client:
             token = client.post("/api/v1/auth/login",

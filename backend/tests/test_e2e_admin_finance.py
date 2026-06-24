@@ -4,8 +4,8 @@ from fastapi.testclient import TestClient
 
 from app.db.session import SessionLocal, init_db
 from app.main import app
-from tests.conftest import get_admin_headers, get_center_headers
 from app.models_payment import Payment
+from tests.conftest import get_admin_headers, get_center_headers
 
 
 def _admin_headers(client: TestClient) -> dict[str, str]:
@@ -78,8 +78,8 @@ def test_admin_finance_reconciliation_end_to_end() -> None:
     provider = f"e2e_provider_{uuid4().hex[:8]}"
 
     with TestClient(app) as client:
-        admin_headers = get_admin_headers(client)
-        center_headers = get_center_headers(client)
+        get_admin_headers(client)
+        get_center_headers(client)
         headers = _admin_headers(client)
         _seed_payments(provider)
 

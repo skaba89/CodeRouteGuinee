@@ -117,6 +117,7 @@ def test_admin_can_import_official_centers_with_audit_log() -> None:
 
         with SessionLocal() as _db:
             from sqlalchemy import select as _select
+
             from app.models_center import Center as _Center
             _c = _db.scalar(_select(_Center).where(_Center.code == f"IMP-{suffix}-1"))
             assert _c is not None, f"Centre IMP-{suffix}-1 non trouvé en base"
