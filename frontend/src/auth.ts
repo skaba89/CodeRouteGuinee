@@ -17,6 +17,7 @@ export const demoRoles: Array<{ label: string; value: UserRole }> = [
 export const navigationItems: NavigationItem[] = [
   { label: 'Accueil',         href: '#/',           roles: ['candidate','center','driving_school','admin','super_admin'] },
   { label: 'Entraînement',    href: '#/training',   roles: ['candidate','driving_school','admin','super_admin'] },
+  { label: '📚 Cours',         href: '#/elearning',  roles: ['candidate','driving_school','admin','super_admin'] },
   { label: 'Examen',          href: '#/exam',       roles: ['candidate','center','admin','super_admin'] },
   { label: 'Résultats',       href: '#/results',    roles: ['candidate','admin','super_admin'] },
   { label: 'Espace candidat', href: '#/candidate',  roles: ['candidate','admin','super_admin'] },
