@@ -48,6 +48,7 @@ from app.routers import (
 )
 from app.routers.elearning import router_admin as elearning_admin_router
 from app.routers.elearning import router_public as elearning_public_router
+from app.routers.rgpd import router as rgpd_router
 from app.routers.tarifs import router_admin as tarifs_admin_router
 from app.routers.tarifs import router_public as tarifs_public_router
 
@@ -168,5 +169,6 @@ app.include_router(users.router, prefix=settings.api_v1_prefix)
 
 app.include_router(elearning_public_router, prefix=settings.api_v1_prefix)
 app.include_router(elearning_admin_router,  prefix=settings.api_v1_prefix)
+app.include_router(rgpd_router, prefix=settings.api_v1_prefix)
 app.include_router(tarifs_public_router, prefix=settings.api_v1_prefix)
 app.include_router(tarifs_admin_router,  prefix=settings.api_v1_prefix)
