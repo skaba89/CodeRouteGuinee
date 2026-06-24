@@ -93,7 +93,10 @@ def list_sessions(
     """
     q = select(ExamSession).order_by(ExamSession.starts_at.asc())
 
-    if center_id:
+    # Si l'utilisateur est un agent de centre → restreindre à son centre uniquement
+    if current_user.role == "center" and hasattr(current_user, "center_id") and current_user.center_id:
+        q = q.where(ExamSession.center_id == current_user.center_id)
+    elif center_id:
         q = q.where(ExamSession.center_id == center_id)
 
     if commune or prefecture:

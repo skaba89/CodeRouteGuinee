@@ -57,3 +57,23 @@ def get_center_headers(client: TestClient) -> dict[str, str]:
 
 def get_candidate_headers(client: TestClient) -> dict[str, str]:
     return get_auth_headers(client, "candidate")
+
+
+@pytest.fixture(autouse=True)
+def clean_test_questions(request):
+    """
+    Supprime TOUTES les questions actives après chaque test
+    pour éviter la pollution de la DB partagée entre les fichiers de tests.
+    Les tests qui ont besoin de questions les recrée systématiquement.
+    """
+    yield
+    # Nettoyage agressif après chaque test : supprimer toutes les questions
+    try:
+        db = SessionLocal()
+        from sqlalchemy import delete
+        from app.models_question import Question
+        db.execute(delete(Question))
+        db.commit()
+        db.close()
+    except Exception:
+        pass  # Silencieux

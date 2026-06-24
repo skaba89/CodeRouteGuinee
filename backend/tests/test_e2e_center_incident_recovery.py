@@ -68,6 +68,14 @@ def test_center_incident_blocks_attempt_and_allows_retake() -> None:
         assert session_response.status_code == 201
         session = session_response.json()
 
+        # Isolation : supprimer les questions résiduelles des tests précédents
+        from app.db.session import SessionLocal as _SL
+        from app.models_question import Question as _Q
+        from sqlalchemy import delete as _del
+        with _SL() as _db:
+            _db.execute(_del(_Q))
+            _db.commit()
+
         for index in range(40):
             question_response = client.post(
                 "/api/v1/questions",
@@ -145,16 +153,21 @@ def test_center_incident_blocks_attempt_and_allows_retake() -> None:
         assert resolved_incident["new_attempt_id"] != initial_attempt["id"]
 
         # Récupérer les bonnes réponses depuis la DB (bypass pagination API)
-        from app.db.session import SessionLocal as _SL
-        from app.models_question import Question as _Q
-        from sqlalchemy import select as _select
-        _db = _SL()
-        _all_q = _db.scalars(_select(_Q).where(_Q.is_active == True)).all()
-        answers = {q.id: q.correct_answer for q in _all_q}
-        _db.close()
-        assert len(answers) >= 40
-
         new_attempt_id = resolved_incident["new_attempt_id"]
+        # Récupérer les questions de ce nouvel examen via l'API
+        q_resp = client.get(
+            f"/api/v1/exams/{new_attempt_id}/questions",
+            headers=center_headers,
+        )
+        assert q_resp.status_code == 200
+        exam_questions = q_resp.json()["questions"]
+        def _first_opt_ci(q: dict) -> str:
+            opts = q.get("options", [])
+            if isinstance(opts, list) and opts:
+                return opts[0]
+            return "A"
+        answers = {q["id"]: _first_opt_ci(q) for q in exam_questions}
+        assert len(answers) >= 40
         submit_response = client.post(
             f"/api/v1/exams/{new_attempt_id}/submit",
             headers=center_headers,

@@ -1096,3 +1096,35 @@ export async function downloadExamCertificatePdf(attemptId: string): Promise<voi
 export function verifyExamCertificate(attemptId: string): Promise<ExamCertificateVerification> {
   return getJson<ExamCertificateVerification>(`/api/v1/exams/${encodeURIComponent(attemptId)}/certificate/verify`);
 }
+
+// ── Training ──────────────────────────────────────────────────────────────────
+
+export interface TrainingQuestion {
+  id: string;
+  index: number;
+  category: string;
+  category_label: string;
+  text: string;
+  options: string[];
+  correct_answer: string;
+  explanation: string;
+}
+
+export function getTrainingQuestions(
+  limit: number = 20,
+  category?: string
+): Promise<TrainingQuestion[]> {
+  const params = new URLSearchParams({ limit: String(limit), shuffle: 'true' });
+  if (category) params.set('category', category);
+  return getPrivateJson<TrainingQuestion[]>(`/api/v1/training/questions?${params}`);
+}
+
+export function checkTrainingAnswer(
+  questionId: string,
+  answer: string
+): Promise<{ correct: boolean; correct_answer: string; explanation: string }> {
+  return postJson<{ correct: boolean; correct_answer: string; explanation: string }>(
+    `/api/v1/training/check`,
+    { question_id: questionId, answer }
+  );
+}

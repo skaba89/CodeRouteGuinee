@@ -17,6 +17,11 @@ def _seed_exam_context() -> tuple[str, str]:
     db = SessionLocal()
     suffix = uuid4().hex[:8]
     try:
+        # Nettoyer toutes les questions existantes pour l'isolation
+        # (évite la contamination par seed_questions de test_coverage_v5)
+        from sqlalchemy import delete as _delete
+        db.execute(_delete(Question))
+        db.flush()
         center = Center(
             code=f"CTR-EXAM-{suffix}",
             name="Centre Examen E2E",
@@ -82,14 +87,15 @@ def test_exam_scoring_certificate_and_public_verification_end_to_end() -> None:
         attempt = start_response.json()
         assert attempt["status"] == "started"
 
-        # Récupérer les bonnes réponses depuis la DB (bypass pagination API)
-        from app.db.session import SessionLocal as _SL
-        from app.models_question import Question as _Q
-        from sqlalchemy import select as _select
-        _db = _SL()
-        _all_q = _db.scalars(_select(_Q).where(_Q.is_active == True)).all()
-        answers = {q.id: q.correct_answer for q in _all_q}
-        _db.close()
+        # Récupérer les questions VIA L'API de cet examen spécifique
+        q_response = client.get(
+            f"/api/v1/exams/{attempt['id']}/questions",
+            headers=center_headers,
+        )
+        assert q_response.status_code == 200
+        exam_questions = q_response.json()["questions"]
+        # Construire les réponses : utiliser la première option comme réponse
+        answers = {q["id"]: q["options"][0] for q in exam_questions}
         assert len(answers) >= 40
 
         submit_response = client.post(

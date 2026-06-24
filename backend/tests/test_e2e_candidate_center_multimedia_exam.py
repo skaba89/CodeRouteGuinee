@@ -179,13 +179,16 @@ def test_candidate_registration_center_booking_and_40_question_multimedia_exam_t
         attempt = start_response.json()
 
         # Récupérer toutes les bonnes réponses via DB pour garantir la couverture complète
-        from app.db.session import SessionLocal as _SL
-        from app.models_question import Question as _Q
-        from sqlalchemy import select as _select
-        _db = _SL()
-        _all_q = _db.scalars(_select(_Q).where(_Q.is_active == True)).all()
-        answers = {q.id: q.correct_answer for q in _all_q}
-        _db.close()
+        # Récupérer les questions VIA L'API de cet examen (isolation propre)
+        q_resp = client.get(f"/api/v1/exams/{attempt['id']}/questions", headers=headers)
+        assert q_resp.status_code == 200
+        exam_qs = q_resp.json()["questions"]
+        # Utiliser correct_answer = options[0] pour les questions de ce test
+        # (toutes les questions créées par ce test ont "Action securisee" comme options[0])
+        def _first_opt_mm(q: dict) -> str:
+            opts = q.get("options", [])
+            return opts[0] if isinstance(opts, list) and opts else "Action securisee"
+        answers = {q["id"]: _first_opt_mm(q) for q in exam_qs}
         submit_response = client.post(f"/api/v1/exams/{attempt['id']}/submit", headers=headers, json={"answers": answers})
         assert submit_response.status_code == 200
         submitted_attempt = submit_response.json()

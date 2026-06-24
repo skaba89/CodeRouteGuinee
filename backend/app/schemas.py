@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class Token(BaseModel):
@@ -33,6 +33,7 @@ class UserRead(BaseModel):
     full_name: str
     role: str
     is_active: bool
+    center_id: str | None = None
     created_at: datetime
 
     model_config = {"from_attributes": True}
@@ -325,7 +326,28 @@ class ExamStartFromBookingRequest(BaseModel):
 
 
 class ExamSubmitRequest(BaseModel):
-    answers: dict[str, str]
+    """
+    Payload de soumission d'examen.
+    Validations : max 60 réponses, clé ≤ 36 chars, valeur ≤ 500 chars.
+    Un dict vide est autorisé : la logique métier vérifie l'état de l'attempt
+    avant de scorer (ex: attempt suspendu → 409).
+    """
+    answers: dict[str, str] = Field(
+        default_factory=dict,
+        description="Réponses par question_id (vide autorisé)",
+    )
+
+    @field_validator("answers")
+    @classmethod
+    def validate_answers(cls, v: dict[str, str]) -> dict[str, str]:
+        if len(v) > 60:
+            raise ValueError(f"Trop de réponses : {len(v)} (max 60)")
+        for key, val in v.items():
+            if len(key) > 36:
+                raise ValueError(f"question_id trop long : {key[:20]}...")
+            if len(val) > 500:
+                raise ValueError(f"Réponse trop longue pour {key[:20]}...")
+        return v
 
 
 class ExamAttemptRead(BaseModel):

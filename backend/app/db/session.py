@@ -100,12 +100,13 @@ def _sqlite_add_columns_if_missing() -> None:
         ("candidates", "date_of_birth", "DATE"),
         ("candidates", "address", "TEXT"),
         ("candidates", "attempt_count", "INTEGER DEFAULT 0 NOT NULL"),
+        ("users",      "center_id",    "VARCHAR(36)"),
     ]
     # Liste blanche explicite pour prévenir toute injection SQL
     # (même si les valeurs sont hardcodées, on valide explicitement)
     _ALLOWED_TABLES = {
         "centers", "exam_sessions", "candidates", "payments",
-        "bookings", "questions", "exam_attempts", "device_sessions",
+        "bookings", "questions", "exam_attempts", "device_sessions", "users",
         "exam_monitoring_events", "exam_question_traces", "center_incidents",
     }
     _SAFE_COL_PATTERN = __import__("re").compile(r"^[a-z_][a-z0-9_]{0,63}$")

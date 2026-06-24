@@ -18,10 +18,12 @@ import {
   type CenterFilters,
   type QuestionFilters,
   type UserFilters,
+
+  getTrainingQuestions, type TrainingQuestion,
 } from '../api';
 import { isAudioLocale, speakFeedback, stop as stopAudio } from '../audio';
 import { type Locale } from '../i18n';
-import { type AuthUser, getAccessToken } from '../authClient';
+import { type AuthUser } from '../authClient';
 import { type UserRole } from '../auth';
 import { useAuthSession, canUseProtectedActions } from '../authSession';
 import {
@@ -115,11 +117,14 @@ export function TrainingPage() {
   async function startSession() {
     setLoading(true);
     try {
-      const url = `/api/v1/training/questions?limit=20&shuffle=true${cat ? `&category=${cat}` : ''}`;
       let qs: TrainingQ[] = [];
       if (canUseApi) {
-        const r = await fetch(url, { headers: { 'Authorization': `Bearer ${getAccessToken() ?? ''}` } });
-        if (r.ok) qs = await r.json();
+        try {
+          const fetched = await getTrainingQuestions(20, cat || undefined);
+          qs = fetched;
+        } catch {
+          // Silencieux — fallback local ci-dessous
+        }
       }
       if (qs.length === 0) {
         // Fallback local depuis les données DEMO_QUESTIONS

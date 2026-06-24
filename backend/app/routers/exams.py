@@ -300,7 +300,14 @@ def get_exam_questions(
             number=i + 1,
             category=q.category,
             text=q.text,
-            options=q.options if isinstance(q.options, list) else [],
+            options=(
+                q.options if isinstance(q.options, list)
+                else (
+                    __import__('json').loads(q.options)
+                    if isinstance(q.options, str) and q.options.startswith('[')
+                    else []
+                )
+            ),
             media_url=getattr(q, "media_url", None),
             media_type=getattr(q, "media_type", None),
         )

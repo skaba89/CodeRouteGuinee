@@ -30,6 +30,14 @@ def list_candidates(
     current_user: User = Depends(require_roles("admin", "super_admin", "center")),
 ) -> list[Candidate]:
     q = select(Candidate).order_by(Candidate.created_at.desc())
+    # Agent de centre : restreindre aux candidats ayant des réservations dans son centre
+    if current_user.role == "center" and hasattr(current_user, "center_id") and current_user.center_id:
+        from app.models_booking import Booking as _Booking
+        from app.models_session import ExamSession as _ES
+        center_candidate_ids = select(_Booking.candidate_id).join(
+            _ES, _Booking.session_id == _ES.id
+        ).where(_ES.center_id == current_user.center_id).distinct()
+        q = q.where(Candidate.id.in_(center_candidate_ids))
     if search:
         term = f"%{search.strip()}%"
         q = q.where(
