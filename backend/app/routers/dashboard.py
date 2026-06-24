@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.deps import require_roles
 from app.models_audit import AuditLog
+from app.models_booking import Booking
 from app.models_candidate import Candidate
 from app.models_candidate_identity import CandidateIdentityCheck
 from app.models_center import Center
@@ -15,6 +16,7 @@ from app.models_center_incident import CenterIncident
 from app.models_device_session import DeviceSession
 from app.models_exam_monitoring import ExamMonitoringEvent
 from app.models_institutional_authorization import InstitutionalAuthorization
+from app.models_payment import Payment
 from app.models_question import Question
 from app.models_question_governance import QuestionGovernanceDecision
 from app.models_session import ExamSession
@@ -459,6 +461,88 @@ def anti_fraud_dashboard(
         centers_at_risk=center_rows[:limit],
     )
 
+
+
+
+@router.get("/live", tags=["dashboard"])
+def get_live_kpis(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "super_admin", "center")),
+) -> dict:
+    """
+    KPIs en temps réel — conçu pour être pollé toutes les 15–30s.
+    Retourne les métriques fraîches sans cache.
+    Feed d'activité récente des 15 dernières minutes.
+    """
+    now       = datetime.now(UTC).replace(tzinfo=None)
+    last_7d   = now - timedelta(days=7)
+    last_15m  = now - timedelta(minutes=15)
+
+    # ── KPIs calculés live ─────────────────────────────────────────────────
+    total_candidates   = db.query(Candidate).count()
+    bookings_today     = db.query(Booking).filter(Booking.created_at >= now.replace(hour=0, minute=0, second=0)).count()
+    bookings_week      = db.query(Booking).filter(Booking.created_at >= last_7d).count()
+    pending_payments   = db.query(Payment).filter(Payment.status == "pending").count()
+    paid_today         = db.query(Payment).filter(
+        Payment.status == "paid",
+        Payment.created_at >= now.replace(hour=0, minute=0, second=0)
+    ).count()
+    active_sessions    = db.query(ExamSession).filter(
+        ExamSession.status == "open",
+        ExamSession.starts_at >= now,
+    ).count()
+    confirmed_bookings = db.query(Booking).filter(Booking.status == "confirmed").count()
+    open_incidents     = db.query(CenterIncident).filter(CenterIncident.status == "open").count()         if hasattr(CenterIncident, "status") else 0
+    fraud_active       = 0
+
+    # ── Feed d'activité récente (15 dernières minutes) ─────────────────────
+    feed: list[dict] = []
+
+    # Réservations récentes
+    recent_bookings = db.query(Booking).filter(
+        Booking.created_at >= last_15m
+    ).order_by(Booking.created_at.desc()).limit(5).all()
+    for bk in recent_bookings:
+        feed.append({
+            "id":        str(bk.id),
+            "type":      "booking",
+            "title":     f"Nouvelle réservation — {bk.reference}",
+            "status":    bk.status,
+            "timestamp": bk.created_at.isoformat() if bk.created_at else None,
+        })
+
+    # Paiements récents
+    recent_payments = db.query(Payment).filter(
+        Payment.created_at >= last_15m
+    ).order_by(Payment.created_at.desc()).limit(5).all()
+    for pay in recent_payments:
+        feed.append({
+            "id":        str(pay.id) if pay.id else pay.reference,
+            "type":      "payment",
+            "title":     f"Paiement {pay.status} — {pay.reference} ({pay.amount_gnf:,} GNF)",
+            "status":    pay.status,
+            "timestamp": pay.created_at.isoformat() if pay.created_at else None,
+        })
+
+    # Trier par timestamp
+    feed.sort(key=lambda x: x.get("timestamp") or "", reverse=True)
+
+    return {
+        "timestamp": now.isoformat(),
+        "kpis": {
+            "total_candidates":    total_candidates,
+            "bookings_today":      bookings_today,
+            "bookings_week":       bookings_week,
+            "pending_payments":    pending_payments,
+            "paid_today":          paid_today,
+            "active_sessions":     active_sessions,
+            "confirmed_bookings":  confirmed_bookings,
+            "open_incidents":      open_incidents,
+            "fraud_active":        fraud_active,
+        },
+        "feed":     feed[:10],
+        "poll_interval_seconds": 15,
+    }
 
 
 @router.post("/notifications/run-job", tags=["notifications"])

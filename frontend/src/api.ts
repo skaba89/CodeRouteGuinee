@@ -619,7 +619,7 @@ async function getJson<T>(path: string): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-async function getPrivateJson<T>(path: string): Promise<T> {
+export async function getPrivateJson<T>(path: string): Promise<T> {
   const response = await fetchWithAuth(`${API_BASE_URL}${path}`);
   if (!response.ok) {
     throw await buildApiError(response);

@@ -52,6 +52,8 @@ def normalize_provider(provider: str) -> str:
         "orange_money": "orange_money",
         "mtn": "mtn_money",
         "mtn_money": "mtn_money",
+        "celcom": "celcom_money",
+        "celcom_money": "celcom_money",
         "wave": "wave",
         "wave_money": "wave",
         "paydunya": "paydunya",
@@ -299,6 +301,58 @@ def _mtn_money_payment(phone: str, amount_gnf: int) -> ProviderResult:
 
 # ── Point d'entrée unique ─────────────────────────────────────────────────
 
+
+def _celcom_money_payment(phone: str, amount_gnf: int) -> ProviderResult:
+    """
+    Celcom Money Guinée — Collection API OAuth2.
+    Variables d'env : CELCOM_MONEY_CLIENT_ID, CELCOM_MONEY_CLIENT_SECRET,
+                      CELCOM_MONEY_API_BASE, CELCOM_MONEY_CURRENCY
+    """
+    import os as _os
+    import uuid as _uuid
+
+    import httpx as _httpx
+
+    client_id     = _os.environ.get("CELCOM_MONEY_CLIENT_ID", "")
+    client_secret = _os.environ.get("CELCOM_MONEY_CLIENT_SECRET", "")
+    api_base      = _os.environ.get("CELCOM_MONEY_API_BASE", "https://api.celcom.com")
+    currency      = _os.environ.get("CELCOM_MONEY_CURRENCY", "GNF")
+
+    if not client_id or not client_secret:
+        return _sandbox_payment("celcom_money", phone, amount_gnf)
+
+    try:
+        tok = _httpx.post(
+            f"{api_base}/oauth/token",
+            data={"grant_type": "client_credentials",
+                  "client_id": client_id, "client_secret": client_secret},
+            timeout=10,
+        )
+        tok.raise_for_status()
+        token = tok.json()["access_token"]
+
+        ref = str(_uuid.uuid4())
+        r = _httpx.post(
+            f"{api_base}/payment/v1/requesttopay",
+            headers={"Authorization": f"Bearer {token}",
+                     "X-Reference-Id": ref, "Content-Type": "application/json"},
+            json={"amount": str(amount_gnf), "currency": currency,
+                  "externalId": ref,
+                  "payer": {"partyIdType": "MSISDN",
+                            "partyId": phone.replace("+", "").replace(" ", "")},
+                  "payerMessage": f"CodeRoute {amount_gnf} {currency}",
+                  "payeeNote": "Frais code route"},
+            timeout=30,
+        )
+        r.raise_for_status()
+        return ProviderResult(provider="celcom_money", status="pending",
+                              reference=ref, message=f"Celcom {amount_gnf} GNF")
+    except Exception as exc:
+        import logging as _log
+        _log.getLogger("coderoute.celcom").error("Erreur Celcom : %s", exc)
+        return ProviderResult(provider="celcom_money", status="failed", message=str(exc))
+
+
 def simulate_mobile_money_payment(provider: str, phone: str, amount_gnf: int) -> ProviderResult:
     """
     Dispatcher principal — sandbox ou production selon MOBILE_MONEY_MODE.
@@ -311,6 +365,8 @@ def simulate_mobile_money_payment(provider: str, phone: str, amount_gnf: int) ->
     normalized = normalize_provider(provider)
 
     if mode != "production":
+        if normalized == "celcom_money":
+            return _celcom_money_payment(phone, amount_gnf)
         return _sandbox_payment(normalized, phone, amount_gnf)
 
     try:

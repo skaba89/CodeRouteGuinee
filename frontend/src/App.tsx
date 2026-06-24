@@ -1,4 +1,5 @@
 import React from 'react';
+import { ThemeToggle } from './components/theme-toggle';
 import { FormEvent, useEffect, useState } from 'react';
 import { canAccessRoute, demoRoles, navigationItems, type UserRole } from './auth';
 import {
@@ -341,6 +342,7 @@ export default function App() {
         <div className="session-panel">
           <LocaleSwitcher />
           <span title={sessionLabel}>{sessionLabel}</span>
+          <ThemeToggle compact />
           <button onClick={handleLogout}>{isPres ? 'Quitter' : 'Déconnexion'}</button>
         </div>
 
