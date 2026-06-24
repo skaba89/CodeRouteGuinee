@@ -13,6 +13,7 @@ from app.models_session import ExamSession
 from app.models_user import User
 from app.qr_service import generate_qr_svg
 from app.schemas import BookingCreate, BookingRead, BookingVerificationRead
+from app.sentry import capture_exception as _sentry_cap
 from app.sentry import capture_exception as _sentry_capture
 
 router = APIRouter(prefix="/bookings", tags=["bookings"])
@@ -132,7 +133,8 @@ def create_booking(
                 session_date   = session.starts_at.strftime("%d/%m/%Y %Hh%M"),
                 center_name    = center.name,
             )
-    except Exception:
+    except Exception as _sms_bk_exc:
+        _sentry_cap(_sms_bk_exc, context={'endpoint': 'create_booking_sms'})
         pass  # SMS non bloquant
 
     return booking

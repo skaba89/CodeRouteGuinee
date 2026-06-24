@@ -17,6 +17,7 @@ from app.models_payment import Payment
 from app.models_user import User
 from app.payment_recap import summarize_payments
 from app.payment_service import build_payment_reference, build_receipt_number
+from app.sentry import capture_exception as _sentry_cap
 
 router = APIRouter(prefix="/payments", tags=["payments"])
 
@@ -109,7 +110,8 @@ def create_payment(
         # Utiliser attempt_count réel pour les tarifs réinscription/rattrapage
         _attempts = getattr(_cand, "attempt_count", 0) or 0
         resolved_amount = get_tarif_for_candidate(_cat, attempt_number=_attempts + 1)
-    except Exception:
+    except Exception as _tarif_exc:
+        _sentry_cap(_tarif_exc, context={'endpoint': 'tarif_resolution'})
         resolved_amount = payload.amount_gnf
     final_amount = payload.amount_gnf if payload.amount_gnf != 250000 else resolved_amount
 
@@ -163,7 +165,8 @@ def create_payment(
                     provider          = provider_result.provider,
                     receipt_number    = payment.receipt_number,
                 )
-    except Exception:
+    except Exception as _email_exc:
+        _sentry_cap(_email_exc, context={'endpoint': 'payment_email'})
         pass  # Email non bloquant
 
     return {

@@ -29,6 +29,7 @@ from app.models_session import ExamSession
 from app.models_user import User
 from app.pdf_service import build_result_certificate_pdf
 from app.schemas import ExamAttemptRead, ExamCertificateVerificationRead, ExamStartFromBookingRequest, ExamStartRequest, ExamSubmitRequest
+from app.sentry import capture_exception as _sentry_cap
 from app.sentry import capture_exception as _sentry_capture
 
 
@@ -498,7 +499,7 @@ def submit_exam(
                 certificate_url = cert_url,
             )
     except Exception as _sentry_exc:
-        _sentry_capture(_sentry_exc, context={"file": __file__})
+        _sentry_capture(_sentry_exc, context={"file": __file__, "endpoint": "submit_exam_email"})
         pass  # Email non bloquant
 
     # SMS de résultat — best effort
@@ -512,7 +513,8 @@ def submit_exam(
                 score          = result["correct_answers"],
                 total          = result["total_questions"],
             )
-    except Exception:
+    except Exception as _sms_exc:
+        _sentry_cap(_sms_exc, context={'endpoint': 'submit_exam_sms'})
         pass  # SMS non bloquant
 
     return attempt
