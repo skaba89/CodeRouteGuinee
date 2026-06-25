@@ -90,7 +90,7 @@ function AccountPage({ currentUser }: { currentUser: AuthUser | null }) {
     try {
       await changePassword(cur, nw);
       setCur(''); setNw(''); setConf('');
-      setMsg('✅ Mot de passe mis à jour.');
+      setMsg('Mot de passe mis à jour.');
     } catch {
       setMsg('❌ Mot de passe actuel incorrect.');
     }
@@ -112,7 +112,7 @@ function AccountPage({ currentUser }: { currentUser: AuthUser | null }) {
         <div className="acct-card">
           <span>Rôle</span>
           <strong style={{ textTransform: 'capitalize' }}>{currentUser?.role ?? '—'}</strong>
-          <small>{currentUser?.is_active ? '✅ Compte actif' : '⚠️ Compte inactif'}</small>
+          <small>{currentUser?.is_active ? 'Compte actif' : 'Compte inactif'}</small>
         </div>
       </div>
       {/* Sélecteur de langue avec badge audio */}
@@ -135,7 +135,7 @@ function AccountPage({ currentUser }: { currentUser: AuthUser | null }) {
           <label>Nouveau mot de passe (12 car. min.)<input type="password" value={nw} onChange={e => setNw(e.target.value)} /></label>
           <label>Confirmer<input type="password" value={conf} onChange={e => setConf(e.target.value)} /></label>
           <button type="submit" className="btn-primary" disabled={!cur || nw.length < 12 || !conf}>Changer le mot de passe</button>
-          {msg && <p className={msg.startsWith('✅') ? 'login-status' : 'form-error'}>{msg}</p>}
+          {msg && <p className={!msg.toLowerCase().startsWith('err') && !msg.toLowerCase().startsWith('invalid') ? 'login-status' : 'form-error'}>{msg}</p>}
         </form>
       </div>
     </section>
@@ -195,7 +195,7 @@ function LoginPage({
 
         {!isPres && currentUser && (
           <div className="auth-session-card">
-            <strong>✅ Connecté : {currentUser.full_name}</strong>
+            <strong>Connecté : {currentUser.full_name}</strong>
             <span>{currentUser.email} · {currentUser.role}</span>
           </div>
         )}

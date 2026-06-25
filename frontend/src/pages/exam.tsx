@@ -211,13 +211,13 @@ export function ExamPage() {
       <div style={{ maxWidth: 520, margin: '0 auto' }}>
         <AudioModeBanner />
         <div style={{ background: 'linear-gradient(135deg,var(--navy),var(--navy2))', borderRadius: 20, padding: 28, color: '#fff', marginBottom: 20, textAlign: 'center' }}>
-          <div style={{ fontSize: 48, marginBottom: 8 }}>🇬🇳</div>
+          <div style={{ fontSize: 48, marginBottom: 8 }}></div>
           <h2 style={{ color: '#fff', fontSize: 22 }}>Code de la route — Catégorie B</h2>
           <p style={{ color: 'rgba(255,255,255,.7)', marginTop: 6, fontSize: 13 }}>40 questions • 30 minutes • Seuil 35/40</p>
         </div>
         <div className="card">
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 18 }}>
-            {[['📋','40 questions illustrées'],['⏱','30 minutes'],['✅','Seuil : 35/40'],['🎯','Résultats détaillés']].map(([icon,label]) => (
+            {[['','40 questions illustrées'],['','30 minutes'],['','Seuil : 35/40'],['','Résultats détaillés']].map(([icon,label]) => (
               <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', background: 'var(--bg)', borderRadius: 'var(--r)', fontSize: 13, fontWeight: 500 }}>
                 <span>{icon}</span><span>{label}</span>
               </div>
@@ -232,7 +232,7 @@ export function ExamPage() {
           {startErr && (
             <div style={{ padding: '8px 12px', background: 'var(--gold-l, #fff3cd)', borderRadius: 8,
               fontSize: 13, color: 'var(--gold-dark, #856404)', marginBottom: 10 }}>
-              ⚠ {startErr}
+              {startErr}
             </div>
           )}
           <button
@@ -259,7 +259,7 @@ export function ExamPage() {
       <section className="screen" role="main" aria-label="Contenu principal">
         <div style={{ maxWidth: 720, margin: '0 auto', display: 'grid', gap: 18 }}>
           <div style={{ background: `linear-gradient(135deg,${result.passed ? 'var(--green)' : 'var(--navy)'},${result.passed ? '#006b47' : 'var(--navy2)'})`, borderRadius: 20, padding: 28, color: '#fff', textAlign: 'center' }}>
-            <div style={{ fontSize: 48 }}>{result.passed ? '🏆' : '📋'}</div>
+            <div style={{ fontSize: 48 }}>{''}</div>
             <h2 style={{ color: '#fff', fontSize: 24, margin: '8px 0 4px' }}>{result.passed ? 'Félicitations — Admis !' : 'Ajourné'}</h2>
             <div style={{ fontSize: 40, fontWeight: 900 }}>{result.score} <span style={{ fontSize: 20, fontWeight: 500, opacity: .8 }}>/ {result.total}</span></div>
             <div style={{ fontSize: 14, opacity: .8 }}>{result.score_percent}% — Seuil : {result.threshold}/{result.total}</div>
@@ -272,7 +272,7 @@ export function ExamPage() {
                 className={filter === f ? 'btn-primary btn-sm' : 'secondary-button btn-sm'}
                 onClick={() => setFilter(f)}>
                 {f === 'all' ? `Toutes (${result.questions.length})`
-                  : f === 'ok' ? `✅ Correctes (${result.questions.filter(q2 => q2.is_correct).length})`
+                  : f === 'ok' ? `Correctes (${result.questions.filter(q2 => q2.is_correct).length})`
                   : `❌ Incorrectes (${result.questions.filter(q2 => !q2.is_correct).length})`}
               </button>
             ))}
@@ -286,7 +286,7 @@ export function ExamPage() {
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ background: 'var(--bg)', padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 700 }}>Q{q2.number}</span>
                 <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--muted)', flex: 1 }}>{q2.category}</span>
-                <span>{q2.is_correct ? '✅' : '❌'}</span>
+                <span>{q2.is_correct ? '✓' : '✗'}</span>
               </div>
               <p style={{ fontWeight: 600, fontSize: 13, color: 'var(--ink)', margin: 0 }}>{q2.text}</p>
               {!q2.is_correct && q2.given_answer && <p style={{ fontSize: 12, color: 'var(--red, #D32F2F)', margin: 0 }}>Votre réponse : <strong>{q2.given_answer}</strong></p>}
@@ -322,7 +322,7 @@ export function ExamPage() {
           )}
           <div className="actions">
             <button className="secondary-button" onClick={() => setPhase('running')}>↩ Revenir</button>
-            <button className="btn-success" onClick={submitExam}>✅ Soumettre définitivement</button>
+            <button className="btn-success" onClick={submitExam}>Soumettre définitivement</button>
           </div>
         </div>
       </section>

@@ -1,3 +1,4 @@
+import { IconLock, IconAlertCircle } from '../icons';
 /**
  * LoginForm — Gère le login en 2 étapes avec 2FA optionnel
  * Étape 1 : email + mot de passe
@@ -62,7 +63,7 @@ export function LoginForm({ onSuccess, onError }: LoginFormProps) {
   if (step === '2fa') return (
     <form onSubmit={handleTfa} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       <div style={{ textAlign: 'center', marginBottom: 8 }}>
-        <div style={{ fontSize: 36, marginBottom: 6 }}>🔐</div>
+        <IconLock size={36} style={{ marginBottom: 6, color: "var(--guinea-green)" }} />
         <h3 style={{ margin: 0, color: 'var(--ink)' }}>Authentification à deux facteurs</h3>
         <p style={{ margin: '6px 0 0', fontSize: 13, color: 'var(--muted)' }}>
           Ouvrez Google Authenticator et entrez le code à 6 chiffres.
@@ -70,7 +71,7 @@ export function LoginForm({ onSuccess, onError }: LoginFormProps) {
       </div>
       {error && (
         <div style={{ padding: '8px 12px', background: 'var(--red-l, #fdecea)',
-          borderRadius: 8, fontSize: 13, color: 'var(--red, #c00)' }}>⚠ {error}</div>
+          borderRadius: 8, fontSize: 13, color: 'var(--red, #c00)' }}>{error}</div>
       )}
       <label>
         <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink2)' }}>
@@ -100,7 +101,7 @@ export function LoginForm({ onSuccess, onError }: LoginFormProps) {
     <form onSubmit={handleCredentials} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       {error && (
         <div style={{ padding: '8px 12px', background: 'var(--red-l, #fdecea)',
-          borderRadius: 8, fontSize: 13, color: 'var(--red, #c00)' }}>⚠ {error}</div>
+          borderRadius: 8, fontSize: 13, color: 'var(--red, #c00)' }}>{error}</div>
       )}
       <label>
         <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink2)' }}>Email</span>

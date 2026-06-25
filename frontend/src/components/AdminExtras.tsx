@@ -111,7 +111,7 @@ export function InstitutionalAuthsPanel({ canAdmin }: { canAdmin: boolean }) {
   }
 
   if (!canAdmin) {
-    return <div className="alert aw">⚠️ Réservé aux administrateurs.</div>;
+    return <div className="alert aw">️ Réservé aux administrateurs.</div>;
   }
 
   return (
@@ -129,7 +129,7 @@ export function InstitutionalAuthsPanel({ canAdmin }: { canAdmin: boolean }) {
           <div style={{ display: 'grid', gap: 8 }}>
             {Object.entries(readiness.checks ?? {}).map(([key, val]) => (
               <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13 }}>
-                <span>{val.status === 'ok' ? '✅' : '⚠️'}</span>
+                <span>{val.status === 'ok' ? '' : '️'}</span>
                 <span style={{ flex: 1, color: 'var(--ink2)' }}>{key}</span>
                 {val.detail && (
                   <span style={{ fontSize: 11, color: 'var(--muted)' }}>{val.detail}</span>
@@ -234,13 +234,13 @@ export function InstitutionalAuthsPanel({ canAdmin }: { canAdmin: boolean }) {
                             disabled={updatingId === a.id}
                             onClick={() => handleDecision(a.id, 'approved')}
                             aria-label={`Approuver ${a.title}`}
-                          >✅</button>
+                          ></button>
                           <button
                             className="btn-sm btn-danger"
                             disabled={updatingId === a.id}
                             onClick={() => handleDecision(a.id, 'rejected')}
                             aria-label={`Rejeter ${a.title}`}
-                          >❌</button>
+                          ></button>
                         </div>
                       )}
                     </td>
@@ -290,7 +290,7 @@ export function DeviceAlertsPanel({
         <p className="text-muted" style={{ padding: 12 }}>Chargement…</p>
       ) : alerts.length === 0 ? (
         <div style={{ textAlign: 'center', color: 'var(--muted)', fontSize: 13, padding: '16px 0' }}>
-          Aucune alerte ✅
+          Aucune alerte 
         </div>
       ) : (
         <div className="table-wrap">
@@ -353,9 +353,9 @@ export function CenterManagementPanel({ center }: { center: Center | null }) {
     setStatusMsg(null);
     try {
       await updateCenterStatus(center.id, next, reason);
-      setStatusMsg(`✅ Statut mis à jour : ${next}`);
+      setStatusMsg(` Statut mis à jour : ${next}`);
     } catch (e) {
-      setStatusMsg(`❌ ${errMsg(e)}`);
+      setStatusMsg(` ${errMsg(e)}`);
     } finally {
       setUpdating(false);
     }
@@ -389,7 +389,7 @@ export function CenterManagementPanel({ center }: { center: Center | null }) {
           {center.name} — {center.city}
         </p>
         {statusMsg && (
-          <div className={`alert ${statusMsg.startsWith('✅') ? 'as' : 'ae'}`}
+          <div className={`alert ${statusMsg.startsWith('') ? 'as' : 'ae'}`}
             style={{ marginBottom: 10 }}>
             {statusMsg}
           </div>
@@ -445,7 +445,7 @@ export function CenterManagementPanel({ center }: { center: Center | null }) {
                     ? '…'
                     : s.status === 'active'
                     ? '🔧 Maintenance'
-                    : '✅ Actif'}
+                    : ' Actif'}
                 </button>
               </div>
             ))}
@@ -487,7 +487,7 @@ export function QuestionsAdminPanel({ canAdmin }: { canAdmin: boolean }) {
   }, {});
 
   if (!canAdmin) {
-    return <div className="alert aw">⚠️ Réservé aux administrateurs.</div>;
+    return <div className="alert aw">️ Réservé aux administrateurs.</div>;
   }
 
   return (
@@ -495,7 +495,7 @@ export function QuestionsAdminPanel({ canAdmin }: { canAdmin: boolean }) {
       {/* Stats par catégorie */}
       <div className="card">
         <div className="card-header">
-          <span className="card-title">📊 Répartition ({questions.length} questions)</span>
+          <span className="card-title"> Répartition ({questions.length} questions)</span>
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
           {Object.entries(byCategory).map(([cat, n]) => (
@@ -775,17 +775,17 @@ export function CsvExportsPanel({
 
   const exports = [
     {
-      label: '📊 Dashboard',
+      label: ' Dashboard',
       url: getDashboardCsvUrl(),
       file: 'dashboard.csv',
     },
     {
-      label: '💳 Paiements',
+      label: ' Paiements',
       url: getAdminPaymentsCsvUrl(paymentFilters),
       file: 'paiements.csv',
     },
     {
-      label: '📋 Audit logs',
+      label: ' Audit logs',
       url: getAuditLogsCsvUrl(auditFilters),
       file: 'audit.csv',
     },
@@ -860,27 +860,27 @@ export function OfficialPaymentsImportPanel({ canAdmin }: { canAdmin: boolean })
       );
 
       if (!confirmed) {
-        setStatus(`✅ Aperçu : ${result.created ?? 0} nouveaux, ${result.skipped ?? 0} ignorés sur ${rows.length} lignes. Cochez "Confirmer" puis soumettez à nouveau.`);
+        setStatus(` Aperçu : ${result.created ?? 0} nouveaux, ${result.skipped ?? 0} ignorés sur ${rows.length} lignes. Cochez "Confirmer" puis soumettez à nouveau.`);
       } else {
-        setStatus(`✅ Import validé : ${result.created ?? 0} paiements enregistrés.`);
+        setStatus(` Import validé : ${result.created ?? 0} paiements enregistrés.`);
         setFile(null);
         setConfirmed(false);
       }
     } catch (err) {
-      setStatus(`❌ ${errMsg(err)}`);
+      setStatus(` ${errMsg(err)}`);
     } finally {
       setImporting(false);
     }
   }
 
   if (!canAdmin) {
-    return <div className="alert aw">⚠️ Réservé aux administrateurs.</div>;
+    return <div className="alert aw">️ Réservé aux administrateurs.</div>;
   }
 
   return (
     <div className="card">
       <div className="card-header">
-        <span className="card-title">💳 Import paiements officiels</span>
+        <span className="card-title"> Import paiements officiels</span>
       </div>
       <form onSubmit={handleImport} style={{ display: 'grid', gap: 12 }}>
         <label>
@@ -898,7 +898,7 @@ export function OfficialPaymentsImportPanel({ canAdmin }: { canAdmin: boolean })
           <code>BK-001,150000,orange_money,+224620001234,paid,REC-001</code>
         </div>
         {status && (
-          <div className={`alert ${status.startsWith('✅') ? 'as' : 'ae'}`}>{status}</div>
+          <div className={`alert ${status.startsWith('') ? 'as' : 'ae'}`}>{status}</div>
         )}
         {status?.includes('Cochez') && (
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
@@ -911,7 +911,7 @@ export function OfficialPaymentsImportPanel({ canAdmin }: { canAdmin: boolean })
           </label>
         )}
         <button type="submit" className="btn-primary" disabled={importing || !file}>
-          {importing ? 'Import…' : confirmed ? '✅ Valider l\'import' : '🔍 Aperçu (dry-run)'}
+          {importing ? 'Import…' : confirmed ? ' Valider l\'import' : '🔍 Aperçu (dry-run)'}
         </button>
       </form>
     </div>

@@ -140,7 +140,7 @@ export function ELearningPage() {
             }}
             disabled={progress[lesson.id] >= 100}
           >
-            {progress[lesson.id] >= 100 ? '✅ Terminé' : 'Marquer comme terminé'}
+            {progress[lesson.id] >= 100 ? ' Terminé' : 'Marquer comme terminé'}
           </button>
         </div>
       </div>
@@ -207,7 +207,7 @@ export function ELearningPage() {
   // ── Liste des cours ────────────────────────────────────────────────────────
   return (
     <div>
-      <h2 style={{ fontSize: 22, marginBottom: 4 }}>📚 Cours en ligne</h2>
+      <h2 style={{ fontSize: 22, marginBottom: 4 }}> Cours en ligne</h2>
       <p style={{ color: 'var(--muted)', fontSize: 14, marginBottom: 20 }}>
         Préparez-vous avec nos modules de formation officiels DNTT
       </p>
@@ -260,7 +260,7 @@ export function ELearningPage() {
                   {c.description.slice(0, 80)}{c.description.length > 80 ? '…' : ''}
                 </p>
                 <div style={{ fontSize: 12, color: 'var(--muted)' }}>
-                  📝 {c.lesson_count} leçon{c.lesson_count > 1 ? 's' : ''}
+                   {c.lesson_count} leçon{c.lesson_count > 1 ? 's' : ''}
                 </div>
               </div>
             </div>

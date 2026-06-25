@@ -23,6 +23,7 @@ import {
 import { isAudioLocale, speakFeedback, stop as stopAudio } from '../audio';
 import { type Locale } from '../i18n';
 import { type AuthUser } from '../authClient';
+import { IconDashboard, IconUsers, IconBuilding, IconCalendar, IconShieldAlert, IconZap, IconGraduate, IconClipboard, IconCheckCircle, FlagGuinea } from '../icons';
 import { type UserRole } from '../auth';
 import { useAuthSession, canUseProtectedActions } from '../authSession';
 import {
@@ -116,7 +117,7 @@ export function HomePage() {
           <p>Examen officiel du code de la route — République de Guinée</p>
         </div>
         <div className="dash-hero-emblem">
-          <div className="dash-hero-flag">🇬🇳</div>
+          <FlagGuinea size={48} />
           <div className="dash-hero-label">République de Guinée</div>
         </div>
       </div>
@@ -147,7 +148,7 @@ export function HomePage() {
         {isAdmin && (
           <>
             <div className="card">
-              <div className="card-header"><span className="card-title">📊 Administration</span></div>
+              <div className="card-header"><span className="card-title">Administration</span></div>
               <div className="actions">
                 <a href="#/admin"><button className="btn-primary btn-sm">Tableau de bord admin</button></a>
                 <a href="#/dossier"><button className="secondary-button btn-sm">Dossier institutionnel</button></a>
@@ -155,7 +156,7 @@ export function HomePage() {
               </div>
             </div>
             <div className="card">
-              <div className="card-header"><span className="card-title">⚡ Actions rapides</span></div>
+              <div className="card-header"><span className="card-title">Actions rapides</span></div>
               <div style={{ marginTop: 12 }}>
                 <CsvExportsPanel />
               </div>
@@ -165,7 +166,7 @@ export function HomePage() {
 
         {isCenter && (
           <div className="card">
-            <div className="card-header"><span className="card-title">🏢 Espace centre</span></div>
+            <div className="card-header"><span className="card-title">Espace centre</span></div>
             <p style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 14 }}>
               Gérez les entrées, démarrez les examens et déclarez les incidents.
             </p>
@@ -175,7 +176,7 @@ export function HomePage() {
 
         {isCandidate && (
           <div className="card">
-            <div className="card-header"><span className="card-title">🎓 Espace candidat</span></div>
+            <div className="card-header"><span className="card-title">Espace candidat</span></div>
             <p style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 14 }}>
               Suivez votre dossier, payez votre examen et téléchargez votre convocation.
             </p>
@@ -184,10 +185,10 @@ export function HomePage() {
         )}
 
         <div className="card">
-          <div className="card-header"><span className="card-title">📋 Examen code de la route</span></div>
+          <div className="card-header"><span className="card-title">Examen code de la route</span></div>
           <div style={{ display: 'grid', gap: 8, fontSize: 13, color: 'var(--ink2)', marginBottom: 14 }}>
             <div>⏱ 30 minutes • 40 questions tirées sur 200</div>
-            <div>✅ Seuil d'admission : 35/40 (87,5 %)</div>
+            <div>Seuil d'admission : 35/40 (87,5 %)</div>
             <div>📱 Questions illustrées par catégorie</div>
           </div>
           {tarifs.length > 0 && (

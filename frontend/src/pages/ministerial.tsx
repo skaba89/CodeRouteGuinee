@@ -162,24 +162,24 @@ export function MinisterialPage() {
           return { last_name: last, first_name: first, identity_number: nina, phone, permit_category: cat || 'B', status: 'registered' as const };
         });
         const r = await importOfficialCandidates('csv_import', `Import CSV ${importFile.name}`, rows, true);
-        setImportStatus(`✅ Aperçu import : ${r.created ?? 0} nouveaux, ${r.skipped ?? 0} ignorés sur ${count} lignes`);
+        setImportStatus(` Aperçu import : ${r.created ?? 0} nouveaux, ${r.skipped ?? 0} ignorés sur ${count} lignes`);
       } else if (importType === 'centers') {
         const rows = lines.map(l => {
           const [code, name, city, address, cap] = l.split(',').map(s => s.trim().replace(/"/g,''));
           return { code, name, city, address, capacity: parseInt(cap) || 30, status: 'pending_audit' as const };
         });
         const r = await importOfficialCenters('csv_import', `Import CSV ${importFile.name}`, rows, true);
-        setImportStatus(`✅ Aperçu import : ${r.created ?? 0} nouveaux centres sur ${count} lignes`);
+        setImportStatus(` Aperçu import : ${r.created ?? 0} nouveaux centres sur ${count} lignes`);
       } else {
         const rows = lines.map(l => {
           const [cat, text, opt1, opt2, opt3, opt4, correct] = l.split(',').map(s => s.trim().replace(/"/g,''));
           return { category: cat, text, options: [opt1,opt2,opt3,opt4].filter(Boolean), correct_answer: correct, is_active: true };
         });
         const r = await importOfficialQuestions('csv_import', `Import CSV ${importFile.name}`, rows, true);
-        setImportStatus(`✅ Aperçu import : ${r.created ?? 0} nouvelles questions sur ${count} lignes`);
+        setImportStatus(` Aperçu import : ${r.created ?? 0} nouvelles questions sur ${count} lignes`);
       }
     } catch (err) {
-      setImportStatus(`❌ Erreur import : ${errMsg(err)}`);
+      setImportStatus(` Erreur import : ${errMsg(err)}`);
     } finally { setImporting(false); }
   }
 
@@ -197,10 +197,10 @@ export function MinisterialPage() {
   }
 
   const TABS = [
-    { id: 'overview', label: '📊 Vue nationale' },
+    { id: 'overview', label: ' Vue nationale' },
     { id: 'import',   label: '📥 Imports officiels' },
     { id: 'stations', label: '🖥️ Postes d\'examen' },
-    { id: 'alerts',   label: '⚠️ Centre d\'action' },
+    { id: 'alerts',   label: '️ Centre d\'action' },
   ] as const;
 
   return (
@@ -212,7 +212,7 @@ export function MinisterialPage() {
       </div>
 
       {!canAdmin && (
-        <div className="alert aw">⚠️ Réservé aux administrateurs nationaux et super_admin.</div>
+        <div className="alert aw">️ Réservé aux administrateurs nationaux et super_admin.</div>
       )}
 
       {/* Tabs */}
@@ -274,7 +274,7 @@ export function MinisterialPage() {
                   <div style={{ display:'grid', gap:14 }}>
                     {readiness?.items?.slice(0,6).map((item: import('../api').InstitutionalReadinessItem, i: number) => (
                       <div key={i} style={{ display:'flex', alignItems:'center', gap:10 }}>
-                        <span style={{ fontSize:20 }}>{item.status === 'ready' ? '✅' : item.status === 'partial' ? '⚠️' : '❌'}</span>
+                        <span style={{ fontSize:20 }}>{item.status === 'ready' ? '' : item.status === 'partial' ? '️' : ''}</span>
                         <div style={{ flex:1 }}>
                           <div style={{ fontSize:13, fontWeight:600 }}>{(item as {pillar?:string; label?:string}).pillar ?? (item as {label?:string}).label ?? ""}</div>
                           <div style={{ fontSize:11, color:'var(--muted)' }}>{(item as {evidence?:string; val?:string}).evidence ?? (item as {val?:string}).val ?? ""}</div>
@@ -291,7 +291,7 @@ export function MinisterialPage() {
                           { label:'Intégration NINA', val:'Non connectée', ok:false },
                         ].map((item, i) => (
                           <div key={i} style={{ display:'flex', alignItems:'center', gap:10 }}>
-                            <span>{item.ok ? '✅' : '⚠️'}</span>
+                            <span>{item.ok ? '' : '️'}</span>
                             <div style={{ flex:1 }}>
                               <div style={{ fontSize:13, fontWeight:600 }}>{(item as {pillar?:string; label?:string}).pillar ?? (item as {label?:string}).label ?? ""}</div>
                               <div style={{ fontSize:11, color:'var(--muted)' }}>{item.val}</div>
@@ -329,7 +329,7 @@ export function MinisterialPage() {
                   style={{ padding:'6px 0' }} />
               </label>
               {importStatus && (
-                <div className={`alert ${importStatus.startsWith('✅') ? 'as' : 'ae'}`}>
+                <div className={`alert ${importStatus.startsWith('') ? 'as' : 'ae'}`}>
                   {importStatus}
                 </div>
               )}
@@ -343,7 +343,7 @@ export function MinisterialPage() {
           </div>
 
           <div className="card">
-            <div className="card-header"><span className="card-title">📋 Format CSV attendu</span></div>
+            <div className="card-header"><span className="card-title"> Format CSV attendu</span></div>
             <div style={{ display:'grid', gap:14 }}>
               {[
                 {
@@ -425,7 +425,7 @@ export function MinisterialPage() {
       {tab === 'alerts' && (
         <div className="g2">
           <div className="card">
-            <div className="card-header"><span className="card-title">⚠️ Alertes nationales</span></div>
+            <div className="card-header"><span className="card-title">️ Alertes nationales</span></div>
             {actionCenter?.items?.length ? (
               <div style={{ display:'grid', gap:12 }}>
                 {actionCenter.items.map((item: import('../api').InstitutionalActionItem, i: number) => (
@@ -463,9 +463,9 @@ export function MinisterialPage() {
             <div className="card-header"><span className="card-title">🛡️ Anti-fraude — Vue nationale</span></div>
             <div style={{ display:'grid', gap:14, fontSize:13 }}>
               {[
-                { icon:'📊', label:'Centres sous surveillance', val:'3 / 35 centres', color:'var(--gold)' },
+                { icon:'', label:'Centres sous surveillance', val:'3 / 35 centres', color:'var(--gold)' },
                 { icon:'🔍', label:'Examens avec anomalies détectées', val:'12 ce mois', color:'var(--red)' },
-                { icon:'✅', label:'Taux d\'intégrité global', val:'96,8 %', color:'var(--green)' },
+                { icon:'', label:'Taux d\'intégrité global', val:'96,8 %', color:'var(--green)' },
                 { icon:'📡', label:'Postes hors ligne', val:'2 postes à Kindia', color:'var(--gold)' },
                 { icon:'🎯', label:'Fraude détectée et bloquée', val:'7 tentatives', color:'var(--navy)' },
                 { icon:'📱', label:'QR codes vérifiés par tiers', val:'1 249 ce mois', color:'var(--blue)' },

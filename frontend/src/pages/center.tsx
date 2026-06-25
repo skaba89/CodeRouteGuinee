@@ -158,14 +158,14 @@ export function CenterPage() {
 
       {!canAct && (
         <div className="alert aw" style={{ marginBottom: 20 }}>
-          ⚠️ Connectez-vous avec un compte <strong>center</strong> pour utiliser les fonctionnalités réelles.
+          ️ Connectez-vous avec un compte <strong>center</strong> pour utiliser les fonctionnalités réelles.
         </div>
       )}
 
       <div className="g2">
         {/* Validation entrée */}
         <div className="card">
-          <div className="card-header"><span className="card-title">🔍 Valider l'entrée candidat</span></div>
+          <div className="card-header"><span className="card-title"> Valider l'entrée candidat</span></div>
           <form onSubmit={handleEntry} style={{ display: 'grid', gap: 12 }}>
             <label>
               Code centre
@@ -183,7 +183,7 @@ export function CenterPage() {
             {entryErr && <p className="form-error">{entryErr}</p>}
             {entryResult && (
               <div className={`scanner-result${entryResult.allowed ? '' : ' denied'}`}>
-                <div className="scanner-icon">{entryResult.allowed ? '✅' : '❌'}</div>
+                <div className="scanner-icon">{entryResult.allowed ? '' : ''}</div>
                 <strong style={{ fontSize: 16 }}>{entryResult.allowed ? 'ENTRÉE AUTORISÉE' : 'ENTRÉE REFUSÉE'}</strong>
                 <span style={{ fontSize: 13, color: 'var(--muted)' }}>{entryResult.message ?? entryResult.reason ?? ''}</span>
               </div>
@@ -203,7 +203,7 @@ export function CenterPage() {
             {startErr && <p className="form-error">{startErr}</p>}
             {attempt && (
               <div className="alert as">
-                ✅ Examen démarré — ID : <code style={{ fontSize: 11 }}>{attempt.id}</code>
+                 Examen démarré — ID : <code style={{ fontSize: 11 }}>{attempt.id}</code>
                 <a href="#/exam" style={{ marginLeft: 8 }}><button type="button" className="btn-sm btn-success">Ouvrir l'examen →</button></a>
               </div>
             )}
@@ -215,7 +215,7 @@ export function CenterPage() {
 
         {/* Incidents */}
         <div className="card">
-          <div className="card-header"><span className="card-title">⚠️ Déclarer un incident</span></div>
+          <div className="card-header"><span className="card-title">️ Déclarer un incident</span></div>
           <form onSubmit={handleIncident} style={{ display: 'grid', gap: 12 }}>
             <label>
               Type d'incident
@@ -247,13 +247,13 @@ export function CenterPage() {
         {/* Incidents ouverts */}
         <div className="card">
           <div className="card-header">
-            <span className="card-title">📋 Incidents ouverts ({incidents.length})</span>
+            <span className="card-title"> Incidents ouverts ({incidents.length})</span>
             <button className="btn-sm secondary-button" onClick={() => getCenterIncidents({ statusFilter: 'open', limit: 25 }).then(r => setIncidents(r.items)).catch(() => undefined)}>
               Actualiser
             </button>
           </div>
           {incidents.length === 0 ? (
-            <div className="empty-state"><p>Aucun incident en cours ✅</p></div>
+            <div className="empty-state"><p>Aucun incident en cours </p></div>
           ) : (
             <div className="table-wrap">
               <table>

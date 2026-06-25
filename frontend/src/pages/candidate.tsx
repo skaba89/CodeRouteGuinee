@@ -163,7 +163,7 @@ export function CandidatePage() {
       <div className="g2">
         {/* Paiement Mobile Money */}
         <div className="card">
-          <div className="card-header"><span className="card-title">💳 Paiement Mobile Money</span></div>
+          <div className="card-header"><span className="card-title"> Paiement Mobile Money</span></div>
           {!canAct && (
             <div className="alert ai" style={{ marginBottom: 14 }}>
               ℹ️ Connectez-vous avec un compte candidat pour effectuer un paiement réel.
@@ -181,7 +181,7 @@ export function CandidatePage() {
                   { id: 'orange_money', icon: '🟠', label: 'Orange Money' },
                   { id: 'mtn_money',    icon: '🟡', label: 'MTN Money' },
                   { id: 'wave',         icon: '🔵', label: 'Wave' },
-                  { id: 'paydunya',     icon: '💳', label: 'PayDunya' },
+                  { id: 'paydunya',     icon: '', label: 'PayDunya' },
                 ].map(p => (
                   <button type="button" key={p.id} className={`prov-btn${provider === p.id ? ' sel' : ''}`}
                     onClick={() => setProvider(p.id)}>
@@ -199,7 +199,7 @@ export function CandidatePage() {
             {payErr && <p className="form-error">{payErr}</p>}
             {payResult && (
               <div className="alert as">
-                ✅ Paiement <strong>{payResult.status === 'paid' ? 'confirmé' : payResult.status}</strong> — Réf. {payResult.reference}
+                 Paiement <strong>{payResult.status === 'paid' ? 'confirmé' : payResult.status}</strong> — Réf. {payResult.reference}
                 {payResult.checkout_url && (
                   <span> — <a href={payResult.checkout_url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--blue-dark, #004085)', fontWeight: 600 }}>Finaliser Wave →</a></span>
                 )}
@@ -213,7 +213,7 @@ export function CandidatePage() {
 
         {/* Convocation */}
         <div className="card">
-          <div className="card-header"><span className="card-title">📄 Convocation & Documents</span></div>
+          <div className="card-header"><span className="card-title"> Convocation & Documents</span></div>
           <div style={{ display: 'grid', gap: 12 }}>
             <label>
               Référence de réservation
@@ -245,7 +245,7 @@ export function CandidatePage() {
             {certErr && <p className="form-error">{certErr}</p>}
             {cert && (
               <div className={`alert ${cert.valid && cert.passed ? 'as' : cert.valid ? 'aw' : 'ae'}`}>
-                {cert.valid && cert.passed ? '🏆 ADMIS' : cert.valid ? '📋 Ajourné' : '❌ Invalide'}{' '}
+                {cert.valid && cert.passed ? '🏆 ADMIS' : cert.valid ? ' Ajourné' : ' Invalide'}{' '}
                 — {cert.candidate_name ?? ''} {cert.score !== undefined ? `· ${cert.score}/40` : ''}
                 {cert.valid && cert.passed && (
                   <button type="button" className="btn-sm" style={{ marginLeft: 10 }}

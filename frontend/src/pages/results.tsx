@@ -136,7 +136,7 @@ export function ResultsPage() {
       {cert && (
         <div style={{ maxWidth: 600, marginTop: 16 }}>
           <div className={`alert ${cert.valid && cert.passed ? 'as' : cert.valid ? 'aw' : 'ae'}`}>
-            <span style={{ fontSize: 24 }}>{cert.valid && cert.passed ? '🏆' : cert.valid ? '📋' : '❌'}</span>
+            <span style={{ fontSize: 24 }}>{cert.valid && cert.passed ? '' : cert.valid ? '' : ''}</span>
             <div>
               <strong>{cert.valid && cert.passed ? 'ADMIS — Certificat valide' : cert.valid ? 'AJOURNÉ' : 'Certificat invalide'}</strong>
               {cert.candidate_name && <div style={{ fontSize: 12, marginTop: 2 }}>{cert.candidate_name} {cert.score !== undefined ? `· ${cert.score}/40` : ''}</div>}
@@ -154,7 +154,7 @@ export function ResultsPage() {
       {result && (
         <div style={{ maxWidth: 720, marginTop: 20, display: 'grid', gap: 14 }}>
           <div style={{ background: `linear-gradient(135deg,${result.passed ? 'var(--green)' : 'var(--navy)'},${result.passed ? '#006b47' : 'var(--navy2)'})`, borderRadius: 16, padding: '20px 24px', color: '#fff', display: 'flex', alignItems: 'center', gap: 16 }}>
-            <span style={{ fontSize: 40 }}>{result.passed ? '🏆' : '📋'}</span>
+            <span style={{ fontSize: 40 }}>{result.passed ? '' : ''}</span>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 18, fontWeight: 800 }}>{result.passed ? 'Admis' : 'Ajourné'}</div>
               <div style={{ fontSize: 12, opacity: .75 }}>{result.candidate_name}</div>
@@ -171,8 +171,8 @@ export function ResultsPage() {
                 className={filter === f ? 'btn-primary btn-sm' : 'secondary-button btn-sm'}
                 onClick={() => setFilter(f)}>
                 {f === 'all' ? `Toutes (${result.questions.length})`
-                  : f === 'ok' ? `✅ Correctes (${result.questions.filter(q => q.is_correct).length})`
-                  : `❌ Incorrectes (${result.questions.filter(q => !q.is_correct).length})`}
+                  : f === 'ok' ? ` Correctes (${result.questions.filter(q => q.is_correct).length})`
+                  : ` Incorrectes (${result.questions.filter(q => !q.is_correct).length})`}
               </button>
             ))}
           </div>
@@ -182,7 +182,7 @@ export function ResultsPage() {
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                 <span style={{ background: 'var(--bg)', padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 700 }}>Q{q.number}</span>
                 <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--muted)', flex: 1 }}>{q.category}</span>
-                <span>{q.is_correct ? '✅' : '❌'}</span>
+                <span>{q.is_correct ? '' : ''}</span>
               </div>
               <p style={{ fontWeight: 600, fontSize: 13, margin: 0 }}>{q.text}</p>
               {!q.is_correct && q.given_answer && <p style={{ fontSize: 12, color: 'var(--red, #D32F2F)', margin: 0 }}>Votre réponse : <strong>{q.given_answer}</strong></p>}

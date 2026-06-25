@@ -103,7 +103,7 @@ export function InstitutionalDossierPage() {
       </div>
 
       {!canAdmin && (
-        <div className="alert aw">⚠️ Réservé aux administrateurs nationaux.</div>
+        <div className="alert aw">️ Réservé aux administrateurs nationaux.</div>
       )}
 
       <div className="g2">
@@ -113,7 +113,7 @@ export function InstitutionalDossierPage() {
             <button className="secondary-button btn-sm" onClick={() => getCandidateIdentityChecks({ status_filter: 'pending', limit: 25 }).then(setIdentityChecks).catch(() => undefined)}>Actualiser</button>
           </div>
           {identityChecks.length === 0 ? (
-            <div style={{ padding: '20px', textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>{canAdmin ? 'Aucune vérification en attente ✅' : 'Connectez-vous.'}</div>
+            <div style={{ padding: '20px', textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>{canAdmin ? 'Aucune vérification en attente ' : 'Connectez-vous.'}</div>
           ) : (
             <div className="table-wrap">
               <table>
@@ -128,8 +128,8 @@ export function InstitutionalDossierPage() {
                       <td>
                         {c.status === 'pending' && canAdmin && (
                           <div style={{ display: 'flex', gap: 4 }}>
-                            <button className="btn-sm btn-success" onClick={() => decideCandidateIdentity(c.id, 'approved', 'Validé').then(() => getCandidateIdentityChecks({ status_filter: 'pending', limit: 25 }).then(setIdentityChecks).catch(() => undefined)).catch(() => undefined)}>✅</button>
-                            <button className="btn-sm btn-danger" onClick={() => decideCandidateIdentity(c.id, 'rejected', 'Rejeté').then(() => getCandidateIdentityChecks({ status_filter: 'pending', limit: 25 }).then(setIdentityChecks).catch(() => undefined)).catch(() => undefined)}>❌</button>
+                            <button className="btn-sm btn-success" onClick={() => decideCandidateIdentity(c.id, 'approved', 'Validé').then(() => getCandidateIdentityChecks({ status_filter: 'pending', limit: 25 }).then(setIdentityChecks).catch(() => undefined)).catch(() => undefined)}></button>
+                            <button className="btn-sm btn-danger" onClick={() => decideCandidateIdentity(c.id, 'rejected', 'Rejeté').then(() => getCandidateIdentityChecks({ status_filter: 'pending', limit: 25 }).then(setIdentityChecks).catch(() => undefined)).catch(() => undefined)}></button>
                           </div>
                         )}
                       </td>
@@ -147,7 +147,7 @@ export function InstitutionalDossierPage() {
             <button className="secondary-button btn-sm" onClick={() => getCandidateSubmissions({ status_filter: 'submitted', limit: 25 }).then(setSubmissions).catch(() => undefined)}>Actualiser</button>
           </div>
           {submissions.length === 0 ? (
-            <div style={{ padding: '20px', textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>{canAdmin ? 'Aucun recours en attente ✅' : 'Connectez-vous.'}</div>
+            <div style={{ padding: '20px', textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>{canAdmin ? 'Aucun recours en attente ' : 'Connectez-vous.'}</div>
           ) : (
             <div className="table-wrap">
               <table>
@@ -162,8 +162,8 @@ export function InstitutionalDossierPage() {
                       <td>
                         {s.status === 'submitted' && canAdmin && (
                           <div style={{ display: 'flex', gap: 4 }}>
-                            <button className="btn-sm btn-success" onClick={() => handleCandidateSubmission(s.id, 'approved', 'Accepté').then(() => getCandidateSubmissions({ status_filter: 'submitted', limit: 25 }).then(setSubmissions).catch(() => undefined)).catch(() => undefined)}>✅</button>
-                            <button className="btn-sm btn-danger" onClick={() => handleCandidateSubmission(s.id, 'rejected', 'Rejeté').then(() => getCandidateSubmissions({ status_filter: 'submitted', limit: 25 }).then(setSubmissions).catch(() => undefined)).catch(() => undefined)}>❌</button>
+                            <button className="btn-sm btn-success" onClick={() => handleCandidateSubmission(s.id, 'approved', 'Accepté').then(() => getCandidateSubmissions({ status_filter: 'submitted', limit: 25 }).then(setSubmissions).catch(() => undefined)).catch(() => undefined)}></button>
+                            <button className="btn-sm btn-danger" onClick={() => handleCandidateSubmission(s.id, 'rejected', 'Rejeté').then(() => getCandidateSubmissions({ status_filter: 'submitted', limit: 25 }).then(setSubmissions).catch(() => undefined)).catch(() => undefined)}></button>
                           </div>
                         )}
                       </td>
@@ -320,7 +320,7 @@ function Timer({ secs, total, onExpire }: { secs: number; total: number; onExpir
         </div>
       </div>
       <p style={{ fontSize: 11, color: crit ? 'var(--red, #D32F2F)' : 'var(--muted)', fontWeight: crit ? 700 : 500 }}>
-        {crit ? '⚠️ Temps critique !' : urgent ? '⏳ < 5 min' : 'Temps restant'}
+        {crit ? '️ Temps critique !' : urgent ? '⏳ < 5 min' : 'Temps restant'}
       </p>
     </div>
   );

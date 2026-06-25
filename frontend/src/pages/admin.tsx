@@ -139,22 +139,22 @@ export function AdminPage() {
     setCreating(true); setMsg(null);
     try {
       await createInstitutionalUser({ email: newEmail, full_name: newName, role: newRole, initial_password: newPass, reason: 'Création par super_admin' });
-      setMsg('✅ Utilisateur créé.');
+      setMsg(' Utilisateur créé.');
       setNewEmail(''); setNewName(''); setNewPass('');
       getInstitutionalUsers().then(setUsers).catch(() => undefined);
     } catch (err) {
-      setMsg('❌ ' + errMsg(err, 'Création échouée.'));
+      setMsg(' ' + errMsg(err, 'Création échouée.'));
     } finally { setCreating(false); }
   }
 
   const TABS = [
-    { id: 'dashboard',  label: '📊 Dashboard' },
+    { id: 'dashboard',  label: ' Dashboard' },
     { id: 'candidates', label: '👥 Candidats' },
-    { id: 'payments',   label: '💳 Paiements' },
+    { id: 'payments',   label: ' Paiements' },
     { id: 'monitoring', label: '🔍 Monitoring' },
     { id: 'questions',  label: '📝 Questions' },
-    { id: 'audit',      label: '📋 Audit' },
-    { id: 'users',      label: '👤 Utilisateurs' },
+    { id: 'audit',      label: ' Audit' },
+    { id: 'users',      label: ' Utilisateurs' },
   ] as const;
 
   return (
@@ -171,7 +171,7 @@ export function AdminPage() {
       </div>
 
       {!canAdmin && (
-        <div className="alert aw">⚠️ Connectez-vous avec un compte admin ou super_admin pour accéder aux données réelles.</div>
+        <div className="alert aw">️ Connectez-vous avec un compte admin ou super_admin pour accéder aux données réelles.</div>
       )}
 
       {/* Tabs */}
@@ -275,7 +275,7 @@ export function AdminPage() {
       {tab === 'audit' && (
         <div className="card">
           <div className="card-header">
-            <span className="card-title">📋 Audit logs</span>
+            <span className="card-title"> Audit logs</span>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               <SearchBar
                 value={auditSearch}
@@ -346,7 +346,7 @@ export function AdminPage() {
                   </select>
                 </label>
                 <label>Mot de passe temporaire<input type="password" value={newPass} onChange={e => setNewPass(e.target.value)} placeholder="12 caractères minimum" /></label>
-                {msg && <p className={msg.startsWith('✅') ? 'login-status' : 'form-error'}>{msg}</p>}
+                {msg && <p className={msg.startsWith('') ? 'login-status' : 'form-error'}>{msg}</p>}
                 <button type="submit" className="btn-primary" disabled={creating || !newEmail || !newName || newPass.length < 12}>
                   {creating ? 'Création…' : 'Créer l\'utilisateur'}
                 </button>
@@ -355,7 +355,7 @@ export function AdminPage() {
           )}
           <div className="card">
             <div className="card-header">
-              <span className="card-title">👤 Comptes ({users.length})</span>
+              <span className="card-title"> Comptes ({users.length})</span>
               <button className="secondary-button btn-sm" onClick={() => getInstitutionalUsers().then(setUsers).catch(() => undefined)}>Actualiser</button>
             </div>
             {users.length === 0 ? (
@@ -403,7 +403,7 @@ function MonitoringPanel({ canAdmin }: { canAdmin: boolean }) {
     }).finally(() => setLoading(false));
   }, [canAdmin]);
 
-  if (!canAdmin) return <div className="alert aw">⚠️ Accès réservé aux administrateurs.</div>;
+  if (!canAdmin) return <div className="alert aw">️ Accès réservé aux administrateurs.</div>;
 
   return (
     <div className="g2">
@@ -413,7 +413,7 @@ function MonitoringPanel({ canAdmin }: { canAdmin: boolean }) {
           <button className="secondary-button btn-sm" aria-label="Actualiser le monitoring" onClick={() => getExamMonitoringSummaries({ limit: 20 }).then(setSummaries).catch(() => undefined)}>Actualiser</button>
         </div>
         {loading ? <p className="text-muted" style={{ padding: 16 }}>Chargement…</p> :
-          summaries.length === 0 ? <div style={{ padding: '24px', textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>Aucune anomalie détectée ✅</div> :
+          summaries.length === 0 ? <div style={{ padding: '24px', textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>Aucune anomalie détectée </div> :
           <div className="table-wrap">
             <table>
               <thead><tr><th>Tentative</th><th>Risque</th><th>Anomalies</th><th>Statut</th></tr></thead>
@@ -489,7 +489,7 @@ function QuestionsPanel({ canAdmin }: { canAdmin: boolean }) {
     finally { setDeciding(null); }
   }
 
-  if (!canAdmin) return <div className="alert aw">⚠️ Accès réservé aux administrateurs.</div>;
+  if (!canAdmin) return <div className="alert aw">️ Accès réservé aux administrateurs.</div>;
 
   return (
     <div className="card">
@@ -498,7 +498,7 @@ function QuestionsPanel({ canAdmin }: { canAdmin: boolean }) {
         <button className="secondary-button btn-sm" onClick={() => getQuestionGovernanceItems().then(setItems).catch(() => undefined)}>Actualiser</button>
       </div>
       {loading ? <p className="text-muted" style={{ padding: 16 }}>Chargement…</p> :
-        items.length === 0 ? <div style={{ padding: '24px', textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>Toutes les questions sont validées ✅</div> :
+        items.length === 0 ? <div style={{ padding: '24px', textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>Toutes les questions sont validées </div> :
         <div className="table-wrap">
           <table>
             <thead><tr><th>Catégorie</th><th>Question</th><th>Statut</th><th>Actions</th></tr></thead>
@@ -519,12 +519,12 @@ function QuestionsPanel({ canAdmin }: { canAdmin: boolean }) {
                       <button className="btn-sm btn-success"
                         disabled={deciding === item.question_id || item.latest_status === 'approved'}
                         onClick={() => handleDecide(item.question_id, 'approved', 'Validée par admin')}>
-                        ✅
+                        
                       </button>
                       <button className="btn-sm btn-danger"
                         disabled={deciding === item.question_id || item.latest_status === 'rejected'}
                         onClick={() => handleDecide(item.question_id, 'rejected', 'Rejetée par admin')}>
-                        ❌
+                        
                       </button>
                     </div>
                   </td>
@@ -549,7 +549,7 @@ function PaymentsPanel({ canAdmin }: { canAdmin: boolean }) {
 
   return (
     <div className="card">
-      <div className="card-header"><span className="card-title">💳 Paiements</span></div>
+      <div className="card-header"><span className="card-title"> Paiements</span></div>
       {loading ? (
         <div style={{ textAlign: 'center', padding: 32, color: 'var(--muted)' }}>Chargement…</div>
       ) : items.length === 0 ? (

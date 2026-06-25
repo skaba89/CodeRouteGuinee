@@ -106,7 +106,7 @@ export function DrivingSchoolPage() {
 
       {!isSchool && (
         <div className="alert aw" style={{ marginBottom: 20 }}>
-          🏫 Mode démonstration — Connectez-vous avec un compte auto-école pour voir vos élèves réels.
+           Mode démonstration — Connectez-vous avec un compte auto-école pour voir vos élèves réels.
         </div>
       )}
 
@@ -171,7 +171,7 @@ export function DrivingSchoolPage() {
                   </td>
                   <td>
                     <span className={`badge ${s.status==='pret'?'bg':s.status==='risque'?'br':s.status==='en_cours'?'bb':'bgr'}`}>
-                      {s.status==='pret' ? '✅ Prêt' : s.status==='risque' ? '⚠️ Risque' : s.status==='en_cours' ? '📈 En cours' : '🆕 Débutant'}
+                      {s.status==='pret' ? ' Prêt' : s.status==='risque' ? '️ Risque' : s.status==='en_cours' ? '📈 En cours' : '🆕 Débutant'}
                     </span>
                   </td>
                   <td>
@@ -192,7 +192,7 @@ export function DrivingSchoolPage() {
       {/* Recommandations */}
       {risque > 0 && (
         <div className="alert aw">
-          ⚠️ <strong>{risque} élève(s) en difficulté</strong> — Leur score moyen est inférieur à 28/40.
+          ️ <strong>{risque} élève(s) en difficulté</strong> — Leur score moyen est inférieur à 28/40.
           Planifiez des sessions supplémentaires sur les catégories Priorités et Signalisation.
         </div>
       )}
@@ -222,7 +222,7 @@ export function DrivingSchoolPage() {
         </div>
 
         <div className="card">
-          <div className="card-header"><span className="card-title">📋 Actions rapides</span></div>
+          <div className="card-header"><span className="card-title"> Actions rapides</span></div>
           <div style={{ display: 'grid', gap: 10 }}>
             <button className="secondary-button btn-block" style={{ justifyContent: 'flex-start', gap: 10 }}>
               ➕ Inscrire un nouvel élève

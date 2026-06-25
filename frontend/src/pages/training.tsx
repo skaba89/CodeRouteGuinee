@@ -184,7 +184,7 @@ export function TrainingPage() {
         <AudioModeBanner />
         {/* Sélecteur de catégorie */}
         <div className="card" style={{ marginBottom: 16 }}>
-          <div className="card-header"><span className="card-title">🎯 Choisissez une catégorie</span></div>
+          <div className="card-header"><span className="card-title"> Choisissez une catégorie</span></div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(180px,1fr))', gap: 8 }}>
             {CATS.map(c => (
               <button key={c.id} type="button"
@@ -202,10 +202,10 @@ export function TrainingPage() {
           <div className="card">
             <div className="card-header"><span className="card-title">📖 Mode entraînement libre</span></div>
             <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 14, display: 'grid', gap: 6 }}>
-              <div>✅ Réponse correcte affichée immédiatement</div>
-              <div>💡 Explication pédagogique après chaque question</div>
-              <div>📊 Statistiques par catégorie en fin de session</div>
-              <div>🔄 20 questions tirées aléatoirement</div>
+              <div> Réponse correcte affichée immédiatement</div>
+              <div> Explication pédagogique après chaque question</div>
+              <div> Statistiques par catégorie en fin de session</div>
+              <div> 20 questions tirées aléatoirement</div>
             </div>
             <button className="btn-success btn-block btn-lg" onClick={startSession} disabled={loading}>
               {loading ? 'Chargement…' : '🚀 Démarrer l\'entraînement'}
@@ -213,7 +213,7 @@ export function TrainingPage() {
           </div>
 
           <div className="card">
-            <div className="card-header"><span className="card-title">📊 Statistiques globales</span></div>
+            <div className="card-header"><span className="card-title"> Statistiques globales</span></div>
             <div style={{ display: 'grid', gap: 10 }}>
               {CATS.slice(1).map(c => (
                 <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13 }}>
@@ -251,7 +251,7 @@ export function TrainingPage() {
 
           {weak.length > 0 && (
             <div className="card">
-              <div className="card-header"><span className="card-title">⚠️ Points à améliorer</span></div>
+              <div className="card-header"><span className="card-title">️ Points à améliorer</span></div>
               {weak.map(([cat, v]) => (
                 <div key={cat} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
                   <span style={{ flex: 1, fontSize: 13 }}>{CATS.find(c=>c.id===cat)?.icon} {CATS.find(c=>c.id===cat)?.label ?? cat}</span>
@@ -275,7 +275,7 @@ export function TrainingPage() {
           )}
 
           <div className="actions">
-            <button className="btn-success" onClick={() => { setMode('menu'); setQi(0); setAnswers({}); }}>🔄 Nouvelle session</button>
+            <button className="btn-success" onClick={() => { setMode('menu'); setQi(0); setAnswers({}); }}> Nouvelle session</button>
             <a href="#/exam"><button className="btn-primary">🎓 Passer l'examen officiel →</button></a>
           </div>
         </div>
@@ -331,7 +331,7 @@ export function TrainingPage() {
           {revealed && q.explanation && (
             <div style={{ marginTop:16, background: isCorrect ? 'var(--green-l)' : 'var(--blue-l)', border:`1px solid ${isCorrect ? '#86efac' : '#bfdbfe'}`, borderRadius:'var(--r)', padding:'12px 14px', fontSize:13 }}>
               <div style={{ fontWeight:700, marginBottom:4, color: isCorrect ? '#166534' : 'var(--blue)' }}>
-                {isCorrect ? '✅ Bonne réponse !' : '💡 Explication'}
+                {isCorrect ? ' Bonne réponse !' : ' Explication'}
               </div>
               <div style={{ color: 'var(--ink2)', lineHeight:1.5 }}>{q.explanation}</div>
             </div>
@@ -341,7 +341,7 @@ export function TrainingPage() {
         {/* Navigation */}
         {revealed && (
           <button className="btn-success btn-block btn-lg" onClick={next}>
-            {qi < questions.length - 1 ? 'Question suivante →' : '📊 Voir mes résultats'}
+            {qi < questions.length - 1 ? 'Question suivante →' : ' Voir mes résultats'}
           </button>
         )}
         {!revealed && (

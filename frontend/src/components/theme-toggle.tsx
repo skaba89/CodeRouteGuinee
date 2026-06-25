@@ -1,3 +1,4 @@
+import { IconSun, IconMoon } from '../icons';
 /**
  * ThemeToggle — Bouton bascule Clair/Sombre
  * Persiste la préférence dans localStorage
@@ -64,7 +65,7 @@ export function ThemeToggle({ compact = false }: { compact?: boolean }) {
         }}
         aria-label={isDark ? 'Mode clair' : 'Mode sombre'}
       >
-        {isDark ? '☀️' : '🌙'}
+        {isDark ? '' : ''}
       </button>
     );
   }
@@ -81,7 +82,7 @@ export function ThemeToggle({ compact = false }: { compact?: boolean }) {
         transition: 'all 0.2s',
       }}
     >
-      <span>{isDark ? '☀️' : '🌙'}</span>
+      <span>{isDark ? '' : ''}</span>
       <span>{isDark ? 'Mode clair' : 'Mode sombre'}</span>
     </button>
   );

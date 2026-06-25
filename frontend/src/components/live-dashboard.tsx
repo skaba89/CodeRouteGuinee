@@ -36,7 +36,7 @@ interface LiveData {
 }
 
 const TYPE_ICON: Record<string, string> = {
-  booking: '📅', payment: '💳', exam: '📝', user: '👤', fraud: '🚨',
+  booking: 'calendar', payment: 'credit-card', exam: 'clipboard', user: 'user', fraud: 'alert',
 };
 
 const STATUS_COLOR: Record<string, string> = {
@@ -98,7 +98,7 @@ export function LiveDashboard() {
       {/* En-tête */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
         <span style={{ fontSize: 15, fontWeight: 800, color: 'var(--ink)', letterSpacing: '-.02em' }}>
-          📊 Tableau de bord temps réel
+          Tableau de bord temps réel
         </span>
         <span style={{
           display: 'inline-flex', alignItems: 'center', gap: 5,
@@ -126,20 +126,20 @@ export function LiveDashboard() {
       </div>
 
       {loading && <p style={{ color: 'var(--muted)', fontSize: 13 }}>Chargement…</p>}
-      {error  && !loading && <p style={{ color: 'var(--red, #c00)', fontSize: 13 }}>⚠ {error}</p>}
+      {error  && !loading && <p style={{ color: 'var(--red, #c00)', fontSize: 13 }}>{error}</p>}
 
       {kpis && (
         <>
           {/* KPIs grid */}
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 20 }}>
-            <KpiCard label="Candidats total"    value={kpis.total_candidates}   icon="👥" />
-            <KpiCard label="Réservations auj."  value={kpis.bookings_today}     icon="📅" />
+            <KpiCard label="Candidats total"    value={kpis.total_candidates}   icon="users" />
+            <KpiCard label="Réservations auj."  value={kpis.bookings_today}     icon="calendar" />
             <KpiCard label="Réservées cette sem." value={kpis.bookings_week}    icon="🗓" />
             <KpiCard label="Paiements en attente" value={kpis.pending_payments} icon="⏳" alert />
-            <KpiCard label="Paiements auj."     value={kpis.paid_today}         icon="💳" />
-            <KpiCard label="Sessions actives"   value={kpis.active_sessions}    icon="🏫" />
-            <KpiCard label="Réservations conf." value={kpis.confirmed_bookings} icon="✅" />
-            <KpiCard label="Incidents ouverts"  value={kpis.open_incidents}     icon="🚨" alert />
+            <KpiCard label="Paiements auj."     value={kpis.paid_today}         icon="card" />
+            <KpiCard label="Sessions actives"   value={kpis.active_sessions}    icon="building" />
+            <KpiCard label="Réservations conf." value={kpis.confirmed_bookings} icon="check" />
+            <KpiCard label="Incidents ouverts"  value={kpis.open_incidents}     icon="alert" alert />
             <KpiCard label="Alertes fraude"     value={kpis.fraud_active}       icon="🔴" alert />
           </div>
 
@@ -147,7 +147,7 @@ export function LiveDashboard() {
           {data.feed.length > 0 && (
             <div>
               <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--ink2)', marginBottom: 8 }}>
-                ⚡ Activité récente (15 dernières minutes)
+                Activité récente (15 dernières minutes)
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {data.feed.map((item) => (
