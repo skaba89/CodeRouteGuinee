@@ -17,6 +17,7 @@ class UserCreate(BaseModel):
     full_name: str
     password: str = Field(min_length=8)
     role: Literal["super_admin", "admin", "center", "candidate"] = "candidate"
+    center_id: str | None = None
 
 
 class InstitutionalUserCreate(BaseModel):

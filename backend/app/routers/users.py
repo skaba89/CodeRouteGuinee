@@ -164,3 +164,50 @@ def reset_user_password(
     db.commit()
     db.refresh(target_user)
     return target_user
+
+@router.patch("/{user_id}/center", response_model=UserRead)
+def assign_user_center(
+    user_id: str,
+    payload: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "super_admin")),
+) -> User:
+    """
+    Assigne (ou retire) un agent 'center' à un centre.
+    Payload : {"center_id": "<uuid>" | null}
+    Seuls les users de role 'center' peuvent être associés à un centre.
+    """
+    from app.models_center import Center
+
+    target = db.get(User, user_id)
+    if not target:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    if target.role not in ("center",):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Seuls les agents 'center' peuvent être associés à un centre (rôle actuel: {target.role})",
+        )
+
+    new_center_id = payload.get("center_id")
+    if new_center_id and not db.get(Center, new_center_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Centre introuvable")
+
+    old_center_id = getattr(target, "center_id", None)
+    target.center_id = new_center_id  # type: ignore[assignment]
+
+    from app.models_audit import AuditLog
+    db.add(AuditLog(
+        actor_id=current_user.id,
+        action="user.center_assigned",
+        entity="user",
+        entity_id=user_id,
+        details={
+            "old_center_id": old_center_id,
+            "new_center_id": new_center_id,
+            "user_email": target.email,
+        },
+    ))
+    db.commit()
+    db.refresh(target)
+    return target

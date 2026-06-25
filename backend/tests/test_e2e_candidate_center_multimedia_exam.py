@@ -189,7 +189,8 @@ def test_candidate_registration_center_booking_and_40_question_multimedia_exam_t
         def _first_opt_mm(q: dict) -> str:
             opts = q.get("options", [])
             return opts[0] if isinstance(opts, list) and opts else "Action securisee"
-        answers = {q["id"]: _first_opt_mm(q) for q in exam_qs}        submit_response = client.post(f"/api/v1/exams/{attempt['id']}/submit", headers=headers, json={"answers": answers})
+        answers = {q["id"]: _first_opt_mm(q) for q in exam_qs}
+        submit_response = client.post(f"/api/v1/exams/{attempt['id']}/submit", headers=headers, json={"answers": answers})
         assert submit_response.status_code == 200
         submitted_attempt = submit_response.json()
         assert submitted_attempt["status"] == "submitted"
