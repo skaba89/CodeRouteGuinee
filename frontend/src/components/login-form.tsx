@@ -56,12 +56,8 @@ export function LoginForm({ onSuccess, onError }: LoginFormProps) {
     }
   }
 
-  const inputStyle: React.CSSProperties = {
-    width: '100%', padding: '10px 14px', borderRadius: 8,
-    border: '1px solid var(--border)', fontSize: 15,
-    background: 'var(--surface, #fff)', color: 'var(--ink)',
-    marginTop: 4,
-  };
+  // Utilise les styles globaux input de styles.css
+  const inputStyle: React.CSSProperties = { marginTop: 4, fontSize: 14 };
 
   if (step === '2fa') return (
     <form onSubmit={handleTfa} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -89,13 +85,12 @@ export function LoginForm({ onSuccess, onError }: LoginFormProps) {
         />
       </label>
       <button type="submit" disabled={loading || tfaCode.length !== 6}
-        style={{ padding: '12px', borderRadius: 10, background: 'var(--primary, #006B3F)',
-          color: '#fff', border: 'none', fontWeight: 700, fontSize: 15, cursor: 'pointer' }}>
+        className="btn-success btn-block btn-lg">
         {loading ? 'Vérification…' : 'Valider le code'}
       </button>
       <button type="button" onClick={() => { setStep('credentials'); setTfaCode(''); }}
         style={{ background: 'none', border: 'none', color: 'var(--muted)',
-          fontSize: 13, cursor: 'pointer', textDecoration: 'underline' }}>
+          fontSize: 13, cursor: 'pointer', textDecoration: 'underline', minHeight: 'auto', padding: 0 }}>
         ← Retour à la connexion
       </button>
     </form>
@@ -117,9 +112,7 @@ export function LoginForm({ onSuccess, onError }: LoginFormProps) {
         <input type="password" value={password} onChange={e => setPassword(e.target.value)}
           required placeholder="••••••••" style={inputStyle} />
       </label>
-      <button type="submit" disabled={loading}
-        style={{ padding: '12px', borderRadius: 10, background: 'var(--primary, #006B3F)',
-          color: '#fff', border: 'none', fontWeight: 700, fontSize: 15, cursor: 'pointer' }}>
+      <button type="submit" disabled={loading} className="btn-success btn-block btn-lg">
         {loading ? 'Connexion…' : 'Se connecter'}
       </button>
     </form>

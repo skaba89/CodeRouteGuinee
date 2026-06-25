@@ -110,12 +110,15 @@ export function HomePage() {
           <span className="eyebrow" style={{ color: 'rgba(255,255,255,.6)' }}>Plateforme nationale</span>
           <h1>
             {isPresentationMode
-              ? 'Bienvenue sur CodeRoute Guinée'
+              ? 'CodeRoute Guinée'
               : `Bonjour, ${currentUser?.full_name?.split(' ')[0] ?? 'Agent'} 👋`}
           </h1>
           <p>Examen officiel du code de la route — République de Guinée</p>
         </div>
-        <div className="dash-hero-flag">🇬🇳</div>
+        <div className="dash-hero-emblem">
+          <div className="dash-hero-flag">🇬🇳</div>
+          <div className="dash-hero-label">République de Guinée</div>
+        </div>
       </div>
 
       {isAdmin && dashboard && (

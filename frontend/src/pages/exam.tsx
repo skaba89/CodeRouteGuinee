@@ -236,7 +236,8 @@ export function ExamPage() {
             </div>
           )}
           <button
-            className="btn-success btn-block btn-lg"
+            className="btn-success btn-block"
+            style={{ minHeight: 50, fontSize: 15, fontWeight: 800, letterSpacing: '.01em' }}
             onClick={handleStartExam}
             disabled={startLoading}
           >

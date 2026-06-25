@@ -96,8 +96,10 @@ export function LiveDashboard() {
   return (
     <div style={{ fontFamily: 'system-ui, sans-serif' }}>
       {/* En-tête */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-        <span style={{ fontSize: 18, fontWeight: 700 }}>📊 Tableau de bord live</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
+        <span style={{ fontSize: 15, fontWeight: 800, color: 'var(--ink)', letterSpacing: '-.02em' }}>
+          📊 Tableau de bord temps réel
+        </span>
         <span style={{
           display: 'inline-flex', alignItems: 'center', gap: 5,
           fontSize: 12, padding: '3px 10px', borderRadius: 20,

@@ -185,9 +185,13 @@ function LoginPage({
   return (
     <div className="login-screen">
       <div className="login-card">
-        <span className="eyebrow">Accès sécurisé</span>
-        <h2>CodeRoute Guinée</h2>
-        <p>Connectez-vous à la plateforme nationale d'examen du code de la route.</p>
+        <div className="login-brand">
+          <div className="login-logo">CR</div>
+          <div>
+            <h2>CodeRoute Guinée</h2>
+            <p className="login-sub" style={{marginBottom:0}}>Plateforme nationale DNTT</p>
+          </div>
+        </div>
 
         {!isPres && currentUser && (
           <div className="auth-session-card">
