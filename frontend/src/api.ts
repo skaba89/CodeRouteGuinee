@@ -1009,6 +1009,7 @@ export type ExamQuestion = {
   is_active?: boolean;
   media_url?: string | null;
   media_type?: string | null;  // 'sign' | 'scene' | null
+  media_alt?: string | null;
 };
 
 export type ExamQuestionsResponse = {

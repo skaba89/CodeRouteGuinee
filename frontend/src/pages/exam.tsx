@@ -76,7 +76,7 @@ function errMsg(e: unknown, fallback = 'Erreur inattendue'): string {
   return fallback;
 }
 import { ExamQuestion } from '../api';
-import { QData, Timer, QGrid, SignSvg, SceneSvg } from './shared-exam-components';
+import { QData, Timer, QGrid, SignSvg, SceneSvg , MediaBlock } from './shared-exam-components';
 
 // ══════════════════════════════════════════════════════════════════
 // HOME PAGE — Accueil toutes rôles
@@ -107,13 +107,15 @@ export function ExamPage() {
         options: q.options, correct: undefined,  // réponse correcte masquée
         media: q.media_url ?? undefined,
         mediaType: q.media_type as 'sign' | 'scene' | undefined,
+        mediaAlt: q.media_alt ?? undefined,
         expl: '',
       }))
     : DEMO_QUESTIONS.map((q: import('./examQuestions').ExamQuestionData) => ({
         id: q.id, number: q.number, category: q.category, text: q.text,
         options: q.options, correct: q.correct_answer,
         media: q.media_url ?? undefined,
-        mediaType: q.media_url ? (q.media_url.startsWith('intersection') || q.media_url.startsWith('situation') ? 'scene' : 'sign') : undefined,
+        mediaType: q.media_url ? (q.media_url.startsWith('intersection') || q.media_url.startsWith('situation') || q.media_url.endsWith('_driving') || q.media_url.endsWith('_scene') || q.media_url.endsWith('_priority_right') ? 'scene' : 'sign') : undefined,
+        mediaAlt: q.media_alt ?? undefined,
         expl: q.explanation ?? '',
       }));
 
@@ -361,9 +363,7 @@ export function ExamPage() {
 
           {/* Media */}
           {q.media && (
-            <div style={{ background: q.mediaType === 'scene' ? '#1a2e1a' : '#f8fafc', border: '1px solid var(--border)', borderRadius: 'var(--r-lg)', padding: 20, display: 'flex', justifyContent: 'center', minHeight: 140 }}>
-              {q.mediaType === 'sign' ? <SignSvg type={q.media} /> : <SceneSvg type={q.media.replace('situation_','').replace('intersection_','')} />}
-            </div>
+            <MediaBlock mediaType={q.mediaType} media={q.media} alt={q.mediaAlt} />
           )}
 
           {/* Bouton écouter (visible pour toutes les locales, obligatoire pour les langues nationales) */}
