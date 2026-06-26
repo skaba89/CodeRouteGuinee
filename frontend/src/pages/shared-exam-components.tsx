@@ -1,3 +1,4 @@
+import { ILLUSTRATION_MAP } from './illustrations';
 // Composants partagés — ExamPage et InstitutionalDossierPage
 import { useEffect, useRef, useState } from 'react';
 
@@ -448,7 +449,7 @@ export function VideoPlayer({ url, poster, alt }: { url: string; poster?: string
   );
 }
 
-// ── Bloc média unifié (image / vidéo / SVG) ───────────────────────────────────
+// ── Bloc média unifié — style Ornikar ─────────────────────────────────────────
 
 export function MediaBlock({ mediaType, media, alt }: { mediaType?: string; media?: string; alt?: string }) {
   if (!media) return null;
@@ -456,58 +457,68 @@ export function MediaBlock({ mediaType, media, alt }: { mediaType?: string; medi
   // Vidéo réelle
   if (mediaType === 'video') {
     return (
-      <div style={{ background: '#000', borderRadius: 12, overflow: 'hidden', marginBottom: 20, boxShadow: '0 4px 16px rgba(0,0,0,.3)' }}>
+      <div style={{ background: '#000', borderRadius: 14, overflow: 'hidden', marginBottom: 0, boxShadow: '0 4px 20px rgba(0,0,0,.3)' }}>
         <VideoPlayer url={media} alt={alt} />
       </div>
     );
   }
 
-  // Image réelle (URL http)
+  // Image réelle (URL http/https)
   if (mediaType === 'image') {
     return (
-      <div style={{ borderRadius: 12, overflow: 'hidden', marginBottom: 20, background: '#f8fafc', textAlign: 'center', padding: 16, boxShadow: '0 2px 8px rgba(0,0,0,.1)' }}>
+      <div style={{ borderRadius: 14, overflow: 'hidden', marginBottom: 0, background: '#f8fafc', textAlign: 'center', padding: 20 }}>
         <img
           src={media}
           alt={alt ?? 'Illustration de la question'}
-          style={{ maxWidth: '100%', maxHeight: 280, borderRadius: 8, objectFit: 'contain' }}
+          style={{ maxWidth: '100%', maxHeight: 300, borderRadius: 8, objectFit: 'contain' }}
         />
-        {alt && <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 8 }}>{alt}</p>}
+        {alt && <p style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 10, lineHeight: 1.5 }}>{alt}</p>}
       </div>
     );
   }
 
-  // SVG panneau de signalisation
-  if (mediaType === 'sign' || media.match(/^(stop|give_way|speed_|no_entry|roundabout|mandatory|priority|no_overtaking|pedestrian|school|danger|parking|end_restriction|traffic_light)/)) {
+  // Illustration style Ornikar — first-person, route perspective
+  const IllusComp = ILLUSTRATION_MAP[media];
+  if (IllusComp) {
+    return (
+      <div style={{ borderRadius: 0, overflow: 'hidden', lineHeight: 0 }}>
+        <IllusComp style={{ width: '100%', height: 'auto', display: 'block' }} />
+        {alt && (
+          <div style={{
+            background: 'rgba(13,33,55,.82)',
+            color: '#fff',
+            fontSize: 11.5,
+            padding: '7px 16px',
+            lineHeight: 1.55,
+            textAlign: 'center',
+          }}>
+            {alt}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Fallback : ancien système SVG schématique pour les types non migrés
+  if (mediaType === 'sign' || media.match(/^(no_entry|mandatory|priority|no_overtaking|pedestrian|school|danger|parking|end_restriction)/)) {
     return (
       <div style={{
         background: 'linear-gradient(135deg, #f8fafc, #f0f4f8)',
         border: '1px solid var(--border)',
-        borderRadius: 14,
-        padding: '28px 20px 20px',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        gap: 10,
-        marginBottom: 20,
-        boxShadow: '0 2px 8px rgba(0,0,0,.06)',
+        padding: '24px 20px 18px',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
       }}>
         <SignSvg type={media} alt={alt} />
-        {alt && <p style={{ fontSize: 11.5, color: 'var(--muted)', textAlign: 'center', maxWidth: 260, lineHeight: 1.5 }}>{alt}</p>}
+        {alt && <p style={{ fontSize: 11.5, color: 'var(--muted)', textAlign: 'center', maxWidth: 280, lineHeight: 1.5 }}>{alt}</p>}
       </div>
     );
   }
 
-  // SVG scène de circulation
   return (
-    <div style={{
-      borderRadius: 14,
-      overflow: 'hidden',
-      marginBottom: 20,
-      boxShadow: '0 4px 16px rgba(0,0,0,.25)',
-    }}>
+    <div style={{ overflow: 'hidden', lineHeight: 0 }}>
       <SceneSvg type={media.replace('situation_', '').replace('intersection_', '')} alt={alt} />
       {alt && (
-        <div style={{ background: 'rgba(0,0,0,.6)', color: '#fff', fontSize: 11, padding: '5px 12px', textAlign: 'center' }}>
+        <div style={{ background: 'rgba(0,0,0,.65)', color: '#fff', fontSize: 11, padding: '6px 14px', textAlign: 'center' }}>
           {alt}
         </div>
       )}
