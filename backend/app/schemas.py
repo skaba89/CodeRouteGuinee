@@ -91,6 +91,8 @@ class CandidateRead(CandidateCreate):
     status: str
     attempt_count: int = 0
     created_at: datetime
+    # Override: lecture tolère les numéros courts (données legacy)
+    phone: str = Field(default='', min_length=0, max_length=30)
 
     model_config = {"from_attributes": True}
 
