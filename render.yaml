@@ -36,11 +36,13 @@ services:
       - key: BOOTSTRAP_ADMIN_FULL_NAME
         value: "Administrateur National DNTT"
 
-      # ── Base de données ── (référence au service DB ci-dessous)
+      # ── Base de données Neon ── (à saisir manuellement depuis neon.tech)
+      # URL POOLÉE pour l'app FastAPI (hostname contient -pooler) :
       - key: DATABASE_URL
-        fromDatabase:
-          name: coderoute-db
-          property: connectionString
+        sync: false  # postgresql+psycopg://user:pwd@ep-xxx-pooler.eu-central-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require
+      # URL DIRECTE pour Alembic migrations (sans -pooler) :
+      - key: ALEMBIC_DATABASE_URL
+        sync: false  # postgresql+psycopg://user:pwd@ep-xxx.eu-central-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require
 
       # ── JWT ──
       - key: ACCESS_TOKEN_EXPIRE_MINUTES
@@ -142,12 +144,8 @@ services:
 
     autoDeploy: true
 
-# ── Base de données PostgreSQL ──────────────────────────────────────
-databases:
-  - name: coderoute-db
-    databaseName: coderoute
-    user: coderoute
-    region: frankfurt
-    plan: free          # 256 MB RAM, 1 GB stockage — starter pour prod
-    postgresMajorVersion: 16
-    ipAllowList: []     # Accès depuis les services Render uniquement
+# ── Base de données ──────────────────────────────────────────────────
+# Utiliser Neon (https://neon.tech) au lieu de la DB Render :
+#  → gratuit, serverless, scale-to-zero, 10 GB stockage, branchement Git-like
+#  → configurer DATABASE_URL et ALEMBIC_DATABASE_URL manuellement dans Render Dashboard
+#  → Neon fournit deux URLs : directe (Alembic) et poolée avec -pooler (app FastAPI)

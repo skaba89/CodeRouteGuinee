@@ -41,18 +41,43 @@ else:
     _pool_timeout = int(os.getenv("DB_POOL_TIMEOUT", "30"))
     _pool_recycle = int(os.getenv("DB_POOL_RECYCLE", "1800"))
 
-    engine = create_engine(
-        settings.database_url,
-        pool_size=_pool_size,
-        max_overflow=_max_overflow,
-        pool_timeout=_pool_timeout,
-        pool_recycle=_pool_recycle,
-        pool_pre_ping=True,
-        # Statement timeout côté PostgreSQL (évite les requêtes zombies)
-        connect_args={"options": "-c statement_timeout=30000"},
-        # Taille du batch de lignes retournées par psycopg (moins de round-trips)
-        execution_options={"stream_results": False},
-    )
+    # Neon serverless : utiliser NullPool + connexion poolée (-pooler dans l'URL)
+    # afin de laisser PgBouncer gérer le pool (10 000 connexions client max).
+    # Sur Postgres classique : QueuePool avec pool_size/max_overflow.
+    _use_neon_pooler = "neon.tech" in settings.database_url and "-pooler" in settings.database_url
+    _use_neon_direct = "neon.tech" in settings.database_url and "-pooler" not in settings.database_url
+
+    if _use_neon_pooler:
+        # Connexion poolée Neon → NullPool (pas de pool côté app, PgBouncer gère tout)
+        from sqlalchemy.pool import NullPool
+        engine = create_engine(
+            settings.database_url,
+            poolclass=NullPool,
+            connect_args={"options": "-c statement_timeout=30000"},
+        )
+    elif _use_neon_direct:
+        # Connexion directe Neon (migrations Alembic) → pool minimal + pre_ping
+        engine = create_engine(
+            settings.database_url,
+            pool_size=2,
+            max_overflow=3,
+            pool_timeout=_pool_timeout,
+            pool_recycle=300,   # 5 min = durée auto-suspend Neon par défaut
+            pool_pre_ping=True,
+            connect_args={"options": "-c statement_timeout=30000"},
+        )
+    else:
+        # PostgreSQL classique (dev local, docker-compose)
+        engine = create_engine(
+            settings.database_url,
+            pool_size=_pool_size,
+            max_overflow=_max_overflow,
+            pool_timeout=_pool_timeout,
+            pool_recycle=_pool_recycle,
+            pool_pre_ping=True,
+            connect_args={"options": "-c statement_timeout=30000"},
+            execution_options={"stream_results": False},
+        )
 
     # ── Optimisations PostgreSQL appliquées à chaque nouvelle connexion ───────
     @event.listens_for(engine, "connect")

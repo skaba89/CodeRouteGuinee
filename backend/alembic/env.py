@@ -16,7 +16,11 @@ target_metadata = Base.metadata
 
 
 def get_url() -> str:
-    return get_settings().database_url
+    import os
+    # Neon : utiliser la connexion directe (sans -pooler) pour les migrations Alembic.
+    # Sur Render, définir ALEMBIC_DATABASE_URL avec l'URL directe Neon.
+    # Si non défini, on utilise DATABASE_URL (local ou Postgres classique).
+    return os.environ.get("ALEMBIC_DATABASE_URL", get_settings().database_url)
 
 
 def run_migrations_offline() -> None:
