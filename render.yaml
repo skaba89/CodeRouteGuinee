@@ -104,6 +104,12 @@ services:
 
     healthCheckPath: /health
     autoDeploy: true
+    # Migration Alembic avant chaque déploiement (utilise ALEMBIC_DATABASE_URL)
+    preDeployCommand: >-
+      cd /app &&
+      PYTHONPATH=/app
+      DATABASE_URL=$ALEMBIC_DATABASE_URL
+      alembic upgrade head
 
   # ── Frontend React (PWA statique) ───────────────────────────────
   - type: web
