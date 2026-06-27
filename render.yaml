@@ -1,0 +1,153 @@
+# render.yaml — CodeRoute Guinée
+# Déploiement sur Render.com (Backend API + Frontend static)
+# Documentation : https://render.com/docs/blueprint-spec
+
+services:
+
+  # ── Backend FastAPI ──────────────────────────────────────────────
+  - type: web
+    name: coderoute-backend
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    region: frankfurt   # Le plus proche de Conakry en termes de latence
+    plan: starter       # 512 MB RAM, 0.5 CPU — adapter selon charge
+
+    envVars:
+      # ── Core ──
+      - key: PROJECT_NAME
+        value: "CodeRoute Guinée API"
+      - key: API_V1_PREFIX
+        value: "/api/v1"
+      - key: PYTHONPATH
+        value: "/app"
+
+      # ── Sécurité ── (à remplir dans le dashboard Render)
+      - key: SECRET_KEY
+        generateValue: true   # Render génère automatiquement
+      - key: CSRF_SECRET
+        generateValue: true
+      - key: ADMIN_REGISTRATION_TOKEN
+        generateValue: true
+      - key: BOOTSTRAP_ADMIN_EMAIL
+        sync: false           # À saisir manuellement dans Render
+      - key: BOOTSTRAP_ADMIN_PASSWORD
+        sync: false
+      - key: BOOTSTRAP_ADMIN_FULL_NAME
+        value: "Administrateur National DNTT"
+
+      # ── Base de données ── (référence au service DB ci-dessous)
+      - key: DATABASE_URL
+        fromDatabase:
+          name: coderoute-db
+          property: connectionString
+
+      # ── JWT ──
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: "120"
+      - key: REFRESH_TOKEN_EXPIRE_DAYS
+        value: "30"
+
+      # ── CORS ──
+      - key: CORS_ORIGINS
+        value: "https://coderoute.gov.gn,https://www.coderoute.gov.gn,https://coderoute-frontend.onrender.com"
+
+      # ── Mobile Money ── (à remplir manuellement)
+      - key: MOBILE_MONEY_MODE
+        value: "sandbox"   # ← passer à "production" pour le live
+      - key: ORANGE_MONEY_CLIENT_ID
+        sync: false
+      - key: ORANGE_MONEY_CLIENT_SECRET
+        sync: false
+      - key: ORANGE_MONEY_MERCHANT_CODE
+        sync: false
+      - key: MTN_MONEY_SUBSCRIPTION_KEY
+        sync: false
+      - key: MTN_MONEY_API_USER_ID
+        sync: false
+      - key: MTN_MONEY_API_KEY
+        sync: false
+      - key: MTN_MONEY_ENVIRONMENT
+        value: "sandbox"
+      - key: WAVE_API_KEY
+        sync: false
+      - key: WAVE_WEBHOOK_SECRET
+        sync: false
+      - key: WAVE_BASE_URL
+        value: "https://api.wave.com"
+
+      # ── SMS Orange ── (à remplir manuellement)
+      - key: ORANGE_SMS_CLIENT_ID
+        sync: false
+      - key: ORANGE_SMS_CLIENT_SECRET
+        sync: false
+      - key: ORANGE_SMS_SENDER
+        value: "CODEROUTE"
+
+      # ── Monitoring ──
+      - key: SENTRY_DSN
+        sync: false
+      - key: SENTRY_ENVIRONMENT
+        value: "production"
+      - key: SENTRY_SAMPLE_RATE
+        value: "0.2"
+
+      # ── Misc ──
+      - key: AUTO_CREATE_TABLES
+        value: "false"
+      - key: LOGIN_RATE_LIMIT_ATTEMPTS
+        value: "5"
+      - key: LOGIN_RATE_LIMIT_WINDOW_SECONDS
+        value: "300"
+
+    healthCheckPath: /health
+    autoDeploy: true
+
+  # ── Frontend React (PWA statique) ───────────────────────────────
+  - type: web
+    name: coderoute-frontend
+    runtime: static
+    buildCommand: cd frontend && npm ci && npm run build
+    staticPublishPath: ./frontend/dist
+    region: frankfurt
+    plan: free
+
+    headers:
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: Referrer-Policy
+        value: strict-origin-when-cross-origin
+      - path: /assets/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable
+
+    routes:
+      # SPA fallback — toutes les routes → index.html
+      - type: rewrite
+        source: /*
+        destination: /index.html
+
+    envVars:
+      - key: VITE_API_BASE_URL
+        fromService:
+          type: web
+          name: coderoute-backend
+          property: host
+          envVarKey: RENDER_EXTERNAL_URL
+
+    autoDeploy: true
+
+# ── Base de données PostgreSQL ──────────────────────────────────────
+databases:
+  - name: coderoute-db
+    databaseName: coderoute
+    user: coderoute
+    region: frankfurt
+    plan: free          # 256 MB RAM, 1 GB stockage — starter pour prod
+    postgresMajorVersion: 16
+    ipAllowList: []     # Accès depuis les services Render uniquement

@@ -1855,6 +1855,115 @@ def seed_centers(db) -> dict[str, Center]:
 
 # ── QUESTIONS ─────────────────────────────────────────────────────────────
 
+
+
+def _get_media_for_question(text: str, category: str) -> tuple[str | None, str | None, str | None]:
+    """
+    Retourne (media_type, media_url, media_alt) selon le texte et la catégorie.
+    Mappe les questions sur les illustrations SVG de ILLUSTRATION_MAP.
+    """
+    t = text.lower()
+
+    # ── FEUX TRICOLORES ──────────────────────────────────────────────────
+    if "rouge et orange" in t or "rouge fixe et orange" in t:
+        return "scene", "traffic_light_red_orange", "Feu rouge et orange simultanés"
+    if "feu orange" in t or "passe à l'orange" in t or "orange fixe" in t:
+        return "scene", "traffic_light_orange", "Feu tricolore orange"
+    if "feu rouge" in t or "feu tricolore" in t or "feu est rouge" in t or "feu vert" in t:
+        return "scene", "traffic_light_red", "Feu tricolore"
+    if "passage à niveau" in t:
+        return "scene", "traffic_light_red", "Passage à niveau — arrêt obligatoire"
+
+    # ── PANNEAUX DE SIGNALISATION ────────────────────────────────────────
+    if "stop" in t and ("panneau" in t or "impose" in t or "signifie" in t or "approchez" in t):
+        return "sign", "stop", "Panneau STOP"
+    if "cédez le passage" in t or "céder le passage" in t or "triangle inversé" in t:
+        return "sign", "give_way", "Panneau Cédez le passage"
+    if "sens interdit" in t or "barre horizontale blanche" in t:
+        return "sign", "no_entry", "Panneau Sens interdit"
+    if "50" in t and ("agglomération" in t or "entrée" in t):
+        return "sign", "speed_50", "Limitation 50 km/h"
+    if "zone 30" in t or ("30" in t and ("zone" in t or "zone résidentielle" in t)):
+        return "sign", "speed_30", "Zone 30"
+    if "90" in t and ("national" in t or "limitation" in t or "phares" in t):
+        return "sign", "speed_90", "Limitation 90 km/h"
+    if "100" in t and ("chaussées séparées" in t or "2×2" in t or "limitation" in t):
+        return "sign", "speed_100", "Limitation 100 km/h"
+    if "passage piéton" in t or "passage protégé" in t or "passage clouté" in t:
+        return "sign", "pedestrian_crossing", "Passage pour piétons"
+    if "giratoire" in t or "rond-point" in t:
+        return "sign", "roundabout", "Giratoire"
+    if ("priorité" in t and ("route" in t or "losange" in t)) or "route prioritaire" in t:
+        return "sign", "priority", "Route prioritaire"
+    if ("dépasser" in t or "dépassement" in t) and ("interdit" in t or "ligne" in t or "panneau" in t):
+        return "sign", "no_overtaking", "Interdiction de dépasser"
+    if "zone scolaire" in t or ("enfants" in t and ("panneau" in t or "triangle" in t)):
+        return "sign", "school_zone", "Zone scolaire"
+    if "fin de" in t and ("limitation" in t or "interdiction" in t):
+        return "sign", "end_restriction", "Fin de limitation"
+    if "parking" in t and ("panneau" in t or "signifie" in t or "interdit" in t):
+        return "sign", "parking", "Signalisation de parking"
+    if "danger" in t and ("panneau" in t or "triangle" in t or "signifie" in t):
+        return "sign", "danger", "Panneau de danger"
+
+    # ── CATÉGORIE SIGNALISATION — fallback générique ─────────────────────
+    if category == "signalisation":
+        return "sign", "stop", "Signalisation routière"
+
+    # ── SCÈNES DE CONDUITE ───────────────────────────────────────────────
+    if ("priorité" in t and "droite" in t) or ("intersection" in t and ("sans panneau" in t or "sans signalisation" in t)):
+        return "scene", "intersection_priority_right", "Intersection — priorité à droite"
+    if "ambulance" in t or "gyrophare" in t or "véhicule prioritaire" in t or "samu" in t or "pompier" in t or "police" in t and "sirène" in t:
+        return "scene", "situation_emergency_vehicle", "Véhicule d'urgence prioritaire"
+    if "distance de sécurité" in t or "2 secondes" in t or ("freinage" in t and "distance" in t):
+        return "scene", "situation_safe_distance", "Distance de sécurité"
+    if "nuit" in t or "phare" in t and ("éclaire" in t or "croisement" in t or "route" in t) or "nocturne" in t:
+        return "scene", "night_driving", "Conduite de nuit"
+    if "pluie" in t or "mouillée" in t or ("brouillard" in t and "visibilité" in t) or ("visibilité" in t and "50" in t):
+        return "scene", "rain_driving", "Conditions météo dégradées"
+    if "alcool" in t or "ivresse" in t or "alcoolémie" in t or "taux" in t and "g/l" in t:
+        return "scene", "alcohol_scene", "Alcool et conduite"
+    if "premiers secours" in t or "arrêt cardiaque" in t or "rcp" in t or "massage cardiaque" in t or "pls" in t or "heimlich" in t or "brûlure" in t or "fracture" in t:
+        return "scene", "first_aid", "Premiers secours"
+    if "somnolence" in t or "fatigue" in t or "dormir" in t:
+        return "scene", "night_driving", "Somnolence au volant"
+    if "dépassement" in t and ("col" in t or "côte" in t or "virage" in t or "tunnel" in t):
+        return "scene", "intersection_priority_right", "Scène de dépassement"
+    if "crevaison" in t or "pneu" in t and ("éclate" in t or "éclatement" in t):
+        return "scene", "situation_safe_distance", "Crevaison à grande vitesse"
+    if "frein" in t and ("bloque" in t or "fail" in t or "tombe en panne" in t):
+        return "scene", "situation_safe_distance", "Défaillance des freins"
+    if "inondation" in t or "eau" in t and "route" in t:
+        return "scene", "rain_driving", "Route inondée"
+    if "convoi" in t or "priorité.*militaire" in t:
+        return "scene", "situation_emergency_vehicle", "Convoi prioritaire"
+    if "piéton" in t and ("aveugle" in t or "canne" in t or "traverse" in t):
+        return "sign", "pedestrian_crossing", "Piéton traversant"
+    if "troupeau" in t or "animaux" in t or "bœufs" in t:
+        return "scene", "rain_driving", "Animaux sur la route"
+    if "enfant" in t and ("court" in t or "ballon" in t or "surgit" in t):
+        return "sign", "school_zone", "Enfant sur la chaussée"
+    if "incendie" in t or "feu de voiture" in t or "extincteur" in t:
+        return "scene", "first_aid", "Incendie de véhicule"
+
+    # ── CATÉGORIES SANS ILLUSTRATION SPÉCIFIQUE — fallbacks ─────────────
+    if category == "alcool_drogues":
+        return "scene", "alcohol_scene", "Alcool et conduite"
+    if category == "premiers_secours":
+        return "scene", "first_aid", "Premiers secours"
+    if category == "urgence":
+        return "scene", "situation_safe_distance", "Situation d'urgence"
+    if category == "vitesse":
+        return "sign", "speed_90", "Limitation de vitesse"
+    if category == "priorites":
+        return "scene", "intersection_priority_right", "Règles de priorité"
+    if category == "depassement":
+        return "sign", "no_overtaking", "Règles de dépassement"
+    if category == "securite_passive":
+        return "scene", "situation_safe_distance", "Sécurité passive"
+
+    return None, None, None
+
 def seed_questions(db) -> list[Question]:
     """
     Charge les 200 questions dans la base de données.
@@ -1881,12 +1990,16 @@ def seed_questions(db) -> list[Question]:
         to_add = [q for q in all_bank if q["text"] not in existing_texts]
         questions_out = list(existing)
         for q in to_add:
+            _mtype, _murl, _malt = _get_media_for_question(q["text"], q["category"])
             obj = Question(
                 category=q["category"],
                 text=q["text"],
                 options=q["options"],
                 correct_answer=q["correct_answer"],
                 explanation=q.get("explanation", ""),
+                media_type=_mtype,
+                media_url=_murl,
+                media_alt=_malt,
                 is_active=True,
             )
             db.add(obj)
@@ -1901,12 +2014,16 @@ def seed_questions(db) -> list[Question]:
     all_bank = QUESTIONS_GN + QUESTIONS_TRAINING_FULL  # 200 questions
     questions = []
     for q in all_bank:
+        _mtype, _murl, _malt = _get_media_for_question(q["text"], q["category"])
         obj = Question(
             category=q["category"],
             text=q["text"],
             options=q["options"],
             correct_answer=q["correct_answer"],
             explanation=q.get("explanation", ""),
+            media_type=_mtype,
+            media_url=_murl,
+            media_alt=_malt,
             is_active=True,
         )
         db.add(obj)
