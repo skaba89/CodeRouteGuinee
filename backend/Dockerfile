@@ -35,6 +35,8 @@ COPY app/ ./app/
 COPY alembic/ ./alembic/
 COPY alembic.ini .
 COPY requirements.txt .
+COPY gunicorn.conf.py .
+COPY entrypoint.sh .
 
 # Utilisateur non-root pour la sécurité
 RUN useradd -m -u 1001 appuser && chown -R appuser:appuser /app
@@ -43,8 +45,8 @@ USER appuser
 EXPOSE 8000
 
 # Healthcheck intégré
-HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=5 \
     CMD curl -sf http://localhost:8000/health || exit 1
 
-# Utiliser Gunicorn avec workers auto (2×CPU+1) — voir gunicorn.conf.py
-CMD ["gunicorn", "app.main:app", "-c", "gunicorn.conf.py"]
+# Entrypoint : migrations Alembic puis Gunicorn
+CMD ["./entrypoint.sh"]

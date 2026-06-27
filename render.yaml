@@ -1,62 +1,57 @@
 # render.yaml — CodeRoute Guinée
-# Déploiement sur Render.com (Backend API + Frontend static)
-# Documentation : https://render.com/docs/blueprint-spec
+# Blueprint Render.com : Backend FastAPI (Docker) + Frontend React (Static)
+# Doc : https://render.com/docs/blueprint-spec
 
 services:
 
-  # ── Backend FastAPI ──────────────────────────────────────────────
+  # ── Backend FastAPI ────────────────────────────────────────────────────────
   - type: web
     name: coderoute-backend
     runtime: docker
     dockerfilePath: ./backend/Dockerfile
     dockerContext: ./backend
-    region: frankfurt   # Le plus proche de Conakry en termes de latence
-    plan: starter       # 512 MB RAM, 0.5 CPU — adapter selon charge
+    region: frankfurt
+    plan: free
 
     envVars:
-      # ── Core ──
       - key: PROJECT_NAME
-        value: "CodeRoute Guinée API"
+        value: "CodeRoute Guinee API"
       - key: API_V1_PREFIX
         value: "/api/v1"
       - key: PYTHONPATH
         value: "/app"
-
-      # ── Sécurité ── (à remplir dans le dashboard Render)
       - key: SECRET_KEY
-        generateValue: true   # Render génère automatiquement
+        generateValue: true
       - key: CSRF_SECRET
         generateValue: true
       - key: ADMIN_REGISTRATION_TOKEN
         generateValue: true
-      - key: BOOTSTRAP_ADMIN_EMAIL
-        sync: false           # À saisir manuellement dans Render
-      - key: BOOTSTRAP_ADMIN_PASSWORD
-        sync: false
       - key: BOOTSTRAP_ADMIN_FULL_NAME
         value: "Administrateur National DNTT"
 
-      # ── Base de données Neon ── (à saisir manuellement depuis neon.tech)
-      # URL POOLÉE pour l'app FastAPI (hostname contient -pooler) :
+      # Neon PostgreSQL — saisir manuellement dans Render Dashboard
       - key: DATABASE_URL
-        sync: false  # postgresql+psycopg://user:pwd@ep-xxx-pooler.eu-central-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require
-      # URL DIRECTE pour Alembic migrations (sans -pooler) :
+        sync: false
       - key: ALEMBIC_DATABASE_URL
-        sync: false  # postgresql+psycopg://user:pwd@ep-xxx.eu-central-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require
+        sync: false
+      - key: BOOTSTRAP_ADMIN_EMAIL
+        sync: false
+      - key: BOOTSTRAP_ADMIN_PASSWORD
+        sync: false
 
-      # ── JWT ──
+      # JWT
       - key: ACCESS_TOKEN_EXPIRE_MINUTES
         value: "120"
       - key: REFRESH_TOKEN_EXPIRE_DAYS
         value: "30"
 
-      # ── CORS ──
+      # CORS — ajuster avec l'URL réelle du frontend après déploiement
       - key: CORS_ORIGINS
-        value: "https://coderoute.gov.gn,https://www.coderoute.gov.gn,https://coderoute-frontend.onrender.com"
+        value: "https://coderoute-frontend.onrender.com"
 
-      # ── Mobile Money ── (à remplir manuellement)
+      # Mobile Money
       - key: MOBILE_MONEY_MODE
-        value: "sandbox"   # ← passer à "production" pour le live
+        value: "sandbox"
       - key: ORANGE_MONEY_CLIENT_ID
         sync: false
       - key: ORANGE_MONEY_CLIENT_SECRET
@@ -78,7 +73,7 @@ services:
       - key: WAVE_BASE_URL
         value: "https://api.wave.com"
 
-      # ── SMS Orange ── (à remplir manuellement)
+      # SMS Orange
       - key: ORANGE_SMS_CLIENT_ID
         sync: false
       - key: ORANGE_SMS_CLIENT_SECRET
@@ -86,7 +81,7 @@ services:
       - key: ORANGE_SMS_SENDER
         value: "CODEROUTE"
 
-      # ── Monitoring ──
+      # Sentry
       - key: SENTRY_DSN
         sync: false
       - key: SENTRY_ENVIRONMENT
@@ -94,24 +89,20 @@ services:
       - key: SENTRY_SAMPLE_RATE
         value: "0.2"
 
-      # ── Misc ──
+      # App
       - key: AUTO_CREATE_TABLES
         value: "false"
       - key: LOGIN_RATE_LIMIT_ATTEMPTS
         value: "5"
       - key: LOGIN_RATE_LIMIT_WINDOW_SECONDS
         value: "300"
+      - key: ENVIRONMENT
+        value: "production"
 
     healthCheckPath: /health
     autoDeploy: true
-    # Migration Alembic avant chaque déploiement (utilise ALEMBIC_DATABASE_URL)
-    preDeployCommand: >-
-      cd /app &&
-      PYTHONPATH=/app
-      DATABASE_URL=$ALEMBIC_DATABASE_URL
-      alembic upgrade head
 
-  # ── Frontend React (PWA statique) ───────────────────────────────
+  # ── Frontend React SPA ─────────────────────────────────────────────────────
   - type: web
     name: coderoute-frontend
     runtime: static
@@ -127,31 +118,13 @@ services:
       - path: /*
         name: X-Content-Type-Options
         value: nosniff
-      - path: /*
-        name: Referrer-Policy
-        value: strict-origin-when-cross-origin
       - path: /assets/*
         name: Cache-Control
         value: public, max-age=31536000, immutable
 
     routes:
-      # SPA fallback — toutes les routes → index.html
       - type: rewrite
         source: /*
         destination: /index.html
 
-    envVars:
-      - key: VITE_API_BASE_URL
-        fromService:
-          type: web
-          name: coderoute-backend
-          property: host
-          envVarKey: RENDER_EXTERNAL_URL
-
     autoDeploy: true
-
-# ── Base de données ──────────────────────────────────────────────────
-# Utiliser Neon (https://neon.tech) au lieu de la DB Render :
-#  → gratuit, serverless, scale-to-zero, 10 GB stockage, branchement Git-like
-#  → configurer DATABASE_URL et ALEMBIC_DATABASE_URL manuellement dans Render Dashboard
-#  → Neon fournit deux URLs : directe (Alembic) et poolée avec -pooler (app FastAPI)

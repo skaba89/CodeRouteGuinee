@@ -1,48 +1,31 @@
-# Cache et builds
+# Tests et cache
+tests/
 __pycache__/
 *.pyc
 *.pyo
-*.pyd
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
-htmlcov/
 .coverage
-coverage.xml
-coverage.json
-*.egg-info/
-dist/
-build/
+htmlcov/
 
-# Environnements virtuels
-.venv/
-venv/
-env/
+# Dev
+*.env
+.env*
+!.env.example
 
-# Base de données locales
-*.db
-*.sqlite
-*.sqlite3
+# Docker
+Dockerfile*
+docker-compose*
+.dockerignore
 
-# Fichiers IDE et OS
-.idea/
+# Git
+.git/
+.gitignore
+
+# IDE
 .vscode/
-*.swp
-*.swo
-.DS_Store
-Thumbs.db
+.idea/
 
 # Logs
 *.log
-logs/
-
-# Fichiers de test et données de dev
-tests/
-# alembic/ est inclus — les migrations font partie du code source
-docs/
-scripts/
-
-# Fichiers sensibles
-.env
-.env.local
-.env.*.local
