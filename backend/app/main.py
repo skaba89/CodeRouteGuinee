@@ -69,7 +69,15 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         release="0.14.0",
         traces_sample_rate=settings.sentry_sample_rate,
     )
-    init_db()
+    # init_db() ne fait rien si AUTO_CREATE_TABLES=false (production).
+    # Les migrations sont gérées par Alembic dans entrypoint.sh.
+    try:
+        init_db()
+    except Exception as e:
+        import logging
+        logging.getLogger("app.startup").warning(
+            "init_db() non-critique ignoré au démarrage: %s", e
+        )
     yield
 
 

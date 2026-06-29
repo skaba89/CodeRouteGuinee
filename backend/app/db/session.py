@@ -92,14 +92,27 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
 def init_db() -> None:
-    if not settings.auto_create_tables:
-        return
-    from app import models  # noqa: F401
-    from app.db.base import Base
-    Base.metadata.create_all(bind=engine)
+    """Initialise la base de données.
 
-    if _IS_SQLITE:
-        _sqlite_add_columns_if_missing()
+    En production (AUTO_CREATE_TABLES=false), cette fonction ne fait rien.
+    Les migrations sont gérées par Alembic (entrypoint.sh : alembic upgrade head).
+    En développement local avec SQLite, crée les tables automatiquement.
+    """
+    if not settings.auto_create_tables:
+        return  # Production : Alembic gère le schéma, on ne touche pas à la DB ici
+    try:
+        from app import models  # noqa: F401
+        from app.db.base import Base
+        Base.metadata.create_all(bind=engine)
+        if _IS_SQLITE:
+            _sqlite_add_columns_if_missing()
+    except Exception as e:
+        import logging
+        logging.getLogger("app.db").warning(
+            "init_db create_all failed (non-blocking): %s — "
+            "En production, définir AUTO_CREATE_TABLES=false et utiliser Alembic.",
+            e,
+        )
 
 
 def _sqlite_add_columns_if_missing() -> None:
