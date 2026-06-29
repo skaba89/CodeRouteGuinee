@@ -56,6 +56,14 @@ export default defineConfig({
 
   server: {
     port: 5173,
+    host: '0.0.0.0',
+    allowedHosts: ['all'],   // Nécessaire pour Render preview
+  },
+
+  preview: {
+    port: 4173,
+    host: '0.0.0.0',
+    allowedHosts: ['all'],   // Nécessaire pour Render preview
   },
 
   build: {
