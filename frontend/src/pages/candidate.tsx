@@ -166,7 +166,7 @@ export function CandidatePage() {
           <div className="card-header"><span className="card-title"> Paiement Mobile Money</span></div>
           {!canAct && (
             <div className="alert ai" style={{ marginBottom: 14 }}>
-              ℹ️ Connectez-vous avec un compte candidat pour effectuer un paiement réel.
+              Connectez-vous avec un compte candidat pour effectuer un paiement réel.
             </div>
           )}
           <form onSubmit={handlePay} style={{ display: 'grid', gap: 14 }}>
@@ -178,9 +178,9 @@ export function CandidatePage() {
               <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--ink2)', marginBottom: 8 }}>Opérateur</div>
               <div className="providers">
                 {[
-                  { id: 'orange_money', icon: '🟠', label: 'Orange Money' },
-                  { id: 'mtn_money',    icon: '🟡', label: 'MTN Money' },
-                  { id: 'wave',         icon: '🔵', label: 'Wave' },
+                  { id: 'orange_money', icon: 'OM', label: 'Orange Money' },
+                  { id: 'mtn_money',    icon: 'MTN', label: 'MTN Money' },
+                  { id: 'wave',         icon: 'W', label: 'Wave' },
                   { id: 'paydunya',     icon: '', label: 'PayDunya' },
                 ].map(p => (
                   <button type="button" key={p.id} className={`prov-btn${provider === p.id ? ' sel' : ''}`}
@@ -221,15 +221,15 @@ export function CandidatePage() {
             </label>
             <a href={bookRef ? getConvocationPdfUrl(bookRef) : '#'} target="_blank" rel="noreferrer">
               <button className="btn-primary btn-block" disabled={!bookRef}>
-                ⬇ Télécharger la convocation PDF
+                ↓ Télécharger la convocation PDF
               </button>
             </a>
             <div className="divider" />
             <a href="#/exam">
-              <button className="btn-success btn-block">🎓 Accéder à l'examen →</button>
+              <button className="btn-success btn-block">Accéder à l'examen →</button>
             </a>
             <a href="#/results">
-              <button className="secondary-button btn-block">📊 Voir mes résultats →</button>
+              <button className="secondary-button btn-block">Voir mes résultats →</button>
             </a>
           </div>
         </div>
@@ -245,12 +245,12 @@ export function CandidatePage() {
             {certErr && <p className="form-error">{certErr}</p>}
             {cert && (
               <div className={`alert ${cert.valid && cert.passed ? 'as' : cert.valid ? 'aw' : 'ae'}`}>
-                {cert.valid && cert.passed ? '🏆 ADMIS' : cert.valid ? ' Ajourné' : ' Invalide'}{' '}
+                {cert.valid && cert.passed ? 'ADMIS' : cert.valid ? ' Ajourné' : ' Invalide'}{' '}
                 — {cert.candidate_name ?? ''} {cert.score !== undefined ? `· ${cert.score}/40` : ''}
                 {cert.valid && cert.passed && (
                   <button type="button" className="btn-sm" style={{ marginLeft: 10 }}
                     onClick={() => { window.open(getExamCertificatePdfUrl(certId), '_blank', 'noopener'); }}>
-                    ⬇ PDF
+                    ↓ PDF
                   </button>
                 )}
               </div>
@@ -263,7 +263,7 @@ export function CandidatePage() {
 
         {/* Infos pratiques */}
         <div className="card">
-          <div className="card-header"><span className="card-title">ℹ️ Infos pratiques</span></div>
+          <div className="card-header"><span className="card-title">Infos pratiques</span></div>
           <ul style={{ paddingLeft: 18, display: 'grid', gap: 8, fontSize: 13, color: 'var(--ink2)' }}>
             <li>Présentez-vous <strong>30 minutes avant</strong> la session</li>
             <li>Apportez votre <strong>pièce d'identité originale</strong></li>

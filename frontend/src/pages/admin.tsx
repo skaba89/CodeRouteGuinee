@@ -149,10 +149,10 @@ export function AdminPage() {
 
   const TABS = [
     { id: 'dashboard',  label: ' Dashboard' },
-    { id: 'candidates', label: '👥 Candidats' },
+    { id: 'candidates', label: 'Candidats' },
     { id: 'payments',   label: ' Paiements' },
-    { id: 'monitoring', label: '🔍 Monitoring' },
-    { id: 'questions',  label: '📝 Questions' },
+    { id: 'monitoring', label: 'Monitoring' },
+    { id: 'questions',  label: 'Questions' },
     { id: 'audit',      label: ' Audit' },
     { id: 'users',      label: ' Utilisateurs' },
   ] as const;
@@ -171,7 +171,7 @@ export function AdminPage() {
       </div>
 
       {!canAdmin && (
-        <div className="alert aw">️ Connectez-vous avec un compte admin ou super_admin pour accéder aux données réelles.</div>
+        <div className="alert aw">Connectez-vous avec un compte admin ou super_admin pour accéder aux données réelles.</div>
       )}
 
       {/* Tabs */}
@@ -199,7 +199,7 @@ export function AdminPage() {
           {examSum && (
             <div className="g2">
               <div className="card">
-                <div className="card-header"><span className="card-title">🎓 Examens</span></div>
+                <div className="card-header"><span className="card-title">Examens</span></div>
                 <div className="stats-grid" style={{ marginBottom: 0 }}>
                   <div><div className="stat-label">Total</div><div className="stat-value">{fmt(examSum.total_attempts)}</div></div>
                   <div><div className="stat-label">Admis</div><div className="stat-value" style={{ color: 'var(--green)' }}>{fmt(examSum.passed_attempts)}</div></div>
@@ -208,7 +208,7 @@ export function AdminPage() {
                 </div>
               </div>
               <div className="card">
-                <div className="card-header"><span className="card-title">⚡ Exports</span></div>
+                <div className="card-header"><span className="card-title">Exports</span></div>
                 <div className="actions">
                   <button className="secondary-button btn-sm" onClick={() => downloadDashboardCsv().catch(() => undefined)}>⬇ Dashboard CSV</button>
                   <button className="secondary-button btn-sm" onClick={() => downloadAuditLogsCsv().catch(() => undefined)}>⬇ Audit CSV</button>
@@ -223,7 +223,7 @@ export function AdminPage() {
       {tab === 'candidates' && (
         <div className="card">
           <div className="card-header">
-            <span className="card-title">👥 Candidats</span>
+            <span className="card-title">Candidats</span>
             <SearchBar
               value={candSearch}
               onChange={s => { setCandSearch(s); }}
@@ -334,7 +334,7 @@ export function AdminPage() {
         <div className="g2">
           {canSA && (
             <div className="card">
-              <div className="card-header"><span className="card-title">➕ Créer un utilisateur</span></div>
+              <div className="card-header"><span className="card-title">Créer un utilisateur</span></div>
               <form onSubmit={handleCreateUser} style={{ display: 'grid', gap: 12 }}>
                 <label>Nom complet<input value={newName} onChange={e => setNewName(e.target.value)} placeholder="Prénom Nom" /></label>
                 <label>Email<input type="email" value={newEmail} onChange={e => setNewEmail(e.target.value)} placeholder="agent@coderoute.gov.gn" /></label>
@@ -403,13 +403,13 @@ function MonitoringPanel({ canAdmin }: { canAdmin: boolean }) {
     }).finally(() => setLoading(false));
   }, [canAdmin]);
 
-  if (!canAdmin) return <div className="alert aw">️ Accès réservé aux administrateurs.</div>;
+  if (!canAdmin) return <div className="alert aw">Accès réservé aux administrateurs.</div>;
 
   return (
     <div className="g2">
       <div className="card">
         <div className="card-header">
-          <span className="card-title">🔍 Résumés de monitoring ({summaries.length})</span>
+          <span className="card-title">Résumés de monitoring ({summaries.length})</span>
           <button className="secondary-button btn-sm" aria-label="Actualiser le monitoring" onClick={() => getExamMonitoringSummaries({ limit: 20 }).then(setSummaries).catch(() => undefined)}>Actualiser</button>
         </div>
         {loading ? <p className="text-muted" style={{ padding: 16 }}>Chargement…</p> :
@@ -438,7 +438,7 @@ function MonitoringPanel({ canAdmin }: { canAdmin: boolean }) {
 
       <div className="card">
         <div className="card-header">
-          <span className="card-title">⚡ Événements récents ({events.length})</span>
+          <span className="card-title">Événements récents ({events.length})</span>
           <button className="secondary-button btn-sm" aria-label="Télécharger export CSV" onClick={() => downloadExamAttemptsCsv().catch(() => undefined)}>⬇ Export</button>
         </div>
         {loading ? <p className="text-muted" style={{ padding: 16 }}>Chargement…</p> :
@@ -489,12 +489,12 @@ function QuestionsPanel({ canAdmin }: { canAdmin: boolean }) {
     finally { setDeciding(null); }
   }
 
-  if (!canAdmin) return <div className="alert aw">️ Accès réservé aux administrateurs.</div>;
+  if (!canAdmin) return <div className="alert aw">Accès réservé aux administrateurs.</div>;
 
   return (
     <div className="card">
       <div className="card-header">
-        <span className="card-title">📝 Gouvernance des questions ({items.length})</span>
+        <span className="card-title">Gouvernance des questions ({items.length})</span>
         <button className="secondary-button btn-sm" onClick={() => getQuestionGovernanceItems().then(setItems).catch(() => undefined)}>Actualiser</button>
       </div>
       {loading ? <p className="text-muted" style={{ padding: 16 }}>Chargement…</p> :

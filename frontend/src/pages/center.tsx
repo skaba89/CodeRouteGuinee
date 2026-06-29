@@ -158,7 +158,7 @@ export function CenterPage() {
 
       {!canAct && (
         <div className="alert aw" style={{ marginBottom: 20 }}>
-          ️ Connectez-vous avec un compte <strong>center</strong> pour utiliser les fonctionnalités réelles.
+          Connectez-vous avec un compte <strong>center</strong> pour utiliser les fonctionnalités réelles.
         </div>
       )}
 
@@ -196,7 +196,7 @@ export function CenterPage() {
 
         {/* Démarrer examen */}
         <div className="card">
-          <div className="card-header"><span className="card-title">🚀 Démarrer un examen</span></div>
+          <div className="card-header"><span className="card-title">Démarrer un examen</span></div>
           <form onSubmit={handleStartExam} style={{ display: 'grid', gap: 12 }}>
             <label>Référence de réservation<input value={bookingRef} onChange={e => setBookingRef(e.target.value)} placeholder="GN-CONV-2026-000001" /></label>
             <label>Code du poste<input value={deviceKey} onChange={e => setDeviceKey(e.target.value)} placeholder="POSTE-01" /></label>
@@ -215,7 +215,7 @@ export function CenterPage() {
 
         {/* Incidents */}
         <div className="card">
-          <div className="card-header"><span className="card-title">️ Déclarer un incident</span></div>
+          <div className="card-header"><span className="card-title">Déclarer un incident</span></div>
           <form onSubmit={handleIncident} style={{ display: 'grid', gap: 12 }}>
             <label>
               Type d'incident

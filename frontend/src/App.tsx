@@ -5,6 +5,11 @@ import { ELearningPage } from './pages/elearning';
 import { FormEvent, useEffect, useState } from 'react';
 import { canAccessRoute, demoRoles, navigationItems, type UserRole } from './auth';
 import {
+  IconHome, IconBook, IconGraduate, IconUser, IconBuilding,
+  IconLandmark, IconDashboard, IconClipboard, IconTarget,
+  IconBarChart, IconSettings,
+} from './icons';
+import {
   type AuthUser,
   changePassword,
   getAccessToken,
@@ -65,7 +70,9 @@ function Loading() {
 function AccessDenied({ role }: { role: UserRole }) {
   return (
     <section className="screen access-denied">
-      <div style={{ fontSize: 48, marginBottom: 12 }}>🔒</div>
+      <div style={{ fontSize: 48, marginBottom: 12, color: 'var(--muted)' }}>
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            </div>
       <h2>Accès non autorisé</h2>
       <p>Le rôle <strong>{role}</strong> ne peut pas accéder à cette page.</p>
       <div className="actions" style={{ justifyContent: 'center', marginTop: 20 }}>
@@ -92,7 +99,7 @@ function AccountPage({ currentUser }: { currentUser: AuthUser | null }) {
       setCur(''); setNw(''); setConf('');
       setMsg('Mot de passe mis à jour.');
     } catch {
-      setMsg('❌ Mot de passe actuel incorrect.');
+      setMsg('Mot de passe actuel incorrect.');
     }
   }
 
@@ -123,7 +130,7 @@ function AccountPage({ currentUser }: { currentUser: AuthUser | null }) {
         </div>
         <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 12 }}>
           Les langues nationales guinéennes utilisent l'audio pour les questions d'examen.
-          Sélectionnez votre langue — un bouton 🔊 apparaîtra sur chaque question.
+          Sélectionnez votre langue — un bouton audio apparaîtra sur chaque question.
         </p>
         <LocaleAudioSwitcher />
       </div>
@@ -172,7 +179,7 @@ function LoginPage({
     try {
       await onLogin(email, pass);
     } catch {
-      setStatus('❌ Identifiants incorrects. Vérifiez votre email et mot de passe.');
+      setStatus('Identifiants incorrects. Vérifiez votre email et mot de passe.');
       setLoading(false);
     }
   }
@@ -202,9 +209,9 @@ function LoginPage({
 
         <LoginForm
           onSuccess={() => window.location.reload()}
-          onError={(msg) => setStatus(`❌ ${msg}`)}
+          onError={(msg) => setStatus(`Erreur : ${msg}`)}
         />
-        {status && !status.includes('❌') && (
+        {status && !status.includes('Erreur') && (
           <p className="login-status">{status}</p>
         )}
 
@@ -333,14 +340,32 @@ export default function App() {
         <div className="nav-links">
           {visibleNav.map(item => {
             const r = item.href.replace('#/', '') || 'home';
+            const label = t(`nav.${r}`) !== `nav.${r}` ? t(`nav.${r}`) : item.label;
+            const NAV_ICONS: Record<string, React.ReactElement> = {
+              home:        <IconHome size={15} />,
+              training:    <IconTarget size={15} />,
+              elearning:   <IconBook size={15} />,
+              candidate:   <IconUser size={15} />,
+              center:      <IconBuilding size={15} />,
+              school:      <IconGraduate size={15} />,
+              ministerial: <IconLandmark size={15} />,
+              admin:       <IconDashboard size={15} />,
+              dossier:     <IconClipboard size={15} />,
+              results:     <IconBarChart size={15} />,
+              exam:        <IconTarget size={15} />,
+            };
             return (
               <a key={item.href} href={item.href} className={route === r ? 'active' : ''}>
-                {t(`nav.${r}`) !== `nav.${r}` ? t(`nav.${r}`) : item.label}
+                {NAV_ICONS[r] && <span className="nav-icon" aria-hidden="true">{NAV_ICONS[r]}</span>}
+                <span>{label}</span>
               </a>
             );
           })}
           {!isPres && (
-            <a href="#/account" className={route === 'account' ? 'active' : ''}>Mon compte</a>
+            <a href="#/account" className={route === 'account' ? 'active' : ''}>
+              <span className="nav-icon" aria-hidden="true"><IconSettings size={15} /></span>
+              <span>Mon compte</span>
+            </a>
           )}
           <a href="#/login" className={route === 'login' ? 'active' : ''}>Connexion</a>
         </div>
