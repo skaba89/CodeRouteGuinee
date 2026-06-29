@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Guide de Formation — Agents DNTT | CodeRoute Guinée Pilote</title>
+<style>
+  :root {
+    --gn-rouge:  #CE1126;
+    --gn-or:     #FCD116;
+    --gn-vert:   #006B3F;
+    --navy:      #0D2137;
+    --navy2:     #1A3250;
+    --ink:       #0F1923;
+    --ink2:      #3A4A58;
+    --muted:     #6B7A8A;
+    --bg:        #F5F7FA;
+    --surface:   #FFFFFF;
+    --border:    #E2E8F0;
+    --success:   #006B3F;
+    --warning:   #B45309;
+    --danger:    #C0392B;
+    --r:         8px;
+    --font:      'Segoe UI', system-ui, sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: var(--font); background: var(--bg); color: var(--ink); line-height: 1.7; }
+
+  /* ── Header officiel ── */
+  .header {
+    background: linear-gradient(135deg, var(--navy) 0%, var(--navy2) 60%, #0F3A20 100%);
+    padding: 0;
+    position: relative;
+  }
+  .header-band {
+    height: 6px;
+    background: linear-gradient(90deg, var(--gn-rouge) 33.3%, var(--gn-or) 33.3% 66.6%, var(--gn-vert) 66.6%);
+  }
+  .header-inner {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 28px;
+    padding: 28px 48px;
+  }
+  .header-logo {
+    width: 72px; height: 72px;
+    background: rgba(255,255,255,.08);
+    border: 2px solid rgba(255,255,255,.15);
+    border-radius: 14px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 28px; font-weight: 900; color: #fff;
+    letter-spacing: -.04em;
+  }
+  .header-titles h1 {
+    font-size: 22px; font-weight: 700; color: #fff;
+    letter-spacing: -.02em; line-height: 1.2;
+  }
+  .header-titles p {
+    font-size: 13px; color: rgba(255,255,255,.6); margin-top: 3px;
+  }
+  .header-flag {
+    display: flex; gap: 3px;
+  }
+  .header-flag span {
+    width: 16px; height: 42px; border-radius: 3px;
+  }
+
+  /* ── Breadcrumb type pilote ── */
+  .pilote-badge {
+    background: var(--gn-or);
+    color: var(--navy);
+    font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: .1em;
+    padding: 5px 18px;
+    display: flex; align-items: center; gap: 32px;
+    flex-wrap: wrap;
+  }
+  .pilote-badge span { display: flex; align-items: center; gap: 6px; }
+
+  /* ── Layout ── */
+  .container { max-width: 900px; margin: 0 auto; padding: 40px 24px 80px; }
+
+  /* ── Intro card ── */
+  .intro-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 28px 32px;
+    margin-bottom: 36px;
+    border-left: 4px solid var(--gn-vert);
+  }
+  .intro-card h2 { font-size: 17px; font-weight: 600; color: var(--navy); margin-bottom: 10px; }
+  .intro-card p { color: var(--ink2); font-size: 14px; }
+
+  /* ── Sections ── */
+  .section { margin-bottom: 48px; }
+  .section-head {
+    display: flex; align-items: center; gap: 14px;
+    margin-bottom: 20px;
+    padding-bottom: 12px;
+    border-bottom: 2px solid var(--border);
+  }
+  .section-num {
+    width: 36px; height: 36px;
+    background: var(--navy);
+    color: #fff;
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px; font-weight: 700; flex-shrink: 0;
+  }
+  .section-head h2 { font-size: 19px; font-weight: 700; color: var(--navy); }
+
+  /* ── Steps ── */
+  .steps { display: flex; flex-direction: column; gap: 16px; }
+  .step {
+    display: grid;
+    grid-template-columns: 28px 1fr;
+    gap: 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    padding: 18px 20px;
+    align-items: start;
+  }
+  .step-n {
+    width: 28px; height: 28px;
+    border: 2px solid var(--gn-vert);
+    border-radius: 50%;
+    color: var(--gn-vert);
+    font-size: 12px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; margin-top: 2px;
+  }
+  .step h3 { font-size: 14px; font-weight: 600; color: var(--ink); margin-bottom: 6px; }
+  .step p, .step li { font-size: 13.5px; color: var(--ink2); line-height: 1.65; }
+  .step ul { list-style: none; padding: 0; }
+  .step ul li::before { content: '→ '; color: var(--gn-vert); font-weight: 600; }
+  .step ul li + li { margin-top: 4px; }
+
+  /* ── Alertes ── */
+  .alert {
+    display: flex; gap: 14px; align-items: flex-start;
+    border-radius: var(--r);
+    padding: 14px 18px;
+    margin: 16px 0;
+    font-size: 13.5px;
+  }
+  .alert-icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+  .alert.ok  { background: #E6F3EC; border-left: 3px solid var(--gn-vert); color: #004D2D; }
+  .alert.warn { background: #FEF3C7; border-left: 3px solid #D97706; color: #7C3A00; }
+  .alert.info { background: #EBF3FC; border-left: 3px solid #1A6FC4; color: #0C3A6E; }
+  .alert.danger { background: #FDECEA; border-left: 3px solid var(--danger); color: #7A0E0E; }
+
+  /* ── Tableau ── */
+  .table-wrap { overflow-x: auto; border-radius: var(--r); border: 1px solid var(--border); }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; background: var(--surface); }
+  th {
+    background: var(--navy); color: #fff;
+    font-size: 11px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: .07em;
+    padding: 10px 14px; text-align: left;
+  }
+  td { padding: 10px 14px; border-bottom: 1px solid var(--border); color: var(--ink2); }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--bg); }
+
+  /* ── Credentials ── */
+  .cred-box {
+    background: #0F1923;
+    border-radius: var(--r);
+    padding: 18px 22px;
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    color: #A8D8A8;
+    margin: 12px 0;
+    line-height: 1.8;
+  }
+  .cred-box .label { color: rgba(255,255,255,.5); font-size: 11px; }
+
+  /* ── Print ── */
+  @media print {
+    body { background: white; }
+    .header { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .section { page-break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-band"></div>
+  <div class="header-inner">
+    <div class="header-logo">CR</div>
+    <div class="header-titles">
+      <h1>CodeRoute Guinée — Guide de Formation Agents</h1>
+      <p>Direction Nationale des Transports Terrestres (DNTT) · Pilote Centre Kaloum, Conakry</p>
+    </div>
+    <div class="header-flag">
+      <span style="background:var(--gn-rouge)"></span>
+      <span style="background:var(--gn-or)"></span>
+      <span style="background:var(--gn-vert)"></span>
+    </div>
+  </div>
+</div>
+
+<div class="pilote-badge">
+  <span>📋 Pilote Conakry · Centre DNTT Kaloum</span>
+  <span>👥 50 candidats volontaires</span>
+  <span>🚗 Permis B uniquement</span>
+  <span>💵 Paiement espèces</span>
+  <span>📅 Phase pilote 2024</span>
+</div>
+
+<div class="container">
+
+  <div class="intro-card">
+    <h2>Objectif de ce guide</h2>
+    <p>Ce document est destiné aux agents DNTT du Centre Kaloum qui opèrent la plateforme CodeRoute Guinée durant la phase pilote. Il couvre l'inscription des candidats, la gestion des sessions d'examen, les paiements en espèces, et le suivi des résultats. La durée de formation estimée est de <strong>2 heures</strong>.</p>
+  </div>
+
+  <!-- SECTION 1 : Connexion -->
+  <div class="section">
+    <div class="section-head">
+      <div class="section-num">1</div>
+      <h2>Connexion à la plateforme</h2>
+    </div>
+
+    <div class="alert info">
+      <span class="alert-icon">ℹ</span>
+      <div>Accès plateforme : <strong>https://coderouteguinee-frontend.onrender.com</strong><br>
+      Connexion internet requise. Navigateur recommandé : Chrome ou Firefox (version récente).</div>
+    </div>
+
+    <div class="steps">
+      <div class="step">
+        <div class="step-n">1</div>
+        <div>
+          <h3>Ouvrir la plateforme</h3>
+          <p>Saisir l'adresse dans la barre du navigateur. L'écran d'accueil "CodeRoute Guinée — Examen officiel du code de la route" s'affiche.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-n">2</div>
+        <div>
+          <h3>Se connecter avec le compte centre</h3>
+          <div class="cred-box">
+            <span class="label">Email :</span> centre.kaloum@dntt.gov.gn<br>
+            <span class="label">Mot de passe :</span> [fourni séparément par l'administrateur DNTT]
+          </div>
+          <p>Cliquer sur <strong>"Connexion"</strong>. Le tableau de bord du centre s'ouvre automatiquement.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-n">3</div>
+        <div>
+          <h3>Vérifier l'affichage du tableau de bord</h3>
+          <p>La page doit afficher :</p>
+          <ul>
+            <li>Le nom du centre : "Centre DNTT Kaloum — Pilote Conakry"</li>
+            <li>Le nombre de candidats inscrits</li>
+            <li>Les sessions d'examen disponibles</li>
+          </ul>
+          <div class="alert warn">
+            <span class="alert-icon">⚠</span>
+            <div>Si la page affiche "Connexion refusée", contacter l'administrateur DNTT. Ne pas tenter plus de 5 connexions incorrectes (blocage automatique 5 minutes).</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 2 : Inscription candidat -->
+  <div class="section">
+    <div class="section-head">
+      <div class="section-num">2</div>
+      <h2>Inscrire un candidat</h2>
+    </div>
+
+    <div class="alert info">
+      <span class="alert-icon">ℹ</span>
+      <div>Durant le pilote, les 50 candidats sont <strong>déjà pré-inscrits</strong> dans le système. Cette section s'applique uniquement si un candidat a un problème d'accès ou si un remplacement est nécessaire.</div>
+    </div>
+
+    <h3 style="font-size:15px;color:var(--navy);margin:20px 0 12px">Documents à vérifier avant inscription</h3>
+    <div class="table-wrap">
+      <table>
+        <tr><th>Document</th><th>Exigence</th><th>Vérification</th></tr>
+        <tr><td>Pièce d'identité nationale</td><td>Originale, en cours de validité</td><td>Nom, prénom, date de naissance</td></tr>
+        <tr><td>Reçu de paiement</td><td>Espèces collectées par le centre</td><td>Tampon et signature agent</td></tr>
+        <tr><td>Formulaire DNTT</td><td>Rempli et signé</td><td>Catégorie permis B cochée</td></tr>
+      </table>
+    </div>
+
+    <div class="steps" style="margin-top:16px">
+      <div class="step">
+        <div class="step-n">1</div>
+        <div>
+          <h3>Aller dans "Espace Centre" → "Candidats"</h3>
+          <p>Cliquer sur le menu <strong>"Centre"</strong> dans la barre de navigation.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-n">2</div>
+        <div>
+          <h3>Rechercher le candidat par nom ou numéro</h3>
+          <p>Saisir le nom de famille ou le numéro de référence (format GN-CODE-B-PILOT-XXX) dans la barre de recherche. Vérifier que le statut est "Inscrit".</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-n">3</div>
+        <div>
+          <h3>Enregistrer le paiement espèces</h3>
+          <p>Cliquer sur <strong>"Enregistrer paiement"</strong> → sélectionner "Espèces (manuel)" → saisir le montant encaissé → confirmer. Le statut du candidat passe à "Vérifié".</p>
+          <div class="alert ok">
+            <span class="alert-icon">✓</span>
+            <div>Le reçu est généré automatiquement. L'imprimer et le remettre au candidat comme justificatif.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 3 : Session d'examen -->
+  <div class="section">
+    <div class="section-head">
+      <div class="section-num">3</div>
+      <h2>Ouvrir et gérer une session d'examen</h2>
+    </div>
+
+    <div class="alert warn">
+      <span class="alert-icon">⚠</span>
+      <div><strong>Capacité maximale : 35 candidats par session.</strong> Pour 50 candidats pilote, prévoir 2 sessions (35 + 15 candidats). Chaque session dure environ 45 minutes (30 min d'examen + 15 min installation/résultats).</div>
+    </div>
+
+    <div class="steps">
+      <div class="step">
+        <div class="step-n">1</div>
+        <div>
+          <h3>Créer une session d'examen</h3>
+          <ul>
+            <li>Aller dans "Centre" → "Démarrer un examen"</li>
+            <li>Sélectionner la date et l'heure</li>
+            <li>Catégorie : <strong>Permis B</strong> (uniquement)</li>
+            <li>Nombre de places : 35 maximum</li>
+          </ul>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-n">2</div>
+        <div>
+          <h3>Affecter les candidats à la session</h3>
+          <p>Sélectionner les candidats dans la liste "Vérifiés" et les affecter à la session. Vérifier que chaque candidat a une convocation générée (cliquer "Générer convocations").</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-n">3</div>
+        <div>
+          <h3>Le jour J — Installation salle</h3>
+          <ul>
+            <li>Ouvrir la plateforme sur chaque poste (ou tablette) 30 min avant</li>
+            <li>Vérifier la connexion internet sur chaque poste</li>
+            <li>Afficher l'URL de connexion candidat sur le tableau</li>
+            <li>Ne pas distribuer les identifiants avant l'heure officielle</li>
+          </ul>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-n">4</div>
+        <div>
+          <h3>Démarrer la session officielle</h3>
+          <p>Cliquer <strong>"Lancer la session"</strong> → confirmer. Les candidats peuvent alors se connecter avec leur numéro de référence et démarrer l'examen. Le timer de 30 minutes démarre automatiquement.</p>
+          <div class="alert danger">
+            <span class="alert-icon">!</span>
+            <div><strong>NE PAS couper internet pendant l'examen.</strong> Les réponses sont enregistrées en temps réel. Une coupure peut entraîner une perte de données.</div>
+          </div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-n">5</div>
+        <div>
+          <h3>Fin de session — Consultation des résultats</h3>
+          <ul>
+            <li>À 30 min, l'examen se ferme automatiquement pour tous</li>
+            <li>Aller dans "Résultats &amp; Certificats" → sélectionner la session</li>
+            <li>Imprimer la liste des résultats (ADMIS / AJOURNÉ)</li>
+            <li>Seuil d'admission : <strong>35/40 bonnes réponses (87,5%)</strong></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 4 : Incidents -->
+  <div class="section">
+    <div class="section-head">
+      <div class="section-num">4</div>
+      <h2>Gérer les incidents</h2>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <tr><th>Problème</th><th>Cause probable</th><th>Solution</th></tr>
+        <tr>
+          <td>Candidat ne trouve pas sa référence</td>
+          <td>Faute de frappe ou candidat non inscrit</td>
+          <td>Chercher par nom dans l'espace centre → vérifier statut</td>
+        </tr>
+        <tr>
+          <td>Page "Session expirée"</td>
+          <td>Inactivité de 2h ou déconnexion</td>
+          <td>Se reconnecter → l'examen en cours est sauvegardé</td>
+        </tr>
+        <tr>
+          <td>Coupure internet en cours d'examen</td>
+          <td>Réseau instable</td>
+          <td>Reconnecter internet → les réponses jusqu'à la coupure sont sauvegardées</td>
+        </tr>
+        <tr>
+          <td>Candidat ne voit pas les images/illustrations</td>
+          <td>Connexion lente (images chargent)</td>
+          <td>Attendre 5-10 sec — les images SVG se chargent progressivement</td>
+        </tr>
+        <tr>
+          <td>Page blanche ou erreur rouge</td>
+          <td>Erreur serveur temporaire</td>
+          <td>Actualiser (F5). Si persistant : contacter le support DataSphere</td>
+        </tr>
+        <tr>
+          <td>Cold start lent (première connexion)</td>
+          <td>Serveur en veille (plan gratuit)</td>
+          <td>Normal si aucun accès depuis 5 min — attendre 30-50 secondes</td>
+        </tr>
+      </table>
+    </div>
+
+    <div class="alert info" style="margin-top:16px">
+      <span class="alert-icon">ℹ</span>
+      <div><strong>Contact support pilote :</strong> WhatsApp DataSphere Innovation au +224 XXX XXX XXX (disponible 8h-18h les jours d'examen pilote).</div>
+    </div>
+  </div>
+
+  <!-- SECTION 5 : Fin de journée -->
+  <div class="section">
+    <div class="section-head">
+      <div class="section-num">5</div>
+      <h2>Clôture et rapport de fin de journée</h2>
+    </div>
+
+    <div class="steps">
+      <div class="step">
+        <div class="step-n">1</div>
+        <div>
+          <h3>Exporter les résultats de la journée</h3>
+          <p>Aller dans "Admin" → "Exports CSV" → "Dashboard" → télécharger le fichier. Ce fichier contient tous les résultats, horodatés, à remettre à la direction DNTT.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-n">2</div>
+        <div>
+          <h3>Réconcilier les paiements espèces</h3>
+          <p>Compter les espèces collectées. Vérifier que le total correspond au nombre de candidats "Vérifiés" dans le système × tarif unitaire. Signer le bordereau de caisse.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-n">3</div>
+        <div>
+          <h3>Remplir la fiche retour pilote</h3>
+          <p>Compléter la fiche d'évaluation (voir document 03_fiche_retour_pilote) et l'envoyer à DataSphere et à la direction DNTT avant 18h.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-n">4</div>
+        <div>
+          <h3>Se déconnecter</h3>
+          <p>Cliquer sur <strong>"Déconnexion"</strong> en haut à droite. Fermer le navigateur sur tous les postes utilisés.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 6 : Contacts -->
+  <div class="section">
+    <div class="section-head">
+      <div class="section-num">6</div>
+      <h2>Contacts et escalade</h2>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <tr><th>Niveau</th><th>Contact</th><th>Pour quoi</th></tr>
+        <tr><td>Support technique</td><td>DataSphere Innovation<br>+224 XXX XXX XXX (WhatsApp)</td><td>Bugs, erreurs plateforme, accès bloqué</td></tr>
+        <tr><td>Supervision pilote</td><td>Coordinateur DNTT Pilote<br>+224 XXX XXX XXX</td><td>Fraude, incidents graves, décisions</td></tr>
+        <tr><td>Direction DNTT</td><td>Direction Nationale des Transports Terrestres<br>Kaloum, Conakry</td><td>Contestation résultats, réclamations</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- Signature -->
+  <div style="border-top:1px solid var(--border);padding-top:24px;margin-top:40px;display:grid;grid-template-columns:1fr 1fr;gap:24px;font-size:12px;color:var(--muted)">
+    <div>
+      <strong style="color:var(--ink)">Direction Nationale des Transports Terrestres</strong><br>
+      République de Guinée · Ministère des Transports<br>
+      Document officiel pilote — Usage interne DNTT
+    </div>
+    <div style="text-align:right">
+      <strong style="color:var(--ink)">DataSphere Innovation</strong><br>
+      Partenaire technologique<br>
+      datasphereinnovation.fr · datasphere-innovation.net
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fiche de Retour Pilote — CodeRoute Guinée</title>
+<style>
+  :root {
+    --gn-vert: #006B3F; --gn-rouge: #CE1126; --gn-or: #FCD116;
+    --navy: #0D2137; --ink: #0F1923; --ink2: #3A4A58;
+    --muted: #6B7A8A; --bg: #F5F7FA; --surface: #FFF;
+    --border: #D1D9E6; --r: 8px;
+    --font: 'Segoe UI', system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: var(--font); background: var(--bg); color: var(--ink); font-size: 13.5px; line-height: 1.65; }
+
+  .page { max-width: 760px; margin: 0 auto; background: var(--surface); padding: 48px; }
+
+  /* Header */
+  .header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 32px; padding-bottom: 20px; border-bottom: 2px solid var(--navy); }
+  .header-left h1 { font-size: 20px; font-weight: 800; color: var(--navy); margin-bottom: 4px; }
+  .header-left p { font-size: 12px; color: var(--muted); }
+  .header-flag { display: flex; gap: 3px; }
+  .header-flag span { width: 13px; height: 34px; border-radius: 2px; }
+  .ref-box { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 10px 16px; font-size: 12px; color: var(--ink2); margin-bottom: 28px; display: flex; gap: 24px; flex-wrap: wrap; }
+  .ref-field { display: flex; flex-direction: column; gap: 2px; }
+  .ref-field label { font-size: 10px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); font-weight: 600; }
+  .ref-field .blank { min-width: 140px; border-bottom: 1px solid var(--ink); display: inline-block; height: 18px; }
+
+  /* Sections */
+  .section { margin-bottom: 28px; }
+  .section-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: var(--gn-vert); margin-bottom: 12px; padding-bottom: 6px; border-bottom: 1.5px solid var(--gn-vert); }
+  .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+  .field { display: flex; flex-direction: column; gap: 4px; }
+  .field label { font-size: 11.5px; font-weight: 600; color: var(--ink2); }
+  .field .line { border: none; border-bottom: 1px solid var(--border); height: 26px; width: 100%; background: transparent; }
+  .field-full { margin-bottom: 12px; }
+  .field-full label { font-size: 11.5px; font-weight: 600; color: var(--ink2); display: block; margin-bottom: 4px; }
+  .field-full .box { border: 1px solid var(--border); border-radius: 6px; height: 60px; width: 100%; }
+
+  /* Rating */
+  .rating-grid { display: grid; grid-template-columns: 1fr auto; gap: 16px; align-items: center; margin-bottom: 8px; }
+  .rating-q { font-size: 13px; color: var(--ink); }
+  .rating-opts { display: flex; gap: 6px; }
+  .rating-opts label { display: flex; flex-direction: column; align-items: center; gap: 3px; cursor: pointer; font-size: 10px; color: var(--muted); }
+  .rating-opts input[type=radio] { width: 16px; height: 16px; accent-color: var(--gn-vert); }
+
+  /* Check */
+  .check-list { display: flex; flex-direction: column; gap: 8px; }
+  .check-item { display: flex; align-items: center; gap: 10px; }
+  .check-item input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--gn-vert); flex-shrink: 0; }
+  .check-item label { font-size: 13px; color: var(--ink); cursor: pointer; }
+
+  /* Signature */
+  .sig-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; margin-top: 28px; padding-top: 20px; border-top: 1px solid var(--border); }
+  .sig-box { display: flex; flex-direction: column; gap: 4px; }
+  .sig-box label { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .07em; }
+  .sig-box .sig-line { border-bottom: 1px solid var(--ink); height: 48px; margin-bottom: 4px; }
+  .sig-box .sig-name { font-size: 11px; color: var(--muted); }
+
+  /* Table incidents */
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  th { background: var(--navy); color: #fff; padding: 8px 12px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
+  td { padding: 8px 12px; border-bottom: 1px solid var(--border); }
+  td.write { height: 32px; }
+  tr:last-child td { border-bottom: none; }
+
+  /* Print */
+  @media print {
+    body { background: white; }
+    .page { max-width: 100%; padding: 24px; }
+    .section { page-break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- En-tête -->
+  <div class="header">
+    <div class="header-left">
+      <h1>Fiche de Retour — Pilote CodeRoute Guinée</h1>
+      <p>À compléter par l'agent DNTT après chaque session d'examen · Confidentiel</p>
+    </div>
+    <div class="header-flag">
+      <span style="background:#CE1126"></span>
+      <span style="background:#FCD116"></span>
+      <span style="background:#006B3F"></span>
+    </div>
+  </div>
+
+  <!-- Informations session -->
+  <div class="ref-box">
+    <div class="ref-field">
+      <label>Date de la session</label>
+      <span class="blank"></span>
+    </div>
+    <div class="ref-field">
+      <label>Heure de début</label>
+      <span class="blank" style="min-width:80px"></span>
+    </div>
+    <div class="ref-field">
+      <label>Heure de fin</label>
+      <span class="blank" style="min-width:80px"></span>
+    </div>
+    <div class="ref-field">
+      <label>Agent superviseur</label>
+      <span class="blank" style="min-width:180px"></span>
+    </div>
+    <div class="ref-field">
+      <label>N° de session</label>
+      <span class="blank" style="min-width:80px"></span>
+    </div>
+  </div>
+
+  <!-- SECTION 1 : Présence -->
+  <div class="section">
+    <div class="section-title">1. Présence et inscriptions</div>
+    <div class="field-row">
+      <div class="field"><label>Candidats convoqués</label><input type="text" class="line"></div>
+      <div class="field"><label>Candidats présents</label><input type="text" class="line"></div>
+      <div class="field"><label>Candidats absents</label><input type="text" class="line"></div>
+      <div class="field"><label>Abandons en cours d'examen</label><input type="text" class="line"></div>
+    </div>
+    <div class="field-full">
+      <label>Motifs des absences / abandons (si connus)</label>
+      <textarea class="box"></textarea>
+    </div>
+  </div>
+
+  <!-- SECTION 2 : Résultats -->
+  <div class="section">
+    <div class="section-title">2. Résultats de la session</div>
+    <div class="field-row">
+      <div class="field"><label>Candidats ADMIS (≥ 35/40)</label><input type="text" class="line"></div>
+      <div class="field"><label>Candidats AJOURNÉS (< 35/40)</label><input type="text" class="line"></div>
+      <div class="field"><label>Score moyen de la session</label><input type="text" class="line"></div>
+      <div class="field"><label>Score le plus bas</label><input type="text" class="line"></div>
+    </div>
+    <div class="field-full">
+      <label>Observations sur les résultats (catégories difficiles, questions contestées…)</label>
+      <textarea class="box"></textarea>
+    </div>
+  </div>
+
+  <!-- SECTION 3 : Paiements -->
+  <div class="section">
+    <div class="section-title">3. Paiements espèces</div>
+    <div class="field-row">
+      <div class="field"><label>Montant encaissé total (GNF)</label><input type="text" class="line"></div>
+      <div class="field"><label>Nombre de reçus émis</label><input type="text" class="line"></div>
+      <div class="field"><label>Concordance caisse / système</label>
+        <select class="line">
+          <option>— Sélectionner —</option>
+          <option>OUI — concordance parfaite</option>
+          <option>NON — écart à expliquer</option>
+        </select>
+      </div>
+      <div class="field"><label>Montant de l'écart (si applicable)</label><input type="text" class="line"></div>
+    </div>
+    <div class="field-full">
+      <label>Explication de l'écart (si applicable)</label>
+      <textarea class="box"></textarea>
+    </div>
+  </div>
+
+  <!-- SECTION 4 : Technique -->
+  <div class="section">
+    <div class="section-title">4. Incidents techniques</div>
+    <table>
+      <tr><th>Type d'incident</th><th>Nb fois</th><th>Description / impact</th><th>Résolu ?</th></tr>
+      <tr>
+        <td>Connexion internet coupée</td>
+        <td><input type="text" style="width:40px;border:none;border-bottom:1px solid var(--border)"></td>
+        <td class="write"></td>
+        <td><select style="font-size:11px"><option>—</option><option>Oui</option><option>Non</option></select></td>
+      </tr>
+      <tr>
+        <td>Page d'erreur / bug plateforme</td>
+        <td><input type="text" style="width:40px;border:none;border-bottom:1px solid var(--border)"></td>
+        <td class="write"></td>
+        <td><select style="font-size:11px"><option>—</option><option>Oui</option><option>Non</option></select></td>
+      </tr>
+      <tr>
+        <td>Candidat ne pouvait pas se connecter</td>
+        <td><input type="text" style="width:40px;border:none;border-bottom:1px solid var(--border)"></td>
+        <td class="write"></td>
+        <td><select style="font-size:11px"><option>—</option><option>Oui</option><option>Non</option></select></td>
+      </tr>
+      <tr>
+        <td>Image / illustration non affichée</td>
+        <td><input type="text" style="width:40px;border:none;border-bottom:1px solid var(--border)"></td>
+        <td class="write"></td>
+        <td><select style="font-size:11px"><option>—</option><option>Oui</option><option>Non</option></select></td>
+      </tr>
+      <tr>
+        <td>Autre incident</td>
+        <td><input type="text" style="width:40px;border:none;border-bottom:1px solid var(--border)"></td>
+        <td class="write"></td>
+        <td><select style="font-size:11px"><option>—</option><option>Oui</option><option>Non</option></select></td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- SECTION 5 : Évaluation -->
+  <div class="section">
+    <div class="section-title">5. Évaluation de la plateforme (agent)</div>
+    <div style="margin-bottom:12px;font-size:11.5px;color:var(--muted)">Coter de 1 (très mauvais) à 5 (excellent)</div>
+
+    <div class="rating-grid">
+      <div class="rating-q">Facilité de connexion et d'accès à la plateforme</div>
+      <div class="rating-opts">
+        <label><input type="radio" name="r1" value="1"> 1</label>
+        <label><input type="radio" name="r1" value="2"> 2</label>
+        <label><input type="radio" name="r1" value="3"> 3</label>
+        <label><input type="radio" name="r1" value="4"> 4</label>
+        <label><input type="radio" name="r1" value="5"> 5</label>
+      </div>
+    </div>
+    <div class="rating-grid">
+      <div class="rating-q">Clarté de l'interface pour les candidats</div>
+      <div class="rating-opts">
+        <label><input type="radio" name="r2" value="1"> 1</label>
+        <label><input type="radio" name="r2" value="2"> 2</label>
+        <label><input type="radio" name="r2" value="3"> 3</label>
+        <label><input type="radio" name="r2" value="4"> 4</label>
+        <label><input type="radio" name="r2" value="5"> 5</label>
+      </div>
+    </div>
+    <div class="rating-grid">
+      <div class="rating-q">Qualité des illustrations (images des scènes)</div>
+      <div class="rating-opts">
+        <label><input type="radio" name="r3" value="1"> 1</label>
+        <label><input type="radio" name="r3" value="2"> 2</label>
+        <label><input type="radio" name="r3" value="3"> 3</label>
+        <label><input type="radio" name="r3" value="4"> 4</label>
+        <label><input type="radio" name="r3" value="5"> 5</label>
+      </div>
+    </div>
+    <div class="rating-grid">
+      <div class="rating-q">Fiabilité de la plateforme (pas de bug / coupure)</div>
+      <div class="rating-opts">
+        <label><input type="radio" name="r4" value="1"> 1</label>
+        <label><input type="radio" name="r4" value="2"> 2</label>
+        <label><input type="radio" name="r4" value="3"> 3</label>
+        <label><input type="radio" name="r4" value="4"> 4</label>
+        <label><input type="radio" name="r4" value="5"> 5</label>
+      </div>
+    </div>
+    <div class="rating-grid">
+      <div class="rating-q">Pertinence des questions par rapport à la conduite réelle</div>
+      <div class="rating-opts">
+        <label><input type="radio" name="r5" value="1"> 1</label>
+        <label><input type="radio" name="r5" value="2"> 2</label>
+        <label><input type="radio" name="r5" value="3"> 3</label>
+        <label><input type="radio" name="r5" value="4"> 4</label>
+        <label><input type="radio" name="r5" value="5"> 5</label>
+      </div>
+    </div>
+
+    <div class="field-full" style="margin-top:16px">
+      <label>Ce qui a bien fonctionné</label>
+      <textarea class="box"></textarea>
+    </div>
+    <div class="field-full">
+      <label>Ce qui doit être amélioré avant le déploiement national</label>
+      <textarea class="box"></textarea>
+    </div>
+    <div class="field-full">
+      <label>Questions des candidats les plus fréquentes</label>
+      <textarea class="box"></textarea>
+    </div>
+  </div>
+
+  <!-- SECTION 6 : Questions contestées -->
+  <div class="section">
+    <div class="section-title">6. Questions contestées par les candidats</div>
+    <div style="margin-bottom:10px;font-size:12px;color:var(--muted)">Si des candidats ont contesté la formulation ou la réponse d'une question, la noter ici.</div>
+    <table>
+      <tr><th>N° question (si connu)</th><th>Motif de la contestation</th><th>Décision de l'agent</th></tr>
+      <tr><td style="height:32px"></td><td></td><td></td></tr>
+      <tr><td style="height:32px"></td><td></td><td></td></tr>
+      <tr><td style="height:32px"></td><td></td><td></td></tr>
+    </table>
+  </div>
+
+  <!-- Signature -->
+  <div class="sig-grid">
+    <div class="sig-box">
+      <label>Signature de l'agent superviseur</label>
+      <div class="sig-line"></div>
+      <div class="sig-name">Nom et prénom : ……………………………………</div>
+    </div>
+    <div class="sig-box">
+      <label>Cachet et visa de la direction DNTT</label>
+      <div class="sig-line"></div>
+      <div class="sig-name">Date de réception : …………………………………</div>
+    </div>
+  </div>
+
+  <div style="margin-top:28px;font-size:11px;color:var(--muted);text-align:center;border-top:1px solid var(--border);padding-top:16px">
+    CodeRoute Guinée · Pilote Centre DNTT Kaloum · Document officiel · Envoyer à DataSphere Innovation et direction DNTT avant 18h le jour de la session
+  </div>
+
+</div>
+</body>
+</html>
