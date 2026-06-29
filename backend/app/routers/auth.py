@@ -120,7 +120,7 @@ def me(current_user: User = Depends(get_current_user)) -> User:
     return current_user
 
 
-@router.post("/change-password", status_code=status.HTTP_204_NO_CONTENT)
+@router.post("/change-password", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
 def change_password(
     payload: PasswordChangeRequest,
     db: Session = Depends(get_db),
