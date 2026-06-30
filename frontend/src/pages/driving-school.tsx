@@ -82,7 +82,7 @@ function errMsg(e: unknown, fallback = 'Erreur inattendue'): string {
 
 export function DrivingSchoolPage() {
   const { currentUser, isPresentationMode } = useAuthSession();
-  const isSchool = !isPresentationMode && currentUser?.role === 'driving_school';
+  const isSchool = currentUser?.role === 'driving_school';
 
   const MOCK_STUDENTS = [
     { id:'1', name:'Mamadou Diallo',    score:32, sessions:8,  status:'en_cours',  progress:80 },

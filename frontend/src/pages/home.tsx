@@ -85,7 +85,7 @@ function errMsg(e: unknown, fallback = 'Erreur inattendue'): string {
 type TarifPublic = { cle: string; libelle: string; montant_gnf: number; };
 
 export function HomePage() {
-  const { currentUser, isPresentationMode, role } = useAuthSession();
+  const { currentUser, role } = useAuthSession();
   const [tarifs, setTarifs] = useState<TarifPublic[]>([]);
 
   useEffect(() => {
@@ -110,9 +110,7 @@ export function HomePage() {
         <div>
           <span className="eyebrow" style={{ color: 'rgba(255,255,255,.6)' }}>Plateforme nationale</span>
           <h1>
-            {isPresentationMode
-              ? 'CodeRoute Guinée'
-              : `Bonjour, ${currentUser?.full_name?.split(' ')[0] ?? 'Agent'} `}
+            `Bonjour, ${currentUser?.full_name?.split(' ')[0] ?? 'Agent'}`
           </h1>
           <p>Examen officiel du code de la route — République de Guinée</p>
         </div>
