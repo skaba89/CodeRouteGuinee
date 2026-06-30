@@ -207,7 +207,7 @@ img { max-width: 100%; }
 .brand-text small {
   display: block;
   font-size: 9.5px;
-  color: rgba(255,255,255,.42);
+  color: rgba(255,255,255,.62);
   text-transform: uppercase;
   letter-spacing: .10em;
   line-height: 1;
@@ -231,11 +231,11 @@ img { max-width: 100%; }
   align-items: center;
   gap: 6px;
   height: 38px;
-  padding: 0 12px;
+  padding: 0 14px;
   border-radius: 8px;
-  font-size: 12.5px;
-  font-weight: 500;
-  color: rgba(255,255,255,.75);  /* contraste amélioré : .58 → .75 */
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255,255,255,.94);  /* contraste fort : lisibilité garantie sur navy */
   text-decoration: none;
   transition: all var(--t-fast);
   white-space: nowrap;
@@ -243,13 +243,13 @@ img { max-width: 100%; }
 }
 .nav-links a:hover {
   color: #fff;
-  background: rgba(255,255,255,.12);
+  background: rgba(255,255,255,.16);
   text-decoration: none;
 }
 .nav-links a.active {
   color: #fff;
-  background: rgba(255,255,255,.15);
-  font-weight: 600;
+  background: rgba(255,255,255,.20);
+  font-weight: 700;
 }
 /* Icône dans la nav */
 .nav-icon {
@@ -283,18 +283,20 @@ img { max-width: 100%; }
 }
 .session-panel span {
   font-size: 11.5px;
-  color: rgba(255,255,255,.55);
+  color: rgba(255,255,255,.78);
+  font-weight: 500;
   max-width: 180px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .session-panel button {
-  background: rgba(255,255,255,.09);
-  border: 1px solid rgba(255,255,255,.18);
-  color: rgba(255,255,255,.85);
+  background: rgba(255,255,255,.13);
+  border: 1.5px solid rgba(255,255,255,.3);
+  color: #fff;
+  font-weight: 600;
   border-radius: var(--r-sm);
-  padding: 5px 11px;
+  padding: 5px 12px;
   font-size: 11.5px;
   cursor: pointer;
   transition: all var(--t-fast);
@@ -312,22 +314,29 @@ img { max-width: 100%; }
   align-items: center;
   gap: 6px;
   padding: 0 10px;
-  font-size: 10px;
-  color: rgba(255,255,255,.35);
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255,255,255,.75);
   text-transform: uppercase;
   letter-spacing: .06em;
 }
 .role-switcher select,
 .locale-select {
-  background: rgba(255,255,255,.09);
-  border: 1px solid rgba(255,255,255,.18);
-  color: rgba(255,255,255,.8);
+  background: rgba(255,255,255,.14);
+  border: 1.5px solid rgba(255,255,255,.32);
+  color: #fff;
   border-radius: var(--r-sm);
-  padding: 4px 7px;
-  font-size: 11px;
+  padding: 4px 9px;
+  font-size: 12px;
+  font-weight: 600;
   cursor: pointer;
   min-height: unset;
   width: auto;
+}
+.role-switcher select:hover,
+.locale-select:hover {
+  background: rgba(255,255,255,.22);
+  border-color: rgba(255,255,255,.5);
 }
 .locale-switcher { margin-right: 2px; }
 
@@ -515,7 +524,7 @@ h3 { font-size: 15px; font-weight: 600; color: var(--ink); }
   font-weight: 700;
   letter-spacing: .12em;
   text-transform: uppercase;
-  color: rgba(255,255,255,.4);
+  color: rgba(255,255,255,.65);
 }
 
 /* ═══════════════════════════════════════════════════
@@ -560,26 +569,27 @@ button:focus-visible {
 .btn-gold    { background: var(--gold); color: var(--navy); }
 .btn-outline {
   background: transparent;
-  border-color: var(--border);
-  color: var(--ink2);
+  border: 1.5px solid var(--navy2);
+  color: var(--ink);
   box-shadow: var(--sh-xs);
+  font-weight: 600;
 }
 .btn-outline:hover:not(:disabled) {
   background: var(--bg);
-  border-color: #aab;
+  border-color: var(--navy);
   filter: none;
   transform: none;
 }
 .secondary-button {
   background: var(--surface);
-  color: var(--ink2);
-  border-color: var(--border);
+  color: var(--ink);
+  border: 1.5px solid var(--navy2);
   box-shadow: var(--sh-xs);
-  font-weight: 500;
+  font-weight: 600;
 }
 .secondary-button:hover:not(:disabled) {
   background: var(--bg);
-  border-color: #b0bac6;
+  border-color: var(--navy);
   filter: none;
   transform: none;
 }
