@@ -137,7 +137,7 @@ function AccountPage({ currentUser }: { currentUser: AuthUser | null }) {
 
       <div className="card">
         <div className="card-header"><span className="card-title">Changer le mot de passe</span></div>
-        <form className="pwd-form" onSubmit={handleSubmit}>
+        <form className="login-form" onSubmit={handleSubmit}>
           <label>Mot de passe actuel<input type="password" value={cur} onChange={e => setCur(e.target.value)} /></label>
           <label>Nouveau mot de passe (12 car. min.)<input type="password" value={nw} onChange={e => setNw(e.target.value)} /></label>
           <label>Confirmer<input type="password" value={conf} onChange={e => setConf(e.target.value)} /></label>
@@ -201,7 +201,7 @@ function LoginPage({
         </div>
 
         {!isPres && currentUser && (
-          <div className="auth-session-card">
+          <div className="card">
             <strong>Connecté : {currentUser.full_name}</strong>
             <span>{currentUser.email} · {currentUser.role}</span>
           </div>
@@ -216,7 +216,7 @@ function LoginPage({
         )}
 
         <div className="login-sep">Comptes de test disponibles</div>
-        <div className="demo-grid">
+        <div className="g2">
           {DEMO_ACCOUNTS.map(acc => (
             <button key={acc.role} type="button"
               className={`demo-btn${role === acc.role && !acc.email ? ' active' : ''}`}
@@ -328,8 +328,8 @@ export default function App() {
 
   return (
     <main className="app-shell">
-      <nav className="top-nav" role="navigation" aria-label="Navigation principale">
-        <a href="#/" className="brand-link">
+      <nav className="topbar" role="navigation" aria-label="Navigation principale">
+        <a href="#/" className="brand">
           <div className="brand-logo">CR</div>
           <div className="brand-text">
             <strong>CodeRoute Guinée</strong>
