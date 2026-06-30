@@ -110,7 +110,7 @@ export function HomePage() {
         <div>
           <span className="eyebrow" style={{ color: 'rgba(255,255,255,.6)' }}>Plateforme nationale</span>
           <h1>
-            `Bonjour, ${currentUser?.full_name?.split(' ')[0] ?? 'Agent'}`
+            {`Bonjour, ${currentUser?.full_name?.split(' ')[0] ?? 'Agent'}`}
           </h1>
           <p>Examen officiel du code de la route — République de Guinée</p>
         </div>

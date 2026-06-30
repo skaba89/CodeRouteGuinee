@@ -151,6 +151,7 @@ function AccountPage({ currentUser }: { currentUser: AuthUser | null }) {
 function LoginPage({ onLogin }: { onLogin: (email: string, pass: string) => Promise<void> }) {
   const [email, setEmail] = useState('');
   const [pass, setPass] = useState('');
+  const [showPass, setShowPass] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -169,45 +170,109 @@ function LoginPage({ onLogin }: { onLogin: (email: string, pass: string) => Prom
 
   return (
     <div className="login-screen">
-      <div className="login-card">
-        <div className="login-brand">
-          <div className="login-logo">CR</div>
-          <div>
-            <h2>CodeRoute Guinée</h2>
-            <p className="login-sub">Plateforme nationale DNTT</p>
+
+      {/* Panneau gauche — identité visuelle */}
+      <div className="login-visual" aria-hidden="true">
+        <div className="login-visual-inner">
+          <svg className="login-logo-big" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect width="80" height="80" rx="20" fill="rgba(255,255,255,.12)"/>
+            <text x="50%" y="54%" dominantBaseline="middle" textAnchor="middle"
+              fill="white" fontSize="32" fontWeight="900" fontFamily="Inter,sans-serif">CR</text>
+          </svg>
+          <h2 className="login-visual-title">CodeRoute<br/>Guinée</h2>
+          <p className="login-visual-sub">
+            Plateforme officielle d'examen du code de la route — République de Guinée
+          </p>
+          <div className="login-visual-flags">
+            <svg width="64" height="44" viewBox="0 0 64 44" style={{borderRadius:6,overflow:'hidden'}}>
+              <rect width="21.3" height="44" fill="#CE1126"/>
+              <rect x="21.3" width="21.4" height="44" fill="#FCD116"/>
+              <rect x="42.7" width="21.3" height="44" fill="#006B3F"/>
+            </svg>
+            <span>DNTT — Ministère des Transports</span>
           </div>
         </div>
+      </div>
 
-        <form className="login-form" onSubmit={handleSubmit}>
-          <label>
-            Adresse email
-            <input
-              type="email" value={email}
-              onChange={e => setEmail(e.target.value)}
-              placeholder="votre@email.com"
-              autoComplete="email" required
-            />
-          </label>
-          <label>
-            Mot de passe
-            <input
-              type="password" value={pass}
-              onChange={e => setPass(e.target.value)}
-              placeholder="••••••••••••"
-              autoComplete="current-password" required
-            />
-          </label>
-          <button type="submit" className="btn-success" style={{ width: '100%', minHeight: 44 }} disabled={loading}>
-            {loading ? 'Connexion…' : 'Se connecter'}
-          </button>
-          {status && <p className="form-error">{status}</p>}
-        </form>
+      {/* Panneau droit — formulaire */}
+      <div className="login-form-panel">
+        <div className="login-card">
 
-        <div style={{ marginTop: 20, textAlign: 'center', fontSize: 12, color: 'var(--muted)' }}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ verticalAlign: 'middle', marginRight: 4 }}>
-            <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-          </svg>
-          Connexion sécurisée — Plateforme officielle DNTT
+          <div className="login-brand">
+            <div className="login-logo">CR</div>
+            <div>
+              <h2 style={{fontSize:20,letterSpacing:'-.02em'}}>Connexion</h2>
+              <p className="login-sub">Plateforme nationale DNTT</p>
+            </div>
+          </div>
+
+          <form className="login-form" onSubmit={handleSubmit}>
+            <label>
+              Adresse email
+              <input
+                type="email" value={email}
+                onChange={e => setEmail(e.target.value)}
+                placeholder="votre@email.com"
+                autoComplete="email" required
+                autoFocus
+              />
+            </label>
+            <label>
+              Mot de passe
+              <div style={{position:'relative'}}>
+                <input
+                  type={showPass ? 'text' : 'password'}
+                  value={pass}
+                  onChange={e => setPass(e.target.value)}
+                  placeholder="••••••••••••"
+                  autoComplete="current-password" required
+                  style={{paddingRight: 44}}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPass(v => !v)}
+                  style={{
+                    position:'absolute', right:10, top:'50%', transform:'translateY(-50%)',
+                    background:'none', border:'none', color:'var(--muted)', cursor:'pointer',
+                    padding:4, minHeight:'unset', boxShadow:'none',
+                  }}
+                  tabIndex={-1}
+                  aria-label={showPass ? 'Masquer' : 'Afficher'}
+                >
+                  {showPass
+                    ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                    : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                  }
+                </button>
+              </div>
+            </label>
+
+            {status && (
+              <div className="login-error-box">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                {status}
+              </div>
+            )}
+
+            <button
+              type="submit"
+              className="btn-success"
+              style={{width:'100%', minHeight:46, fontSize:14, marginTop:4}}
+              disabled={loading || !email || !pass}
+            >
+              {loading
+                ? <><span className="spinner" style={{width:16,height:16,borderWidth:2}}/> Connexion…</>
+                : 'Se connecter →'
+              }
+            </button>
+          </form>
+
+          <div className="login-secure-badge">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            </svg>
+            Connexion chiffrée TLS — Plateforme officielle DNTT
+          </div>
         </div>
       </div>
     </div>
