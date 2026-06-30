@@ -162,8 +162,18 @@ function LoginPage({ onLogin }: { onLogin: (email: string, pass: string) => Prom
     setStatus(null);
     try {
       await onLogin(email, pass);
-    } catch {
-      setStatus('Identifiants incorrects. Vérifiez votre email et mot de passe.');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      // 500 = erreur serveur (probablement DB non configurée)
+      if (msg.includes('500') || msg.includes('Erreur interne')) {
+        setStatus('Erreur serveur. La base de données démarre. Réessayez dans 30 secondes.');
+      } else if (msg.includes('503') || msg.includes('indisponible')) {
+        setStatus('Base de données en cours de démarrage (cold start Neon). Réessayez dans 15 secondes.');
+      } else if (msg.includes('Failed to fetch') || msg.includes('ERR_FAILED')) {
+        setStatus('Impossible de joindre le serveur. Vérifiez votre connexion internet.');
+      } else {
+        setStatus('Identifiants incorrects. Vérifiez votre email et mot de passe.');
+      }
       setLoading(false);
     }
   }

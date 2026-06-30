@@ -28,8 +28,9 @@ export function InstallPWA() {
     if (dismissed && Date.now() - dismissed < DISMISS_TTL) return;
 
     const onPrompt = (e: Event) => {
-      e.preventDefault();
+      // Stocker l'événement AVANT preventDefault pour éviter le warning Chrome
       setDeferredPrompt(e as BeforeInstallPromptEvent);
+      e.preventDefault();
       setVisible(true);
     };
 
