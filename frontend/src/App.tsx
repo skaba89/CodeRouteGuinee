@@ -310,30 +310,32 @@ export default function App() {
     <main className="app-shell">
       {showTopbar && (
         <header className="topbar">
+          {/* Brand */}
           <a href="#/" className="brand">
             <div className="brand-logo">CR</div>
             <div className="brand-text">
               <strong>CodeRoute Guinée</strong>
-              <small>Plateforme nationale DNTT</small>
+              <small>Plateforme DNTT</small>
             </div>
           </a>
 
+          {/* Navigation principale */}
           <nav className="nav-links" role="navigation" aria-label="Navigation principale">
             {visibleNav.map(item => {
               const r = item.href.replace('#/', '') || 'home';
               const label = t(`nav.${r}`) !== `nav.${r}` ? t(`nav.${r}`) : item.label;
               const NAV_ICONS: Record<string, React.ReactElement> = {
-                home:        <IconHome size={15} />,
-                training:    <IconTarget size={15} />,
-                elearning:   <IconBook size={15} />,
-                candidate:   <IconUser size={15} />,
-                center:      <IconBuilding size={15} />,
-                school:      <IconGraduate size={15} />,
-                ministerial: <IconLandmark size={15} />,
-                admin:       <IconDashboard size={15} />,
-                dossier:     <IconClipboard size={15} />,
-                results:     <IconBarChart size={15} />,
-                exam:        <IconTarget size={15} />,
+                home:        <IconHome size={14} />,
+                training:    <IconTarget size={14} />,
+                elearning:   <IconBook size={14} />,
+                candidate:   <IconUser size={14} />,
+                center:      <IconBuilding size={14} />,
+                school:      <IconGraduate size={14} />,
+                ministerial: <IconLandmark size={14} />,
+                admin:       <IconDashboard size={14} />,
+                dossier:     <IconClipboard size={14} />,
+                results:     <IconBarChart size={14} />,
+                exam:        <IconTarget size={14} />,
               };
               return (
                 <a key={item.href} href={item.href} className={route === r ? 'active' : ''}>
@@ -342,19 +344,27 @@ export default function App() {
                 </a>
               );
             })}
-            <a href="#/account" className={route === 'account' ? 'active' : ''}>
-              <span className="nav-icon" aria-hidden="true"><IconSettings size={15} /></span>
-              <span>Mon compte</span>
-            </a>
           </nav>
 
-          <div className="session-panel">
+          {/* Contrôles droite */}
+          <div className="topbar-actions">
             <LocaleSwitcher />
-            <span title={`${currentUser?.full_name} · ${role}`}>
-              {currentUser?.full_name?.split(' ')[0] ?? 'Agent'}
-            </span>
             <ThemeToggle compact />
-            <button type="button" onClick={handleLogout}>Déconnexion</button>
+            <div className="topbar-user">
+              <div className="topbar-avatar">
+                {(currentUser?.full_name?.[0] ?? 'A').toUpperCase()}
+              </div>
+              <span className="topbar-username">
+                {currentUser?.full_name?.split(' ')[0] ?? 'Agent'}
+              </span>
+              <button type="button" className="topbar-logout" onClick={handleLogout} title="Déconnexion">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                  <polyline points="16 17 21 12 16 7"/>
+                  <line x1="21" y1="12" x2="9" y2="12"/>
+                </svg>
+              </button>
+            </div>
           </div>
         </header>
       )}

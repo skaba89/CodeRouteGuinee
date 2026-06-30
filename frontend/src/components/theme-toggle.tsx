@@ -55,17 +55,16 @@ export function ThemeToggle({ compact = false }: { compact?: boolean }) {
   if (compact) {
     return (
       <button
+        type="button"
         onClick={toggle}
-        title={isDark ? 'Passer en mode clair' : 'Passer en mode sombre'}
-        style={{
-          background: 'none', border: 'none', cursor: 'pointer',
-          fontSize: 18, lineHeight: 1, padding: '4px 6px',
-          borderRadius: 6,
-          color: 'inherit',
-        }}
+        title={isDark ? 'Mode clair' : 'Mode sombre'}
         aria-label={isDark ? 'Mode clair' : 'Mode sombre'}
+        className="topbar-logout"
+        style={{ color: 'rgba(255,255,255,.72)' }}
       >
-        {isDark ? '' : ''}
+        {isDark
+          ? <IconSun size={14} />
+          : <IconMoon size={14} />}
       </button>
     );
   }

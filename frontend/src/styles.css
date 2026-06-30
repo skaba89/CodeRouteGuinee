@@ -169,131 +169,155 @@ h3 { font-size: 15.5px; font-weight: 600; font-family: var(--font-ui); color: va
 
 /* ── Topbar ─────────────────────────────────────────────────────── */
 .topbar {
-  position: sticky;
-  top: 0; z-index: 200;
-  display: flex;
-  align-items: center;
-  height: 56px;
-  padding: 0 20px;
+  position: sticky; top: 0; z-index: 200;
+  display: flex; align-items: center;
+  height: 58px; padding: 0 24px;
   background: var(--navy);
-  box-shadow: 0 1px 0 rgba(255,255,255,.06), 0 2px 8px rgba(0,0,0,.2);
+  border-bottom: 1px solid rgba(255,255,255,.07);
+  box-shadow: 0 2px 12px rgba(0,0,0,.22);
   gap: 0;
 }
-/* Bande tricolore Guinée en bas */
 .topbar::after {
   content: '';
-  position: absolute;
-  bottom: 0; left: 0; right: 0; height: 3px;
+  position: absolute; bottom: 0; left: 0; right: 0; height: 2.5px;
   background: linear-gradient(90deg,
-    #CE1126 0% 33.33%,
-    #FCD116 33.33% 66.66%,
-    #006B3F 66.66% 100%);
+    #CE1126 0% 33.33%, #FCD116 33.33% 66.66%, #006B3F 66.66% 100%);
 }
 
-/* Logo brand */
+/* ── Brand ── */
 .brand {
-  display: flex; align-items: center;
-  gap: 10px;
-  text-decoration: none;
-  flex-shrink: 0;
-  margin-right: 24px;
+  display: flex; align-items: center; gap: 10px;
+  text-decoration: none; flex-shrink: 0; margin-right: 28px;
 }
 .brand:hover { text-decoration: none; }
 .brand-logo {
-  width: 36px; height: 36px;
-  border-radius: 9px;
-  background: linear-gradient(135deg, var(--guinea-green), #009460);
+  width: 34px; height: 34px; border-radius: 8px;
+  background: linear-gradient(140deg, #006B3F 0%, #009455 100%);
   display: flex; align-items: center; justify-content: center;
-  font-weight: 900; font-size: 14px; color: #fff;
-  letter-spacing: -.03em;
-  box-shadow: 0 2px 6px rgba(0,107,63,.5);
+  font-weight: 900; font-size: 13px; color: #fff; letter-spacing: -.03em;
   flex-shrink: 0;
+  box-shadow: 0 1px 4px rgba(0,107,63,.5), inset 0 1px 0 rgba(255,255,255,.15);
 }
 .brand-text strong {
-  display: block;
-  font-size: 14px; font-weight: 800;
-  color: #fff; letter-spacing: -.02em; line-height: 1.2;
+  display: block; font-family: var(--font-ui);
+  font-size: 13.5px; font-weight: 700;
+  color: #fff; letter-spacing: -.01em; line-height: 1.2;
 }
 .brand-text small {
-  display: block;
-  font-size: 9.5px; color: rgba(255,255,255,.62);
-  text-transform: uppercase; letter-spacing: .10em; line-height: 1;
-  margin-top: 2px;
+  display: block; font-size: 9px; color: rgba(255,255,255,.5);
+  text-transform: uppercase; letter-spacing: .12em; margin-top: 1px;
 }
 
-/* Navigation */
+/* ── Nav ── */
 .nav-links {
   display: flex; align-items: center;
-  height: 100%; flex: 1; gap: 1px;
+  height: 100%; flex: 1; gap: 2px;
   overflow-x: auto; scrollbar-width: none;
 }
 .nav-links::-webkit-scrollbar { display: none; }
 .nav-links a {
-  display: flex; align-items: center; gap: 6px;
-  height: 40px; padding: 0 13px;
-  border-radius: 8px;
-  font-size: 13px; font-weight: 600;
-  color: rgba(255,255,255,.94);
-  text-decoration: none;
-  white-space: nowrap;
-  position: relative;
+  display: flex; align-items: center; gap: 5px;
+  height: 36px; padding: 0 11px;
+  border-radius: 7px;
+  font-family: var(--font-ui);
+  font-size: 12.5px; font-weight: 500;
+  color: rgba(255,255,255,.78);
+  text-decoration: none; white-space: nowrap; position: relative;
   transition: background var(--t-fast), color var(--t-fast);
 }
-.nav-links a:hover { color: #fff; background: rgba(255,255,255,.14); }
-.nav-links a.active { color: #fff; background: rgba(255,255,255,.18); font-weight: 700; }
+.nav-links a:hover {
+  color: #fff; background: rgba(255,255,255,.1);
+  text-decoration: none;
+}
+.nav-links a.active {
+  color: #fff; background: rgba(255,255,255,.13); font-weight: 600;
+}
 .nav-links a.active::after {
   content: '';
-  position: absolute; bottom: 0; left: 10px; right: 10px;
-  height: 2.5px; border-radius: 2px 2px 0 0;
-  background: var(--guinea-green);
+  position: absolute; bottom: -1px; left: 8px; right: 8px;
+  height: 2px; border-radius: 2px 2px 0 0;
+  background: #006B3F;
 }
-.nav-icon { display: flex; align-items: center; opacity: .8; flex-shrink: 0; }
-.nav-links a.active .nav-icon { opacity: 1; }
+.nav-icon {
+  display: flex; align-items: center;
+  opacity: .7; flex-shrink: 0;
+}
+.nav-links a.active .nav-icon,
+.nav-links a:hover .nav-icon { opacity: 1; }
 
-/* Role / locale switcher */
-.role-switcher {
+/* ── Contrôles droite ── */
+.topbar-actions {
   display: flex; align-items: center; gap: 6px;
-  padding: 0 10px;
-  font-size: 11px; font-weight: 600;
-  color: rgba(255,255,255,.75);
-  text-transform: uppercase; letter-spacing: .06em;
+  margin-left: auto; flex-shrink: 0; padding-left: 16px;
+  border-left: 1px solid rgba(255,255,255,.08);
 }
-.role-switcher select, .locale-select {
-  background: rgba(255,255,255,.13);
-  border: 1.5px solid rgba(255,255,255,.28);
-  color: #fff; font-size: 12px; font-weight: 600;
-  border-radius: var(--r-sm); padding: 4px 9px;
-  cursor: pointer; width: auto; min-height: unset;
-  transition: background var(--t-fast), border-color var(--t-fast);
-}
-.role-switcher select:hover, .locale-select:hover {
-  background: rgba(255,255,255,.2); border-color: rgba(255,255,255,.5);
-}
-.locale-switcher { margin-right: 2px; }
 
-/* Session panel */
-.session-panel {
-  display: flex; align-items: center; gap: 8px;
-  padding: 0 14px;
-  border-left: 1px solid rgba(255,255,255,.1);
-  height: 100%; flex-shrink: 0;
+/* Locale select compact */
+.locale-switcher {
+  position: relative; display: flex; align-items: center;
 }
-.session-panel span {
-  font-size: 11.5px; font-weight: 500;
-  color: rgba(255,255,255,.82);
-  max-width: 180px;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+.locale-select {
+  position: absolute; inset: 0; opacity: 0;
+  width: 100%; cursor: pointer;
+  border: none; background: transparent;
 }
-.session-panel button {
-  background: rgba(255,255,255,.12);
-  border: 1.5px solid rgba(255,255,255,.28);
-  color: #fff; font-weight: 600;
-  border-radius: var(--r-sm);
-  padding: 5px 12px; font-size: 11.5px;
-  cursor: pointer; min-height: unset; white-space: nowrap;
+.locale-label {
+  display: flex; align-items: center;
+  height: 30px; padding: 0 9px;
+  background: rgba(255,255,255,.09);
+  border: 1px solid rgba(255,255,255,.16);
+  border-radius: 6px;
+  font-family: var(--font-ui);
+  font-size: 11px; font-weight: 700;
+  color: rgba(255,255,255,.88);
+  letter-spacing: .04em; cursor: pointer;
   transition: background var(--t-fast);
+  pointer-events: none;
 }
-.session-panel button:hover { background: rgba(255,255,255,.22); }
+.locale-switcher:hover .locale-label {
+  background: rgba(255,255,255,.16);
+  border-color: rgba(255,255,255,.3);
+}
+
+/* User block */
+.topbar-user {
+  display: flex; align-items: center; gap: 6px;
+  padding: 0 4px;
+}
+.topbar-avatar {
+  width: 28px; height: 28px; border-radius: 50%;
+  background: rgba(255,255,255,.16);
+  border: 1.5px solid rgba(255,255,255,.25);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700; color: #fff;
+  flex-shrink: 0;
+}
+.topbar-username {
+  font-size: 12px; font-weight: 600;
+  color: rgba(255,255,255,.88);
+  max-width: 120px; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap;
+}
+.topbar-logout {
+  display: flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; border-radius: 6px;
+  background: transparent;
+  border: 1px solid rgba(255,255,255,.14);
+  color: rgba(255,255,255,.65);
+  cursor: pointer; min-height: unset; padding: 0;
+  transition: background var(--t-fast), color var(--t-fast), border-color var(--t-fast);
+  box-shadow: none;
+}
+.topbar-logout:hover {
+  background: rgba(206,17,38,.35);
+  border-color: rgba(206,17,38,.5);
+  color: #fff;
+  transform: none; filter: none; box-shadow: none;
+}
+
+/* Rétro-compat classes non utilisées mais gardées */
+.session-panel { display: none; }
+.role-switcher  { display: none; }
 
 /* ── Screen (zone de contenu) ───────────────────────────────────── */
 .screen {
