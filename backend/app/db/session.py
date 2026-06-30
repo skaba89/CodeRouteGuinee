@@ -184,8 +184,23 @@ def _sqlite_add_columns_if_missing() -> None:
 
 
 def get_db() -> Generator[Session, None, None]:
-    db = SessionLocal()
+    """Dépendance FastAPI — ouvre une session DB et la ferme proprement.
+    Si la DB est inaccessible, retourne une 503 lisible (pas un 500 opaque).
+    """
+    from fastapi import HTTPException
+    import logging
+    try:
+        db = SessionLocal()
+    except Exception as e:
+        logging.getLogger("app.db").error("Impossible d'ouvrir une session DB : %s", e)
+        raise HTTPException(
+            status_code=503,
+            detail="Base de données temporairement indisponible. Réessayez dans quelques secondes.",
+        )
     try:
         yield db
+    except Exception:
+        db.rollback()
+        raise
     finally:
         db.close()

@@ -151,9 +151,24 @@ if os.environ.get("ENVIRONMENT", "development").lower() == "production":
 # ── Handler d'erreur global 500 ────────────────────────────────────────────
 
 
+def _cors_headers(request: Request) -> dict:
+    """Retourne les headers CORS corrects pour une requête donnée."""
+    origin = request.headers.get("origin", "")
+    allowed = settings.cors_origin_list
+    if origin in allowed or "*" in allowed:
+        return {
+            "Access-Control-Allow-Origin": origin,
+            "Access-Control-Allow-Credentials": "true",
+            "Access-Control-Allow-Methods": "GET,POST,PUT,PATCH,DELETE,OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type,Authorization,X-CSRF-Token",
+        }
+    return {}
+
+
 @app.exception_handler(Exception)
 async def global_exception_handler(_req: Request, exc: Exception) -> _JSONResponse:
-    """Capture toutes les erreurs 500 non gérées — envoie à Sentry, retourne JSON propre."""
+    """Capture toutes les erreurs 500 non gérées — envoie à Sentry, retourne JSON propre.
+    Inclut les headers CORS pour que le frontend puisse lire l'erreur."""
     from app.sentry import capture_exception as _sentry_cap
     _sentry_cap(exc, context={
         "method": _req.method,
@@ -167,6 +182,7 @@ async def global_exception_handler(_req: Request, exc: Exception) -> _JSONRespon
     return _JSONResponse(
         status_code=500,
         content={"detail": "Erreur interne du serveur. L'équipe technique a été notifiée."},
+        headers=_cors_headers(_req),
     )
 
 
@@ -180,6 +196,7 @@ async def validation_exception_handler(_req: Request, exc: _ValidationError) -> 
     return _JSONResponse(
         status_code=422,
         content={"detail": "Données invalides", "errors": errors},
+        headers=_cors_headers(_req),
     )
 
 
