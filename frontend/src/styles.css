@@ -931,3 +931,22 @@ hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
   h1 { font-size: 22px; }
   .stat-value { font-size: 24px; }
 }
+
+/* ── Examen — transitions médias et illustrations ──────────────────────── */
+@keyframes examMediaPop {
+  from { opacity: 0; transform: translateY(4px) scale(.99); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.exam-media-fade {
+  animation: examMediaPop .32s cubic-bezier(.22,1,.36,1);
+}
+.exam-media-fade svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* Grille navigation questions — feedback hover plus net */
+.screen [aria-label="Examen en cours"] button[type="button"]:hover {
+  filter: brightness(1.04);
+}

@@ -386,12 +386,15 @@ export function ExamPage({ locale, onLocaleChange }: Props) {
           {/* ── Colonne média (si présent) ──────────────────────────────── */}
           {hasMedia && (
             <div style={{ position: 'sticky', top: 76 }}>
-              <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16, overflow: 'hidden', boxShadow: 'var(--sh)' }}>
+              <div key={idx} className="exam-media-fade" style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16, overflow: 'hidden', boxShadow: 'var(--sh)' }}>
                 {/* Entête zone média */}
                 <div style={{ padding: '10px 16px', background: 'var(--bg)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 6 }}>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
                   <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.07em' }}>
-                    {q.mediaType === 'sign' ? 'Panneau de signalisation' : q.mediaType === 'video' ? 'Vidéo pédagogique' : 'Situation de conduite'}
+                    {q.mediaType === 'sign' ? 'Panneau de signalisation' : q.mediaType === 'video' ? 'Vidéo pédagogique' : q.mediaType === 'image' ? 'Photo réelle' : 'Situation de conduite'}
+                  </span>
+                  <span style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--muted)', opacity: .6 }}>
+                    Question {idx + 1}
                   </span>
                 </div>
                 {/* Média */}

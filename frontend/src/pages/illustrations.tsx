@@ -1,4 +1,5 @@
 import React from 'react';
+import { SIGN_ILLUSTRATION_MAP } from './illustrations_signs';
 /**
  * CodeRoute Guinée — Illustrations style Ornikar
  * Vue first-person conducteur : route en perspective, ciel, végétation,
@@ -155,7 +156,7 @@ export function IllusGiveWay({ className, style }: IllusProps) {
 // ─────────────────────────────────────────────────────────────────────────
 // 3. LIMITATION 50 — entrée agglomération
 // ─────────────────────────────────────────────────────────────────────────
-export function IllusSpeed50({ className, style }: IllusProps) {
+export function IllusSpeed50({ className, style, speed = '50' }: IllusProps & { speed?: string }) {
   return (
     <svg viewBox="0 0 800 420" xmlns="http://www.w3.org/2000/svg" className={className} style={style}>
       <defs>
@@ -201,8 +202,8 @@ export function IllusSpeed50({ className, style }: IllusProps) {
       <Pole x={543} yTop={186}/>
       <circle cx="570" cy="164" r="36" fill="white" stroke="#C0392B" strokeWidth="10"/>
       <circle cx="570" cy="164" r="25" fill="white" stroke="#eee" strokeWidth="1"/>
-      <text x="570" y="174" textAnchor="middle" fill="#111" fontSize="26"
-        fontWeight="bold" fontFamily="Arial Black,sans-serif">50</text>
+      <text x="570" y="174" textAnchor="middle" fill="#111" fontSize={speed.length > 2 ? 20 : 26}
+        fontWeight="bold" fontFamily="Arial Black,sans-serif">{speed}</text>
       <rect x="544" y="204" width="54" height="22" rx="3" fill="#1a2a5a" stroke="white" strokeWidth="1.5"/>
       <text x="571" y="219" textAnchor="middle" fill="white" fontSize="9" fontWeight="bold">CONAKRY</text>
       <Dashboard/>
@@ -704,14 +705,11 @@ export function IllusRoundabout({ className, style }: IllusProps) {
 type IllusComponent = (props: IllusProps) => React.ReactElement;
 
 export const ILLUSTRATION_MAP: Record<string, IllusComponent> = {
-  // Panneaux
+  // Panneaux — vitesse (prop speed pour réutiliser le même gabarit visuel)
   'stop':                    IllusStop,
   'give_way':                IllusGiveWay,
   'speed_50':                IllusSpeed50,
-  'speed_30':                IllusSpeed50,   // même rendu, texte variable → TO-DO
-  'speed_70':                IllusSpeed50,
-  'speed_90':                IllusSpeed50,
-  'speed_100':               IllusSpeed50,
+  'speed_70':                (p) => IllusSpeed50({ ...p, speed: '70' } as any),
   'roundabout':              IllusRoundabout,
   // Feux
   'traffic_light_red':       IllusTrafficLightRed,
@@ -724,6 +722,128 @@ export const ILLUSTRATION_MAP: Record<string, IllusComponent> = {
   'rain_driving':                IllusRainDriving,
   'situation_safe_distance':     IllusSafeDistance,
   'situation_emergency_vehicle': IllusAmbulance,
-  'alcohol_scene':               IllusAmbulance,  // fallback visuel
-  'first_aid':                   IllusAmbulance,  // fallback visuel
+  'alcohol_scene':               IllusAlcoholCheck,
+  'first_aid':                   IllusFirstAid,
+  // Panneaux complémentaires — illustrations_signs.tsx
+  ...SIGN_ILLUSTRATION_MAP,
 };
+
+// ─────────────────────────────────────────────────────────────────────────
+// CONTRÔLE ALCOOLÉMIE — agent + éthylotest, vue conducteur arrêté
+// ─────────────────────────────────────────────────────────────────────────
+export function IllusAlcoholCheck({ className, style }: IllusProps) {
+  return (
+    <svg viewBox="0 0 800 420" xmlns="http://www.w3.org/2000/svg" className={className} style={style}
+      role="img" aria-label="Contrôle d'alcoolémie par un agent — éthylotest">
+      <defs>
+        <linearGradient id="i-skyalc" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#0a1428"/>
+          <stop offset="55%" stopColor="#16243d"/>
+          <stop offset="100%" stopColor="#242424"/>
+        </linearGradient>
+        <radialGradient id="i-gyro-b" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stopColor="#0055ff" stopOpacity=".75"/>
+          <stop offset="100%" stopColor="#0055ff" stopOpacity="0"/>
+        </radialGradient>
+        <radialGradient id="i-gyro-r" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stopColor="#ff2200" stopOpacity=".75"/>
+          <stop offset="100%" stopColor="#ff2200" stopOpacity="0"/>
+        </radialGradient>
+      </defs>
+      <rect width="800" height="420" fill="url(#i-skyalc)"/>
+      {/* Étoiles */}
+      {[[70,30],[180,18],[300,40],[420,15],[540,32],[660,20],[740,42]].map(([x,y],i)=>(
+        <circle key={i} cx={x} cy={y} r="1.4" fill="white" opacity={.5+i*0.05}/>
+      ))}
+      <Grass/>
+      <Road/>
+      <Trees/>
+      {/* Gyrophares véhicule police gauche */}
+      <rect x="40" y="248" width="120" height="50" rx="6" fill="#0d1d2e"/>
+      <rect x="44" y="240" width="112" height="9" rx="3" fill="#0a0a0a"/>
+      <ellipse cx="72" cy="240" rx="13" ry="5" fill="url(#i-gyro-b)"/>
+      <ellipse cx="72" cy="240" rx="7" ry="3" fill="#3a7aff"/>
+      <ellipse cx="128" cy="240" rx="13" ry="5" fill="url(#i-gyro-r)"/>
+      <ellipse cx="128" cy="240" rx="7" ry="3" fill="#ff5533"/>
+      <ellipse cx="100" cy="350" rx="100" ry="14" fill="rgba(0,90,255,.08)"/>
+      <ellipse cx="100" cy="350" rx="60" ry="10" fill="rgba(255,40,0,.06)"/>
+      {/* Agent silhouette */}
+      <ellipse cx="430" cy="232" rx="16" ry="20" fill="#d8a878"/>
+      <rect x="412" y="252" width="36" height="58" rx="6" fill="#0c3d22"/>
+      <rect x="412" y="252" width="36" height="14" fill="#0a2e18"/>
+      <rect x="402" y="262" width="14" height="38" rx="4" fill="#0c3d22"/>
+      <rect x="446" y="262" width="14" height="38" rx="4" fill="#0c3d22"/>
+      {/* Bras tenant éthylotest */}
+      <rect x="450" y="268" width="32" height="9" rx="3" fill="#222" transform="rotate(-18 450 272)"/>
+      <rect x="478" y="255" width="14" height="22" rx="3" fill="#e8e8e8" stroke="#999" strokeWidth="1"/>
+      <rect x="481" y="258" width="8" height="8" fill="#0a8a4a"/>
+      {/* Casquette */}
+      <ellipse cx="430" cy="218" rx="17" ry="8" fill="#0a2e18"/>
+      <rect x="418" y="206" width="24" height="14" rx="6" fill="#0a2e18"/>
+      {/* Voiture arrêtée (vue conducteur) */}
+      <rect x="312" y="252" width="168" height="58" fill="#2a2a2a" rx="7"/>
+      <rect x="320" y="256" width="60" height="38" fill="#3a6070" rx="3" opacity=".84"/>
+      <rect x="392" y="256" width="60" height="38" fill="#3a6070" rx="3" opacity=".84"/>
+      <ellipse cx="336" cy="312" rx="17" ry="9" fill="#111"/>
+      <ellipse cx="458" cy="312" rx="17" ry="9" fill="#111"/>
+      {/* Panneau taux légal */}
+      <rect x="600" y="190" width="160" height="92" rx="10" fill="rgba(255,255,255,.06)" stroke="#C0392B" strokeWidth="2"/>
+      <text x="680" y="216" textAnchor="middle" fill="#f1c40f" fontSize="13" fontWeight="bold" fontFamily="Arial,sans-serif">TAUX LÉGAL</text>
+      <text x="680" y="244" textAnchor="middle" fill="white" fontSize="20" fontWeight="bold" fontFamily="Arial Black,sans-serif">0,5 g/L</text>
+      <text x="680" y="262" textAnchor="middle" fill="rgba(255,255,255,.55)" fontSize="10">Permis probatoire</text>
+      <text x="680" y="276" textAnchor="middle" fill="#ff6b5b" fontSize="13" fontWeight="bold">0,2 g/L</text>
+      <Dashboard dark/>
+    </svg>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// PREMIERS SECOURS — accident, triangle, croix rouge
+// ─────────────────────────────────────────────────────────────────────────
+export function IllusFirstAid({ className, style }: IllusProps) {
+  return (
+    <svg viewBox="0 0 800 420" xmlns="http://www.w3.org/2000/svg" className={className} style={style}
+      role="img" aria-label="Accident de la route — premiers secours, triangle de signalisation">
+      <defs>
+        <linearGradient id="i-skyfa" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#6aa8cc"/>
+          <stop offset="100%" stopColor="#aed4e8"/>
+        </linearGradient>
+      </defs>
+      <rect width="800" height="420" fill="url(#i-skyfa)"/>
+      <Clouds y={66}/>
+      <Grass/>
+      <Road/>
+      <Trees/>
+      {/* Véhicule accidenté légèrement de travers */}
+      <g transform="rotate(-6 280 275)">
+        <rect x="200" y="248" width="160" height="58" rx="7" fill="#C0392B"/>
+        <rect x="208" y="252" width="56" height="36" fill="#8a2a2a" rx="3" opacity=".7"/>
+        <rect x="276" y="252" width="56" height="36" fill="#8a2a2a" rx="3" opacity=".7"/>
+        <ellipse cx="224" cy="306" rx="16" ry="9" fill="#111"/>
+        <ellipse cx="340" cy="306" rx="16" ry="9" fill="#111"/>
+      </g>
+      {/* Triangle de signalisation au sol, en avant */}
+      <polygon points="470,330 500,278 530,330" fill="#F5C518" stroke="#0A2540" strokeWidth="4"/>
+      <polygon points="470,326 500,286 530,326" fill="none" stroke="#0A2540" strokeWidth="1.5" opacity=".4"/>
+      {/* Personne au sol secourue (silhouette PLS schématique) */}
+      <ellipse cx="395" cy="350" rx="46" ry="9" fill="rgba(0,0,0,.18)"/>
+      <ellipse cx="368" cy="340" rx="9" ry="9" fill="#d8a878"/>
+      <path d="M376,344 Q400,348 422,344 Q430,348 430,354 L370,356 Q364,350 376,344 Z" fill="#1A6FC4"/>
+      {/* Secouriste agenouillé */}
+      <ellipse cx="470" cy="300" rx="11" ry="13" fill="#d8a878"/>
+      <path d="M462,312 Q470,340 486,348 L498,338 Q486,326 480,312 Z" fill="#C0392B"/>
+      <rect x="478" y="330" width="12" height="22" rx="4" fill="#C0392B" transform="rotate(35 484 340)"/>
+      {/* Trousse premiers secours */}
+      <rect x="555" y="320" width="46" height="32" rx="4" fill="white" stroke="#C0392B" strokeWidth="2"/>
+      <rect x="572" y="328" width="12" height="16" fill="#C0392B"/>
+      <rect x="566" y="334" width="24" height="6" fill="#C0392B"/>
+      {/* Panneau croix hôpital lointain */}
+      <rect x="660" y="160" width="64" height="64" rx="8" fill="#C0392B"/>
+      <rect x="678" y="174" width="28" height="12" fill="white"/>
+      <rect x="686" y="166" width="12" height="28" fill="white"/>
+      <text x="692" y="246" textAnchor="middle" fill="#0A2540" fontSize="10" fontWeight="bold">Hôpital — 5 km</text>
+      <Dashboard/>
+    </svg>
+  );
+}
