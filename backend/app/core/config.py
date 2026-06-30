@@ -13,8 +13,8 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 120
     database_url: str = "sqlite:///./coderoute.db"
     auto_create_tables: bool = True
-    cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
-    allowed_hosts: str = "localhost,127.0.0.1,testserver"
+    cors_origins: str = "https://coderouteguinee-frontend.onrender.com,http://localhost:5173,http://127.0.0.1:5173"
+    allowed_hosts: str = "coderouteguinee-backend.onrender.com,localhost,127.0.0.1,testserver"
     enable_api_docs: bool = True
     bootstrap_admin_email: str | None = None
     bootstrap_admin_password: str | None = None

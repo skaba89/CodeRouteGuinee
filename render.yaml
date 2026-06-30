@@ -47,7 +47,9 @@ services:
 
       # CORS — ajuster avec l'URL réelle du frontend après déploiement
       - key: CORS_ORIGINS
-        value: "https://coderoute-frontend.onrender.com"
+        value: "https://coderouteguinee-frontend.onrender.com,http://localhost:5173,http://127.0.0.1:5173"
+      - key: ALLOWED_HOSTS
+        value: "coderouteguinee-backend.onrender.com,localhost,127.0.0.1"
 
       # Mobile Money
       - key: MOBILE_MONEY_MODE
