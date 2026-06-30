@@ -202,7 +202,7 @@ export function HomePage() {
           </div>
           {tarifs.length > 0 && (
             <div style={{ marginBottom: 16, padding: '12px 16px',
-              background: 'var(--primary-light, #e8f5e9)', borderRadius: 10 }}>
+              background: 'var(--primary-light, #E6F3EC)', borderRadius: 10 }}>
               <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--primary)',
                 marginBottom: 8 }}>Frais d'examen en vigueur</div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>

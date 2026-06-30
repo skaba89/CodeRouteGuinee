@@ -1,7 +1,8 @@
 /* ═══════════════════════════════════════════════════════════════
-   CodeRoute Guinée — Design System v4
+   CodeRoute Guinée — Design System v5
    Identité : vert forêt guinéen × or DNTT × blanc institutionnel
-   Signature : barre d'accentuation verte sur les éléments actifs
+   Typographie : Source Serif 4 (autorité, titres) × Inter (UI, corps)
+   Signature : liseré tricolore, entrées orchestrées, ombres calmes
    ═══════════════════════════════════════════════════════════════ */
 
 :root {
@@ -37,30 +38,67 @@
   --primary-light:  #E6F3EC;
   --primary-text:   var(--guinea-green);
 
+  /* Polices */
+  --font-display: 'Source Serif 4', Georgia, 'Times New Roman', serif;
+  --font-ui:      'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+
   /* Rayons */
-  --r-sm: 5px;
-  --r:    9px;
-  --r-lg: 13px;
-  --r-xl: 18px;
+  --r-sm: 6px;
+  --r:    10px;
+  --r-lg: 14px;
+  --r-xl: 20px;
 
-  /* Ombres affinées */
-  --sh-xs: 0 1px 3px rgba(13,33,55,.07), 0 1px 2px rgba(13,33,55,.04);
-  --sh-sm: 0 2px 6px rgba(13,33,55,.09), 0 1px 3px rgba(13,33,55,.05);
-  --sh:    0 4px 12px rgba(13,33,55,.10), 0 2px 4px rgba(13,33,55,.06);
-  --sh-lg: 0 20px 40px rgba(13,33,55,.14), 0 4px 12px rgba(13,33,55,.08);
+  /* Ombres calmes — diffuses, pas de halo dur */
+  --sh-xs: 0 1px 2px rgba(13,33,55,.05), 0 1px 1px rgba(13,33,55,.04);
+  --sh-sm: 0 3px 8px rgba(13,33,55,.07), 0 1px 3px rgba(13,33,55,.05);
+  --sh:    0 8px 20px rgba(13,33,55,.09), 0 2px 6px rgba(13,33,55,.05);
+  --sh-lg: 0 24px 48px rgba(13,33,55,.16), 0 6px 16px rgba(13,33,55,.08);
 
-  /* Transitions */
-  --t-fast: 120ms ease;
-  --t:      200ms ease;
-  --t-slow: 350ms ease;
+  /* Transitions — easing affiné, pas de linear */
+  --t-fast: 140ms cubic-bezier(.4,0,.2,1);
+  --t:      220ms cubic-bezier(.4,0,.2,1);
+  --t-slow: 380ms cubic-bezier(.16,1,.3,1);
 
-  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif;
+  font-family: var(--font-ui);
   font-size: 14px;
-  line-height: 1.5;
+  line-height: 1.55;
   color: var(--ink);
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
+/* Titres — Source Serif 4, autorité institutionnelle */
+h1, h2, h3, .font-display { font-family: var(--font-display); }
+
+/* Respect des préférences de mouvement réduit */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ── Entrée orchestrée — chaque .screen apparaît en fondu+translate ── */
+@keyframes screenEnter {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.screen { animation: screenEnter .42s cubic-bezier(.16,1,.3,1) both; }
+
+@keyframes cardEnter {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.dash-hero, .stat-card, .card {
+  animation: cardEnter .46s cubic-bezier(.16,1,.3,1) both;
+}
+.stats-grid .stat-card:nth-child(1) { animation-delay: .02s; }
+.stats-grid .stat-card:nth-child(2) { animation-delay: .06s; }
+.stats-grid .stat-card:nth-child(3) { animation-delay: .10s; }
+.stats-grid .stat-card:nth-child(4) { animation-delay: .14s; }
 /* ═══════════════════════════════════════════════════
    Dark Mode
    ═══════════════════════════════════════════════════ */
@@ -354,9 +392,9 @@ img { max-width: 100%; }
 /* ═══════════════════════════════════════════════════
    Typography
    ═══════════════════════════════════════════════════ */
-h1 { font-size: 26px; font-weight: 800; letter-spacing: -.04em; color: var(--ink); line-height: 1.2; }
-h2 { font-size: 19px; font-weight: 700; letter-spacing: -.02em; color: var(--ink); }
-h3 { font-size: 15px; font-weight: 600; color: var(--ink); }
+h1 { font-size: 28px; font-weight: 600; letter-spacing: -.02em; color: var(--ink); line-height: 1.18; }
+h2 { font-size: 20px; font-weight: 600; letter-spacing: -.01em; color: var(--ink); }
+h3 { font-size: 15.5px; font-weight: 600; font-family: var(--font-ui); color: var(--ink); }
 
 .eyebrow {
   display: inline-block;
@@ -382,10 +420,14 @@ h3 { font-size: 15px; font-weight: 600; color: var(--ink); }
   border-radius: var(--r-lg);
   padding: 24px;
   box-shadow: var(--sh-xs);
-  transition: box-shadow var(--t);
+  transition: box-shadow var(--t), border-color var(--t), transform var(--t);
+}
+.card:hover {
+  box-shadow: var(--sh-sm);
+  border-color: #C5D0DE;
+  transform: translateY(-1px);
 }
 .card + .card { margin-top: 18px; }
-.card:hover { box-shadow: var(--sh-sm); }
 
 .card-header {
   display: flex;
@@ -422,9 +464,13 @@ h3 { font-size: 15px; font-weight: 600; color: var(--ink); }
   box-shadow: var(--sh-xs);
   position: relative;
   overflow: hidden;
-  transition: box-shadow var(--t);
+  transition: box-shadow var(--t), transform var(--t), border-color var(--t);
 }
-.stat-card:hover { box-shadow: var(--sh-sm); }
+.stat-card:hover {
+  box-shadow: var(--sh-sm);
+  border-color: #C5D0DE;
+  transform: translateY(-2px);
+}
 
 /* Accent bar en haut */
 .stat-card::before {
@@ -448,9 +494,11 @@ h3 { font-size: 15px; font-weight: 600; color: var(--ink); }
   margin-bottom: 8px;
 }
 .stat-value {
-  font-size: 28px;
-  font-weight: 800;
-  letter-spacing: -.04em;
+  font-family: var(--font-ui);
+  font-variant-numeric: tabular-nums;
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: -.03em;
   color: var(--ink);
   line-height: 1;
   margin-bottom: 4px;
@@ -463,15 +511,47 @@ h3 { font-size: 15px; font-weight: 600; color: var(--ink); }
 .dash-hero {
   background: linear-gradient(135deg, var(--navy) 0%, #1B3254 60%, #0F4A2A 100%);
   border-radius: var(--r-xl);
-  padding: 36px 40px;
+  padding: 38px 42px;
   margin-bottom: 28px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   position: relative;
   overflow: hidden;
-  box-shadow: var(--sh);
+  box-shadow: var(--sh-lg);
   color: #fff;
+}
+/* Liseré tricolore signature — fin, en bordure haute */
+.dash-hero::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: linear-gradient(90deg,
+    var(--guinea-red) 0% 33.3%,
+    var(--guinea-gold) 33.3% 66.6%,
+    var(--guinea-green) 66.6% 100%);
+}
+/* Texture radiale discrète — profondeur sans bruit */
+.dash-hero::after {
+  content: '';
+  position: absolute;
+  top: -30%; right: -10%;
+  width: 480px; height: 480px;
+  background: radial-gradient(circle, rgba(255,255,255,.05) 0%, transparent 68%);
+  pointer-events: none;
+}
+.dash-hero h1 {
+  color: #fff;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 30px;
+  letter-spacing: -.01em;
+}
+.dash-hero p {
+  color: rgba(255,255,255,.68);
+  font-size: 14px;
+  margin-top: 4px;
 }
 
 /* Motif décoratif fond */
