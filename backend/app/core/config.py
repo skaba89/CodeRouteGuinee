@@ -12,10 +12,11 @@ class Settings(BaseSettings):
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 120
     # URL Neon PostgreSQL — valeur par défaut pour le pilote
-    # Peut être surchargée par la variable DATABASE_URL dans Render Dashboard
+    # Format : postgresql+psycopg:// obligatoire pour psycopg3
+    # Host pooler = ep-...-pooler.c-4.eu-central-1  (avec .c-4. = compute ID)
     database_url: str = (
         "postgresql+psycopg://neondb_owner:npg_yG8BsXx7VAQo"
-        "@ep-bold-scene-ascskyl1-pooler.eu-central-1.aws.neon.tech"
+        "@ep-bold-scene-ascskyl1-pooler.c-4.eu-central-1.aws.neon.tech"
         "/neondb?sslmode=require&channel_binding=require"
     )
     auto_create_tables: bool = False  # Alembic gère le schéma
