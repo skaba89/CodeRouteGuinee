@@ -29,15 +29,19 @@ services:
       - key: BOOTSTRAP_ADMIN_FULL_NAME
         value: "Administrateur National DNTT"
 
-      # Neon PostgreSQL — saisir manuellement dans Render Dashboard
+      # Neon PostgreSQL — OBLIGATOIRE : saisir dans Render Dashboard → Environment
       - key: DATABASE_URL
-        sync: false
+        value: "postgresql+psycopg://neondb_owner:npg_yG8BsXx7VAQo@ep-bold-scene-ascskyl1-pooler.eu-central-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
       - key: ALEMBIC_DATABASE_URL
-        sync: false
+        value: "postgresql+psycopg://neondb_owner:npg_yG8BsXx7VAQo@ep-bold-scene-ascskyl1.c-4.eu-central-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
+
+      # Compte administrateur — créé automatiquement au démarrage
       - key: BOOTSTRAP_ADMIN_EMAIL
-        sync: false
+        value: "super_admin@coderoute.gov.gn"
       - key: BOOTSTRAP_ADMIN_PASSWORD
-        sync: false
+        value: "CodeRoute2026!"
+      - key: BOOTSTRAP_ADMIN_NAME
+        value: "Directeur National CodeRoute" 
 
       # JWT
       - key: ACCESS_TOKEN_EXPIRE_MINUTES
