@@ -138,7 +138,7 @@ def run():
                 id=str(uuid.uuid4()),
                 email=ADMIN_CENTRE["email"],
                 full_name=ADMIN_CENTRE["full_name"],
-                hashed_password=_hash_password(ADMIN_CENTRE["password_raw"]),
+                password_hash=_hash_password(ADMIN_CENTRE["password_raw"]),
                 role=ADMIN_CENTRE["role"],
                 is_active=True,
                 center_id=centre.id if hasattr(centre, 'id') else None,

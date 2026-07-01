@@ -81,7 +81,7 @@ try:
             id=str(uuid.uuid4()),
             email=ADMIN_EMAIL,
             full_name=ADMIN_NAME,
-            hashed_password=get_password_hash(ADMIN_PASSWORD),
+            password_hash=get_password_hash(ADMIN_PASSWORD),
             role="super_admin",
             is_active=True,
         )
