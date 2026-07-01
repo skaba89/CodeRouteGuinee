@@ -21,9 +21,9 @@ services:
       - key: PYTHONPATH
         value: "/app"
       - key: SECRET_KEY
-        generateValue: true
+        value: "4b11230abf456aedc3b90736ba62fb77915806f2b585a6ce1296ac7bc1f5fbdf"
       - key: CSRF_SECRET
-        generateValue: true
+        value: "a9f3e2c1d8b7654321fedcba9876543210abcdef1234567890fedcba98765432"
       - key: ADMIN_REGISTRATION_TOKEN
         generateValue: true
       - key: BOOTSTRAP_ADMIN_FULL_NAME

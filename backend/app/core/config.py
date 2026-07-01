@@ -7,7 +7,7 @@ class Settings(BaseSettings):
     project_name: str = "CodeRoute Guinee API"
     environment: str = "development"
     api_v1_prefix: str = "/api/v1"
-    secret_key: str = "change-me-in-production"
+    secret_key: str = "4b11230abf456aedc3b90736ba62fb77915806f2b585a6ce1296ac7bc1f5fbdf"
     admin_registration_token: str | None = None
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 120
