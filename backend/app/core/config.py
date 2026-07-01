@@ -11,8 +11,15 @@ class Settings(BaseSettings):
     admin_registration_token: str | None = None
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 120
-    database_url: str = "sqlite:///./coderoute.db"
-    auto_create_tables: bool = True
+    # URL Neon PostgreSQL — valeur par défaut pour le pilote
+    # Peut être surchargée par la variable DATABASE_URL dans Render Dashboard
+    database_url: str = (
+        "postgresql+psycopg://neondb_owner:npg_yG8BsXx7VAQo"
+        "@ep-bold-scene-ascskyl1-pooler.eu-central-1.aws.neon.tech"
+        "/neondb?sslmode=require&channel_binding=require"
+    )
+    auto_create_tables: bool = False  # Alembic gère le schéma
+
     cors_origins: str = "https://coderouteguinee-frontend.onrender.com,http://localhost:5173,http://127.0.0.1:5173"
     allowed_hosts: str = "coderouteguinee-backend.onrender.com,localhost,127.0.0.1,testserver"
     enable_api_docs: bool = True
