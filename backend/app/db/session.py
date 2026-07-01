@@ -48,12 +48,13 @@ else:
     _use_neon_direct = "neon.tech" in settings.database_url and "-pooler" not in settings.database_url
 
     if _use_neon_pooler:
-        # Connexion poolée Neon → NullPool (pas de pool côté app, PgBouncer gère tout)
+        # Connexion poolée Neon → NullPool (PgBouncer gère le pool)
+        # IMPORTANT : PgBouncer rejette les startup parameters (statement_timeout etc.)
+        # → connect_args vide, pas d'options de session au niveau connexion
         from sqlalchemy.pool import NullPool
         engine = create_engine(
             settings.database_url,
             poolclass=NullPool,
-            connect_args={"options": "-c statement_timeout=30000"},
         )
     elif _use_neon_direct:
         # Connexion directe Neon (migrations Alembic) → pool minimal + pre_ping
@@ -80,13 +81,17 @@ else:
         )
 
     # ── Optimisations PostgreSQL appliquées à chaque nouvelle connexion ───────
-    @event.listens_for(engine, "connect")
-    def _set_pg_session_params(dbapi_conn, _connection_record):
-        """Tune les paramètres PostgreSQL par session pour la performance."""
-        with dbapi_conn.cursor() as cur:
-            cur.execute("SET timezone = 'Africa/Conakry'")
-            cur.execute("SET synchronous_commit = 'local'")   # commit async (10× plus rapide, pas de perte)
-            cur.execute("SET work_mem = '8MB'")               # mémoire pour tri/hash par opération
+    # Skip pour le pooler Neon : PgBouncer en mode transaction ne supporte
+    # pas les SET de session (statement_timeout, synchronous_commit, work_mem).
+    # Ces paramètres sont valides uniquement sur connexion directe.
+    if not _use_neon_pooler:
+        @event.listens_for(engine, "connect")
+        def _set_pg_session_params(dbapi_conn, _connection_record):
+            """Tune les paramètres PostgreSQL par session pour la performance."""
+            with dbapi_conn.cursor() as cur:
+                cur.execute("SET timezone = 'Africa/Conakry'")
+                cur.execute("SET synchronous_commit = 'local'")
+                cur.execute("SET work_mem = '8MB'")
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
