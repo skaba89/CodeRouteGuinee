@@ -106,9 +106,16 @@ export function CenterPage() {
   const [reporting, setReporting] = useState(false);
 
   useEffect(() => {
-    getCenters().then(r => setCenters(r.items)).catch(() => undefined);
+    getCenters().then(r => {
+      setCenters(r.items);
+      // Pré-sélectionner le centre de l'agent connecté si disponible
+      if (currentUser?.center_id) {
+        const myCenter = r.items.find((c: { id: string; code: string }) => c.id === currentUser.center_id);
+        if (myCenter) setCenterCode(myCenter.code);
+      }
+    }).catch(() => undefined);
     getCenterIncidents({ statusFilter: 'open', limit: 10 }).then(r => setIncidents(r.items)).catch(() => undefined);
-  }, []);
+  }, [currentUser]);
 
   async function handleEntry(e: FormEvent) {
     e.preventDefault();
@@ -183,7 +190,12 @@ export function CenterPage() {
             {entryErr && <p className="form-error">{entryErr}</p>}
             {entryResult && (
               <div className={`scanner-result${entryResult.allowed ? '' : ' denied'}`}>
-                <div className="scanner-icon">{entryResult.allowed ? '' : ''}</div>
+                <div className="scanner-icon" style={{ color: entryResult.allowed ? 'var(--guinea-green)' : 'var(--red)' }}>
+                  {entryResult.allowed
+                    ? <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                    : <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+                  }
+                </div>
                 <strong style={{ fontSize: 16 }}>{entryResult.allowed ? 'ENTRÉE AUTORISÉE' : 'ENTRÉE REFUSÉE'}</strong>
                 <span style={{ fontSize: 13, color: 'var(--muted)' }}>{entryResult.message ?? entryResult.reason ?? ''}</span>
               </div>

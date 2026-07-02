@@ -37,15 +37,9 @@ CSRF_COOKIE_NAME  = "csrf_token"
 CSRF_TOKEN_TTL    = 3600          # 1 heure
 CSRF_TOKEN_LENGTH = 32            # octets
 
-_SECRET_ENV = os.environ.get("CSRF_SECRET", "")
-if not _SECRET_ENV:
-    import logging as _logging
-    _logging.getLogger("coderoute.csrf").warning(
-        "CSRF_SECRET non défini — utilisation d'un secret temporaire. "
-        "Définir CSRF_SECRET dans .env pour la production."
-    )
-    # Secret éphémère redémarrage-unique (acceptable en dev)
-    _SECRET_ENV = secrets.token_hex(32)
+# Lire depuis Settings (qui a une valeur par défaut stable)
+from app.core.config import get_settings as _get_settings
+_SECRET_ENV = os.environ.get("CSRF_SECRET", "") or _get_settings().csrf_secret
 
 _SECRET_BYTES = _SECRET_ENV.encode()
 

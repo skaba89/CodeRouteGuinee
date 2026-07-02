@@ -20,6 +20,7 @@ export type AuthUser = {
   full_name: string;
   role: string;
   is_active: boolean;
+  center_id?: string | null;
 };
 
 export type RegisterPayload = {

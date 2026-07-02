@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     environment: str = "development"
     api_v1_prefix: str = "/api/v1"
     secret_key: str = "4b11230abf456aedc3b90736ba62fb77915806f2b585a6ce1296ac7bc1f5fbdf"
+    csrf_secret: str = "82c96b1a4408410da36f2f9cf6ca3cc5140d0fc3747a4726e13a4776803a7672"
     admin_registration_token: str | None = None
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 120
@@ -27,6 +28,11 @@ class Settings(BaseSettings):
     bootstrap_admin_email: str | None = None
     bootstrap_admin_password: str | None = None
     bootstrap_admin_full_name: str = "Administrateur National CodeRoute"
+    # Email transactionnel Brevo
+    brevo_api_key: str = ""
+    email_from: str = "noreply@coderoute.gov.gn"
+    email_from_name: str = "CodeRoute Guinée — DNTT"
+
     # Monitoring Sentry
     sentry_dsn: str = ""
     sentry_environment: str = ""

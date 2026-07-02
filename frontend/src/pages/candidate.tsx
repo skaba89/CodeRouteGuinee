@@ -145,6 +145,26 @@ export function CandidatePage() {
         <p>Suivez votre parcours, payez et téléchargez votre convocation.</p>
       </div>
 
+      {/* Réservations du candidat pilote */}
+      {myBookings.length > 0 && (
+        <div className="card" style={{ marginBottom: 20 }}>
+          <div className="card-header"><span className="card-title">Mes réservations</span></div>
+          <div style={{ display: 'grid', gap: 10, marginTop: 4 }}>
+            {myBookings.map(bk => (
+              <div key={bk.reference} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: 'var(--bg)', borderRadius: 'var(--r)', fontSize: 13 }}>
+                <div>
+                  <strong style={{ color: 'var(--ink)', fontFamily: 'var(--font-ui)', letterSpacing: '.01em' }}>{bk.reference}</strong>
+                  <span style={{ color: 'var(--muted)', marginLeft: 12 }}>{bk.session_date ?? bk.status}</span>
+                </div>
+                <button className="btn-sm btn-outline" onClick={() => setBookRef(bk.reference)}>
+                  Utiliser
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Étapes */}
       <div className="steps">
         {[
@@ -163,7 +183,11 @@ export function CandidatePage() {
       <div className="g2">
         {/* Paiement Mobile Money */}
         <div className="card">
-          <div className="card-header"><span className="card-title"> Paiement Mobile Money</span></div>
+          <div className="card-header"><span className="card-title">Paiement</span></div>
+          <div className="alert aw" style={{ marginBottom: 14 }}>
+            <strong>Phase pilote</strong> — Le paiement s'effectue en espèces auprès de l'agent DNTT du centre.
+            Mobile Money sera activé pour le déploiement national.
+          </div>
           {!canAct && (
             <div className="alert ai" style={{ marginBottom: 14 }}>
               Connectez-vous avec un compte candidat pour effectuer un paiement réel.
@@ -219,24 +243,23 @@ export function CandidatePage() {
               Référence de réservation
               <input value={bookRef} onChange={e => setBookRef(e.target.value)} placeholder="GN-CONV-2026-000001" />
             </label>
-            <a href={bookRef ? getConvocationPdfUrl(bookRef) : '#'} target="_blank" rel="noreferrer">
-              <button className="btn-primary btn-block" disabled={!bookRef}>
-                ↓ Télécharger la convocation PDF
-              </button>
-            </a>
+            <button className="btn-primary btn-block" disabled={!bookRef}
+              onClick={() => { if (bookRef) window.open(getConvocationPdfUrl(bookRef), '_blank', 'noopener'); }}>
+              ↓ Télécharger la convocation PDF
+            </button>
             <div className="divider" />
-            <a href="#/exam">
-              <button className="btn-success btn-block">Accéder à l'examen →</button>
-            </a>
-            <a href="#/results">
-              <button className="secondary-button btn-block">Voir mes résultats →</button>
-            </a>
+            <button className="btn-success btn-block" onClick={() => { window.location.hash = '#/exam'; }}>
+              Accéder à l'examen →
+            </button>
+            <button className="secondary-button btn-block" onClick={() => { window.location.hash = '#/results'; }}>
+              Voir mes résultats →
+            </button>
           </div>
         </div>
 
         {/* Vérification certificat */}
         <div className="card">
-          <div className="card-header"><span className="card-title">🏆 Vérifier un certificat</span></div>
+          <div className="card-header"><span className="card-title">Vérifier un certificat</span></div>
           <form onSubmit={handleVerify} style={{ display: 'grid', gap: 12 }}>
             <label>
               Identifiant de tentative
