@@ -649,21 +649,24 @@ function buildAuditQuery(filters: AuditLogFilters = {}): string {
 }
 
 async function postPrivateJson<T>(path: string, body: unknown): Promise<T> {
+  const csrf = await getCsrfToken();
   const response = await fetchWithAuth(`${API_BASE_URL}${path}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf },
     body: JSON.stringify(body),
   });
   if (!response.ok) {
     throw await buildApiError(response);
   }
+  if (response.status === 204) return undefined as T;
   return response.json() as Promise<T>;
 }
 
 async function patchPrivateJson<T>(path: string, body: unknown): Promise<T> {
+  const csrf = await getCsrfToken();
   const response = await fetchWithAuth(`${API_BASE_URL}${path}`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf },
     body: JSON.stringify(body),
   });
   if (!response.ok) {
@@ -781,12 +784,15 @@ export function getAuditLogsCsvUrl(filters: AuditLogFilters = {}): string {
 }
 
 export function getAuditLogs(filters: AuditLogFilters = {}): Promise<AuditLogEntry[]> {
-  return getPrivateJson<AuditLogEntry[]>(`/api/v1/supervision/audit-logs${buildAuditQuery({ ...filters, limit: filters.limit ?? 25 })}`);
+  return getPrivateJson<{ items: AuditLogEntry[]; total: number } | AuditLogEntry[]>(
+    `/api/v1/supervision/audit-logs${buildAuditQuery({ ...filters, limit: filters.limit ?? 25 })}`
+  ).then(r => (Array.isArray(r) ? r : r?.items ?? []));
 }
 
 export function getInstitutionalUsers(params: UserFilters = {}): Promise<InstitutionalUser[]> {
   const q = buildQuery(params);
-  return getPrivateJson<InstitutionalUser[]>(`/api/v1/users${q}`);
+  return getPrivateJson<{ items: InstitutionalUser[]; total: number } | InstitutionalUser[]>(`/api/v1/users${q}`)
+    .then(r => (Array.isArray(r) ? r : r?.items ?? []));
 }
 
 export function createInstitutionalUser(payload: InstitutionalUserCreatePayload): Promise<InstitutionalUser> {

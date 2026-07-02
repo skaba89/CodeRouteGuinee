@@ -200,14 +200,34 @@ export async function getCurrentUser(): Promise<AuthUser> {
 }
 
 export async function changePassword(currentPassword: string, newPassword: string): Promise<void> {
-  await readJsonAuth<void>(await fetchWithAuth(`${API_BASE_URL}/api/v1/auth/change-password`, {
+  // Récupérer le CSRF token avant la requête mutative
+  let csrfToken = '';
+  try {
+    const cookieMatch = document.cookie.split('; ').find(r => r.startsWith('csrf_token='));
+    if (cookieMatch) {
+      csrfToken = cookieMatch.split('=')[1];
+    } else {
+      const r = await fetch(`${API_BASE_URL}/api/v1/auth/csrf-token`, { credentials: 'include' });
+      if (r.ok) csrfToken = (await r.json()).csrf_token ?? '';
+    }
+  } catch { /* silencieux */ }
+
+  const response = await fetchWithAuth(`${API_BASE_URL}/api/v1/auth/change-password`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
+    },
     body: JSON.stringify({
       current_password: currentPassword,
       new_password: newPassword,
     }),
-  }));
+  });
+
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}));
+    throw new Error(payload.detail ?? `Erreur ${response.status}`);
+  }
 }
 
 export function logoutUser(): void {
