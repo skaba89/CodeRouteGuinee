@@ -32,7 +32,7 @@ def upgrade() -> None:
     bind.execute(text("""
         INSERT INTO users (
             id, email, full_name, password_hash,
-            role, is_active, created_at
+            role, is_active, center_id, created_at
         ) VALUES (
             'b6db6bac-53bf-4ad5-a8d1-48cdccc6445c',
             'super_admin@coderoute.gov.gn',
@@ -40,6 +40,7 @@ def upgrade() -> None:
             '$2b$12$YYxswN/DntsFQhU22sX57OW1WWr8x5Qq4wZT7A84qEDWQbYIXjhiS',
             'super_admin',
             true,
+            NULL,
             NOW()
         )
     """))

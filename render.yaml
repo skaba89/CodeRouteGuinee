@@ -55,6 +55,22 @@ services:
       - key: ALLOWED_HOSTS
         value: "coderouteguinee-backend.onrender.com,localhost,127.0.0.1"
 
+      # Emails transactionnels Brevo — mettre la vraie clé pour activer
+      - key: BREVO_API_KEY
+        value: ""
+      - key: EMAIL_FROM
+        value: "noreply@coderoute.gov.gn"
+      - key: EMAIL_FROM_NAME
+        value: "CodeRoute Guinée — DNTT"
+
+      # Performance connexion Neon (cold start 5min)
+      - key: DB_POOL_RECYCLE
+        value: "60"
+      - key: DB_POOL_SIZE
+        value: "2"
+      - key: DB_MAX_OVERFLOW
+        value: "3"
+
       # Mobile Money
       - key: MOBILE_MONEY_MODE
         value: "sandbox"

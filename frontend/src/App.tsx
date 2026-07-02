@@ -46,11 +46,25 @@ function normalizeRole(role: string): UserRole {
 
 // ── Loading ───────────────────────────────────────────────────────
 function Loading() {
+  const [slow, setSlow] = React.useState(false);
+  React.useEffect(() => {
+    const t = setTimeout(() => setSlow(true), 4000);
+    return () => clearTimeout(t);
+  }, []);
   return (
     <div className="login-screen">
-      <div style={{ textAlign: 'center', color: 'var(--muted)' }}>
-        <div className="spinner" style={{ width: 32, height: 32, margin: '0 auto 16px' }} />
-        <p>Vérification de la session…</p>
+      <div style={{ textAlign: 'center', color: 'var(--muted)', maxWidth: 320 }}>
+        <div className="brand-logo" style={{ margin: '0 auto 20px', width: 52, height: 52, fontSize: 20 }}>CR</div>
+        <div className="spinner" style={{ width: 28, height: 28, margin: '0 auto 16px' }} />
+        <p style={{ fontWeight: 600, color: 'var(--ink)', marginBottom: 8 }}>
+          {slow ? 'Démarrage en cours…' : 'Connexion…'}
+        </p>
+        {slow && (
+          <p style={{ fontSize: 12, lineHeight: 1.5 }}>
+            Le serveur démarre depuis le mode veille (cold start).<br/>
+            Cela prend 20–40 secondes la première fois.
+          </p>
+        )}
       </div>
     </div>
   );
@@ -169,8 +183,8 @@ function LoginPage({ onLogin }: { onLogin: (email: string, pass: string) => Prom
         setStatus('Erreur serveur. La base de données démarre. Réessayez dans 30 secondes.');
       } else if (msg.includes('503') || msg.includes('indisponible')) {
         setStatus('Base de données en cours de démarrage (cold start Neon). Réessayez dans 15 secondes.');
-      } else if (msg.includes('Failed to fetch') || msg.includes('ERR_FAILED')) {
-        setStatus('Impossible de joindre le serveur. Vérifiez votre connexion internet.');
+      } else if (msg.includes('Failed to fetch') || msg.includes('ERR_FAILED') || msg.includes('NetworkError')) {
+        setStatus('Serveur injoignable. Vérifiez votre connexion internet.');
       } else {
         setStatus('Identifiants incorrects. Vérifiez votre email et mot de passe.');
       }
@@ -375,7 +389,20 @@ export default function App() {
       account:     <AccountPage currentUser={currentUser} />,
       login:       <LoginPage onLogin={handleLogin} />,
     };
-    page = pageMap[route];
+    page = pageMap[route] ?? (
+      <section className="screen access-denied">
+        <div style={{ color: 'var(--muted)', marginBottom: 12 }}>
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+        </div>
+        <h2>Page introuvable</h2>
+        <p style={{ color: 'var(--muted)', fontSize: 14, marginTop: 8 }}>Cette page n'existe pas.</p>
+        <a href="#/" className="btn-primary" style={{ marginTop: 20, display: 'inline-flex', alignItems: 'center', gap: 6, textDecoration: 'none', padding: '0 18px', height: 38, borderRadius: 10 }}>
+          ← Retour à l'accueil
+        </a>
+      </section>
+    );
   }
 
   // Topbar — uniquement si connecté

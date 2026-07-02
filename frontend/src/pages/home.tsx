@@ -148,9 +148,9 @@ export function HomePage() {
             <div className="card">
               <div className="card-header"><span className="card-title">Administration</span></div>
               <div className="actions">
-                <a href="#/admin"><button className="btn-primary btn-sm">Tableau de bord admin</button></a>
-                <a href="#/dossier"><button className="secondary-button btn-sm">Dossier institutionnel</button></a>
-                <a href="#/results"><button className="secondary-button btn-sm">Résultats & certificats</button></a>
+                <button className="btn-primary btn-sm" onClick={() => { window.location.hash = "#/admin"; }}>Tableau de bord admin</button>
+                <button className="secondary-button btn-sm" onClick={() => { window.location.hash = "#/dossier"; }}>Dossier institutionnel</button>
+                <button className="secondary-button btn-sm" onClick={() => { window.location.hash = "#/results"; }}>Résultats &amp; certificats</button>
               </div>
             </div>
             <div className="card">
@@ -168,7 +168,7 @@ export function HomePage() {
             <p style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 14 }}>
               Gérez les entrées, démarrez les examens et déclarez les incidents.
             </p>
-            <a href="#/center"><button className="btn-primary">Accéder à l'espace centre →</button></a>
+            <button className="btn-primary" onClick={() => { window.location.hash = "#/center"; }}>Accéder à l'espace centre →</button>
           </div>
         )}
 
