@@ -139,22 +139,22 @@ export function AdminPage() {
     setCreating(true); setMsg(null);
     try {
       await createInstitutionalUser({ email: newEmail, full_name: newName, role: newRole, initial_password: newPass, reason: 'Création par super_admin' });
-      setMsg(' Utilisateur créé.');
+      setMsg('Utilisateur créé avec succès.');
       setNewEmail(''); setNewName(''); setNewPass('');
       getInstitutionalUsers().then(setUsers).catch(() => undefined);
     } catch (err) {
-      setMsg(' ' + errMsg(err, 'Création échouée.'));
+      setMsg('Erreur : ' + errMsg(err, 'Création échouée.'));
     } finally { setCreating(false); }
   }
 
   const TABS = [
-    { id: 'dashboard',  label: ' Dashboard' },
+    { id: 'dashboard',  label: 'Dashboard' },
     { id: 'candidates', label: 'Candidats' },
-    { id: 'payments',   label: ' Paiements' },
+    { id: 'payments',   label: 'Paiements' },
     { id: 'monitoring', label: 'Monitoring' },
     { id: 'questions',  label: 'Questions' },
     { id: 'audit',      label: ' Audit' },
-    { id: 'users',      label: ' Utilisateurs' },
+    { id: 'users',      label: 'Utilisateurs' },
   ] as const;
 
   return (
@@ -336,8 +336,8 @@ export function AdminPage() {
             <div className="card">
               <div className="card-header"><span className="card-title">Créer un utilisateur</span></div>
               <form onSubmit={handleCreateUser} style={{ display: 'grid', gap: 12 }}>
-                <label>Nom complet<input value={newName} onChange={e => setNewName(e.target.value)} placeholder="Prénom Nom" /></label>
-                <label>Email<input type="email" value={newEmail} onChange={e => setNewEmail(e.target.value)} placeholder="agent@coderoute.gov.gn" /></label>
+                <label>Nom complet<input value={newName} onChange={e => setNewName(e.target.value)} placeholder="Prénom Nom" autoComplete="off" /></label>
+                <label>Email<input type="email" value={newEmail} onChange={e => setNewEmail(e.target.value)} placeholder="agent@coderoute.gov.gn" autoComplete="off" /></label>
                 <label>
                   Rôle
                   <select value={newRole} onChange={e => setNewRole(e.target.value)}>
@@ -345,9 +345,18 @@ export function AdminPage() {
                     <option value="center">Chef de centre</option>
                   </select>
                 </label>
-                <label>Mot de passe temporaire<input type="password" value={newPass} onChange={e => setNewPass(e.target.value)} placeholder="12 caractères minimum" /></label>
+                <label>
+                  Mot de passe temporaire
+                  <input type="password" value={newPass} onChange={e => setNewPass(e.target.value)}
+                    placeholder="12 caractères minimum" autoComplete="new-password" />
+                  {newPass.length > 0 && newPass.length < 12 && (
+                    <span style={{ fontSize: 11, color: 'var(--red)', marginTop: 3, display: 'block' }}>
+                      {newPass.length}/12 caractères minimum
+                    </span>
+                  )}
+                </label>
                 {msg && <p className={msg.startsWith('') ? 'login-status' : 'form-error'}>{msg}</p>}
-                <button type="submit" className="btn-primary" disabled={creating || !newEmail || !newName || newPass.length < 12}>
+                <button type="submit" className="btn-primary btn-block" disabled={creating || !newEmail.trim() || !newName.trim() || newPass.length < 12}>
                   {creating ? 'Création…' : 'Créer l\'utilisateur'}
                 </button>
               </form>
