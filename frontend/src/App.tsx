@@ -14,6 +14,7 @@ import {
   getAccessToken,
   getRefreshToken,
   getCurrentUser,
+  isTokenExpired,
   loginUser,
   logoutUser,
 } from './authClient';
@@ -47,23 +48,35 @@ function normalizeRole(role: string): UserRole {
 // ── Loading ───────────────────────────────────────────────────────
 function Loading() {
   const [slow, setSlow] = React.useState(false);
+  const [verySloww, setVerySlow] = React.useState(false);
   React.useEffect(() => {
-    const t = setTimeout(() => setSlow(true), 4000);
-    return () => clearTimeout(t);
+    const t1 = setTimeout(() => setSlow(true), 5000);
+    const t2 = setTimeout(() => setVerySlow(true), 12000);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
   }, []);
   return (
-    <div className="login-screen">
-      <div style={{ textAlign: 'center', color: 'var(--muted)', maxWidth: 320 }}>
-        <div className="brand-logo" style={{ margin: '0 auto 20px', width: 52, height: 52, fontSize: 20 }}>CR</div>
+    <div className="login-screen" style={{ flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', gap: 0, background: 'var(--bg)' }}>
+      <div style={{ textAlign: 'center', color: 'var(--muted)', maxWidth: 320, padding: '0 24px' }}>
+        <div className="brand-logo" style={{ margin: '0 auto 20px', width: 56, height: 56, fontSize: 20 }}>CR</div>
         <div className="spinner" style={{ width: 28, height: 28, margin: '0 auto 16px' }} />
-        <p style={{ fontWeight: 600, color: 'var(--ink)', marginBottom: 8 }}>
-          {slow ? 'Démarrage en cours…' : 'Connexion…'}
+        <p style={{ fontWeight: 700, color: 'var(--ink)', marginBottom: 8, fontSize: 16 }}>
+          {slow ? 'Démarrage en cours...' : 'Connexion...'}
         </p>
         {slow && (
-          <p style={{ fontSize: 12, lineHeight: 1.5 }}>
+          <p style={{ fontSize: 12, lineHeight: 1.6, color: 'var(--muted)', marginBottom: 20 }}>
             Le serveur démarre depuis le mode veille (cold start).<br/>
             Cela prend 20–40 secondes la première fois.
           </p>
+        )}
+        {verySloww && (
+          <button
+            type="button"
+            className="secondary-button btn-sm"
+            style={{ marginTop: 8 }}
+            onClick={() => { window.location.hash = '#/login'; window.location.reload(); }}
+          >
+            Aller à la page de connexion →
+          </button>
         )}
       </div>
     </div>
@@ -319,11 +332,30 @@ export default function App() {
 
   // Restaurer la session au démarrage
   useEffect(() => {
-    if (!getAccessToken() && !getRefreshToken()) {
+    const token = getAccessToken();
+    const refresh = getRefreshToken();
+
+    // Pas de token du tout → aller directement au login
+    if (!token && !refresh) {
       setLoading(false);
       if (getRouteFromHash() !== 'login') window.location.hash = '#/login';
       return;
     }
+
+    // Token expiré ET pas de refresh → aller au login sans appel réseau
+    if (token && isTokenExpired(token) && !refresh) {
+      logoutUser();
+      setLoading(false);
+      window.location.hash = '#/login';
+      return;
+    }
+
+    // Timeout 30s pour le cold start Render/Neon
+    const timeout = setTimeout(() => {
+      setLoading(false);
+      window.location.hash = '#/login';
+    }, 30_000);
+
     getCurrentUser()
       .then(u => {
         setCurrentUser(u);
@@ -333,7 +365,12 @@ export default function App() {
         logoutUser();
         window.location.hash = '#/login';
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        clearTimeout(timeout);
+        setLoading(false);
+      });
+
+    return () => clearTimeout(timeout);
   }, []);
 
   // Session expirée

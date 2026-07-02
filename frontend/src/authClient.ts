@@ -36,6 +36,16 @@ export function getAccessToken(): string | null {
   return window.localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
 }
 
+/** Vérifie si le JWT est expiré localement (sans appel réseau). */
+export function isTokenExpired(token: string): boolean {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return payload.exp ? Date.now() >= payload.exp * 1000 : false;
+  } catch {
+    return true; // token malformé = considéré expiré
+  }
+}
+
 export function setAccessToken(token: string): void {
   window.localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, token);
 }
