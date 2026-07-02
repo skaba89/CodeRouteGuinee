@@ -153,7 +153,7 @@ export function AdminPage() {
     { id: 'payments',   label: 'Paiements' },
     { id: 'monitoring', label: 'Monitoring' },
     { id: 'questions',  label: 'Questions' },
-    { id: 'audit',      label: ' Audit' },
+    { id: 'audit',      label: 'Audit' },
     { id: 'users',      label: 'Utilisateurs' },
   ] as const;
 
@@ -165,16 +165,20 @@ export function AdminPage() {
         <p>Vue d'ensemble et gestion de la plateforme CodeRoute Guinée.</p>
       </div>
 
-      {/* Live Dashboard — données temps réel, polling 15s */}
-      <div className="card" style={{ marginBottom: 20 }}>
-        <LiveDashboard />
-      </div>
-
       {!canAdmin && (
-        <div className="alert aw">Connectez-vous avec un compte admin ou super_admin pour accéder aux données réelles.</div>
+        <div className="alert aw" style={{ marginBottom: 20 }}>
+          Accès réservé aux comptes <strong>admin</strong> et <strong>super_admin</strong>.
+        </div>
       )}
 
-      {/* Tabs */}
+      {canAdmin && (
+        <>
+          {/* Live Dashboard — données temps réel, polling 15s */}
+          <div className="card" style={{ marginBottom: 20 }}>
+            <LiveDashboard />
+          </div>
+
+          {/* Tabs */}
       <div style={{ display: 'flex', gap: 4, marginBottom: 20, flexWrap: 'wrap' }}>
         {TABS.map(t => (
           <button key={t.id} type="button"
@@ -391,6 +395,8 @@ export function AdminPage() {
           </div>
         </div>
       )}
+          </>
+        )}
     </section>
   );
 }

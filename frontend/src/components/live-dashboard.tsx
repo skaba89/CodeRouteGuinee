@@ -134,7 +134,7 @@ export function LiveDashboard() {
           title="Rafraîchir maintenant"
           style={{ marginLeft: 'auto', background: 'none', border: 'none',
             cursor: 'pointer', fontSize: 16, opacity: 0.6 }}
-        >🔄</button>
+        ><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></button>
         {lastRefresh && (
           <span style={{ fontSize: 11, color: 'var(--muted)' }}>
             Mis à jour {lastRefresh.toLocaleTimeString('fr-FR')}
@@ -142,10 +142,15 @@ export function LiveDashboard() {
         )}
       </div>
 
-      {loading && <p style={{ color: 'var(--muted)', fontSize: 13 }}>Chargement…</p>}
+      {loading && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 0', color: 'var(--muted)', fontSize: 13 }}>
+          <div className="spinner" style={{ width: 16, height: 16 }} />
+          Chargement des données en temps réel…
+        </div>
+      )}
       {error  && !loading && <p style={{ color: 'var(--red, #c00)', fontSize: 13 }}>{error}</p>}
 
-      {kpis && (
+      {kpis != null && (
         <>
           {/* KPIs grid */}
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 20 }}>
@@ -161,13 +166,13 @@ export function LiveDashboard() {
           </div>
 
           {/* Feed activité */}
-          {data.feed.length > 0 && (
+          {(data?.feed?.length ?? 0) > 0 && (
             <div>
               <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--ink2)', marginBottom: 8 }}>
                 Activité récente (15 dernières minutes)
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {data.feed.map((item) => (
+                {(data?.feed ?? []).map((item) => (
                   <div key={item.id} style={{
                     display: 'flex', alignItems: 'center', gap: 10,
                     background: 'var(--bg, #f8faf9)', borderRadius: 8, padding: '8px 12px',
@@ -193,7 +198,7 @@ export function LiveDashboard() {
             </div>
           )}
 
-          {data.feed.length === 0 && (
+          {(data?.feed?.length ?? 0) === 0 && (
             <p style={{ fontSize: 13, color: 'var(--muted)', fontStyle: 'italic' }}>
               Aucune activité dans les 15 dernières minutes.
             </p>
