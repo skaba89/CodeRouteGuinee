@@ -229,23 +229,37 @@ def verify_and_activate_2fa(
 def check_two_factor(
     payload: dict,
     user_id: str,
+    request: Request,
     db: Session = Depends(get_db),
 ) -> dict:
     """
-    Vérifie le code 2FA lors du login (appelé après la validation du mot de passe).
-    Payload : {"code": "123456"}
+    Vérifie le code 2FA lors du login.
+    Retourne un vrai access_token + refresh_token (pas juste valid=True).
     """
+    from sqlalchemy import select as _select
     code = payload.get("code", "")
     if not code:
         raise HTTPException(status_code=400, detail="Code 2FA requis")
 
     ok = check_2fa(user_id, code, db)
     if not ok:
-        raise HTTPException(
-            status_code=401,
-            detail="Code 2FA invalide"
-        )
-    return {"valid": True}
+        raise HTTPException(status_code=401, detail="Code 2FA invalide")
+
+    # Charger l'utilisateur pour émettre les vrais tokens
+    user = db.scalar(_select(User).where(User.id == user_id))
+    if not user or not user.is_active:
+        raise HTTPException(status_code=401, detail="Utilisateur introuvable ou inactif")
+
+    access_token  = create_access_token(user.id, user.role)
+    refresh_token = create_refresh_token(user.id)
+    audit_auth_event(db, "auth.2fa_success", str(user.email), request, user)
+
+    return {
+        "access_token":  access_token,
+        "refresh_token": refresh_token,
+        "token_type":    "bearer",
+        "requires_2fa":  False,
+    }
 
 
 @router.post("/2fa/disable", tags=["auth"])

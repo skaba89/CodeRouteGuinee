@@ -12,6 +12,14 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app.core.config import get_settings
+
+# Validation production au démarrage
+try:
+    get_settings().validate_production_secrets()
+except RuntimeError as _e:
+    import logging as _log
+    _log.getLogger("coderoute.startup").critical(str(_e))
+    raise
 from app.core.config import get_settings as _get_settings
 from app.db.session import init_db
 from app.logging_config import setup_logging

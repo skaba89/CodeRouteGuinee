@@ -310,7 +310,7 @@ class TestTwoFactorEndpoints:
         assert data.get("user_id") is not None
 
     def test_2fa_check_endpoint_with_valid_code(self):
-        """POST /auth/2fa/check avec un vrai code TOTP → 200."""
+        """POST /auth/2fa/check avec un vrai code TOTP → 200 + access_token + refresh_token."""
         email, pwd, user_id = _make_user()
         tok = _get_token(email, pwd)
         with TestClient(app) as c:
@@ -323,7 +323,11 @@ class TestTwoFactorEndpoints:
                        headers=_auth(tok),
                        json={"code": generate_totp(secret)})
         assert r.status_code == 200
-        assert r.json()["valid"] is True
+        data = r.json()
+        # Le backend retourne maintenant les vrais tokens (pas juste valid=True)
+        assert "access_token" in data, f"access_token manquant dans {data}"
+        assert "refresh_token" in data, f"refresh_token manquant dans {data}"
+        assert data.get("requires_2fa") is False
 
     def test_2fa_check_endpoint_invalid_code(self):
         email, pwd, user_id = _make_user()

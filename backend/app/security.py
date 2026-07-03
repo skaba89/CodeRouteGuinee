@@ -8,7 +8,9 @@ from app.core.config import get_settings
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 settings = get_settings()
 
-REFRESH_TOKEN_EXPIRE_DAYS = 7
+def _get_refresh_expire_days() -> int:
+    from app.core.config import get_settings
+    return get_settings().refresh_token_expire_days
 
 
 def verify_password(plain_password: str, password_hash: str) -> bool:
@@ -26,7 +28,7 @@ def create_access_token(subject: str, role: str, expires_minutes: int | None = N
 
 
 def create_refresh_token(subject: str) -> str:
-    expire = datetime.now(UTC) + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+    expire = datetime.now(UTC) + timedelta(days=_get_refresh_expire_days())
     payload = {"sub": subject, "exp": expire, "type": "refresh"}
     return jwt.encode(payload, settings.secret_key, algorithm=settings.algorithm)
 

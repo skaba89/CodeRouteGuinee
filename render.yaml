@@ -1,69 +1,70 @@
 # render.yaml — CodeRoute Guinée
-# Blueprint Render.com : Backend FastAPI (Docker) + Frontend React (Static)
-# Doc : https://render.com/docs/blueprint-spec
+# Les variables marquées sync:false DOIVENT être saisies manuellement dans
+# Render Dashboard → Environment avant le premier déploiement.
+# Les variables generateValue:true sont auto-générées par Render.
 
 services:
-
-  # ── Backend FastAPI ────────────────────────────────────────────────────────
+  # ── Backend FastAPI ──────────────────────────────────────────────────────
   - type: web
     name: coderoute-backend
     runtime: docker
-    dockerfilePath: ./backend/Dockerfile
-    dockerContext: ./backend
+    dockerContext: backend
+    dockerfilePath: backend/Dockerfile
+    plan: starter
     region: frankfurt
-    plan: free
-
+    healthCheckPath: /health
     envVars:
-      - key: PROJECT_NAME
-        value: "CodeRoute Guinee API"
-      - key: API_V1_PREFIX
-        value: "/api/v1"
       - key: PYTHONPATH
         value: "/app"
+
+      # Sécurité — OBLIGATOIRE : saisir dans Render Dashboard
       - key: SECRET_KEY
-        value: "4b11230abf456aedc3b90736ba62fb77915806f2b585a6ce1296ac7bc1f5fbdf"
+        generateValue: true
       - key: CSRF_SECRET
-        value: "a9f3e2c1d8b7654321fedcba9876543210abcdef1234567890fedcba98765432"
+        generateValue: true
       - key: ADMIN_REGISTRATION_TOKEN
         generateValue: true
-      - key: BOOTSTRAP_ADMIN_FULL_NAME
-        value: "Administrateur National DNTT"
 
-      # Neon PostgreSQL — OBLIGATOIRE : saisir dans Render Dashboard → Environment
+      # Base de données Neon — OBLIGATOIRE : saisir dans Render Dashboard
+      # Format : postgresql+psycopg://USER:PASSWORD@HOST/DB?sslmode=require
       - key: DATABASE_URL
-        value: "postgresql+psycopg://neondb_owner:npg_yG8BsXx7VAQo@ep-bold-scene-ascskyl1-pooler.c-4.eu-central-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
+        sync: false
       - key: ALEMBIC_DATABASE_URL
-        value: "postgresql+psycopg://neondb_owner:npg_yG8BsXx7VAQo@ep-bold-scene-ascskyl1.c-4.eu-central-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
+        sync: false
 
-      # Compte administrateur — créé automatiquement au démarrage
+      # Bootstrap admin — saisir dans Render Dashboard
       - key: BOOTSTRAP_ADMIN_EMAIL
-        value: "super_admin@coderoute.gov.gn"
+        sync: false
       - key: BOOTSTRAP_ADMIN_PASSWORD
-        value: "CodeRoute2026!"
+        sync: false
       - key: BOOTSTRAP_ADMIN_NAME
-        value: "Directeur National CodeRoute" 
+        value: "Directeur National CodeRoute"
 
-      # JWT
-      - key: ACCESS_TOKEN_EXPIRE_MINUTES
-        value: "120"
-      - key: REFRESH_TOKEN_EXPIRE_DAYS
-        value: "30"
+      # Application
+      - key: ENVIRONMENT
+        value: "production"
+      - key: ENABLE_API_DOCS
+        value: "false"
 
-      # CORS — ajuster avec l'URL réelle du frontend après déploiement
+      # CORS / Hosts — uniquement le domaine Render (pas de localhost)
       - key: CORS_ORIGINS
-        value: "https://coderouteguinee-frontend.onrender.com,http://localhost:5173,http://127.0.0.1:5173"
+        value: "https://coderouteguinee-frontend.onrender.com"
       - key: ALLOWED_HOSTS
-        value: "coderouteguinee-backend.onrender.com,localhost,127.0.0.1"
+        value: "coderouteguinee-backend.onrender.com"
 
-      # Emails transactionnels Brevo — mettre la vraie clé pour activer
+      # Email Brevo — optionnel pour le pilote
       - key: BREVO_API_KEY
-        value: ""
+        sync: false
       - key: EMAIL_FROM
         value: "noreply@coderoute.gov.gn"
       - key: EMAIL_FROM_NAME
         value: "CodeRoute Guinée — DNTT"
 
-      # Performance connexion Neon (cold start 5min)
+      # Mobile Money — sandbox pour le pilote
+      - key: MOBILE_MONEY_MODE
+        value: "sandbox"
+
+      # Performance DB
       - key: DB_POOL_RECYCLE
         value: "60"
       - key: DB_POOL_SIZE
@@ -71,82 +72,21 @@ services:
       - key: DB_MAX_OVERFLOW
         value: "3"
 
-      # Mobile Money
-      - key: MOBILE_MONEY_MODE
-        value: "sandbox"
-      - key: ORANGE_MONEY_CLIENT_ID
-        sync: false
-      - key: ORANGE_MONEY_CLIENT_SECRET
-        sync: false
-      - key: ORANGE_MONEY_MERCHANT_CODE
-        sync: false
-      - key: MTN_MONEY_SUBSCRIPTION_KEY
-        sync: false
-      - key: MTN_MONEY_API_USER_ID
-        sync: false
-      - key: MTN_MONEY_API_KEY
-        sync: false
-      - key: MTN_MONEY_ENVIRONMENT
-        value: "sandbox"
-      - key: WAVE_API_KEY
-        sync: false
-      - key: WAVE_WEBHOOK_SECRET
-        sync: false
-      - key: WAVE_BASE_URL
-        value: "https://api.wave.com"
+      # Durée tokens
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: "30"
+      - key: REFRESH_TOKEN_EXPIRE_DAYS
+        value: "7"
 
-      # SMS Orange
-      - key: ORANGE_SMS_CLIENT_ID
-        sync: false
-      - key: ORANGE_SMS_CLIENT_SECRET
-        sync: false
-      - key: ORANGE_SMS_SENDER
-        value: "CODEROUTE"
-
-      # Sentry
-      - key: SENTRY_DSN
-        sync: false
-      - key: SENTRY_ENVIRONMENT
-        value: "production"
-      - key: SENTRY_SAMPLE_RATE
-        value: "0.2"
-
-      # App
-      - key: AUTO_CREATE_TABLES
-        value: "false"
-      - key: LOGIN_RATE_LIMIT_ATTEMPTS
-        value: "5"
-      - key: LOGIN_RATE_LIMIT_WINDOW_SECONDS
-        value: "300"
-      - key: ENVIRONMENT
-        value: "production"
-
-    healthCheckPath: /health
-    autoDeploy: true
-
-  # ── Frontend React SPA ─────────────────────────────────────────────────────
+  # ── Frontend Vite ────────────────────────────────────────────────────────
   - type: web
     name: coderoute-frontend
     runtime: static
-    buildCommand: cd frontend && npm ci && npm run build
-    staticPublishPath: ./frontend/dist
-    region: frankfurt
-    plan: free
-
-    headers:
-      - path: /*
-        name: X-Frame-Options
-        value: DENY
-      - path: /*
-        name: X-Content-Type-Options
-        value: nosniff
-      - path: /assets/*
-        name: Cache-Control
-        value: public, max-age=31536000, immutable
-
-    routes:
-      - type: rewrite
-        source: /*
-        destination: /index.html
-
-    autoDeploy: true
+    buildCommand: "cd frontend && npm ci && npm run build"
+    staticPublishPath: frontend/dist
+    pullRequestPreviewsEnabled: false
+    envVars:
+      - key: VITE_API_BASE_URL
+        value: "https://coderouteguinee-backend.onrender.com"
+      - key: VITE_APP_ENV
+        value: "production"
