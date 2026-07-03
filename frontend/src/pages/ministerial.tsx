@@ -82,8 +82,8 @@ function errMsg(e: unknown, fallback = 'Erreur inattendue'): string {
 // ══════════════════════════════════════════════════════════════════
 
 export function MinisterialPage() {
-  const { currentUser, isPresentationMode } = useAuthSession();
-  const canAdmin = canUseProtectedActions(currentUser, isPresentationMode, ['admin','super_admin']);
+  const { currentUser } = useAuthSession();
+  const canAdmin = canUseProtectedActions(currentUser, false, ['admin','super_admin']);
 
   const [tab, setTab] = useState<'overview'|'import'|'stations'|'alerts'>('overview');
   const [opSummary, setOpSummary] = useState<OperationsSummary | null>(null);
@@ -198,9 +198,9 @@ export function MinisterialPage() {
 
   const TABS = [
     { id: 'overview', label: ' Vue nationale' },
-    { id: 'import',   label: '📥 Imports officiels' },
-    { id: 'stations', label: '🖥️ Postes d\'examen' },
-    { id: 'alerts',   label: '️ Centre d\'action' },
+    { id: 'import',   label: ' Imports officiels' },
+    { id: 'stations', label: '🖥 Postes d\'examen' },
+    { id: 'alerts',   label: ' Centre d\'action' },
   ] as const;
 
   return (
@@ -212,7 +212,7 @@ export function MinisterialPage() {
       </div>
 
       {!canAdmin && (
-        <div className="alert aw">️ Réservé aux administrateurs nationaux et super_admin.</div>
+        <div className="alert aw"> Réservé aux administrateurs nationaux et super_admin.</div>
       )}
 
       {/* Tabs */}
@@ -247,7 +247,7 @@ export function MinisterialPage() {
               {/* Carte du taux de réussite par préfecture — simulé */}
               <div className="g2">
                 <div className="card">
-                  <div className="card-header"><span className="card-title">🗺️ Taux de réussite par région</span></div>
+                  <div className="card-header"><span className="card-title">🗺 Taux de réussite par région</span></div>
                   {[
                     { region: 'Conakry', taux: 72, candidats: 48320, centres: 12 },
                     { region: 'Kindia', taux: 68, candidats: 12400, centres: 4 },
@@ -270,11 +270,11 @@ export function MinisterialPage() {
                 </div>
 
                 <div className="card">
-                  <div className="card-header"><span className="card-title">📈 Indicateurs clés</span></div>
+                  <div className="card-header"><span className="card-title"> Indicateurs clés</span></div>
                   <div style={{ display:'grid', gap:14 }}>
                     {readiness?.items?.slice(0,6).map((item: import('../api').InstitutionalReadinessItem, i: number) => (
                       <div key={i} style={{ display:'flex', alignItems:'center', gap:10 }}>
-                        <span style={{ fontSize:20 }}>{item.status === 'ready' ? '' : item.status === 'partial' ? '️' : ''}</span>
+                        <span style={{ fontSize:20 }}>{item.status === 'ready' ? '' : item.status === 'partial' ? '' : ''}</span>
                         <div style={{ flex:1 }}>
                           <div style={{ fontSize:13, fontWeight:600 }}>{(item as {pillar?:string; label?:string}).pillar ?? (item as {label?:string}).label ?? ""}</div>
                           <div style={{ fontSize:11, color:'var(--muted)' }}>{(item as {evidence?:string; val?:string}).evidence ?? (item as {val?:string}).val ?? ""}</div>
@@ -291,7 +291,7 @@ export function MinisterialPage() {
                           { label:'Intégration NINA', val:'Non connectée', ok:false },
                         ].map((item, i) => (
                           <div key={i} style={{ display:'flex', alignItems:'center', gap:10 }}>
-                            <span>{item.ok ? '' : '️'}</span>
+                            <span>{item.ok ? '' : ''}</span>
                             <div style={{ flex:1 }}>
                               <div style={{ fontSize:13, fontWeight:600 }}>{(item as {pillar?:string; label?:string}).pillar ?? (item as {label?:string}).label ?? ""}</div>
                               <div style={{ fontSize:11, color:'var(--muted)' }}>{item.val}</div>
@@ -312,7 +312,7 @@ export function MinisterialPage() {
       {tab === 'import' && (
         <div className="g2">
           <div className="card">
-            <div className="card-header"><span className="card-title">📥 Import CSV officiel</span></div>
+            <div className="card-header"><span className="card-title"> Import CSV officiel</span></div>
             <form onSubmit={handleImport} style={{ display:'grid', gap:14 }}>
               <label>
                 Type d'import
@@ -334,10 +334,10 @@ export function MinisterialPage() {
                 </div>
               )}
               <button type="submit" className="btn-primary" disabled={!importFile || importing}>
-                {importing ? 'Import en cours…' : '📥 Aperçu (dry-run)'}
+                {importing ? 'Import en cours…' : ' Aperçu (dry-run)'}
               </button>
               <p style={{ fontSize:12, color:'var(--muted)' }}>
-                ℹ️ L'aperçu vérifie le fichier sans modifier les données. Confirmez ensuite pour valider l'import réel.
+                 L'aperçu vérifie le fichier sans modifier les données. Confirmez ensuite pour valider l'import réel.
               </p>
             </form>
           </div>
@@ -392,7 +392,7 @@ export function MinisterialPage() {
 
           <div className="card">
             <div className="card-header">
-              <span className="card-title">🖥️ Postes configurés ({stations.length})</span>
+              <span className="card-title">🖥 Postes configurés ({stations.length})</span>
               <button className="secondary-button btn-sm" onClick={() => getCenterStations({ limit:50 }).then(setStations).catch(()=>undefined)}>
                 Actualiser
               </button>
@@ -425,13 +425,13 @@ export function MinisterialPage() {
       {tab === 'alerts' && (
         <div className="g2">
           <div className="card">
-            <div className="card-header"><span className="card-title">️ Alertes nationales</span></div>
+            <div className="card-header"><span className="card-title"> Alertes nationales</span></div>
             {actionCenter?.items?.length ? (
               <div style={{ display:'grid', gap:12 }}>
                 {actionCenter.items.map((item: import('../api').InstitutionalActionItem, i: number) => (
                   <div key={i} style={{ background:item.severity==='critical'?'var(--red-l)':item.severity==='warning'?'var(--gold-l)':'var(--blue-l)', border:`1px solid ${item.severity==='critical'?'#fca5a5':item.severity==='warning'?'#fde68a':'#bfdbfe'}`, borderRadius:'var(--r)', padding:'12px 14px' }}>
                     <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
-                      <span>{item.severity==='critical'?'🔴':item.severity==='warning'?'🟡':'🔵'}</span>
+                      <span>{item.severity==='critical'?'':item.severity==='warning'?'':'🔵'}</span>
                       <strong style={{ fontSize:13 }}>{item.label}</strong>
                       <span className={`badge ${item.severity==='critical'?'br':item.severity==='warning'?'bgo':'bb'}`} style={{ marginLeft:'auto' }}>{item.severity}</span>
                     </div>
@@ -447,7 +447,7 @@ export function MinisterialPage() {
                 ]).map((a, i) => (
                   <div key={i} style={{ background: a.sev==='critical'?'var(--red-l)':a.sev==='medium'?'var(--gold-l)':'var(--blue-l)', border:`1px solid ${a.sev==='critical'?'#fca5a5':a.sev==='medium'?'#fde68a':'#bfdbfe'}`, borderRadius:'var(--r)', padding:'12px 14px', marginBottom:10 }}>
                     <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
-                      <span>{a.sev==='critical'?'🔴':a.sev==='medium'?'🟡':'🔵'}</span>
+                      <span>{a.sev==='critical'?'':a.sev==='medium'?'':'🔵'}</span>
                       <strong style={{ fontSize:13, flex:1 }}>{a.title}</strong>
                       <button className={`btn-sm ${a.sev==='critical'?'btn-danger':a.sev==='medium'?'btn-gold':'secondary-button'}`}>{a.action}</button>
                     </div>
@@ -460,15 +460,15 @@ export function MinisterialPage() {
 
           {/* KPI anti-fraude */}
           <div className="card">
-            <div className="card-header"><span className="card-title">🛡️ Anti-fraude — Vue nationale</span></div>
+            <div className="card-header"><span className="card-title"> Anti-fraude — Vue nationale</span></div>
             <div style={{ display:'grid', gap:14, fontSize:13 }}>
               {[
                 { icon:'', label:'Centres sous surveillance', val:'3 / 35 centres', color:'var(--gold)' },
-                { icon:'🔍', label:'Examens avec anomalies détectées', val:'12 ce mois', color:'var(--red)' },
+                { icon:'', label:'Examens avec anomalies détectées', val:'12 ce mois', color:'var(--red)' },
                 { icon:'', label:'Taux d\'intégrité global', val:'96,8 %', color:'var(--green)' },
                 { icon:'📡', label:'Postes hors ligne', val:'2 postes à Kindia', color:'var(--gold)' },
-                { icon:'🎯', label:'Fraude détectée et bloquée', val:'7 tentatives', color:'var(--navy)' },
-                { icon:'📱', label:'QR codes vérifiés par tiers', val:'1 249 ce mois', color:'var(--blue)' },
+                { icon:'', label:'Fraude détectée et bloquée', val:'7 tentatives', color:'var(--navy)' },
+                { icon:'', label:'QR codes vérifiés par tiers', val:'1 249 ce mois', color:'var(--blue)' },
               ].map((k, i) => (
                 <div key={i} style={{ display:'flex', alignItems:'center', gap:12, padding:'10px 0', borderBottom:'1px solid var(--border)' }}>
                   <span style={{ fontSize:22 }}>{k.icon}</span>

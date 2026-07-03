@@ -81,9 +81,9 @@ function errMsg(e: unknown, fallback = 'Erreur inattendue'): string {
 // ══════════════════════════════════════════════════════════════════
 
 export function CandidatePage() {
-  const { currentUser, isPresentationMode } = useAuthSession();
+  const { currentUser } = useAuthSession();
 
-  const canAct = canUseProtectedActions(currentUser, isPresentationMode, ['candidate','admin','super_admin']);
+  const canAct = canUseProtectedActions(currentUser, false, ['candidate','admin','super_admin']);
 
   const [bookRef, setBookRef] = useState('');
   const [provider, setProvider] = useState('orange_money');
@@ -268,7 +268,7 @@ export function CandidatePage() {
             {certErr && <p className="form-error">{certErr}</p>}
             {cert && (
               <div className={`alert ${cert.valid && cert.passed ? 'as' : cert.valid ? 'aw' : 'ae'}`}>
-                {cert.valid && cert.passed ? 'ADMIS' : cert.valid ? ' Ajourné' : ' Invalide'}{' '}
+                {cert.valid && cert.passed ? 'ADMIS' : cert.valid ? ' Ajourné' : ' Invalide'}{''}
                 — {cert.candidate_name ?? ''} {cert.score !== undefined ? `· ${cert.score}/40` : ''}
                 {cert.valid && cert.passed && (
                   <button type="button" className="btn-sm" style={{ marginLeft: 10 }}

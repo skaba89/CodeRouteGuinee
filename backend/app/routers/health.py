@@ -25,10 +25,21 @@ def _build_configuration_check(current_settings) -> dict:
     errors: list[str] = []
     warnings: list[str] = []
 
-    if current_settings.secret_key in {"change-me-in-production", "replace-with-a-long-random-production-secret"}:
-        errors.append("SECRET_KEY must be replaced")
+    # Placeholders à rejeter (anciens et nouveaux formats)
+    _PLACEHOLDERS = {
+        "change-me-in-production", "replace-with-a-long-random-production-secret",
+        "CHANGE_ME_secret_key_must_be_set_in_env",
+        "CHANGE_ME_database_url_must_be_set_in_env",
+        "", "changeme", "your-secret",
+    }
+
+    if current_settings.secret_key in _PLACEHOLDERS or        current_settings.secret_key.startswith("CHANGE_ME"):
+        errors.append("SECRET_KEY must be replaced (placeholder detected)")
     elif len(current_settings.secret_key) < 32:
         warnings.append("SECRET_KEY should contain at least 32 characters")
+
+    if current_settings.database_url in _PLACEHOLDERS or        current_settings.database_url.startswith("CHANGE_ME"):
+        (errors if is_production else warnings).append("DATABASE_URL must be set")
 
     if current_settings.database_url.startswith("sqlite"):
         (errors if is_production else warnings).append("DATABASE_URL should use PostgreSQL outside local development")

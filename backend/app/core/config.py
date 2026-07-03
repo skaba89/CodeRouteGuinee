@@ -66,10 +66,11 @@ class Settings(BaseSettings):
     sentry_environment: str = ""   # auto-set via property si vide
     sentry_sample_rate: float = 0.05
 
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        extra = "ignore"
+    model_config = {
+        "env_file": ".env",
+        "env_file_encoding": "utf-8",
+        "extra": "ignore",
+    }
 
     # ── Propriétés calculées ──────────────────────────────────────────────
     @property

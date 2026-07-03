@@ -42,7 +42,7 @@ def test_production_configuration_check_rejects_unsafe_defaults() -> None:
     check = _build_configuration_check(settings)
 
     assert check["status"] == "error"
-    assert "SECRET_KEY must be replaced" in check["errors"]
+    assert any("SECRET_KEY must be replaced" in e for e in check["errors"])
     assert "DATABASE_URL should use PostgreSQL outside local development" in check["errors"]
     assert "AUTO_CREATE_TABLES must be false outside local development" in check["errors"]
     assert "CORS_ORIGINS must not contain wildcard origin" in check["errors"]

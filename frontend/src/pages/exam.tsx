@@ -50,9 +50,9 @@ const CATEGORY_BG: Record<string, string> = {
 
 // ── Composant principal ───────────────────────────────────────────────────────
 export function ExamPage({ locale, onLocaleChange }: Props) {
-  const { currentUser, isPresentationMode } = useAuthSession();
+  const { currentUser } = useAuthSession();
   const isAuth = Boolean(currentUser);
-  const canUseApi = canUseProtectedActions(currentUser, isPresentationMode, ['candidate','center','admin','super_admin']);
+  const canUseApi = canUseProtectedActions(currentUser, false, ['candidate','center','admin','super_admin']);
 
   // Questions
   const [liveQuestions, setLiveQuestions] = useState<ExamQuestion[] | null>(null);

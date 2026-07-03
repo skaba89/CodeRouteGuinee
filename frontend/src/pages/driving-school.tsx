@@ -81,7 +81,7 @@ function errMsg(e: unknown, fallback = 'Erreur inattendue'): string {
 // ══════════════════════════════════════════════════════════════════
 
 export function DrivingSchoolPage() {
-  const { currentUser, isPresentationMode } = useAuthSession();
+  const { currentUser } = useAuthSession();
   const isSchool = currentUser?.role === 'driving_school';
 
   const MOCK_STUDENTS = [
@@ -171,12 +171,12 @@ export function DrivingSchoolPage() {
                   </td>
                   <td>
                     <span className={`badge ${s.status==='pret'?'bg':s.status==='risque'?'br':s.status==='en_cours'?'bb':'bgr'}`}>
-                      {s.status==='pret' ? ' Prêt' : s.status==='risque' ? '️ Risque' : s.status==='en_cours' ? '📈 En cours' : '🆕 Débutant'}
+                      {s.status==='pret' ? ' Prêt' : s.status==='risque' ? ' Risque' : s.status==='en_cours' ? ' En cours' : '🆕 Débutant'}
                     </span>
                   </td>
                   <td>
                     <div style={{ display: 'flex', gap: 4 }}>
-                      <button className="secondary-button btn-sm" style={{ fontSize: 11 }}>📊 Rapport</button>
+                      <button className="secondary-button btn-sm" style={{ fontSize: 11 }}> Rapport</button>
                       {s.status === 'risque' && (
                         <button className="btn-sm btn-gold" style={{ fontSize: 11 }}>📞 Contacter</button>
                       )}
@@ -192,7 +192,7 @@ export function DrivingSchoolPage() {
       {/* Recommandations */}
       {risque > 0 && (
         <div className="alert aw">
-          ️ <strong>{risque} élève(s) en difficulté</strong> — Leur score moyen est inférieur à 28/40.
+           <strong>{risque} élève(s) en difficulté</strong> — Leur score moyen est inférieur à 28/40.
           Planifiez des sessions supplémentaires sur les catégories Priorités et Signalisation.
         </div>
       )}
@@ -228,10 +228,10 @@ export function DrivingSchoolPage() {
               ➕ Inscrire un nouvel élève
             </button>
             <button className="secondary-button btn-block" style={{ justifyContent: 'flex-start', gap: 10 }}>
-              📥 Importer liste (CSV)
+               Importer liste (CSV)
             </button>
             <button className="secondary-button btn-block" style={{ justifyContent: 'flex-start', gap: 10 }}>
-              📊 Rapport mensuel PDF
+               Rapport mensuel PDF
             </button>
             <button className="secondary-button btn-block" style={{ justifyContent: 'flex-start', gap: 10 }}>
               📅 Réserver des sessions examen

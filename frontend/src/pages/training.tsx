@@ -83,8 +83,8 @@ function errMsg(e: unknown, fallback = 'Erreur inattendue'): string {
 // ══════════════════════════════════════════════════════════════════
 
 export function TrainingPage() {
-  const { currentUser, isPresentationMode } = useAuthSession();
-  const canUseApi = canUseProtectedActions(currentUser, isPresentationMode, ['candidate','admin','super_admin','driving_school']);
+  const { currentUser } = useAuthSession();
+  const canUseApi = canUseProtectedActions(currentUser, false, ['candidate','admin','super_admin','driving_school']);
 
   type TrainingQ = {
     index: number; category: string; category_label: string;
@@ -96,9 +96,9 @@ export function TrainingPage() {
     { id: '', label: 'Toutes les catégories', icon: '📚' },
     { id: 'signalisation',    label: 'Signalisation',          icon: '🚦' },
     { id: 'priorites',        label: 'Priorités',              icon: '⭐' },
-    { id: 'vitesse',          label: 'Vitesse & Distances',    icon: '⏱️' },
-    { id: 'depassement',      label: 'Dépassement',            icon: '↔️' },
-    { id: 'securite_passive', label: 'Sécurité passive',       icon: '🛡️' },
+    { id: 'vitesse',          label: 'Vitesse & Distances',    icon: '⏱' },
+    { id: 'depassement',      label: 'Dépassement',            icon: '↔' },
+    { id: 'securite_passive', label: 'Sécurité passive',       icon: '' },
     { id: 'urgence',          label: 'Situations d\'urgence',  icon: '🚨' },
     { id: 'alcool_drogues',   label: 'Alcool & Drogues',       icon: '🚫' },
     { id: 'premiers_secours', label: 'Premiers secours',       icon: '🩺' },
@@ -241,7 +241,7 @@ export function TrainingPage() {
       <section className="screen" role="main" aria-label="Contenu principal">
         <div style={{ maxWidth: 640, margin: '0 auto', display: 'grid', gap: 16 }}>
           <div style={{ background: `linear-gradient(135deg,${pct>=70?'var(--green)':'var(--navy)'},${pct>=70?'#006b47':'var(--navy2)'})`, borderRadius: 20, padding: '24px 28px', color: '#fff', textAlign: 'center' }}>
-            <div style={{ fontSize: 44 }}>{pct >= 80 ? '🏆' : pct >= 60 ? '📈' : '📚'}</div>
+            <div style={{ fontSize: 44 }}>{pct >= 80 ? '' : pct >= 60 ? '' : '📚'}</div>
             <h2 style={{ color: '#fff', fontSize: 22, margin: '8px 0 4px' }}>
               {pct >= 80 ? 'Excellent !' : pct >= 60 ? 'En progrès' : 'Continuez à réviser'}
             </h2>
@@ -251,7 +251,7 @@ export function TrainingPage() {
 
           {weak.length > 0 && (
             <div className="card">
-              <div className="card-header"><span className="card-title">️ Points à améliorer</span></div>
+              <div className="card-header"><span className="card-title"> Points à améliorer</span></div>
               {weak.map(([cat, v]) => (
                 <div key={cat} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
                   <span style={{ flex: 1, fontSize: 13 }}>{CATS.find(c=>c.id===cat)?.icon} {CATS.find(c=>c.id===cat)?.label ?? cat}</span>
@@ -276,7 +276,7 @@ export function TrainingPage() {
 
           <div className="actions">
             <button className="btn-success" onClick={() => { setMode('menu'); setQi(0); setAnswers({}); }}> Nouvelle session</button>
-            <a href="#/exam"><button className="btn-primary">🎓 Passer l'examen officiel →</button></a>
+            <a href="#/exam"><button className="btn-primary"> Passer l'examen officiel →</button></a>
           </div>
         </div>
       </section>

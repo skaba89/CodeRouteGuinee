@@ -82,9 +82,9 @@ function errMsg(e: unknown, fallback = 'Erreur inattendue'): string {
 // ══════════════════════════════════════════════════════════════════
 
 export function AdminPage() {
-  const { currentUser, isPresentationMode } = useAuthSession();
-  const canAdmin = canUseProtectedActions(currentUser, isPresentationMode, ['admin','super_admin']);
-  const canSA = canUseProtectedActions(currentUser, isPresentationMode, ['super_admin']);
+  const { currentUser } = useAuthSession();
+  const canAdmin = canUseProtectedActions(currentUser, false, ['admin','super_admin']);
+  const canSA = canUseProtectedActions(currentUser, false, ['super_admin']);
 
   const [tab, setTab] = useState<'dashboard'|'candidates'|'payments'|'monitoring'|'questions'|'audit'|'users'>('dashboard');
   const [dashboard, setDashboard] = useState<DashboardData | null>(null);

@@ -81,8 +81,8 @@ function errMsg(e: unknown, fallback = 'Erreur inattendue'): string {
 // ══════════════════════════════════════════════════════════════════
 
 export function ResultsPage() {
-  const { currentUser, isPresentationMode } = useAuthSession();
-  const canAct = canUseProtectedActions(currentUser, isPresentationMode, ['candidate','center','admin','super_admin']);
+  const { currentUser } = useAuthSession();
+  const canAct = canUseProtectedActions(currentUser, false, ['candidate','center','admin','super_admin']);
 
   const [attemptId, setAttemptId] = useState('');
   const [result, setResult] = useState<ExamDetailedResult | null>(null);
@@ -128,15 +128,15 @@ export function ResultsPage() {
           </label>
           {err && <p className="form-error">{err}</p>}
           <button type="submit" className="btn-primary" disabled={loading || !attemptId.trim()}>
-            {loading ? 'Recherche…' : '🔍 Rechercher'}
+            {loading ? 'Recherche…' : 'Rechercher'}
           </button>
         </form>
       </div>
 
       {cert && (
         <div style={{ maxWidth: 600, marginTop: 16 }}>
-          <div className={`alert ${cert.valid && cert.passed ? 'as' : cert.valid ? 'aw' : 'ae'}`}>
-            <span style={{ fontSize: 24 }}>{cert.valid && cert.passed ? '' : cert.valid ? '' : ''}</span>
+          <div className={`alert ${cert.valid && cert.passed ? 'alert-success' : cert.valid ? 'alert-warn' : 'alert-error'}`}>
+            
             <div>
               <strong>{cert.valid && cert.passed ? 'ADMIS — Certificat valide' : cert.valid ? 'AJOURNÉ' : 'Certificat invalide'}</strong>
               {cert.candidate_name && <div style={{ fontSize: 12, marginTop: 2 }}>{cert.candidate_name} {cert.score !== undefined ? `· ${cert.score}/40` : ''}</div>}

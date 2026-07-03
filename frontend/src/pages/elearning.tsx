@@ -17,11 +17,11 @@ interface Lesson {
 interface CourseDetail extends CourseItem { lessons: Lesson[]; }
 
 const CATEGORY_LABELS: Record<string, string> = {
-  general:        '🚗 Général',
+  general:        ' Général',
   signalisation:  '🚦 Signalisation',
-  priorite:       '⚠️ Priorité',
+  priorite:       ' Priorité',
   vitesse:        '💨 Vitesse',
-  securite:       '🛡 Sécurité',
+  securite:       ' Sécurité',
   environnement:  '🌿 Environnement',
 };
 
@@ -212,7 +212,7 @@ export function ELearningPage() {
         Préparez-vous avec nos modules de formation officiels DNTT
       </p>
 
-      {error && <p style={{ color: 'var(--red, #c00)' }}>⚠ {error}</p>}
+      {error && <p style={{ color: 'var(--red, #c00)' }}> {error}</p>}
 
       {courses.length === 0 ? (
         <div className="card" style={{ textAlign: 'center', padding: 40 }}>
@@ -245,7 +245,7 @@ export function ELearningPage() {
                 background: c.cover_url ? `url(${c.cover_url}) center/cover` : 'linear-gradient(135deg, #006B3F 0%, #009460 100%)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}>
-                {!c.cover_url && <span style={{ fontSize: 40 }}>🚗</span>}
+                {!c.cover_url && <span style={{ fontSize: 40 }}></span>}
               </div>
 
               <div style={{ padding: '0 4px 4px' }}>

@@ -81,8 +81,8 @@ function errMsg(e: unknown, fallback = 'Erreur inattendue'): string {
 // ══════════════════════════════════════════════════════════════════
 
 export function CenterPage() {
-  const { currentUser, isPresentationMode } = useAuthSession();
-  const canAct = canUseProtectedActions(currentUser, isPresentationMode, ['center','admin','super_admin']);
+  const { currentUser } = useAuthSession();
+  const canAct = canUseProtectedActions(currentUser, false, ['center','admin','super_admin']);
 
   const [entryRef, setEntryRef] = useState('');
   const [verifCode, setVerifCode] = useState('');

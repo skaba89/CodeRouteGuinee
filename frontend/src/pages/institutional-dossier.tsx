@@ -81,8 +81,8 @@ function errMsg(e: unknown, fallback = 'Erreur inattendue'): string {
 // ══════════════════════════════════════════════════════════════════
 
 export function InstitutionalDossierPage() {
-  const { currentUser, isPresentationMode } = useAuthSession();
-  const canAdmin = canUseProtectedActions(currentUser, isPresentationMode, ['admin','super_admin']);
+  const { currentUser } = useAuthSession();
+  const canAdmin = canUseProtectedActions(currentUser, false, ['admin','super_admin']);
   const [identityChecks, setIdentityChecks] = useState<CandidateIdentityCheck[]>([]);
   const [identityPage, setIdentityPage] = useState(0);
   const [submissions, setSubmissions] = useState<CandidateSubmission[]>([]);
@@ -103,7 +103,7 @@ export function InstitutionalDossierPage() {
       </div>
 
       {!canAdmin && (
-        <div className="alert aw">️ Réservé aux administrateurs nationaux.</div>
+        <div className="alert aw"> Réservé aux administrateurs nationaux.</div>
       )}
 
       <div className="g2">
@@ -176,7 +176,7 @@ export function InstitutionalDossierPage() {
         </div>
 
         <div className="card">
-          <div className="card-header"><span className="card-title">📊 Pilotage national</span></div>
+          <div className="card-header"><span className="card-title"> Pilotage national</span></div>
           <div style={{ display: 'grid', gap: 10 }}>
             <a href="#/admin"><button className="secondary-button btn-block">→ Tableau de bord admin</button></a>
             <button className="secondary-button btn-block" onClick={() => downloadInstitutionalReportPdf().catch(() => undefined)}>⬇ Rapport institutionnel PDF</button>
@@ -320,7 +320,7 @@ function Timer({ secs, total, onExpire }: { secs: number; total: number; onExpir
         </div>
       </div>
       <p style={{ fontSize: 11, color: crit ? 'var(--red, #D32F2F)' : 'var(--muted)', fontWeight: crit ? 700 : 500 }}>
-        {crit ? '️ Temps critique !' : urgent ? '⏳ < 5 min' : 'Temps restant'}
+        {crit ? ' Temps critique !' : urgent ? ' < 5 min' : 'Temps restant'}
       </p>
     </div>
   );
