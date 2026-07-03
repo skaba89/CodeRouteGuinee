@@ -32,11 +32,11 @@ import {
 type AppRoute =
   | 'home' | 'candidate' | 'center' | 'admin'
   | 'exam' | 'results' | 'dossier' | 'training' | 'school' | 'ministerial'
-  | 'login' | 'account';
+  | 'elearning' | 'login' | 'account';
 
 function getRouteFromHash(): AppRoute {
   const r = window.location.hash.replace('#/', '') as AppRoute;
-  const valid: AppRoute[] = ['candidate','center','admin','exam','results','dossier','training','school','ministerial','login','account'];
+  const valid: AppRoute[] = ['candidate','center','admin','exam','results','dossier','training','school','ministerial','elearning','login','account'];
   return valid.includes(r) ? r : 'home';
 }
 
@@ -414,6 +414,7 @@ export default function App() {
   } else {
     const pageMap: Record<AppRoute, React.ReactElement> = {
       home:        <HomePage />,
+      elearning:   <ELearningPage />,
       training:    <TrainingPage />,
       candidate:   <CandidatePage />,
       center:      <CenterPage />,

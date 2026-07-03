@@ -19,31 +19,14 @@ depends_on = None
 
 
 def upgrade() -> None:
+    """
+    Migration 0009 : le compte super_admin est créé par entrypoint.sh
+    via BOOTSTRAP_ADMIN_EMAIL / BOOTSTRAP_ADMIN_PASSWORD (Render Dashboard).
+    Cette migration vérifie uniquement que la table users est accessible.
+    """
     bind = op.get_bind()
-
-    # Idempotent : ne rien faire si l'admin existe déjà
-    existing = bind.execute(
-        text("SELECT id FROM users WHERE email = 'super_admin@coderoute.gov.gn'")
-    ).fetchone()
-
-    if existing:
-        return  # déjà présent
-
-    bind.execute(text("""
-        INSERT INTO users (
-            id, email, full_name, password_hash,
-            role, is_active, center_id, created_at
-        ) VALUES (
-            'b6db6bac-53bf-4ad5-a8d1-48cdccc6445c',
-            'super_admin@coderoute.gov.gn',
-            'Directeur National CodeRoute',
-            '$2b$12$YYxswN/DntsFQhU22sX57OW1WWr8x5Qq4wZT7A84qEDWQbYIXjhiS',
-            'super_admin',
-            true,
-            NULL,
-            NOW()
-        )
-    """))
+    # Vérification de sanité : la table users doit exister
+    bind.execute(text("SELECT 1 FROM users LIMIT 1"))
 
 
 def downgrade() -> None:

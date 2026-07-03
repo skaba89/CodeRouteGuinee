@@ -184,16 +184,16 @@ export async function verify2FA(userId: string, partialToken: string, code: stri
     const err = await r.json().catch(() => ({}));
     throw new Error(err.detail ?? 'Code 2FA invalide');
   }
-  // Après validation 2FA, re-login pour obtenir le vrai token
-  // (le serveur retourne { valid: true } — on re-appelle login via refresh)
-  // Solution : utiliser le partial token comme access_token
+  const data = await r.json();
+  // Le backend retourne maintenant les vrais access_token + refresh_token
   const fullToken: AuthToken = {
-    access_token: partialToken,
-    refresh_token: '',
-    token_type: 'bearer',
-    requires_2fa: false,
+    access_token:  data.access_token  ?? partialToken, // fallback si ancien backend
+    refresh_token: data.refresh_token ?? '',
+    token_type:    'bearer',
+    requires_2fa:  false,
   };
   setAccessToken(fullToken.access_token);
+  if (fullToken.refresh_token) setRefreshToken(fullToken.refresh_token);
   return fullToken;
 }
 

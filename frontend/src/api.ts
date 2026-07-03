@@ -612,11 +612,22 @@ function buildPaymentQuery(filters: PaymentFilters = {}): string {
 }
 
 async function getJson<T>(path: string): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`);
-  if (!response.ok) {
-    throw await buildApiError(response);
+  try {
+    const response = await fetch(`${API_BASE_URL}${path}`);
+    if (!response.ok) {
+      throw await buildApiError(response);
+    }
+    return response.json() as Promise<T>;
+  } catch (err) {
+    if ((import.meta.env as Record<string, unknown>)['DEV'] as boolean && err instanceof TypeError && err.message.includes('fetch')) {
+      console.warn(
+        `[CodeRoute Dev] Serveur API indisponible ou mal configuré\n` +
+        `URL : ${API_BASE_URL}${path}\n` +
+        `Vérifier VITE_API_BASE_URL dans .env`
+      );
+    }
+    throw err;
   }
-  return response.json() as Promise<T>;
 }
 
 export async function getPrivateJson<T>(path: string): Promise<T> {
@@ -718,7 +729,7 @@ export function getCenters(params: CenterFilters = {}): Promise<PagedResponse<Ce
 
 export function getCandidates(params: CandidateFilters = {}): Promise<PagedResponse<Candidate>> {
   const q = buildQuery(params);
-  return getJson<PagedResponse<Candidate>>(`/api/v1/candidates${q}`);
+  return getPrivateJson<PagedResponse<Candidate>>(`/api/v1/candidates${q}`);
 }
 
 export function getMyCandidateProfile(): Promise<Candidate | null> {
@@ -840,7 +851,7 @@ export function getCandidateIdentityChecks(filters: CandidateIdentityFilters = {
 }
 
 export function submitCandidateIdentity(payload: CandidateIdentityPayload): Promise<CandidateIdentityCheck> {
-  return postJson<CandidateIdentityCheck>('/api/v1/candidate-identity', payload);
+  return postPrivateJson<CandidateIdentityCheck>('/api/v1/candidate-identity', payload);
 }
 
 export function decideCandidateIdentity(checkId: string, status: string, reason: string): Promise<CandidateIdentityCheck> {
@@ -848,7 +859,7 @@ export function decideCandidateIdentity(checkId: string, status: string, reason:
 }
 
 export function submitCandidateSubmission(payload: CandidateSubmissionPayload): Promise<CandidateSubmission> {
-  return postJson<CandidateSubmission>('/api/v1/candidate-submissions', payload);
+  return postPrivateJson<CandidateSubmission>('/api/v1/candidate-submissions', payload);
 }
 
 export function getCandidateSubmissions(filters: CandidateSubmissionFilters = {}): Promise<CandidateSubmission[]> {
@@ -937,7 +948,7 @@ export function downloadAuditLogsCsv(filters: AuditLogFilters = {}): Promise<voi
 }
 
 export function getEntrySummary(): Promise<EntrySummary> {
-  return getJson<EntrySummary>('/api/v1/entries/summary');
+  return getPrivateJson<EntrySummary>('/api/v1/entries/summary');
 }
 
 export type ExamResultItem = {
@@ -985,7 +996,7 @@ export function getExamLiveStatus(attemptId: string): Promise<ExamLiveStatus> {
 }
 
 export function getExamSummary(): Promise<ExamSummary> {
-  return getJson<ExamSummary>('/api/v1/exams/summary');
+  return getPrivateJson<ExamSummary>('/api/v1/exams/summary');
 }
 
 export function getQuestions(params: QuestionFilters = {}): Promise<PagedResponse<ExamQuestion>> {
@@ -994,7 +1005,7 @@ export function getQuestions(params: QuestionFilters = {}): Promise<PagedRespons
 }
 
 export function startExamFromBooking(bookingReference: string, deviceKey?: string, deviceLabel?: string): Promise<ExamAttempt> {
-  return postJson<ExamAttempt>('/api/v1/exams/start-from-booking', {
+  return postPrivateJson<ExamAttempt>('/api/v1/exams/start-from-booking', {
     booking_reference: bookingReference,
     device_key: deviceKey,
     device_label: deviceLabel,
@@ -1002,7 +1013,7 @@ export function startExamFromBooking(bookingReference: string, deviceKey?: strin
 }
 
 export function submitExamAttempt(attemptId: string, answers: Record<string, string>): Promise<ExamAttempt> {
-  return postJson<ExamAttempt>(`/api/v1/exams/${encodeURIComponent(attemptId)}/submit`, { answers });
+  return postPrivateJson<ExamAttempt>(`/api/v1/exams/${encodeURIComponent(attemptId)}/submit`, { answers });
 }
 
 export type ExamQuestion = {
@@ -1055,7 +1066,7 @@ export function getDeviceSessionAlerts(filters: { session_id?: string; center_id
 }
 
 export function validateEntry(payload: EntryValidationPayload): Promise<EntryValidationResult> {
-  return postJson<EntryValidationResult>('/api/v1/entries/validate', payload);
+  return postPrivateJson<EntryValidationResult>('/api/v1/entries/validate', payload);
 }
 
 export function reportCenterIncident(payload: CenterIncidentPayload): Promise<CenterIncident> {
@@ -1082,7 +1093,7 @@ export function resolveCenterIncident(incidentId: string, resolutionNotes: strin
 }
 
 export function createPayment(payload: PaymentPayload): Promise<PaymentResult> {
-  return postJson<PaymentResult>('/api/v1/payments', payload);
+  return postPrivateJson<PaymentResult>('/api/v1/payments', payload);
 }
 
 export function getConvocationPdfUrl(reference: string): string {
