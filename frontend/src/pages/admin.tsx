@@ -19,6 +19,7 @@ import {
   type CenterFilters,
   type QuestionFilters,
   type UserFilters,
+  triggerSeedPilote, getPiloteRoster, type PiloteRosterItem,
 } from '../api';
 import { isAudioLocale, speakFeedback, stop as stopAudio } from '../audio';
 import { type Locale } from '../i18n';
@@ -86,7 +87,7 @@ export function AdminPage() {
   const canAdmin = canUseProtectedActions(currentUser, false, ['admin','super_admin']);
   const canSA = canUseProtectedActions(currentUser, false, ['super_admin']);
 
-  const [tab, setTab] = useState<'dashboard'|'candidates'|'payments'|'monitoring'|'questions'|'audit'|'users'>('dashboard');
+  const [tab, setTab] = useState<'dashboard'|'candidates'|'payments'|'monitoring'|'questions'|'audit'|'users'|'pilote'>('dashboard');
   const [dashboard, setDashboard] = useState<DashboardData | null>(null);
   const [examSum, setExamSum] = useState<ExamSummary | null>(null);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
@@ -155,6 +156,7 @@ export function AdminPage() {
     { id: 'questions',  label: 'Questions' },
     { id: 'audit',      label: 'Audit' },
     { id: 'users',      label: 'Utilisateurs' },
+    { id: 'pilote',     label: 'Pilote Conakry' },
   ] as const;
 
   return (
@@ -395,6 +397,8 @@ export function AdminPage() {
           </div>
         </div>
       )}
+
+      {tab === 'pilote' && <PilotePanel canSA={canSA} />}
           </>
         )}
     </section>
@@ -596,3 +600,98 @@ function PaymentsPanel({ canAdmin }: { canAdmin: boolean }) {
 // ══════════════════════════════════════════════════════════════════
 // INSTITUTIONAL DOSSIER PAGE
 // ══════════════════════════════════════════════════════════════════
+
+
+// ── Pilote Conakry — initialisation + feuille de présence ─────────────────
+function PilotePanel({ canSA }: { canSA: boolean }) {
+  const [roster, setRoster] = useState<PiloteRosterItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [seeding, setSeeding] = useState(false);
+  const [msg, setMsg] = useState('');
+
+  const loadRoster = () => {
+    setLoading(true);
+    getPiloteRoster()
+      .then(r => setRoster(r.items))
+      .catch(() => setRoster([]))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(loadRoster, []);
+
+  async function handleSeed() {
+    setSeeding(true); setMsg('');
+    try {
+      const r = await triggerSeedPilote();
+      setMsg(r.status === 'ok'
+        ? 'Pilote initialisé : centre Kaloum, agent, 50 candidats, 2 sessions, 50 réservations.'
+        : `Erreur : ${r.detail}`);
+      loadRoster();
+    } catch (e) {
+      setMsg('Erreur lors de l\'initialisation. Vérifiez vos droits (super_admin requis).');
+    } finally {
+      setSeeding(false);
+    }
+  }
+
+  return (
+    <div style={{ display: 'grid', gap: 20 }}>
+      <div className="card">
+        <div className="card-header"><span className="card-title">Initialisation du pilote</span></div>
+        <p style={{ fontSize: 13, color: 'var(--muted)', margin: '4px 0 14px' }}>
+          Crée (de façon idempotente) : le centre DNTT Kaloum, le compte agent
+          centre.kaloum@dntt.gov.gn, 50 candidats, 2 sessions d'examen (demain 9h et 14h)
+          et 50 réservations avec codes de vérification.
+        </p>
+        {canSA ? (
+          <button className="btn-primary" onClick={handleSeed} disabled={seeding}>
+            {seeding ? 'Initialisation…' : 'Initialiser le pilote Conakry'}
+          </button>
+        ) : (
+          <div className="alert ai">Réservé au super_admin.</div>
+        )}
+        {msg && <p style={{ fontSize: 13, marginTop: 10 }}>{msg}</p>}
+      </div>
+
+      <div className="card">
+        <div className="card-header">
+          <span className="card-title">Feuille de présence — {roster.length} réservations</span>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn-sm btn-outline" onClick={loadRoster}>Actualiser</button>
+            <button className="btn-sm btn-outline" onClick={() => window.print()}>Imprimer</button>
+          </div>
+        </div>
+        {loading ? (
+          <p style={{ color: 'var(--muted)', fontSize: 13 }}>Chargement…</p>
+        ) : roster.length === 0 ? (
+          <p style={{ color: 'var(--muted)', fontSize: 13 }}>
+            Aucune réservation pilote. Lancez l'initialisation ci-dessus.
+          </p>
+        ) : (
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Candidat</th><th>Téléphone</th><th>Référence réservation</th>
+                  <th>Code</th><th>Session</th><th>Statut</th>
+                </tr>
+              </thead>
+              <tbody>
+                {roster.map(r => (
+                  <tr key={r.booking_reference}>
+                    <td>{r.candidate}</td>
+                    <td style={{ fontSize: 12 }}>{r.phone}</td>
+                    <td><code style={{ fontSize: 11 }}>{r.booking_reference}</code></td>
+                    <td><strong style={{ letterSpacing: '.06em' }}>{r.verification_code}</strong></td>
+                    <td style={{ fontSize: 12 }}>{r.session}</td>
+                    <td>{r.booking_status}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

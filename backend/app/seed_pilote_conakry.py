@@ -13,8 +13,11 @@ from app.models_candidate import Candidate
 from app.models_user import User
 from app.models_center import Center as ExamCenter
 from app.models_question import Question
+from app.models_session import ExamSession
+from app.models_booking import Booking
 from app.seed_full import seed_questions
 import uuid, hashlib, os
+from datetime import datetime, time as dtime
 
 log = logging.getLogger("seed.pilote")
 
@@ -29,7 +32,7 @@ CENTRE_PILOTE = {
     "commune":     "Kaloum",
     "address":     "Direction Nationale des Transports Terrestres, Kaloum, Conakry",
     "capacity":    35,  # max DNTT par session
-    "is_active":   True,
+    "status":      "active",
 }
 
 # ── Compte admin centre ─────────────────────────────────────────────────────
@@ -171,16 +174,69 @@ def run():
         db.commit()
         log.info("✅ %d candidats pilote créés", created)
 
+        # 5. Sessions d'examen pilote (2 sessions demain : 9h et 14h, 35 max chacune)
+        tomorrow = date.today() + timedelta(days=1)
+        sessions = []
+        for i, hour in enumerate((9, 14), start=1):
+            ref = f"SES-PILOT-{tomorrow.isoformat()}-{hour:02d}H"
+            existing_s = db.query(ExamSession).filter_by(reference=ref).first()
+            if existing_s:
+                sessions.append(existing_s)
+                continue
+            s = ExamSession(
+                id=str(uuid.uuid4()),
+                reference=ref,
+                center_id=centre.id,
+                starts_at=datetime.combine(tomorrow, dtime(hour=hour)),
+                capacity=35,
+                status="planned",
+            )
+            db.add(s)
+            sessions.append(s)
+        db.commit()
+        log.info("✅ %d sessions pilote (demain 9h/14h)", len(sessions))
+
+        # 6. Réservations : 1 booking confirmé par candidat pilote
+        #    Répartition : 25 premiers → session 9h, 25 suivants → session 14h
+        #    verification_code = 6 chars déterministes depuis le NNI (imprimable
+        #    sur la convocation, saisi par l'agent à l'entrée)
+        bookings_created = 0
+        pilot_candidates = (
+            db.query(Candidate)
+            .filter(Candidate.reference.like("GN-CODE-B-PILOT-%"))
+            .order_by(Candidate.identity_number)
+            .all()
+        )
+        for idx, cand in enumerate(pilot_candidates):
+            bk_ref = f"BK-{cand.reference}"
+            if db.query(Booking).filter_by(reference=bk_ref).first():
+                continue
+            code = hashlib.sha256(f"pilot:{cand.identity_number}".encode()).hexdigest()[:6].upper()
+            db.add(Booking(
+                id=str(uuid.uuid4()),
+                reference=bk_ref,
+                candidate_id=cand.id,
+                session_id=sessions[0].id if idx < 25 else sessions[-1].id,
+                status="confirmed",
+                verification_code=code,
+                payment_reference="ESPECES-PILOTE",
+                notes="Pilote Conakry — paiement espèces au centre",
+            ))
+            bookings_created += 1
+        db.commit()
+        log.info("✅ %d réservations pilote créées", bookings_created)
+
         # Résumé
         total_c = db.query(Candidate).count()
         total_q = db.query(Question).count()
+        total_b = db.query(Booking).filter(Booking.reference.like("BK-GN-CODE-B-PILOT-%")).count()
         print(f"""
 ╔══════════════════════════════════════════════════════════╗
 ║  PILOTE CONAKRY — SEED TERMINÉ                          ║
 ╠══════════════════════════════════════════════════════════╣
 ║  Questions Permis B  : {total_q:<5} (200 attendues)        ║
 ║  Centre pilote       : {centre.name[:30]:<30} ║
-║  Candidats pilote    : {total_c:<5} / 50                    ║
+║  Candidats pilote    : {total_c:<5} / 50                    ║\n║  Réservations pilote : {total_b:<5} / 50                    ║
 ║  Login admin centre  : {ADMIN_CENTRE['email']:<32} ║
 ╚══════════════════════════════════════════════════════════╝
 """)

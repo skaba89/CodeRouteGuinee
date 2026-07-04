@@ -659,7 +659,7 @@ function buildAuditQuery(filters: AuditLogFilters = {}): string {
   return queryString ? `?${queryString}` : '';
 }
 
-async function postPrivateJson<T>(path: string, body: unknown): Promise<T> {
+export async function postPrivateJson<T>(path: string, body: unknown): Promise<T> {
   const csrf = await getCsrfToken();
   const response = await fetchWithAuth(`${API_BASE_URL}${path}`, {
     method: 'POST',
@@ -1145,4 +1145,25 @@ export function checkTrainingAnswer(
     `/api/v1/training/check`,
     { question_id: questionId, answer }
   );
+}
+
+
+// ── Opérations pilote Conakry ────────────────────────────────────────────────
+export type PiloteRosterItem = {
+  candidate: string;
+  phone: string;
+  identity_number: string;
+  booking_reference: string;
+  verification_code: string;
+  session: string;
+  session_starts_at: string;
+  booking_status: string;
+};
+
+export function triggerSeedPilote(): Promise<{ status: string; detail: string }> {
+  return postPrivateJson<{ status: string; detail: string }>('/api/v1/admin/ops/seed-pilote', {});
+}
+
+export function getPiloteRoster(): Promise<{ items: PiloteRosterItem[]; total: number }> {
+  return getPrivateJson<{ items: PiloteRosterItem[]; total: number }>('/api/v1/admin/ops/pilote-roster');
 }

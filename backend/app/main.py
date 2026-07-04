@@ -254,3 +254,6 @@ app.include_router(elearning_admin_router,  prefix=settings.api_v1_prefix)
 app.include_router(rgpd_router, prefix=settings.api_v1_prefix)
 app.include_router(tarifs_public_router, prefix=settings.api_v1_prefix)
 app.include_router(tarifs_admin_router,  prefix=settings.api_v1_prefix)
+
+from app.routers.admin_ops import router as admin_ops_router
+app.include_router(admin_ops_router, prefix=settings.api_v1_prefix)
