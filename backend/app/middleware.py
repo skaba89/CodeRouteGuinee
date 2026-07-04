@@ -168,3 +168,75 @@ class ResponseCacheMiddleware(BaseHTTPMiddleware):
             )
 
         return response
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# GlobalRateLimitMiddleware — protection anti-abus à l'échelle nationale
+# ══════════════════════════════════════════════════════════════════════════════
+# Sliding window en mémoire par IP. Suffisant pour 1 worker Render ;
+# pour du multi-worker/multi-instance, migrer vers Redis (voir SCALING.md).
+#
+# Limites par défaut (par IP) :
+#   - 300 requêtes / 60 s  → usage normal d'un centre d'examen (~5 req/s)
+#   - /health exclu (probes Render)
+#
+# Réponse en cas de dépassement : 429 + Retry-After.
+
+import time as _time
+from collections import deque
+from starlette.middleware.base import BaseHTTPMiddleware as _BaseMW
+from starlette.responses import JSONResponse as _JSONResponse
+
+
+class GlobalRateLimitMiddleware(_BaseMW):
+    def __init__(self, app, max_requests: int = 300, window_seconds: int = 60):
+        super().__init__(app)
+        self.max_requests = max_requests
+        self.window = window_seconds
+        self._hits: dict[str, deque[float]] = {}
+        self._last_cleanup = _time.monotonic()
+
+    def _client_ip(self, request) -> str:
+        # Render met l'IP réelle dans X-Forwarded-For (première valeur)
+        fwd = request.headers.get("x-forwarded-for")
+        if fwd:
+            return fwd.split(",")[0].strip()
+        return request.client.host if request.client else "unknown"
+
+    def _cleanup(self, now: float) -> None:
+        # Purge périodique des IPs inactives (toutes les 5 min)
+        if now - self._last_cleanup < 300:
+            return
+        self._last_cleanup = now
+        cutoff = now - self.window
+        stale = [ip for ip, dq in self._hits.items() if not dq or dq[-1] < cutoff]
+        for ip in stale:
+            del self._hits[ip]
+
+    async def dispatch(self, request, call_next):
+        path = request.url.path
+        # Exclusions : health checks (probes Render) et assets statiques
+        if path.startswith("/health") or path.startswith("/static"):
+            return await call_next(request)
+
+        now = _time.monotonic()
+        self._cleanup(now)
+
+        ip = self._client_ip(request)
+        dq = self._hits.setdefault(ip, deque())
+        cutoff = now - self.window
+
+        # Sliding window : retirer les hits hors fenêtre
+        while dq and dq[0] < cutoff:
+            dq.popleft()
+
+        if len(dq) >= self.max_requests:
+            retry_after = int(dq[0] + self.window - now) + 1
+            return _JSONResponse(
+                status_code=429,
+                content={"detail": "Trop de requêtes. Réessayez dans quelques instants."},
+                headers={"Retry-After": str(retry_after)},
+            )
+
+        dq.append(now)
+        return await call_next(request)

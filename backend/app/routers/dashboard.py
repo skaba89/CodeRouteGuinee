@@ -411,13 +411,16 @@ def anti_fraud_dashboard(
     critical_events = (db.scalar(select(func.count(ExamMonitoringEvent.id)).where(ExamMonitoringEvent.severity == "critical")) or 0)
     total_monitoring_risk_score = db.scalar(select(func.coalesce(func.sum(ExamMonitoringEvent.risk_score), 0))) or 0
 
-    attempt_scores = db.execute(
-        select(
-            ExamMonitoringEvent.attempt_id,
-            func.coalesce(func.sum(ExamMonitoringEvent.risk_score), 0).label("risk_score"),
-        ).group_by(ExamMonitoringEvent.attempt_id)
-    ).all()
-    manual_review_attempts = sum(1 for _, score in attempt_scores if int(score or 0) >= 10)
+    # Compté directement en SQL (HAVING) — évite de matérialiser
+    # des dizaines de milliers de lignes attempt_id à l'échelle nationale
+    manual_review_attempts = db.scalar(
+        select(func.count()).select_from(
+            select(ExamMonitoringEvent.attempt_id)
+            .group_by(ExamMonitoringEvent.attempt_id)
+            .having(func.coalesce(func.sum(ExamMonitoringEvent.risk_score), 0) >= 10)
+            .subquery()
+        )
+    ) or 0
 
     centers = db.scalars(select(Center)).all()
     center_rows: list[AntiFraudCenterRisk] = []

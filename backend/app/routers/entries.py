@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -62,14 +62,31 @@ def validate_entry(
 
 @router.get("/summary")
 def get_entry_summary(
+    days: int = Query(default=90, ge=1, le=365),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("admin", "super_admin")),
 ) -> dict:
-    logs = db.scalars(select(AuditLog).where(AuditLog.action == "entry_validation")).all()
+    """
+    Statistiques des validations d'entrée.
+    Bornée à `days` jours (défaut 90) et streaming par lots de 1000 —
+    évite de charger des centaines de milliers de logs en RAM à l'échelle nationale.
+    Les agrégats sont sur details JSON → agrégation applicative par lots
+    (compatible SQLite tests + PostgreSQL prod sans SQL JSON spécifique).
+    """
+    from datetime import datetime, timedelta, UTC
+    cutoff = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=days)
+
     total = 0
     by_result: dict[str, int] = {}
     by_center: dict[str, dict[str, int]] = {}
-    for log in logs:
+
+    # yield_per(1000) : streaming par lots — mémoire constante quel que soit le volume
+    stream = db.scalars(
+        select(AuditLog)
+        .where(AuditLog.action == "entry_validation", AuditLog.created_at >= cutoff)
+        .execution_options(yield_per=1000)
+    )
+    for log in stream:
         details = log.details or {}
         result = details.get("result", "unknown")
         center_code = details.get("center_code") or "unknown"
@@ -78,7 +95,7 @@ def get_entry_summary(
         by_center.setdefault(center_code, {"allowed": 0, "denied": 0})
         if result in by_center[center_code]:
             by_center[center_code][result] += 1
-    return {"total": total, "by_result": by_result, "by_center": by_center}
+    return {"total": total, "by_result": by_result, "by_center": by_center, "window_days": days}
 
 
 @router.get("/logs")

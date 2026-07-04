@@ -23,7 +23,7 @@ except RuntimeError as _e:
 from app.core.config import get_settings as _get_settings
 from app.db.session import init_db
 from app.logging_config import setup_logging
-from app.middleware import RequestIDMiddleware, ResponseCacheMiddleware, TimingMiddleware
+from app.middleware import GlobalRateLimitMiddleware, RequestIDMiddleware, ResponseCacheMiddleware, TimingMiddleware
 from app.monitoring import init_sentry
 from app.routers import (
     audio,
@@ -110,6 +110,17 @@ _settings = _get_settings()
 app.add_middleware(ResponseCacheMiddleware, environment=_settings.environment)
 app.add_middleware(TimingMiddleware)
 app.add_middleware(RequestIDMiddleware)
+
+# Compression GZip — essentiel pour les réseaux 3G/Edge en Guinée
+# minimum_size=500 : ne compresse pas les toutes petites réponses (overhead inutile)
+from starlette.middleware.gzip import GZipMiddleware
+app.add_middleware(GZipMiddleware, minimum_size=500)
+
+# Rate limiting global par IP — protection anti-abus à l'échelle nationale
+# 300 req/min par IP (un centre normal fait ~5 req/s en pointe)
+# Activé uniquement en production pour ne pas gêner les tests
+if _settings.environment.lower() == "production":
+    app.add_middleware(GlobalRateLimitMiddleware, max_requests=300, window_seconds=60)
 
 app.add_middleware(
     TrustedHostMiddleware,
