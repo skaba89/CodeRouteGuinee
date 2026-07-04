@@ -90,12 +90,13 @@ class Settings(BaseSettings):
         if not self.is_production:
             return
 
-        PLACEHOLDERS = {"CHANGE_ME", "change-me", "changeme", "", "your-secret", "secret"}
+        # Sous-chaînes interdites (jamais présentes dans un vrai secret/URL)
+        PLACEHOLDER_SUBSTRINGS = ("CHANGE_ME", "change-me-in-production", "changeme")
 
         errors: list[str] = []
 
         def _is_placeholder(v: str, name: str) -> None:
-            if not v or any(p in v for p in PLACEHOLDERS):
+            if not v or not v.strip() or any(p in v for p in PLACEHOLDER_SUBSTRINGS):
                 errors.append(f"{name} est vide ou placeholder — définir dans Render Dashboard")
 
         _is_placeholder(self.secret_key,   "SECRET_KEY")
