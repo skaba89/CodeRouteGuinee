@@ -112,6 +112,9 @@ _EXEMPT_PATHS = {
     "/api/v1/auth/register",
     "/api/v1/auth/refresh",
     "/api/v1/auth/csrf-token",
+    # Inscription publique candidat libre : aucune session préalable
+    # → aucun token CSRF possible (même logique que /auth/register)
+    "/api/v1/registration/candidate",
     "/api/v1/payments/webhook/wave",
     "/api/v1/payments/webhook/paydunya",
     "/docs",
