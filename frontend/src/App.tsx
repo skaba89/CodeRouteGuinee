@@ -338,30 +338,36 @@ export default function App() {
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
 
+  // Routes accessibles sans session (publiques)
+  const PUBLIC_ROUTES: AppRoute[] = ['login', 'register'];
+  const goLoginUnlessPublic = () => {
+    if (!PUBLIC_ROUTES.includes(getRouteFromHash())) window.location.hash = '#/login';
+  };
+
   // Restaurer la session au démarrage
   useEffect(() => {
     const token = getAccessToken();
     const refresh = getRefreshToken();
 
-    // Pas de token du tout → aller directement au login
+    // Pas de token du tout → login, sauf sur une route publique (ex. inscription)
     if (!token && !refresh) {
       setLoading(false);
-      if (getRouteFromHash() !== 'login') window.location.hash = '#/login';
+      goLoginUnlessPublic();
       return;
     }
 
-    // Token expiré ET pas de refresh → aller au login sans appel réseau
+    // Token expiré ET pas de refresh → login sans appel réseau
     if (token && isTokenExpired(token) && !refresh) {
       logoutUser();
       setLoading(false);
-      window.location.hash = '#/login';
+      goLoginUnlessPublic();
       return;
     }
 
     // Timeout 30s pour le cold start Render/Neon
     const timeout = setTimeout(() => {
       setLoading(false);
-      window.location.hash = '#/login';
+      goLoginUnlessPublic();
     }, 30_000);
 
     getCurrentUser()
@@ -371,7 +377,7 @@ export default function App() {
       })
       .catch(() => {
         logoutUser();
-        window.location.hash = '#/login';
+        goLoginUnlessPublic();
       })
       .finally(() => {
         clearTimeout(timeout);
