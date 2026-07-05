@@ -1,6 +1,7 @@
 import React from 'react';
 import { ThemeToggle } from './components/theme-toggle';
 import { ELearningPage } from './pages/elearning';
+import { RegisterPage } from './pages/register';
 import { FormEvent, useEffect, useState } from 'react';
 import { canAccessRoute, navigationItems, type UserRole } from './auth';
 import {
@@ -32,11 +33,11 @@ import {
 type AppRoute =
   | 'home' | 'candidate' | 'center' | 'admin'
   | 'exam' | 'results' | 'dossier' | 'training' | 'school' | 'ministerial'
-  | 'elearning' | 'login' | 'account';
+  | 'elearning' | 'login' | 'register' | 'account';
 
 function getRouteFromHash(): AppRoute {
   const r = window.location.hash.replace('#/', '') as AppRoute;
-  const valid: AppRoute[] = ['candidate','center','admin','exam','results','dossier','training','school','ministerial','elearning','login','account'];
+  const valid: AppRoute[] = ['candidate','center','admin','exam','results','dossier','training','school','ministerial','elearning','login','register','account'];
   return valid.includes(r) ? r : 'home';
 }
 
@@ -304,6 +305,13 @@ function LoginPage({ onLogin }: { onLogin: (email: string, pass: string) => Prom
             </button>
           </form>
 
+          <p style={{ textAlign: 'center', fontSize: 13, marginTop: 14, color: 'var(--muted)' }}>
+            Pas encore de compte ?{' '}
+            <a href="#/register" style={{ color: 'var(--guinea-green)', fontWeight: 600 }}>
+              Créer un compte candidat
+            </a>
+          </p>
+
           <div className="login-secure-badge">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
               <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
@@ -405,8 +413,22 @@ export default function App() {
 
   // Page courante
   let page: React.ReactElement;
+  const handleRegistered = async () => {
+    // Le token est déjà stocké par RegisterPage — charger la session et rediriger
+    try {
+      const u = await getCurrentUser();
+      setCurrentUser(u);
+      setRole(normalizeRole(u.role));
+      window.location.hash = '#/';
+    } catch {
+      window.location.hash = '#/login';
+    }
+  };
+
   if (loading) {
     page = <Loading />;
+  } else if (route === 'register' && !isLoggedIn) {
+    page = <RegisterPage onRegistered={handleRegistered} />;
   } else if (route === 'login' || !isLoggedIn) {
     page = <LoginPage onLogin={handleLogin} />;
   } else if (!hasAccess) {
@@ -426,6 +448,7 @@ export default function App() {
       results:     <ResultsPage />,
       account:     <AccountPage currentUser={currentUser} />,
       login:       <LoginPage onLogin={handleLogin} />,
+      register:    <HomePage />,
     };
     page = pageMap[route] ?? (
       <section className="screen access-denied">

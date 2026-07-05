@@ -257,3 +257,6 @@ app.include_router(tarifs_admin_router,  prefix=settings.api_v1_prefix)
 
 from app.routers.admin_ops import router as admin_ops_router
 app.include_router(admin_ops_router, prefix=settings.api_v1_prefix)
+
+from app.routers.registration import router as registration_router
+app.include_router(registration_router, prefix=settings.api_v1_prefix)

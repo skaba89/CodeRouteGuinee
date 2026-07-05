@@ -1167,3 +1167,52 @@ export function triggerSeedPilote(): Promise<{ status: string; detail: string }>
 export function getPiloteRoster(): Promise<{ items: PiloteRosterItem[]; total: number }> {
   return getPrivateJson<{ items: PiloteRosterItem[]; total: number }>('/api/v1/admin/ops/pilote-roster');
 }
+
+
+// ── Inscription candidats (libre + auto-école) ─────────────────────────────
+export type FreeCandidateRegisterPayload = {
+  first_name: string; last_name: string; email: string; password: string;
+  phone: string; identity_number: string; permit_category?: string; city?: string;
+};
+
+export type SchoolCandidatePayload = {
+  first_name: string; last_name: string; phone: string; identity_number: string;
+  permit_category?: string; city?: string; email?: string; password?: string;
+};
+
+export type SchoolCandidateItem = {
+  id: string; reference: string; first_name: string; last_name: string;
+  phone: string; permit_category: string; status: string; has_login: boolean;
+};
+
+export async function registerFreeCandidate(payload: FreeCandidateRegisterPayload): Promise<{
+  access_token: string; refresh_token: string; candidate_reference: string; candidate_id: string;
+}> {
+  const r = await fetch(`${API_BASE_URL}/api/v1/registration/candidate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!r.ok) {
+    const err = await r.json().catch(() => ({}));
+    throw new Error(typeof err.detail === 'string' ? err.detail : `Erreur ${r.status}`);
+  }
+  return r.json();
+}
+
+export function registerSchoolCandidate(payload: SchoolCandidatePayload): Promise<{
+  candidate_id: string; candidate_reference: string; has_login: boolean;
+}> {
+  return postPrivateJson('/api/v1/registration/school-candidate', payload);
+}
+
+export function getMySchoolCandidates(): Promise<{ items: SchoolCandidateItem[]; total: number }> {
+  return getPrivateJson('/api/v1/registration/my-candidates');
+}
+
+export function getMyRegistrationProfile(): Promise<{
+  id: string; reference: string; first_name: string; last_name: string;
+  phone: string; permit_category: string; status: string;
+}> {
+  return getPrivateJson('/api/v1/registration/my-profile');
+}

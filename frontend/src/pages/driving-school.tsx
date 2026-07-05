@@ -25,6 +25,9 @@ import { type AuthUser } from '../authClient';
 import { type UserRole } from '../auth';
 import { useAuthSession, canUseProtectedActions } from '../authSession';
 import {
+  registerSchoolCandidate, getMySchoolCandidates, type SchoolCandidateItem,
+} from '../api';
+import {
   type Center, type Candidate, type DashboardData, type ExamSummary,
   type EntrySummary, type ExamAttempt, type EntryValidationResult,
   type PaymentResult, type PaymentFilters, type AuditLogEntry, type AuditLogFilters,
@@ -109,6 +112,8 @@ export function DrivingSchoolPage() {
            Mode démonstration — Connectez-vous avec un compte auto-école pour voir vos élèves réels.
         </div>
       )}
+
+      {isSchool && <SchoolCandidatesPanel />}
 
       {/* Stats */}
       <div className="stats-grid">
@@ -247,3 +252,125 @@ export function DrivingSchoolPage() {
 // MINISTERIAL PAGE — Portail ministériel (Mois 13–18)
 // Accessible depuis AdminPage onglet "Ministère"
 // ══════════════════════════════════════════════════════════════════
+
+
+// ── Inscription et suivi des candidats de l'auto-école ────────────────────
+function SchoolCandidatesPanel() {
+  const [items, setItems] = useState<SchoolCandidateItem[]>([]);
+  const [total, setTotal] = useState(0);
+  const [form, setForm] = useState({
+    first_name: '', last_name: '', phone: '', identity_number: '',
+    permit_category: 'B', email: '', password: '',
+  });
+  const [msg, setMsg] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const set = (k: keyof typeof form) => (e: { target: { value: string } }) =>
+    setForm(f => ({ ...f, [k]: e.target.value }));
+
+  const load = () => {
+    getMySchoolCandidates()
+      .then(r => { setItems(r.items); setTotal(r.total); })
+      .catch(() => undefined);
+  };
+  useEffect(load, []);
+
+  const wantsLogin = form.email.trim().length > 0;
+  const valid =
+    form.first_name.trim().length >= 2 &&
+    form.last_name.trim().length >= 2 &&
+    form.phone.trim().length >= 8 &&
+    form.identity_number.trim().length >= 3 &&
+    (!wantsLogin || form.password.length >= 8);
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    if (!valid || saving) return;
+    setSaving(true); setMsg(null);
+    try {
+      const r = await registerSchoolCandidate({
+        first_name: form.first_name.trim(),
+        last_name: form.last_name.trim(),
+        phone: form.phone.trim(),
+        identity_number: form.identity_number.trim(),
+        permit_category: form.permit_category,
+        email: wantsLogin ? form.email.trim() : undefined,
+        password: wantsLogin ? form.password : undefined,
+      });
+      setMsg(`Candidat inscrit — référence : ${r.candidate_reference}`);
+      setForm({ first_name: '', last_name: '', phone: '', identity_number: '', permit_category: 'B', email: '', password: '' });
+      load();
+    } catch (err) {
+      setMsg(err instanceof Error ? err.message : 'Inscription impossible.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="g2" style={{ marginBottom: 24, alignItems: 'start' }}>
+      <div className="card">
+        <div className="card-header"><span className="card-title">Inscrire un candidat</span></div>
+        <form onSubmit={handleSubmit} style={{ display: 'grid', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <label>Prénom<input value={form.first_name} onChange={set('first_name')} autoComplete="off" /></label>
+            <label>Nom<input value={form.last_name} onChange={set('last_name')} autoComplete="off" /></label>
+          </div>
+          <label>Téléphone<input value={form.phone} onChange={set('phone')} autoComplete="off" placeholder="+224 6XX XX XX XX" /></label>
+          <label>Numéro d'identité<input value={form.identity_number} onChange={set('identity_number')} autoComplete="off" /></label>
+          <label>Catégorie
+            <select value={form.permit_category} onChange={set('permit_category')}>
+              <option value="A">A — Moto</option>
+              <option value="B">B — Voiture</option>
+              <option value="C">C — Poids lourd</option>
+              <option value="D">D — Transport en commun</option>
+              <option value="E">E — Remorque</option>
+            </select>
+          </label>
+          <div style={{ borderTop: '1px solid var(--line)', paddingTop: 12 }}>
+            <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 8 }}>
+              Optionnel : créer un accès de connexion pour l'élève
+            </p>
+            <label>Email (optionnel)<input type="email" value={form.email} onChange={set('email')} autoComplete="off" /></label>
+            {wantsLogin && (
+              <label style={{ marginTop: 8, display: 'block' }}>Mot de passe (8 car. min.)
+                <input type="password" value={form.password} onChange={set('password')} autoComplete="new-password" />
+              </label>
+            )}
+          </div>
+          {msg && <p style={{ fontSize: 13 }}>{msg}</p>}
+          <button type="submit" className="btn-primary" disabled={saving || !valid}>
+            {saving ? 'Inscription…' : 'Inscrire le candidat'}
+          </button>
+        </form>
+      </div>
+
+      <div className="card">
+        <div className="card-header">
+          <span className="card-title">Mes candidats ({total})</span>
+          <button className="btn-sm btn-outline" onClick={load}>Actualiser</button>
+        </div>
+        {items.length === 0 ? (
+          <p style={{ color: 'var(--muted)', fontSize: 13 }}>Aucun candidat inscrit pour le moment.</p>
+        ) : (
+          <div className="table-wrap">
+            <table>
+              <thead><tr><th>Candidat</th><th>Référence</th><th>Cat.</th><th>Statut</th><th>Accès</th></tr></thead>
+              <tbody>
+                {items.map(i => (
+                  <tr key={i.id}>
+                    <td>{i.first_name} {i.last_name}<br/><span style={{ fontSize: 11, color: 'var(--muted)' }}>{i.phone}</span></td>
+                    <td><code style={{ fontSize: 11 }}>{i.reference}</code></td>
+                    <td>{i.permit_category}</td>
+                    <td>{i.status}</td>
+                    <td>{i.has_login ? 'Oui' : '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

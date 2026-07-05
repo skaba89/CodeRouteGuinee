@@ -30,6 +30,12 @@ class Candidate(Base):
     address:         Mapped[str | None]  = mapped_column(Text, nullable=True)
     attempt_count:   Mapped[int]         = mapped_column(Integer, nullable=False, default=0, server_default="0")
 
+    # Liens d'inscription (déploiement national)
+    # user_id       : compte User du candidat libre (auto-inscription)
+    # registered_by : User de l'auto-école qui a inscrit ce candidat
+    user_id:         Mapped[str | None]  = mapped_column(String(36), nullable=True, index=True)
+    registered_by:   Mapped[str | None]  = mapped_column(String(36), nullable=True, index=True)
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=lambda: datetime.now(UTC).replace(tzinfo=None), nullable=False
     )
