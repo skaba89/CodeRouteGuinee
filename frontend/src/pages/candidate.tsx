@@ -157,9 +157,15 @@ export function CandidatePage() {
                   <strong style={{ color: 'var(--ink)', fontFamily: 'var(--font-ui)', letterSpacing: '.01em' }}>{bk.reference}</strong>
                   <span style={{ color: 'var(--muted)', marginLeft: 12 }}>{bk.session_date ?? bk.status}</span>
                 </div>
-                <button className="btn-sm btn-outline" onClick={() => setBookRef(bk.reference)}>
-                  Utiliser
-                </button>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button className="btn-sm btn-outline"
+                    onClick={() => window.open(getConvocationPdfUrl(bk.reference), '_blank', 'noopener')}>
+                    Convocation PDF
+                  </button>
+                  <button className="btn-sm btn-outline" onClick={() => setBookRef(bk.reference)}>
+                    Utiliser
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -373,8 +379,10 @@ function BookingWizard({ hasActiveBooking, onBooked }: {
         <p style={{ fontSize: 13, color: 'var(--muted)', margin: '8px 0 4px' }}>Code de vérification (à présenter à l'entrée)</p>
         <p style={{ fontFamily: 'monospace', fontSize: 18, fontWeight: 800, letterSpacing: '.12em' }}>{result.verification_code}</p>
         <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 12 }}>
-          Notez ces informations. Le paiement s'effectue en espèces au centre le jour de l'examen (phase pilote).
+          Notez ces informations, puis réglez les frais d'examen ci-dessous
+          ou en espèces au centre le jour J (phase pilote).
         </p>
+        <PostBookingActions reference={result.reference} />
       </div>
     );
   }
@@ -437,6 +445,76 @@ function BookingWizard({ hasActiveBooking, onBooked }: {
           {err && <div className="alert ae" style={{ marginTop: 12 }}>{err}</div>}
         </>
       )}
+    </div>
+  );
+}
+
+
+// ── Après réservation : payer (Mobile Money sandbox) + convocation PDF ──────
+function PostBookingActions({ reference }: { reference: string }) {
+  const [provider, setProvider] = useState('orange_money');
+  const [phone, setPhone] = useState('');
+  const [paying, setPaying] = useState(false);
+  const [paid, setPaid] = useState<string | null>(null);
+  const [payErr, setPayErr] = useState<string | null>(null);
+
+  async function pay() {
+    if (paying || phone.trim().length < 8) return;
+    setPaying(true); setPayErr(null);
+    try {
+      const r = await createPayment({
+        booking_reference: reference,
+        amount_gnf: 250000,
+        provider,
+        phone: phone.trim(),
+      });
+      if (r.status === 'paid') {
+        setPaid(r.receipt_number ?? r.reference ?? 'OK');
+      } else {
+        setPayErr(r.message ?? 'Paiement refusé par l\'opérateur.');
+      }
+    } catch (e) {
+      setPayErr(e instanceof Error ? e.message : 'Paiement impossible.');
+    } finally {
+      setPaying(false);
+    }
+  }
+
+  return (
+    <div style={{ marginTop: 18, textAlign: 'left', borderTop: '1px solid var(--line)', paddingTop: 16 }}>
+      {paid ? (
+        <div className="alert as" style={{ marginBottom: 12 }}>
+          Paiement confirmé — reçu <strong>{paid}</strong>
+        </div>
+      ) : (
+        <>
+          <p style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>Payer les frais d'examen (250 000 GNF)</p>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+            <label>Opérateur
+              <select value={provider} onChange={e => setProvider(e.target.value)}>
+                <option value="orange_money">Orange Money</option>
+                <option value="mtn_momo">MTN MoMo</option>
+                <option value="wave">Wave</option>
+              </select>
+            </label>
+            <label>Numéro Mobile Money
+              <input value={phone} onChange={e => setPhone(e.target.value)} placeholder="+224 6XX XX XX XX" autoComplete="off" />
+            </label>
+          </div>
+          <button className="btn-primary btn-block" onClick={pay} disabled={paying || phone.trim().length < 8}>
+            {paying ? 'Paiement en cours…' : 'Payer maintenant'}
+          </button>
+          {payErr && <div className="alert ae" style={{ marginTop: 10 }}>{payErr}</div>}
+          <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 8 }}>
+            Ou réglez en espèces auprès de l'agent DNTT au centre, le jour de l'examen.
+          </p>
+        </>
+      )}
+
+      <button className="btn-success btn-block" style={{ marginTop: 10 }}
+        onClick={() => window.open(getConvocationPdfUrl(reference), '_blank', 'noopener')}>
+        Télécharger ma convocation PDF (avec QR code)
+      </button>
     </div>
   );
 }

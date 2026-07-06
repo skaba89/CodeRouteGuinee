@@ -234,11 +234,27 @@ def start_exam(
 def start_exam_from_booking(
     payload: ExamStartFromBookingRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("center", "admin", "super_admin")),
+    current_user: User = Depends(require_roles("candidate", "center", "admin", "super_admin")),
 ) -> ExamAttempt:
     booking = db.scalar(select(Booking).where(Booking.reference == payload.booking_reference))
     if not booking:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Booking not found")
+
+    # Un candidat ne peut démarrer QUE sa propre réservation
+    # (sur les appareils du centre, il se connecte avec SON compte)
+    if current_user.role == "candidate":
+        from app.models_candidate import Candidate as _Cand
+        cand = db.get(_Cand, booking.candidate_id)
+        owns = cand is not None and (
+            cand.user_id == current_user.id
+            or (cand.email and cand.email == current_user.email)
+        )
+        if not owns:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Cette réservation ne vous appartient pas.",
+            )
+
     if booking.status not in {"confirmed", "paid", "checked_in"}:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Booking is not eligible for exam start")
     session = db.get(ExamSession, booking.session_id)
@@ -408,11 +424,22 @@ def submit_exam(
     attempt_id: str,
     payload: ExamSubmitRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("center", "admin", "super_admin")),
+    current_user: User = Depends(require_roles("candidate", "center", "admin", "super_admin")),
 ) -> ExamAttempt:
     attempt = db.get(ExamAttempt, attempt_id)
     if not attempt:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Exam attempt not found")
+
+    # Un candidat ne peut soumettre QUE sa propre tentative
+    if current_user.role == "candidate":
+        from app.models_candidate import Candidate as _Cand
+        _c = db.get(_Cand, attempt.candidate_id)
+        _owns = _c is not None and (
+            _c.user_id == current_user.id or (_c.email and _c.email == current_user.email)
+        )
+        if not _owns:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
+                                detail="Cette tentative ne vous appartient pas.")
 
     now = datetime.now(UTC).replace(tzinfo=None)
     if attempt.status == "submitted":
@@ -523,6 +550,21 @@ def submit_exam(
     except Exception as _sms_exc:
         _sentry_cap(_sms_exc, context={'endpoint': 'submit_exam_sms'})
         pass  # SMS non bloquant
+
+    # WhatsApp de résultat — best effort
+    try:
+        if candidate and candidate.phone:
+            from app.whatsapp_service import send_exam_result_whatsapp
+            send_exam_result_whatsapp(
+                phone          = candidate.phone,
+                candidate_name = f"{candidate.first_name} {candidate.last_name}",
+                passed         = result["passed"],
+                score          = result["correct_answers"],
+                total          = result["total_questions"],
+            )
+    except Exception as _wa_exc:
+        _sentry_cap(_wa_exc, context={'endpoint': 'submit_exam_whatsapp'})
+        pass  # WhatsApp non bloquant
 
     return attempt
 

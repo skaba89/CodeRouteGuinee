@@ -131,6 +131,12 @@ def create_payment(
         paid_at=_dt.now(UTC).replace(tzinfo=None) if provider_result.status == "paid" else None,
     )
     db.add(payment)
+
+    # Paiement réussi → la réservation passe à 'paid' (trace du parcours)
+    if provider_result.status == "paid" and booking.status in ("pending_payment", "confirmed"):
+        booking.status = "paid"
+        booking.payment_reference = reference
+
     db.add(
         AuditLog(
             actor_id=current_user.id,
