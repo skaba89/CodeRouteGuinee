@@ -9,9 +9,10 @@ Règles :
 """
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, time, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import and_, func, select
 from sqlalchemy.orm import Session
 
@@ -443,3 +444,131 @@ def get_sessions_stats_by_commune(
             "compliance_status": "✅ Conforme" if compliant else "❌ < 3 centres requis",
         })
     return result
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Planification en masse — programmer plusieurs semaines de sessions d'un coup
+# ══════════════════════════════════════════════════════════════════════════════
+
+class BulkPlanRequest(BaseModel):
+    center_id: str
+    weeks: int = Field(default=4, ge=1, le=12)          # nombre de semaines à planifier
+    weekdays: list[int] = Field(min_length=1, max_length=6)  # 0=lundi … 5=samedi
+    hours: list[int] = Field(min_length=1, max_length=3)     # ex: [9, 14]
+    capacity: int = Field(default=35, ge=1, le=35)
+    start_from: date | None = None                       # défaut : demain
+
+    @field_validator("weekdays")
+    @classmethod
+    def _valid_weekdays(cls, v: list[int]) -> list[int]:
+        if any(d < 0 or d > 6 for d in v):
+            raise ValueError("weekdays : valeurs 0 (lundi) à 6 (dimanche)")
+        return sorted(set(v))
+
+    @field_validator("hours")
+    @classmethod
+    def _valid_hours(cls, v: list[int]) -> list[int]:
+        if any(h < 7 or h > 18 for h in v):
+            raise ValueError("hours : valeurs entre 7 et 18")
+        return sorted(set(v))
+
+
+@router.post("/bulk-plan", response_model=dict, status_code=status.HTTP_201_CREATED)
+def bulk_plan_sessions(
+    payload: BulkPlanRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "super_admin")),
+) -> dict:
+    """
+    Planifie des sessions récurrentes sur plusieurs semaines en appliquant
+    les MÊMES règles DNTT que la création unitaire :
+      max 35 candidats, max 3 sessions/semaine/centre, pas de chevauchement 2h.
+    Les créneaux refusés sont rapportés avec leur raison (pas d'échec global).
+    """
+    center = db.scalar(select(Center).where(Center.id == payload.center_id))
+    if not center:
+        raise HTTPException(status_code=404, detail="Centre introuvable")
+    if center.status not in ("accredited", "active"):
+        raise HTTPException(
+            status_code=422,
+            detail=f"Le centre '{center.name}' n'est pas agréé (statut: {center.status}).",
+        )
+
+    from datetime import timedelta as _td
+    start = payload.start_from or (date.today() + _td(days=1))
+    effective_max = min(center.max_sessions_per_week, MAX_SESSIONS_PER_WEEK)
+
+    created: list[dict] = []
+    skipped: list[dict] = []
+
+    # Aligner sur le lundi de la semaine de départ
+    monday0 = start - _td(days=start.weekday())
+
+    for week in range(payload.weeks):
+        for wd in payload.weekdays:
+            day = monday0 + _td(weeks=week, days=wd)
+            if day < start:
+                continue  # jours déjà passés dans la première semaine
+            for hour in payload.hours:
+                starts_at = datetime.combine(day, time(hour=hour))
+                label = starts_at.strftime("%d/%m/%Y %Hh")
+
+                if _count_sessions_this_week(db, center.id, starts_at) >= effective_max:
+                    skipped.append({"slot": label, "reason": f"max {effective_max} sessions/semaine atteint"})
+                    continue
+                if _has_overlapping_session(db, center.id, starts_at):
+                    skipped.append({"slot": label, "reason": "chevauchement avec une session existante"})
+                    continue
+
+                s = ExamSession(
+                    reference=build_session_reference(db),
+                    center_id=center.id,
+                    starts_at=starts_at,
+                    capacity=payload.capacity,
+                    status="planned",
+                )
+                db.add(s)
+                db.flush()  # visible pour les contrôles des itérations suivantes
+                created.append({"session_id": s.id, "reference": s.reference, "starts_at": starts_at.isoformat()})
+
+    db.commit()
+    return {
+        "center": {"id": center.id, "name": center.name},
+        "created": created,
+        "skipped": skipped,
+        "created_count": len(created),
+        "skipped_count": len(skipped),
+    }
+
+
+@router.get("/upcoming-by-center/{center_id}", response_model=dict)
+def upcoming_sessions_by_center(
+    center_id: str,
+    limit: int = Query(default=30, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("center", "admin", "super_admin")),
+) -> dict:
+    """Sessions à venir d'un centre avec le nombre de réservations — vue admin."""
+    from app.models_booking import Booking as _Bk
+
+    now = datetime.now(UTC).replace(tzinfo=None)
+    sessions = db.scalars(
+        select(ExamSession)
+        .where(ExamSession.center_id == center_id, ExamSession.starts_at > now)
+        .order_by(ExamSession.starts_at.asc())
+        .limit(limit)
+    ).all()
+
+    items = []
+    for s in sessions:
+        booked = db.scalar(
+            select(func.count(_Bk.id)).where(
+                _Bk.session_id == s.id, _Bk.status.not_in(["cancelled"])
+            )
+        ) or 0
+        items.append({
+            "session_id": s.id, "reference": s.reference,
+            "starts_at": s.starts_at.isoformat(), "capacity": s.capacity,
+            "booked": booked, "status": s.status,
+        })
+    return {"items": items, "total": len(items)}

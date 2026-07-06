@@ -1236,3 +1236,29 @@ export function createSelfBooking(sessionId: string): Promise<{
 }> {
   return postPrivateJson('/api/v1/bookings/self', { session_id: sessionId });
 }
+
+
+// ── Planification des sessions (admin) ─────────────────────────────────────
+export type BulkPlanResult = {
+  center: { id: string; name: string };
+  created: Array<{ session_id: string; reference: string; starts_at: string }>;
+  skipped: Array<{ slot: string; reason: string }>;
+  created_count: number;
+  skipped_count: number;
+};
+
+export function bulkPlanSessions(payload: {
+  center_id: string; weeks: number; weekdays: number[]; hours: number[];
+  capacity?: number; start_from?: string;
+}): Promise<BulkPlanResult> {
+  return postPrivateJson('/api/v1/sessions/bulk-plan', payload);
+}
+
+export type UpcomingSession = {
+  session_id: string; reference: string; starts_at: string;
+  capacity: number; booked: number; status: string;
+};
+
+export function getUpcomingSessionsByCenter(centerId: string): Promise<{ items: UpcomingSession[]; total: number }> {
+  return getPrivateJson(`/api/v1/sessions/upcoming-by-center/${encodeURIComponent(centerId)}`);
+}

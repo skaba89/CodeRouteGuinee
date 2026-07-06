@@ -20,6 +20,7 @@ import {
   type QuestionFilters,
   type UserFilters,
   triggerSeedPilote, getPiloteRoster, type PiloteRosterItem,
+  bulkPlanSessions, getUpcomingSessionsByCenter, type BulkPlanResult, type UpcomingSession,
 } from '../api';
 import { isAudioLocale, speakFeedback, stop as stopAudio } from '../audio';
 import { type Locale } from '../i18n';
@@ -87,7 +88,7 @@ export function AdminPage() {
   const canAdmin = canUseProtectedActions(currentUser, false, ['admin','super_admin']);
   const canSA = canUseProtectedActions(currentUser, false, ['super_admin']);
 
-  const [tab, setTab] = useState<'dashboard'|'candidates'|'payments'|'monitoring'|'questions'|'audit'|'users'|'pilote'>('dashboard');
+  const [tab, setTab] = useState<'dashboard'|'candidates'|'payments'|'monitoring'|'questions'|'audit'|'users'|'sessions'|'pilote'>('dashboard');
   const [dashboard, setDashboard] = useState<DashboardData | null>(null);
   const [examSum, setExamSum] = useState<ExamSummary | null>(null);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
@@ -156,6 +157,7 @@ export function AdminPage() {
     { id: 'questions',  label: 'Questions' },
     { id: 'audit',      label: 'Audit' },
     { id: 'users',      label: 'Utilisateurs' },
+    { id: 'sessions',   label: 'Sessions' },
     { id: 'pilote',     label: 'Pilote Conakry' },
   ] as const;
 
@@ -397,6 +399,8 @@ export function AdminPage() {
           </div>
         </div>
       )}
+
+      {tab === 'sessions' && <SessionPlannerPanel />}
 
       {tab === 'pilote' && <PilotePanel canSA={canSA} />}
           </>
@@ -685,6 +689,173 @@ function PilotePanel({ canSA }: { canSA: boolean }) {
                     <td><strong style={{ letterSpacing: '.06em' }}>{r.verification_code}</strong></td>
                     <td style={{ fontSize: 12 }}>{r.session}</td>
                     <td>{r.booking_status}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+
+// ── Planification des sessions d'examen ─────────────────────────────────────
+const WEEKDAYS_FR = [
+  { v: 0, l: 'Lun' }, { v: 1, l: 'Mar' }, { v: 2, l: 'Mer' },
+  { v: 3, l: 'Jeu' }, { v: 4, l: 'Ven' }, { v: 5, l: 'Sam' },
+];
+const HOURS_CHOICES = [8, 9, 10, 11, 14, 15, 16];
+
+function SessionPlannerPanel() {
+  const [centers, setCenters] = useState<Center[]>([]);
+  const [centerId, setCenterId] = useState('');
+  const [weeks, setWeeks] = useState(4);
+  const [weekdays, setWeekdays] = useState<number[]>([1, 3]);   // mar, jeu
+  const [hours, setHours] = useState<number[]>([9]);
+  const [capacity, setCapacity] = useState(35);
+  const [planning, setPlanning] = useState(false);
+  const [result, setResult] = useState<BulkPlanResult | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [upcoming, setUpcoming] = useState<UpcomingSession[]>([]);
+
+  useEffect(() => {
+    getCenters({ limit: 200 }).then(r => setCenters(r.items)).catch(() => undefined);
+  }, []);
+
+  const loadUpcoming = (cid: string) => {
+    if (!cid) { setUpcoming([]); return; }
+    getUpcomingSessionsByCenter(cid).then(r => setUpcoming(r.items)).catch(() => setUpcoming([]));
+  };
+  useEffect(() => loadUpcoming(centerId), [centerId]);
+
+  const toggle = (arr: number[], set: (v: number[]) => void, v: number) =>
+    set(arr.includes(v) ? arr.filter(x => x !== v) : [...arr, v].sort((a, b) => a - b));
+
+  async function handlePlan() {
+    if (!centerId || weekdays.length === 0 || hours.length === 0 || planning) return;
+    setPlanning(true); setErr(null); setResult(null);
+    try {
+      const r = await bulkPlanSessions({ center_id: centerId, weeks, weekdays, hours, capacity });
+      setResult(r);
+      loadUpcoming(centerId);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Planification impossible.');
+    } finally {
+      setPlanning(false);
+    }
+  }
+
+  const fmt = (iso: string) => new Date(iso).toLocaleDateString('fr-FR', {
+    weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
+  });
+
+  const chip = (active: boolean): React.CSSProperties => ({
+    padding: '6px 12px', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600,
+    border: `1.5px solid ${active ? 'var(--guinea-green)' : 'var(--line)'}`,
+    background: active ? 'var(--guinea-green)' : 'transparent',
+    color: active ? '#fff' : 'var(--ink)',
+  });
+
+  return (
+    <div style={{ display: 'grid', gap: 20 }}>
+      <div className="card">
+        <div className="card-header"><span className="card-title">Planifier des sessions</span></div>
+        <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 14 }}>
+          Règles DNTT appliquées automatiquement : 35 candidats max par session,
+          3 sessions max par semaine et par centre, pas de chevauchement (2h).
+        </p>
+
+        <div style={{ display: 'grid', gap: 14 }}>
+          <label>Centre d'examen
+            <select value={centerId} onChange={e => setCenterId(e.target.value)} style={{ marginTop: 6 }}>
+              <option value="">— Sélectionner ({centers.length} centres) —</option>
+              {centers.map(ct => <option key={ct.id} value={ct.id}>{ct.name} — {ct.city}</option>)}
+            </select>
+          </label>
+
+          <div>
+            <span style={{ fontSize: 13, fontWeight: 600 }}>Jours de la semaine</span>
+            <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+              {WEEKDAYS_FR.map(d => (
+                <span key={d.v} style={chip(weekdays.includes(d.v))} onClick={() => toggle(weekdays, setWeekdays, d.v)}>
+                  {d.l}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <span style={{ fontSize: 13, fontWeight: 600 }}>Heures de début</span>
+            <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+              {HOURS_CHOICES.map(h => (
+                <span key={h} style={chip(hours.includes(h))} onClick={() => toggle(hours, setHours, h)}>
+                  {h}h00
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <label>Nombre de semaines
+              <input type="number" min={1} max={12} value={weeks}
+                onChange={e => setWeeks(Math.max(1, Math.min(12, Number(e.target.value) || 1)))} />
+            </label>
+            <label>Capacité par session (max 35)
+              <input type="number" min={1} max={35} value={capacity}
+                onChange={e => setCapacity(Math.max(1, Math.min(35, Number(e.target.value) || 35)))} />
+            </label>
+          </div>
+
+          <button className="btn-primary" onClick={handlePlan}
+            disabled={planning || !centerId || weekdays.length === 0 || hours.length === 0}>
+            {planning ? 'Planification…' : `Planifier ${weeks} semaine${weeks > 1 ? 's' : ''}`}
+          </button>
+        </div>
+
+        {err && <div className="alert ae" style={{ marginTop: 12 }}>{err}</div>}
+
+        {result && (
+          <div style={{ marginTop: 14 }}>
+            <div className="alert as">
+              {result.created_count} session{result.created_count > 1 ? 's' : ''} créée{result.created_count > 1 ? 's' : ''}
+              {result.skipped_count > 0 && ` — ${result.skipped_count} créneau(x) refusé(s)`}
+            </div>
+            {result.skipped.length > 0 && (
+              <ul style={{ fontSize: 12, color: 'var(--muted)', marginTop: 8, paddingLeft: 18 }}>
+                {result.skipped.slice(0, 8).map((s, i) => <li key={i}>{s.slot} — {s.reason}</li>)}
+                {result.skipped.length > 8 && <li>… et {result.skipped.length - 8} autres</li>}
+              </ul>
+            )}
+          </div>
+        )}
+      </div>
+
+      <div className="card">
+        <div className="card-header">
+          <span className="card-title">Sessions à venir {centerId ? `(${upcoming.length})` : ''}</span>
+          {centerId && <button className="btn-sm btn-outline" onClick={() => loadUpcoming(centerId)}>Actualiser</button>}
+        </div>
+        {!centerId ? (
+          <p style={{ fontSize: 13, color: 'var(--muted)' }}>Sélectionnez un centre pour voir ses sessions.</p>
+        ) : upcoming.length === 0 ? (
+          <p style={{ fontSize: 13, color: 'var(--muted)' }}>Aucune session à venir dans ce centre.</p>
+        ) : (
+          <div className="table-wrap">
+            <table>
+              <thead><tr><th>Date</th><th>Référence</th><th>Réservations</th><th>Statut</th></tr></thead>
+              <tbody>
+                {upcoming.map(s => (
+                  <tr key={s.session_id}>
+                    <td style={{ textTransform: 'capitalize' }}>{fmt(s.starts_at)}</td>
+                    <td><code style={{ fontSize: 11 }}>{s.reference}</code></td>
+                    <td>
+                      <span style={{ color: s.booked >= s.capacity ? 'var(--red)' : 'var(--guinea-green)', fontWeight: 700 }}>
+                        {s.booked}
+                      </span> / {s.capacity}
+                    </td>
+                    <td>{s.status}</td>
                   </tr>
                 ))}
               </tbody>
