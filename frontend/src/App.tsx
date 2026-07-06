@@ -2,6 +2,7 @@ import React from 'react';
 import { ThemeToggle } from './components/theme-toggle';
 import { ELearningPage } from './pages/elearning';
 import { RegisterPage } from './pages/register';
+import { LandingPage } from './pages/landing';
 import { FormEvent, useEffect, useState } from 'react';
 import { canAccessRoute, navigationItems, type UserRole } from './auth';
 import {
@@ -338,11 +339,9 @@ export default function App() {
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
 
-  // Routes accessibles sans session (publiques)
-  const PUBLIC_ROUTES: AppRoute[] = ['login', 'register'];
-  const goLoginUnlessPublic = () => {
-    if (!PUBLIC_ROUTES.includes(getRouteFromHash())) window.location.hash = '#/login';
-  };
+  // Sans session : la landing publique s'affiche (plus de redirection forcée).
+  // Seule une session invalide en cours de route déclenche un retour propre.
+  const goLoginUnlessPublic = () => { /* la landing gère l'accueil des non-connectés */ };
 
   // Restaurer la session au démarrage
   useEffect(() => {
@@ -434,10 +433,13 @@ export default function App() {
 
   if (loading) {
     page = <Loading />;
-  } else if (route === 'register' && !isLoggedIn) {
-    page = <RegisterPage onRegistered={handleRegistered} />;
-  } else if (route === 'login' || !isLoggedIn) {
-    page = <LoginPage onLogin={handleLogin} />;
+  } else if (!isLoggedIn) {
+    // Visiteur public : landing par défaut, login/register sur demande
+    page = route === 'register' ? <RegisterPage onRegistered={handleRegistered} />
+         : route === 'login'    ? <LoginPage onLogin={handleLogin} />
+         : <LandingPage />;
+  } else if (route === 'login' || route === 'register') {
+    page = <HomePage />;  // déjà connecté : retour à l'accueil interne
   } else if (!hasAccess) {
     page = <AccessDenied role={role} />;
   } else {
