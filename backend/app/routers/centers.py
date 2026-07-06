@@ -14,7 +14,7 @@ router = APIRouter(prefix="/centers", tags=["centers"])
 
 @router.get("", response_model=dict)
 def list_centers(
-    limit: int = Query(default=20, ge=1, le=100),
+    limit: int = Query(default=20, ge=1, le=200),  # 135 centres nationaux en une requête
     offset: int = Query(default=0, ge=0),
     search: str | None = Query(default=None, max_length=100),
     status_filter: str | None = Query(default=None, alias="status"),
