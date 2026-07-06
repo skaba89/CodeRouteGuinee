@@ -78,12 +78,26 @@ def create_institutional_user(
     if existing:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered")
 
+    # Affectation de centre à la création (agents 'center' uniquement)
+    center_id: str | None = None
+    if payload.center_id:
+        if payload.role != "center":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="center_id n'est valide que pour le rôle 'center'.",
+            )
+        from app.models_center import Center as _Center
+        if not db.get(_Center, payload.center_id):
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Centre introuvable")
+        center_id = payload.center_id
+
     user = User(
         email=email,
         full_name=payload.full_name.strip(),
         password_hash=get_password_hash(payload.initial_password),
         role=payload.role,
         is_active=True,
+        center_id=center_id,
     )
     db.add(user)
     db.flush()

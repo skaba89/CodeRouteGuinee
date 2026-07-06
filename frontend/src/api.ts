@@ -242,6 +242,7 @@ export type InstitutionalUserCreatePayload = {
   full_name: string;
   initial_password: string;
   role: string;
+  center_id?: string | null;
   reason: string;
 };
 
@@ -1183,6 +1184,7 @@ export type SchoolCandidatePayload = {
 export type SchoolCandidateItem = {
   id: string; reference: string; first_name: string; last_name: string;
   phone: string; permit_category: string; status: string; has_login: boolean;
+  last_result?: { passed: boolean; score: number | null; submitted_at: string | null } | null;
 };
 
 export async function registerFreeCandidate(payload: FreeCandidateRegisterPayload): Promise<{

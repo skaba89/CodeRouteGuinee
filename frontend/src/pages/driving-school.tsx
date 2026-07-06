@@ -355,7 +355,7 @@ function SchoolCandidatesPanel() {
         ) : (
           <div className="table-wrap">
             <table>
-              <thead><tr><th>Candidat</th><th>Référence</th><th>Cat.</th><th>Statut</th><th>Accès</th></tr></thead>
+              <thead><tr><th>Candidat</th><th>Référence</th><th>Cat.</th><th>Statut</th><th>Résultat</th><th>Accès</th></tr></thead>
               <tbody>
                 {items.map(i => (
                   <tr key={i.id}>
@@ -363,6 +363,13 @@ function SchoolCandidatesPanel() {
                     <td><code style={{ fontSize: 11 }}>{i.reference}</code></td>
                     <td>{i.permit_category}</td>
                     <td>{i.status}</td>
+                    <td>
+                      {i.last_result ? (
+                        <span style={{ fontWeight: 700, color: i.last_result.passed ? 'var(--guinea-green)' : 'var(--red)' }}>
+                          {i.last_result.passed ? 'ADMIS' : 'AJOURNÉ'} {i.last_result.score != null ? `(${i.last_result.score}/40)` : ''}
+                        </span>
+                      ) : <span style={{ color: 'var(--muted)' }}>—</span>}
+                    </td>
                     <td>{i.has_login ? 'Oui' : '—'}</td>
                   </tr>
                 ))}

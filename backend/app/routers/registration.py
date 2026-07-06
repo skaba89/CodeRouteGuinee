@@ -240,11 +240,30 @@ def list_my_school_candidates(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("driving_school")),
 ) -> dict:
+    from app.models_exam_attempt import ExamAttempt
+
     base = select(Candidate).where(Candidate.registered_by == current_user.id)
     total = db.scalar(select(func.count()).select_from(base.subquery())) or 0
     rows = db.scalars(
         base.order_by(Candidate.created_at.desc()).offset(offset).limit(limit)
     ).all()
+
+    def _last_result(cand: Candidate) -> dict | None:
+        att = db.scalar(
+            select(ExamAttempt)
+            .where(ExamAttempt.candidate_id == cand.id,
+                   ExamAttempt.status == "submitted")
+            .order_by(ExamAttempt.submitted_at.desc())
+            .limit(1)
+        )
+        if not att:
+            return None
+        return {
+            "passed": bool(att.passed),
+            "score": att.score,
+            "submitted_at": att.submitted_at.isoformat() if att.submitted_at else None,
+        }
+
     return {
         "items": [
             {
@@ -256,6 +275,7 @@ def list_my_school_candidates(
                 "permit_category": c.permit_category,
                 "status": c.status,
                 "has_login": c.user_id is not None,
+                "last_result": _last_result(c),
             }
             for c in rows
         ],

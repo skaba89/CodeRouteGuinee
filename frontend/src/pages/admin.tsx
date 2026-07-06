@@ -110,6 +110,13 @@ export function AdminPage() {
   const [newEmail, setNewEmail] = useState('');
   const [newName, setNewName] = useState('');
   const [newRole, setNewRole] = useState('admin');
+  const [newCenterId, setNewCenterId] = useState('');
+  const [allCenters, setAllCenters] = useState<Center[]>([]);
+  useEffect(() => {
+    if (tab === 'users' && allCenters.length === 0) {
+      getCenters({ limit: 200 }).then(r => setAllCenters(r.items)).catch(() => undefined);
+    }
+  }, [tab, allCenters.length]);
   const [newPass, setNewPass] = useState('');
   const [creating, setCreating] = useState(false);
 
@@ -140,7 +147,12 @@ export function AdminPage() {
     e.preventDefault();
     setCreating(true); setMsg(null);
     try {
-      await createInstitutionalUser({ email: newEmail, full_name: newName, role: newRole, initial_password: newPass, reason: 'Création par super_admin' });
+      await createInstitutionalUser({
+        email: newEmail, full_name: newName, role: newRole,
+        initial_password: newPass,
+        center_id: newRole === 'center' && newCenterId ? newCenterId : undefined,
+        reason: 'Création par super_admin',
+      });
       setMsg('Utilisateur créé avec succès.');
       setNewEmail(''); setNewName(''); setNewPass('');
       getInstitutionalUsers().then(setUsers).catch(() => undefined);
@@ -350,9 +362,19 @@ export function AdminPage() {
                   Rôle
                   <select value={newRole} onChange={e => setNewRole(e.target.value)}>
                     <option value="admin">Admin national</option>
-                    <option value="center">Chef de centre</option>
+                    <option value="center">Agent de centre d'examen</option>
+                    <option value="driving_school">Auto-école</option>
                   </select>
                 </label>
+                {newRole === 'center' && (
+                  <label>
+                    Centre d'affectation
+                    <select value={newCenterId} onChange={e => setNewCenterId(e.target.value)}>
+                      <option value="">— Sélectionner le centre de l'agent —</option>
+                      {allCenters.map(ct => <option key={ct.id} value={ct.id}>{ct.name} — {ct.city}</option>)}
+                    </select>
+                  </label>
+                )}
                 <label>
                   Mot de passe temporaire
                   <input type="password" value={newPass} onChange={e => setNewPass(e.target.value)}
