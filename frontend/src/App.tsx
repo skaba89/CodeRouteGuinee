@@ -425,7 +425,8 @@ export default function App() {
       const u = await getCurrentUser();
       setCurrentUser(u);
       setRole(normalizeRole(u.role));
-      window.location.hash = '#/';
+      // Après inscription : directement vers la prise de rendez-vous
+      window.location.hash = '#/candidate';
     } catch {
       window.location.hash = '#/login';
     }

@@ -33,6 +33,7 @@ import {
   type ExamMonitoringSummary, type ExamMonitoringEvent, type ExamMonitoringFilters,
   type QuestionGovernanceItem,
   getDashboard, getCandidates, getCenters, getExamSummary, getEntrySummary,
+  getCenterAvailability, createSelfBooking, type CenterAvailability,
   getAuditLogs, getAdminPaymentSummary, getPaymentReconciliationItems,
   getInstitutionalUsers, createInstitutionalUser,
   updateInstitutionalUserRole, updateInstitutionalUserStatus,
@@ -163,6 +164,14 @@ export function CandidatePage() {
             ))}
           </div>
         </div>
+      )}
+
+      {/* Prendre rendez-vous — candidat connecté */}
+      {currentUser?.role === 'candidate' && (
+        <BookingWizard
+          hasActiveBooking={myBookings.some(b => b.status !== 'cancelled')}
+          onBooked={() => setMyBookingsLoaded(false)}
+        />
       )}
 
       {/* Étapes */}
@@ -303,3 +312,131 @@ export function CandidatePage() {
 // ══════════════════════════════════════════════════════════════════
 // CENTER PAGE — Espace centre d'examen
 // ══════════════════════════════════════════════════════════════════
+
+
+// ── Prendre rendez-vous : centre → session disponible → réservation ─────────
+function BookingWizard({ hasActiveBooking, onBooked }: {
+  hasActiveBooking: boolean; onBooked: () => void;
+}) {
+  const [centers, setCenters] = useState<Center[]>([]);
+  const [centerId, setCenterId] = useState('');
+  const [avail, setAvail] = useState<CenterAvailability | null>(null);
+  const [loadingAvail, setLoadingAvail] = useState(false);
+  const [booking, setBooking] = useState(false);
+  const [result, setResult] = useState<{ reference: string; verification_code: string } | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    getCenters({ limit: 200 }).then(r => setCenters(r.items)).catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    if (!centerId) { setAvail(null); return; }
+    setLoadingAvail(true); setErr(null);
+    getCenterAvailability(centerId)
+      .then(setAvail)
+      .catch(() => setErr("Impossible de charger les disponibilités."))
+      .finally(() => setLoadingAvail(false));
+  }, [centerId]);
+
+  async function book(sessionId: string) {
+    if (booking) return;
+    setBooking(true); setErr(null);
+    try {
+      const r = await createSelfBooking(sessionId);
+      setResult({ reference: r.reference, verification_code: r.verification_code });
+      onBooked();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Réservation impossible.');
+    } finally {
+      setBooking(false);
+    }
+  }
+
+  const fmt = (iso: string) => {
+    const d = new Date(iso);
+    return d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
+      + ' à ' + d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  };
+
+  if (result) {
+    return (
+      <div className="card" style={{ marginBottom: 20, textAlign: 'center' }}>
+        <div style={{ color: 'var(--guinea-green)', marginBottom: 10 }}>
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
+          </svg>
+        </div>
+        <h3 style={{ fontSize: 17 }}>Rendez-vous confirmé</h3>
+        <p style={{ fontSize: 13, color: 'var(--muted)', margin: '8px 0 4px' }}>Référence de réservation</p>
+        <p style={{ fontFamily: 'monospace', fontSize: 16, fontWeight: 700 }}>{result.reference}</p>
+        <p style={{ fontSize: 13, color: 'var(--muted)', margin: '8px 0 4px' }}>Code de vérification (à présenter à l'entrée)</p>
+        <p style={{ fontFamily: 'monospace', fontSize: 18, fontWeight: 800, letterSpacing: '.12em' }}>{result.verification_code}</p>
+        <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 12 }}>
+          Notez ces informations. Le paiement s'effectue en espèces au centre le jour de l'examen (phase pilote).
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="card" style={{ marginBottom: 20 }}>
+      <div className="card-header"><span className="card-title">Prendre rendez-vous</span></div>
+
+      {hasActiveBooking ? (
+        <p style={{ fontSize: 13, color: 'var(--muted)' }}>
+          Vous avez déjà une réservation active (voir "Mes réservations" ci-dessus).
+          Une seule réservation à la fois est autorisée.
+        </p>
+      ) : (
+        <>
+          <label style={{ display: 'block', marginBottom: 14 }}>
+            Choisissez votre centre d'examen
+            <select value={centerId} onChange={e => setCenterId(e.target.value)} style={{ marginTop: 6 }}>
+              <option value="">— Sélectionner un centre ({centers.length} disponibles) —</option>
+              {centers.map(ct => (
+                <option key={ct.id} value={ct.id}>
+                  {ct.name} — {ct.city}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          {loadingAvail && <p style={{ fontSize: 13, color: 'var(--muted)' }}>Chargement des créneaux…</p>}
+
+          {avail && avail.sessions.length === 0 && (
+            <div className="alert ai">
+              Aucune session programmée dans ce centre pour le moment. Choisissez un autre centre
+              ou revenez plus tard.
+            </div>
+          )}
+
+          {avail && avail.sessions.length > 0 && (
+            <div style={{ display: 'grid', gap: 10 }}>
+              {avail.sessions.map(s => (
+                <div key={s.session_id} style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  padding: '12px 16px', background: 'var(--bg)', borderRadius: 'var(--r)',
+                  opacity: s.full ? 0.55 : 1,
+                }}>
+                  <div>
+                    <strong style={{ fontSize: 14, textTransform: 'capitalize' }}>{fmt(s.starts_at)}</strong>
+                    <div style={{ fontSize: 12, color: s.full ? 'var(--red)' : 'var(--guinea-green)', marginTop: 2 }}>
+                      {s.full ? 'Complet' : `${s.remaining_seats} place${s.remaining_seats > 1 ? 's' : ''} restante${s.remaining_seats > 1 ? 's' : ''} / ${s.capacity}`}
+                    </div>
+                  </div>
+                  <button className="btn-primary btn-sm" disabled={s.full || booking}
+                    onClick={() => book(s.session_id)}>
+                    {booking ? '…' : 'Réserver'}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {err && <div className="alert ae" style={{ marginTop: 12 }}>{err}</div>}
+        </>
+      )}
+    </div>
+  );
+}

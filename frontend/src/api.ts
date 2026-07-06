@@ -1216,3 +1216,23 @@ export function getMyRegistrationProfile(): Promise<{
 }> {
   return getPrivateJson('/api/v1/registration/my-profile');
 }
+
+
+// ── Prise de rendez-vous candidat ───────────────────────────────────────────
+export type CenterAvailability = {
+  center: { id: string; name: string; city: string; commune: string; address: string };
+  sessions: Array<{
+    session_id: string; reference: string; starts_at: string;
+    capacity: number; booked: number; remaining_seats: number; full: boolean;
+  }>;
+};
+
+export function getCenterAvailability(centerId: string): Promise<CenterAvailability> {
+  return getPrivateJson(`/api/v1/bookings/availability/${encodeURIComponent(centerId)}`);
+}
+
+export function createSelfBooking(sessionId: string): Promise<{
+  reference: string; verification_code: string; status: string;
+}> {
+  return postPrivateJson('/api/v1/bookings/self', { session_id: sessionId });
+}

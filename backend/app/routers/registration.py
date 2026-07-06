@@ -31,7 +31,11 @@ from sqlalchemy.orm import Session
 from app.routers.auth import audit_auth_event
 from app.db.session import get_db
 from app.deps import get_current_user, require_roles
+from app.booking_service import build_booking_reference, build_verification_code
+from app.models_booking import Booking
 from app.models_candidate import Candidate
+from app.models_center import Center
+from app.models_session import ExamSession
 from app.models_user import User
 from app.routers.candidates import build_candidate_reference
 from app.security import create_access_token, create_refresh_token, get_password_hash
@@ -279,4 +283,173 @@ def get_my_candidate_profile(
         "phone": cand.phone,
         "permit_category": cand.permit_category,
         "status": cand.status,
+    }
+
+
+# ── Prise de rendez-vous candidat (self-service) ─────────────────────────────
+
+def _get_my_candidate(db: Session, current_user: User) -> Candidate:
+    """Fiche Candidate du compte connecté : par user_id, sinon par email (compat)."""
+    cand = db.scalar(select(Candidate).where(Candidate.user_id == current_user.id))
+    if not cand and current_user.email:
+        cand = db.scalar(select(Candidate).where(Candidate.email == current_user.email))
+    if not cand:
+        raise HTTPException(
+            status_code=404,
+            detail="Aucune fiche candidat liée à ce compte. Complétez votre inscription.",
+        )
+    return cand
+
+
+def _seats_taken(db: Session, session_id: str) -> int:
+    return db.scalar(
+        select(func.count(Booking.id)).where(
+            Booking.session_id == session_id,
+            Booking.status.not_in(["cancelled"]),
+        )
+    ) or 0
+
+
+@router.get("/availability")
+def get_availability(
+    prefecture: str | None = Query(default=None),
+    center_id: str | None = Query(default=None),
+    limit: int = Query(default=60, ge=1, le=200),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    """
+    Sessions futures ouvertes avec les places restantes, groupées par centre.
+    Filtrable par préfecture ou centre précis.
+    """
+    from datetime import datetime, UTC
+    now = datetime.now(UTC).replace(tzinfo=None)
+
+    q = (
+        select(ExamSession, Center)
+        .join(Center, ExamSession.center_id == Center.id)
+        .where(
+            ExamSession.starts_at > now,
+            ExamSession.status.in_(["planned", "open"]),
+        )
+        .order_by(ExamSession.starts_at.asc())
+        .limit(limit * 2)  # marge : certaines seront pleines
+    )
+    if center_id:
+        q = q.where(ExamSession.center_id == center_id)
+    if prefecture:
+        q = q.where(Center.prefecture == prefecture)
+
+    items = []
+    for ses, ctr in db.execute(q).all():
+        taken = _seats_taken(db, ses.id)
+        seats_left = max(0, (ses.capacity or 0) - taken)
+        if seats_left <= 0:
+            continue
+        items.append({
+            "session_id": ses.id,
+            "session_reference": ses.reference,
+            "starts_at": ses.starts_at.isoformat(),
+            "capacity": ses.capacity,
+            "seats_left": seats_left,
+            "center_id": ctr.id,
+            "center_name": ctr.name,
+            "center_city": ctr.city,
+            "center_prefecture": ctr.prefecture,
+            "center_commune": ctr.commune,
+        })
+        if len(items) >= limit:
+            break
+
+    # Liste des préfectures qui ont au moins une session à venir (pour le filtre UI)
+    prefectures = sorted({i["center_prefecture"] for i in items if i["center_prefecture"]})
+    return {"items": items, "total": len(items), "prefectures": prefectures}
+
+
+class BookSessionIn(BaseModel):
+    session_id: str = Field(min_length=8, max_length=64)
+
+
+@router.post("/book", status_code=status.HTTP_201_CREATED)
+def book_session(
+    payload: BookSessionIn,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("candidate")),
+) -> dict:
+    """
+    Le candidat connecté réserve une place dans une session.
+    Règles : 1 réservation active max ; capacité vérifiée ; le candidate_id
+    vient TOUJOURS de la fiche liée au compte (jamais du frontend).
+    """
+    from datetime import datetime, UTC
+    cand = _get_my_candidate(db, current_user)
+
+    ses = db.get(ExamSession, payload.session_id)
+    if not ses or ses.status not in ("planned", "open"):
+        raise HTTPException(status_code=404, detail="Session introuvable ou fermée.")
+    now = datetime.now(UTC).replace(tzinfo=None)
+    if ses.starts_at <= now:
+        raise HTTPException(status_code=409, detail="Cette session est déjà passée.")
+
+    # Une seule réservation active (non annulée, session future)
+    active = db.execute(
+        select(Booking)
+        .join(ExamSession, ExamSession.id == Booking.session_id)
+        .where(
+            Booking.candidate_id == cand.id,
+            Booking.status.not_in(["cancelled"]),
+            ExamSession.starts_at > now,
+        )
+    ).first()
+    if active:
+        raise HTTPException(
+            status_code=409,
+            detail="Vous avez déjà une réservation active. Annulez-la avant d'en créer une autre.",
+        )
+
+    # Capacité (re-vérifiée juste avant l'insertion)
+    if _seats_taken(db, ses.id) >= (ses.capacity or 0):
+        raise HTTPException(status_code=409, detail="Cette session est complète.")
+
+    sequence_number = (db.scalar(select(func.count(Booking.id))) or 0) + 1
+    reference = build_booking_reference(sequence_number)
+    booking = Booking(
+        reference=reference,
+        candidate_id=cand.id,
+        session_id=ses.id,
+        status="confirmed",
+        verification_code=build_verification_code(reference),
+        notes="Réservation en ligne (self-service candidat)",
+    )
+    db.add(booking)
+    audit_auth_event(db, "registration.self_booking", cand.phone, request, current_user)
+    db.commit()
+    db.refresh(booking)
+
+    center = db.get(Center, ses.center_id)
+
+    # Notifications best-effort (email + SMS) — non bloquantes
+    try:
+        if cand.email:
+            from app.email_service import send_booking_confirmation
+            send_booking_confirmation(
+                to_email=cand.email,
+                candidate_name=f"{cand.first_name} {cand.last_name}",
+                booking_reference=booking.reference,
+                session_date=ses.starts_at.strftime("%d/%m/%Y à %Hh%M"),
+                center_name=center.name if center else "",
+                verification_code=booking.verification_code,
+            )
+    except Exception:
+        pass
+
+    return {
+        "booking_reference": booking.reference,
+        "verification_code": booking.verification_code,
+        "status": booking.status,
+        "session_reference": ses.reference,
+        "starts_at": ses.starts_at.isoformat(),
+        "center_name": center.name if center else None,
+        "center_city": center.city if center else None,
     }

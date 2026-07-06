@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
+from pydantic import BaseModel
 
 from app.booking_service import build_booking_reference, build_verification_code
 from app.convocation_service import build_convocation_payload
@@ -188,3 +189,155 @@ def verify_booking(verification_code: str, db: Session = Depends(get_db)) -> Boo
     if not booking:
         return BookingVerificationRead(valid=False)
     return BookingVerificationRead(valid=True, reference=booking.reference, status=booking.status)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Réservation self-service candidat — prise de rendez-vous nationale
+# ══════════════════════════════════════════════════════════════════════════════
+
+@router.get("/availability/{center_id}", response_model=dict)
+def get_center_availability(
+    center_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    """
+    Sessions futures d'un centre avec le nombre de places restantes.
+    Utilisé par le parcours candidat 'Prendre rendez-vous'.
+    """
+    from datetime import UTC as _UTC, datetime as _dt
+
+    center = db.get(Center, center_id)
+    if not center:
+        raise HTTPException(status_code=404, detail="Centre introuvable")
+
+    now = _dt.now(_UTC).replace(tzinfo=None)
+    sessions = db.scalars(
+        select(ExamSession)
+        .where(
+            ExamSession.center_id == center_id,
+            ExamSession.starts_at > now,
+            ExamSession.status.in_(["planned", "open"]),
+        )
+        .order_by(ExamSession.starts_at.asc())
+        .limit(30)
+    ).all()
+
+    items = []
+    for s in sessions:
+        booked = db.scalar(
+            select(func.count(Booking.id)).where(
+                Booking.session_id == s.id,
+                Booking.status.not_in(["cancelled"]),
+            )
+        ) or 0
+        remaining = max(0, s.capacity - booked)
+        items.append({
+            "session_id": s.id,
+            "reference": s.reference,
+            "starts_at": s.starts_at.isoformat(),
+            "capacity": s.capacity,
+            "booked": booked,
+            "remaining_seats": remaining,
+            "full": remaining == 0,
+        })
+
+    return {
+        "center": {"id": center.id, "name": center.name, "city": center.city,
+                   "commune": center.commune, "address": center.address},
+        "sessions": items,
+    }
+
+
+class SelfBookingCreate(BaseModel):
+    session_id: str
+
+
+@router.post("/self", response_model=BookingRead, status_code=status.HTTP_201_CREATED)
+def create_self_booking(
+    payload: SelfBookingCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("candidate")),
+) -> Booking:
+    """
+    Le candidat connecté réserve une place pour LUI-MÊME.
+    - Fiche candidat résolue via user_id (inscription libre / auto-école),
+      fallback email pour les comptes historiques.
+    - Contrôle de capacité (max DNTT par session).
+    - Une seule réservation active par candidat.
+    """
+    from app.models_candidate import Candidate
+
+    candidate = db.scalar(
+        select(Candidate).where(Candidate.user_id == current_user.id)
+    ) or db.scalar(
+        select(Candidate).where(Candidate.email == current_user.email)
+    )
+    if not candidate:
+        raise HTTPException(
+            status_code=404,
+            detail="Aucune fiche candidat liée à ce compte. Complétez votre inscription.",
+        )
+
+    session = db.get(ExamSession, payload.session_id)
+    if not session or session.status not in ("planned", "open"):
+        raise HTTPException(status_code=404, detail="Session introuvable ou fermée.")
+
+    from datetime import UTC as _UTC, datetime as _dt
+    if session.starts_at <= _dt.now(_UTC).replace(tzinfo=None):
+        raise HTTPException(status_code=422, detail="Cette session est déjà passée.")
+
+    # Une seule réservation active par candidat
+    active = db.scalar(
+        select(Booking).where(
+            Booking.candidate_id == candidate.id,
+            Booking.status.not_in(["cancelled"]),
+        )
+    )
+    if active:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Vous avez déjà une réservation active : {active.reference}. "
+                   "Annulez-la avant d'en créer une nouvelle.",
+        )
+
+    # Contrôle de capacité
+    booked = db.scalar(
+        select(func.count(Booking.id)).where(
+            Booking.session_id == session.id,
+            Booking.status.not_in(["cancelled"]),
+        )
+    ) or 0
+    if booked >= session.capacity:
+        raise HTTPException(status_code=409, detail="Cette session est complète. Choisissez un autre créneau.")
+
+    sequence_number = (db.scalar(select(func.count(Booking.id))) or 0) + 1
+    reference = build_booking_reference(sequence_number)
+    booking = Booking(
+        reference=reference,
+        candidate_id=candidate.id,
+        session_id=session.id,
+        verification_code=build_verification_code(reference),
+        notes="Réservation en ligne — paiement espèces au centre (pilote)",
+    )
+    db.add(booking)
+    db.commit()
+    db.refresh(booking)
+
+    # Notifications best-effort (email + SMS) — non bloquantes
+    try:
+        center = db.get(Center, session.center_id)
+        if candidate.email and center:
+            from app.email_service import send_booking_confirmation
+            send_booking_confirmation(
+                to_email=candidate.email,
+                candidate_name=f"{candidate.first_name} {candidate.last_name}",
+                booking_reference=booking.reference,
+                session_date=session.starts_at.strftime("%d/%m/%Y à %Hh%M"),
+                center_name=center.name,
+                verification_code=booking.verification_code,
+            )
+    except Exception:
+        pass
+
+    return booking
