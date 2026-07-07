@@ -64,6 +64,10 @@ def _auth(tok: str) -> dict:
 
 def test_bulk_plan_respecte_regle_3_par_semaine(client, admin_token, fresh_center):
     """4 créneaux demandés par semaine → 3 créés (règle DNTT), 1 refusé."""
+    # Partir d'un lundi futur garantit que lundi ET mercredi tombent
+    # dans la fenêtre (sinon le lundi de la 1re semaine peut être passé).
+    today = date.today()
+    next_monday = today + timedelta(days=(7 - today.weekday()) + 7)  # lundi 2 semaines plus loin
     r = client.post(
         "/api/v1/sessions/bulk-plan",
         json={
@@ -72,7 +76,7 @@ def test_bulk_plan_respecte_regle_3_par_semaine(client, admin_token, fresh_cente
             "weekdays": [0, 2],   # lundi, mercredi
             "hours": [9, 14],     # 2 créneaux/jour → 4 par semaine demandés
             "capacity": 35,
-            "start_from": (date.today() + timedelta(days=14)).isoformat(),
+            "start_from": next_monday.isoformat(),
         },
         headers=_auth(admin_token),
     )

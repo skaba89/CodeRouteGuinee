@@ -90,6 +90,14 @@ def login(
         audit_auth_event(db, "auth.login_failed", form.username, request, user)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
 
+    # Compte désactivé ou en attente de validation (ex. auto-école) → refus
+    if not user.is_active:
+        audit_auth_event(db, "auth.login_inactive", form.username, request, user)
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Compte en attente de validation par la DNTT ou désactivé.",
+        )
+
     login_rate_limiter.reset(key, db)
     audit_auth_event(db, "auth.login_success", form.username, request, user)
 

@@ -143,6 +143,18 @@ export function AdminPage() {
     if (tab === 'users') getInstitutionalUsers().then(setUsers).catch(() => undefined);
   }, [tab, candPage, candLimit, candSearch]);
 
+  async function handleToggleStatus(userId: string, activate: boolean) {
+    try {
+      await updateInstitutionalUserStatus(
+        userId, activate,
+        activate ? 'Validation DNTT' : 'Désactivation par administration',
+      );
+      getInstitutionalUsers().then(setUsers).catch(() => undefined);
+    } catch {
+      /* silencieux : l'état ne change pas si l'appel échoue */
+    }
+  }
+
   async function handleCreateUser(e: FormEvent) {
     e.preventDefault();
     setCreating(true); setMsg(null);
@@ -404,7 +416,7 @@ export function AdminPage() {
             ) : (
               <div className="table-wrap">
                 <table>
-                  <thead><tr><th>Nom</th><th>Email</th><th>Rôle</th><th>Statut</th></tr></thead>
+                  <thead><tr><th>Nom</th><th>Email</th><th>Rôle</th><th>Statut</th><th>Action</th></tr></thead>
                   <tbody>
                     {users.map(u => (
                       <tr key={u.id}>
@@ -412,6 +424,14 @@ export function AdminPage() {
                         <td style={{ fontSize: 12 }}>{u.email}</td>
                         <td><span className="badge bb">{u.role}</span></td>
                         <td><span className={`badge ${u.is_active ? 'bg' : 'bgr'}`}>{u.is_active ? 'Actif' : 'Inactif'}</span></td>
+                        <td>
+                          {canSA && (
+                            <button className="btn-sm btn-outline"
+                              onClick={() => handleToggleStatus(u.id, !u.is_active)}>
+                              {u.is_active ? 'Désactiver' : 'Activer'}
+                            </button>
+                          )}
+                        </td>
                       </tr>
                     ))}
                   </tbody>

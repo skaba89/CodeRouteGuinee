@@ -1264,3 +1264,21 @@ export type UpcomingSession = {
 export function getUpcomingSessionsByCenter(centerId: string): Promise<{ items: UpcomingSession[]; total: number }> {
   return getPrivateJson(`/api/v1/sessions/upcoming-by-center/${encodeURIComponent(centerId)}`);
 }
+
+
+// ── Inscription publique auto-école (validation DNTT) ──────────────────────
+export async function registerSchool(payload: {
+  school_name: string; manager_name: string; email: string;
+  phone: string; city: string; password: string;
+}): Promise<{ status: string; detail: string }> {
+  const r = await fetch(`${API_BASE_URL}/api/v1/registration/school`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!r.ok) {
+    const err = await r.json().catch(() => ({}));
+    throw new Error(typeof err.detail === 'string' ? err.detail : `Erreur ${r.status}`);
+  }
+  return r.json();
+}

@@ -473,3 +473,71 @@ def book_session(
         "center_name": center.name if center else None,
         "center_city": center.city if center else None,
     }
+
+
+# ── Inscription publique auto-école (validation DNTT requise) ────────────────
+
+class SchoolRegisterIn(BaseModel):
+    school_name: str = Field(min_length=3, max_length=160)
+    manager_name: str = Field(min_length=3, max_length=120)
+    email: str = Field(max_length=200)
+    phone: str = Field(min_length=8, max_length=50)
+    city: str = Field(min_length=2, max_length=120)
+    password: str = Field(min_length=8, max_length=128)
+
+    @field_validator("email")
+    @classmethod
+    def _valid_email(cls, v: str) -> str:
+        v = v.strip().lower()
+        if not EMAIL_RE.match(v):
+            raise ValueError("Adresse email invalide")
+        return v
+
+
+@router.post("/school", status_code=status.HTTP_201_CREATED)
+def register_school(
+    payload: SchoolRegisterIn,
+    request: Request,
+    db: Session = Depends(get_db),
+) -> dict:
+    """
+    Inscription publique d'une auto-école.
+    Le compte est créé DÉSACTIVÉ (is_active=False) : la DNTT le valide
+    depuis l'administration avant que l'école puisse se connecter.
+    """
+    email = payload.email
+    if db.scalar(select(User).where(User.email == email)):
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email déjà enregistré.")
+
+    school = User(
+        email=email,
+        full_name=f"{payload.school_name.strip()} — {payload.manager_name.strip()}",
+        password_hash=get_password_hash(payload.password),
+        role="driving_school",
+        is_active=False,   # ← validation DNTT requise
+    )
+    db.add(school)
+    db.flush()
+
+    from app.models_audit import AuditLog
+    db.add(AuditLog(
+        actor_id=school.id,
+        action="registration.school_pending",
+        entity="user",
+        entity_id=school.id,
+        details={
+            "school_name": payload.school_name.strip(),
+            "manager_name": payload.manager_name.strip(),
+            "phone": payload.phone.strip(),
+            "city": payload.city.strip(),
+            "email": email,
+        },
+    ))
+    audit_auth_event(db, "registration.school", email, request, school)
+    db.commit()
+
+    return {
+        "status": "pending_validation",
+        "detail": "Votre demande a été enregistrée. La DNTT validera votre compte "
+                  "sous 48h ouvrées — vous pourrez alors vous connecter.",
+    }

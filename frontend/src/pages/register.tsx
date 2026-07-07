@@ -4,10 +4,11 @@
  * et affiche la référence officielle GN-CODE-....
  */
 import { type FormEvent, useState } from 'react';
-import { registerFreeCandidate } from '../api';
+import { registerFreeCandidate, registerSchool } from '../api';
 import { setAccessToken, setRefreshToken } from '../authClient';
 
 export function RegisterPage({ onRegistered }: { onRegistered: () => void }) {
+  const [mode, setMode] = useState<'candidate' | 'school'>('candidate');
   const [form, setForm] = useState({
     first_name: '', last_name: '', email: '', password: '', confirm: '',
     phone: '', identity_number: '', permit_category: 'B', city: '',
@@ -18,15 +19,53 @@ export function RegisterPage({ onRegistered }: { onRegistered: () => void }) {
 
   const set = (k: keyof typeof form) => (e: { target: { value: string } }) =>
     setForm(f => ({ ...f, [k]: e.target.value }));
+  const [school, setSchool] = useState({
+    school_name: '', manager_name: '', email: '', phone: '', city: '', password: '', confirm: '',
+  });
+  const [schoolDone, setSchoolDone] = useState<string | null>(null);
+  const setS = (k: keyof typeof school) => (e: { target: { value: string } }) =>
+    setSchool(s => ({ ...s, [k]: e.target.value }));
+
+  const emailOk = (v: string) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v);
 
   const valid =
     form.first_name.trim().length >= 2 &&
     form.last_name.trim().length >= 2 &&
-    /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(form.email) &&
+    emailOk(form.email) &&
     form.password.length >= 8 &&
     form.password === form.confirm &&
     form.phone.trim().length >= 8 &&
     form.identity_number.trim().length >= 3;
+
+  const schoolValid =
+    school.school_name.trim().length >= 3 &&
+    school.manager_name.trim().length >= 3 &&
+    emailOk(school.email) &&
+    school.phone.trim().length >= 8 &&
+    school.city.trim().length >= 2 &&
+    school.password.length >= 8 &&
+    school.password === school.confirm;
+
+  async function handleSchoolSubmit(e: FormEvent) {
+    e.preventDefault();
+    if (!schoolValid || loading) return;
+    setLoading(true); setStatus(null);
+    try {
+      const r = await registerSchool({
+        school_name: school.school_name.trim(),
+        manager_name: school.manager_name.trim(),
+        email: school.email.trim(),
+        phone: school.phone.trim(),
+        city: school.city.trim(),
+        password: school.password,
+      });
+      setSchoolDone(r.detail);
+    } catch (err) {
+      setStatus(err instanceof Error ? err.message : 'Inscription impossible. Réessayez.');
+    } finally {
+      setLoading(false);
+    }
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -51,6 +90,29 @@ export function RegisterPage({ onRegistered }: { onRegistered: () => void }) {
     } finally {
       setLoading(false);
     }
+  }
+
+  if (schoolDone) {
+    return (
+      <div className="login-screen">
+        <div className="login-form-panel" style={{ margin: '0 auto' }}>
+          <div className="login-card" style={{ textAlign: 'center', maxWidth: 460 }}>
+            <div style={{ color: 'var(--guinea-gold)', marginBottom: 12 }}>
+              <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+              </svg>
+            </div>
+            <h2 style={{ fontSize: 20 }}>Demande enregistrée</h2>
+            <p style={{ color: 'var(--muted)', fontSize: 13, margin: '12px 0 18px', lineHeight: 1.6 }}>
+              {schoolDone}
+            </p>
+            <a href="#/login" className="btn-primary" style={{ width: '100%', display: 'block', textDecoration: 'none' }}>
+              Retour à la connexion
+            </a>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   if (done) {
@@ -89,11 +151,80 @@ export function RegisterPage({ onRegistered }: { onRegistered: () => void }) {
           <div className="login-brand">
             <div className="login-logo">CR</div>
             <div>
-              <h2 style={{ fontSize: 20, letterSpacing: '-.02em' }}>Créer un compte candidat</h2>
-              <p className="login-sub">Candidat libre — Plateforme nationale DNTT</p>
+              <h2 style={{ fontSize: 20, letterSpacing: '-.02em' }}>
+                {mode === 'candidate' ? 'Créer un compte candidat' : 'Inscrire mon auto-école'}
+              </h2>
+              <p className="login-sub">Plateforme nationale DNTT</p>
             </div>
           </div>
 
+          {/* Toggle Candidat / Auto-école */}
+          <div style={{ display: 'flex', gap: 6, background: 'var(--bg)', padding: 4, borderRadius: 12, marginBottom: 18 }}>
+            <button type="button" onClick={() => { setMode('candidate'); setStatus(null); }}
+              style={{
+                flex: 1, padding: '9px 0', border: 'none', borderRadius: 9, cursor: 'pointer',
+                fontSize: 13, fontWeight: 700, fontFamily: 'var(--font-ui)',
+                background: mode === 'candidate' ? 'var(--guinea-green)' : 'transparent',
+                color: mode === 'candidate' ? '#fff' : 'var(--ink2)',
+              }}>
+              Candidat
+            </button>
+            <button type="button" onClick={() => { setMode('school'); setStatus(null); }}
+              style={{
+                flex: 1, padding: '9px 0', border: 'none', borderRadius: 9, cursor: 'pointer',
+                fontSize: 13, fontWeight: 700, fontFamily: 'var(--font-ui)',
+                background: mode === 'school' ? 'var(--guinea-green)' : 'transparent',
+                color: mode === 'school' ? '#fff' : 'var(--ink2)',
+              }}>
+              Auto-école
+            </button>
+          </div>
+
+          {mode === 'school' ? (
+            <form className="login-form" onSubmit={handleSchoolSubmit}>
+              <label>Nom de l'auto-école
+                <input value={school.school_name} onChange={setS('school_name')} required autoComplete="off" placeholder="Auto-École de la Corniche" />
+              </label>
+              <label>Nom du responsable
+                <input value={school.manager_name} onChange={setS('manager_name')} required autoComplete="off" />
+              </label>
+              <label>Adresse email professionnelle
+                <input type="email" value={school.email} onChange={setS('email')} required autoComplete="off" placeholder="contact@auto-ecole.gn" />
+              </label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <label>Téléphone
+                  <input value={school.phone} onChange={setS('phone')} required autoComplete="off" placeholder="+224 6XX…" />
+                </label>
+                <label>Ville
+                  <input value={school.city} onChange={setS('city')} required autoComplete="off" placeholder="Conakry" />
+                </label>
+              </div>
+              <label>Mot de passe (8 caractères min.)
+                <input type="password" value={school.password} onChange={setS('password')} required autoComplete="new-password" />
+              </label>
+              <label>Confirmer le mot de passe
+                <input type="password" value={school.confirm} onChange={setS('confirm')} required autoComplete="new-password" />
+                {school.confirm.length > 0 && school.confirm !== school.password && (
+                  <span style={{ fontSize: 11, color: 'var(--red)', marginTop: 3, display: 'block' }}>
+                    Les mots de passe ne correspondent pas
+                  </span>
+                )}
+              </label>
+
+              <div className="alert ai" style={{ fontSize: 12 }}>
+                Votre compte sera activé après validation par la DNTT (sous 48h ouvrées).
+                Vous recevrez la confirmation par email.
+              </div>
+
+              {status && <div className="login-error-box">{status}</div>}
+
+              <button type="submit" className="btn-success"
+                style={{ width: '100%', minHeight: 46, fontSize: 14, marginTop: 4 }}
+                disabled={loading || !schoolValid}>
+                {loading ? 'Envoi…' : "Envoyer ma demande →"}
+              </button>
+            </form>
+          ) : (
           <form className="login-form" onSubmit={handleSubmit}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
               <label>Prénom
@@ -146,6 +277,7 @@ export function RegisterPage({ onRegistered }: { onRegistered: () => void }) {
               {loading ? 'Création…' : "Créer mon compte →"}
             </button>
           </form>
+          )}
 
           <p style={{ textAlign: 'center', fontSize: 13, marginTop: 14, color: 'var(--muted)' }}>
             Déjà inscrit ?{' '}
