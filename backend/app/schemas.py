@@ -223,6 +223,27 @@ class QuestionRead(QuestionCreate):
     model_config = {"from_attributes": True}
 
 
+class QuestionMediaUpdate(BaseModel):
+    """Association d'un média (image/vidéo réelle) à une question.
+
+    media_url à None efface le média personnalisé → retour au visuel
+    SVG par défaut calculé automatiquement.
+    """
+    media_type: Literal["image", "video"] | None = None
+    media_url: str | None = Field(default=None, max_length=2000)
+    media_alt: str | None = Field(default=None, max_length=255)
+
+    @field_validator("media_url")
+    @classmethod
+    def _valid_url(cls, v: str | None) -> str | None:
+        if v is None or not v.strip():
+            return None
+        v = v.strip()
+        if not (v.startswith("https://") or v.startswith("http://")):
+            raise ValueError("L'URL doit commencer par https:// ou http://")
+        return v
+
+
 class QuestionOfficialImportRow(BaseModel):
     category: str = Field(min_length=2, max_length=80)
     text: str = Field(min_length=10)

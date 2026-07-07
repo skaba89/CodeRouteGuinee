@@ -7,7 +7,7 @@ from app.deps import require_roles
 from app.models_audit import AuditLog
 from app.models_question import Question
 from app.models_user import User
-from app.schemas import QuestionCreate, QuestionOfficialImportRequest, QuestionOfficialImportResult, QuestionRead
+from app.schemas import QuestionCreate, QuestionMediaUpdate, QuestionOfficialImportRequest, QuestionOfficialImportResult, QuestionRead
 
 router = APIRouter(prefix="/questions", tags=["questions"])
 
@@ -137,3 +137,46 @@ def import_official_questions(
         skipped=0,
         question_ids=question_ids,
     )
+
+
+@router.patch("/{question_id}/media", response_model=QuestionRead,
+              dependencies=[Depends(require_roles("admin", "super_admin"))])
+def update_question_media(
+    question_id: str,
+    payload: QuestionMediaUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "super_admin")),
+) -> Question:
+    """
+    Associe un média (image/vidéo réelle, hébergée sur une URL) à une question,
+    ou l'efface (media_url=None) pour revenir au visuel SVG par défaut.
+
+    N'altère JAMAIS le texte, les options ni la réponse : uniquement le média.
+    """
+    question = db.get(Question, question_id)
+    if not question:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question introuvable")
+
+    if payload.media_url is None:
+        # Effacement : retour au visuel SVG calculé automatiquement
+        question.media_type = None
+        question.media_url = None
+        question.media_alt = None
+    else:
+        question.media_type = payload.media_type or "image"
+        question.media_url = payload.media_url
+        question.media_alt = (payload.media_alt or "").strip() or None
+
+    db.add(AuditLog(
+        actor_id=current_user.id,
+        action="question.media_updated",
+        entity="question",
+        entity_id=question.id,
+        details={
+            "media_type": question.media_type,
+            "has_media": question.media_url is not None,
+        },
+    ))
+    db.commit()
+    db.refresh(question)
+    return question

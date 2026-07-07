@@ -1282,3 +1282,12 @@ export async function registerSchool(payload: {
   }
   return r.json();
 }
+
+
+// ── Association de média (image/vidéo réelle) à une question ────────────────
+export function updateQuestionMedia(
+  questionId: string,
+  media: { media_type?: 'image' | 'video' | null; media_url: string | null; media_alt?: string | null },
+): Promise<ExamQuestion> {
+  return patchPrivateJson(`/api/v1/questions/${encodeURIComponent(questionId)}/media`, media);
+}

@@ -62,7 +62,7 @@ export function ExamPage({ locale, onLocaleChange }: Props) {
         correct_answer: q.correct_answer, number: i + 1,
         category: q.category,
         media: q.media_url ?? undefined,
-        mediaType: q.media_type as 'sign' | 'scene' | undefined,
+        mediaType: (q.media_type ?? undefined) as 'sign' | 'scene' | 'image' | 'video' | undefined,
         mediaAlt: q.media_alt ?? undefined,
       }))
     : DEMO_QUESTIONS.map((q: ExamQuestionData) => ({

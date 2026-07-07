@@ -36,6 +36,7 @@ import {
   getInstitutionalAuthorizations,
   getOperationalReadiness,
   getQuestions,
+  updateQuestionMedia,
   importOfficialPayments,
   submitCandidateIdentity,
   submitCandidateSubmission,
@@ -465,13 +466,18 @@ export function QuestionsAdminPanel({ canAdmin }: { canAdmin: boolean }) {
   const [questions, setQuestions] = useState<ExamQuestion[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('');
+  const [editing, setEditing] = useState<ExamQuestion | null>(null);
 
-  useEffect(() => {
-    if (!canAdmin) { setLoading(false); return; }
+  const reload = () => {
     getQuestions()
       .then(r => setQuestions(r.items))
       .catch(() => undefined)
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    if (!canAdmin) { setLoading(false); return; }
+    reload();
   }, [canAdmin]);
 
   const filtered = filter
@@ -538,6 +544,7 @@ export function QuestionsAdminPanel({ canAdmin }: { canAdmin: boolean }) {
                   <th style={{ width: 130 }}>Catégorie</th>
                   <th>Question</th>
                   <th style={{ width: 60 }}>Active</th>
+                  <th style={{ width: 120 }}>Média</th>
                 </tr>
               </thead>
               <tbody>
@@ -562,6 +569,21 @@ export function QuestionsAdminPanel({ canAdmin }: { canAdmin: boolean }) {
                         {q.is_active ? 'Oui' : 'Non'}
                       </span>
                     </td>
+                    <td>
+                      {q.media_type === 'image' || q.media_type === 'video' ? (
+                        <span className="badge bg" style={{ fontSize: 10 }}>
+                          {q.media_type === 'video' ? 'Vidéo' : 'Photo'}
+                        </span>
+                      ) : (
+                        <span style={{ fontSize: 11, color: 'var(--muted)' }}>SVG auto</span>
+                      )}
+                      {q.id && (
+                        <button className="btn-sm btn-outline" style={{ marginLeft: 6, padding: '2px 8px', fontSize: 11 }}
+                          onClick={() => setEditing(q)}>
+                          Média
+                        </button>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -573,6 +595,118 @@ export function QuestionsAdminPanel({ canAdmin }: { canAdmin: boolean }) {
             )}
           </div>
         )}
+      </div>
+
+      {editing && (
+        <QuestionMediaModal
+          question={editing}
+          onClose={() => setEditing(null)}
+          onSaved={() => { setEditing(null); reload(); }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── Modal : associer une image/vidéo réelle à une question ─────────────────
+function QuestionMediaModal({ question, onClose, onSaved }: {
+  question: ExamQuestion; onClose: () => void; onSaved: () => void;
+}) {
+  const isRealMedia = question.media_type === 'image' || question.media_type === 'video';
+  const [mediaType, setMediaType] = useState<'image' | 'video'>(
+    question.media_type === 'video' ? 'video' : 'image');
+  const [url, setUrl] = useState(isRealMedia ? (question.media_url ?? '') : '');
+  const [alt, setAlt] = useState(isRealMedia ? (question.media_alt ?? '') : '');
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const urlOk = url.trim() === '' || /^https?:\/\//.test(url.trim());
+
+  async function save(clear: boolean) {
+    if (saving) return;
+    setSaving(true); setErr(null);
+    try {
+      await updateQuestionMedia(question.id!, clear
+        ? { media_url: null }
+        : { media_type: mediaType, media_url: url.trim(), media_alt: alt.trim() || null });
+      onSaved();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Enregistrement impossible.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, background: 'rgba(13,33,55,.55)', zIndex: 1000,
+      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
+    }} onClick={onClose}>
+      <div className="card" style={{ maxWidth: 520, width: '100%', maxHeight: '90vh', overflow: 'auto' }}
+        onClick={e => e.stopPropagation()}>
+        <div className="card-header">
+          <span className="card-title">Média de la question</span>
+          <button className="btn-sm btn-outline" onClick={onClose}>Fermer</button>
+        </div>
+
+        <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 14, lineHeight: 1.5 }}>
+          {question.text}
+        </p>
+
+        <div style={{ display: 'grid', gap: 12 }}>
+          <label>Type de média
+            <select value={mediaType} onChange={e => setMediaType(e.target.value as 'image' | 'video')}>
+              <option value="image">Photo (image)</option>
+              <option value="video">Vidéo</option>
+            </select>
+          </label>
+
+          <label>URL du média (https://…)
+            <input value={url} onChange={e => setUrl(e.target.value)} autoComplete="off"
+              placeholder="https://images.unsplash.com/…  ou  https://upload.wikimedia.org/…" />
+            {!urlOk && (
+              <span style={{ fontSize: 11, color: 'var(--red)', marginTop: 3, display: 'block' }}>
+                L'URL doit commencer par https://
+              </span>
+            )}
+          </label>
+
+          <label>Description (texte alternatif)
+            <input value={alt} onChange={e => setAlt(e.target.value)} autoComplete="off"
+              placeholder="Ex. Panneau STOP à une intersection" />
+          </label>
+
+          {/* Aperçu */}
+          {url.trim() && urlOk && (
+            <div style={{ borderRadius: 10, overflow: 'hidden', background: '#f8fafc', padding: 12, textAlign: 'center' }}>
+              <p style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 8 }}>Aperçu</p>
+              {mediaType === 'video' ? (
+                <video src={url.trim()} controls style={{ maxWidth: '100%', maxHeight: 200, borderRadius: 6 }} />
+              ) : (
+                <img src={url.trim()} alt={alt || 'Aperçu'} style={{ maxWidth: '100%', maxHeight: 200, borderRadius: 6, objectFit: 'contain' }} />
+              )}
+            </div>
+          )}
+
+          <div className="alert ai" style={{ fontSize: 11.5 }}>
+            Utilisez uniquement des images libres de droits (Unsplash, Pexels, Wikimedia Commons)
+            ou vos propres visuels. Sans média, la question garde son illustration SVG automatique.
+          </div>
+
+          {err && <div className="alert ae">{err}</div>}
+
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn-primary" style={{ flex: 1 }}
+              disabled={saving || !url.trim() || !urlOk} onClick={() => save(false)}>
+              {saving ? 'Enregistrement…' : 'Associer ce média'}
+            </button>
+            {isRealMedia && (
+              <button className="btn-outline" disabled={saving} onClick={() => save(true)}>
+                Revenir au SVG
+              </button>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );
