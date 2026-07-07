@@ -31,6 +31,15 @@ class Settings(BaseSettings):
     email_from: str = "noreply@coderoute.gov.gn"
     email_from_name: str = "CodeRoute Guinée — DNTT"
 
+    # ── Hébergement média (Cloudinary) ────────────────────────────────────
+    # Upload signé : le navigateur envoie directement à Cloudinary, le
+    # serveur ne fait que signer la requête (les fichiers ne transitent
+    # pas par Render). Vide = fonction upload désactivée proprement.
+    cloudinary_cloud_name: str = ""
+    cloudinary_api_key: str = ""
+    cloudinary_api_secret: str = ""
+    cloudinary_upload_folder: str = "coderoute/questions"
+
     # ── Bootstrap admin ───────────────────────────────────────────────────
     bootstrap_admin_email: str = "super_admin@coderoute.gov.gn"
     bootstrap_admin_password: str = ""        # vide = pas de seed auto

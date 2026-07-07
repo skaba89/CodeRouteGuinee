@@ -38,6 +38,8 @@ import {
   getQuestions,
   updateQuestionMedia,
   importWikimediaSigns,
+  signMediaUpload,
+  uploadToCloudinary,
   importOfficialPayments,
   submitCandidateIdentity,
   submitCandidateSubmission,
@@ -654,8 +656,29 @@ function QuestionMediaModal({ question, onClose, onSaved }: {
   const [alt, setAlt] = useState(isRealMedia ? (question.media_alt ?? '') : '');
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   const urlOk = url.trim() === '' || /^https?:\/\//.test(url.trim());
+
+  async function handleFile(file: File | undefined) {
+    if (!file || uploading) return;
+    setUploading(true); setErr(null);
+    try {
+      const kind = file.type.startsWith('video') ? 'video' : 'image';
+      const sig = await signMediaUpload(kind);
+      const secureUrl = await uploadToCloudinary(file, sig);
+      setMediaType(kind);
+      setUrl(secureUrl);
+      if (!alt.trim()) setAlt(file.name.replace(/\.[^.]+$/, ''));
+    } catch (e) {
+      const m = e instanceof Error ? e.message : "Upload impossible.";
+      setErr(m.includes('503') || m.toLowerCase().includes('cloudinary')
+        ? "L'hébergement de fichiers n'est pas encore configuré (Cloudinary). Vous pouvez coller une URL en attendant."
+        : m);
+    } finally {
+      setUploading(false);
+    }
+  }
 
   async function save(clear: boolean) {
     if (saving) return;
@@ -695,6 +718,26 @@ function QuestionMediaModal({ question, onClose, onSaved }: {
               <option value="video">Vidéo</option>
             </select>
           </label>
+
+          <div style={{ border: '1.5px dashed var(--line)', borderRadius: 10, padding: '14px 12px', textAlign: 'center', background: 'var(--bg)' }}>
+            <label style={{ cursor: uploading ? 'wait' : 'pointer', display: 'block' }}>
+              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--guinea-green)' }}>
+                {uploading ? 'Téléversement en cours…' : 'Téléverser une photo ou vidéo'}
+              </span>
+              <input type="file" accept="image/*,video/*" style={{ display: 'none' }}
+                disabled={uploading}
+                onChange={e => handleFile(e.target.files?.[0])} />
+              <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>
+                Depuis votre ordinateur — hébergé automatiquement
+              </p>
+            </label>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '2px 0' }}>
+            <div style={{ flex: 1, height: 1, background: 'var(--line)' }} />
+            <span style={{ fontSize: 11, color: 'var(--muted)' }}>ou coller une URL</span>
+            <div style={{ flex: 1, height: 1, background: 'var(--line)' }} />
+          </div>
 
           <label>URL du média (https://…)
             <input value={url} onChange={e => setUrl(e.target.value)} autoComplete="off"

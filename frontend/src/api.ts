@@ -1300,3 +1300,31 @@ export function importWikimediaSigns(validate = true): Promise<{
 }> {
   return postPrivateJson(`/api/v1/admin/ops/import-wikimedia-signs?validate=${validate}`, {});
 }
+
+
+// ── Upload de média vers Cloudinary (upload signé, direct navigateur) ───────
+export type CloudinarySignature = {
+  upload_url: string; api_key: string; timestamp: number;
+  folder: string; signature: string; resource_type: string;
+};
+
+export function signMediaUpload(resourceType: 'image' | 'video'): Promise<CloudinarySignature> {
+  return postPrivateJson(`/api/v1/questions/media/sign-upload?resource_type=${resourceType}`, {});
+}
+
+/** Téléverse un fichier vers Cloudinary avec la signature du backend. Retourne l'URL sécurisée. */
+export async function uploadToCloudinary(file: File, sig: CloudinarySignature): Promise<string> {
+  const form = new FormData();
+  form.append('file', file);
+  form.append('api_key', sig.api_key);
+  form.append('timestamp', String(sig.timestamp));
+  form.append('folder', sig.folder);
+  form.append('signature', sig.signature);
+  const r = await fetch(sig.upload_url, { method: 'POST', body: form });
+  if (!r.ok) {
+    const err = await r.json().catch(() => ({}));
+    throw new Error(err?.error?.message ?? `Échec de l'upload (${r.status})`);
+  }
+  const data = await r.json();
+  return data.secure_url as string;
+}

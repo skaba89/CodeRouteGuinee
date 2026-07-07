@@ -180,3 +180,31 @@ def update_question_media(
     db.commit()
     db.refresh(question)
     return question
+
+
+@router.post("/media/sign-upload",
+             dependencies=[Depends(require_roles("admin", "super_admin"))])
+def sign_media_upload(
+    resource_type: str = "image",
+    current_user: User = Depends(require_roles("admin", "super_admin")),
+) -> dict:
+    """
+    Génère une signature d'upload Cloudinary pour que l'admin téléverse
+    une photo ou vidéo directement depuis le navigateur (les fichiers ne
+    transitent pas par le serveur).
+
+    Renvoie 503 si Cloudinary n'est pas configuré (clés absentes).
+    """
+    from app.cloudinary_service import build_upload_signature, is_configured
+
+    if resource_type not in ("image", "video"):
+        raise HTTPException(status_code=422, detail="resource_type doit être 'image' ou 'video'")
+
+    if not is_configured():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="L'hébergement de médias (Cloudinary) n'est pas configuré. "
+                   "Renseignez CLOUDINARY_CLOUD_NAME / API_KEY / API_SECRET dans les variables d'environnement.",
+        )
+
+    return build_upload_signature(resource_type)
