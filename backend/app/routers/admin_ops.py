@@ -74,3 +74,27 @@ def get_pilote_roster(
         for cand, bk, ses in rows
     ]
     return {"items": items, "total": len(items)}
+
+
+@router.post("/refresh-question-media")
+def refresh_question_media(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "super_admin")),
+) -> dict:
+    """
+    Recalcule le visuel (media_type/url/alt) de TOUTES les questions selon
+    le mapping courant. À lancer après une amélioration des illustrations
+    pour que les questions déjà en base bénéficient des visuels corrigés.
+    """
+    from app.models_question import Question
+    from app.seed_full import _get_media_for_question
+
+    updated = 0
+    questions = db.scalars(select(Question)).all()
+    for q in questions:
+        mt, mu, ma = _get_media_for_question(q.text, q.category)
+        if (q.media_type, q.media_url, q.media_alt) != (mt, mu, ma):
+            q.media_type, q.media_url, q.media_alt = mt, mu, ma
+            updated += 1
+    db.commit()
+    return {"status": "ok", "total": len(questions), "updated": updated}

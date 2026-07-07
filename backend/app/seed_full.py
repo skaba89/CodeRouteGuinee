@@ -1857,110 +1857,138 @@ def seed_centers(db) -> dict[str, Center]:
 
 
 
+def _stable_hash(text: str) -> int:
+    """Hash déterministe (hash() Python est randomisé entre process)."""
+    import hashlib
+    return int(hashlib.md5(text.encode()).hexdigest(), 16)
+
+
 def _get_media_for_question(text: str, category: str) -> tuple[str | None, str | None, str | None]:
     """
     Retourne (media_type, media_url, media_alt) selon le texte et la catégorie.
-    Mappe les questions sur les illustrations SVG de ILLUSTRATION_MAP.
+    Mapping précis vers les panneaux français normalisés et les scènes de conduite.
+    Objectif : que le visuel corresponde vraiment à la question (comme les
+    apps FR : Codes Rousseau, Ornikar, ENPC).
     """
     t = text.lower()
 
-    # ── FEUX TRICOLORES ──────────────────────────────────────────────────
+    # ═══ FEUX TRICOLORES ═══════════════════════════════════════════════════
     if "rouge et orange" in t or "rouge fixe et orange" in t:
         return "scene", "traffic_light_red_orange", "Feu rouge et orange simultanés"
-    if "feu orange" in t or "passe à l'orange" in t or "orange fixe" in t:
+    if "feu orange" in t or "passe à l'orange" in t or "orange clignotant" in t or "orange fixe" in t:
         return "scene", "traffic_light_orange", "Feu tricolore orange"
-    if "feu rouge" in t or "feu tricolore" in t or "feu est rouge" in t or "feu vert" in t:
+    if "feu vert" in t:
         return "scene", "traffic_light_red", "Feu tricolore"
-    if "passage à niveau" in t:
-        return "scene", "traffic_light_red", "Passage à niveau — arrêt obligatoire"
+    if "feu rouge" in t or "feu tricolore" in t or "feu est rouge" in t or "passage à niveau" in t:
+        return "scene", "traffic_light_red", "Feu tricolore — arrêt obligatoire"
 
-    # ── PANNEAUX DE SIGNALISATION ────────────────────────────────────────
-    if "stop" in t and ("panneau" in t or "impose" in t or "signifie" in t or "approchez" in t):
-        return "sign", "stop", "Panneau STOP"
-    if "cédez le passage" in t or "céder le passage" in t or "triangle inversé" in t:
-        return "sign", "give_way", "Panneau Cédez le passage"
+    # ═══ PANNEAUX D'INTERDICTION (rond rouge) ═════════════════════════════
     if "sens interdit" in t or "barre horizontale blanche" in t:
         return "sign", "no_entry", "Panneau Sens interdit"
-    if "50" in t and ("agglomération" in t or "entrée" in t):
-        return "sign", "speed_50", "Limitation 50 km/h"
-    if "zone 30" in t or ("30" in t and ("zone" in t or "zone résidentielle" in t)):
-        return "sign", "speed_30", "Zone 30"
-    if "90" in t and ("national" in t or "limitation" in t or "phares" in t):
-        return "sign", "speed_90", "Limitation 90 km/h"
-    if "100" in t and ("chaussées séparées" in t or "2×2" in t or "limitation" in t):
-        return "sign", "speed_100", "Limitation 100 km/h"
-    if "passage piéton" in t or "passage protégé" in t or "passage clouté" in t:
-        return "sign", "pedestrian_crossing", "Passage pour piétons"
-    if "giratoire" in t or "rond-point" in t:
-        return "sign", "roundabout", "Giratoire"
-    if ("priorité" in t and ("route" in t or "losange" in t)) or "route prioritaire" in t:
-        return "sign", "priority", "Route prioritaire"
-    if ("dépasser" in t or "dépassement" in t) and ("interdit" in t or "ligne" in t or "panneau" in t):
+    if ("dépasser" in t or "dépassement" in t) and ("interdit" in t or "panneau" in t):
         return "sign", "no_overtaking", "Interdiction de dépasser"
-    if "zone scolaire" in t or ("enfants" in t and ("panneau" in t or "triangle" in t)):
-        return "sign", "school_zone", "Zone scolaire"
-    if "fin de" in t and ("limitation" in t or "interdiction" in t):
-        return "sign", "end_restriction", "Fin de limitation"
-    if "parking" in t and ("panneau" in t or "signifie" in t or "interdit" in t):
-        return "sign", "parking", "Signalisation de parking"
-    if "danger" in t and ("panneau" in t or "triangle" in t or "signifie" in t):
-        return "sign", "danger", "Panneau de danger"
+    if ("tourner à gauche" in t or "à gauche" in t) and "interdit" in t:
+        return "sign", "no_left_turn", "Interdiction de tourner à gauche"
+    if ("arrêt" in t and "stationnement" in t and "interdit" in t) or "arrêt interdit" in t:
+        return "sign", "no_stopping", "Arrêt et stationnement interdits"
+    if "stationnement interdit" in t or ("stationnement" in t and "interdit" in t):
+        return "sign", "no_parking", "Stationnement interdit"
 
-    # ── CATÉGORIE SIGNALISATION — fallback générique ─────────────────────
-    if category == "signalisation":
-        return "sign", "stop", "Signalisation routière"
+    # ═══ VITESSES (rond rouge, chiffre) ═══════════════════════════════════
+    if "130" in t:
+        return "sign", "speed_130", "Limitation 130 km/h (autoroute)"
+    if "110" in t:
+        return "sign", "speed_110", "Limitation 110 km/h"
+    if "100" in t:
+        return "sign", "speed_100", "Limitation 100 km/h"
+    if "90" in t:
+        return "sign", "speed_90", "Limitation 90 km/h"
+    if "70" in t:
+        return "sign", "speed_70", "Limitation 70 km/h"
+    if "zone 30" in t or ("30" in t and ("zone" in t or "résidentielle" in t)):
+        return "sign", "speed_30", "Zone 30"
+    if "50" in t and ("agglomération" in t or "ville" in t or "entrée" in t or "km/h" in t):
+        return "sign", "speed_50", "Limitation 50 km/h"
 
-    # ── SCÈNES DE CONDUITE ───────────────────────────────────────────────
+    # ═══ PANNEAUX DE PRIORITÉ ═════════════════════════════════════════════
+    if "stop" in t or "marquage 'stop'" in t:
+        return "sign", "stop", "Panneau STOP — arrêt obligatoire"
+    if "cédez le passage" in t or "céder le passage" in t or "triangle inversé" in t or "triangle pointe en bas" in t:
+        return "sign", "give_way", "Cédez le passage"
+    if "route prioritaire" in t or ("priorité" in t and ("losange" in t or "carré jaune" in t)):
+        return "sign", "priority", "Route prioritaire"
+
+    # ═══ PANNEAUX D'OBLIGATION (rond bleu) ════════════════════════════════
+    if "rond bleu" in t or ("bleu" in t and "flèche" in t) or "tout droit obligatoire" in t or "direction obligatoire tout droit" in t:
+        return "sign", "mandatory_straight", "Direction obligatoire"
+    if "giratoire" in t or "rond-point" in t or "sens giratoire" in t:
+        return "sign", "roundabout", "Carrefour à sens giratoire"
+    if "obligation" in t and "droite" in t:
+        return "sign", "mandatory_right", "Obligation de tourner à droite"
+
+    # ═══ MARQUAGES AU SOL ═════════════════════════════════════════════════
+    if "ligne blanche continue" in t or "ligne continue" in t:
+        return "sign", "no_overtaking", "Ligne continue — franchissement interdit"
+
+    # ═══ PANNEAUX DE DANGER (triangle rouge) ══════════════════════════════
+    if "passage piéton" in t or "passage protégé" in t or "passage clouté" in t or ("piéton" in t and "traverse" in t):
+        return "sign", "pedestrian_crossing", "Passage pour piétons"
+    if "enfant" in t or "école" in t or "zone scolaire" in t or "sortie d'école" in t:
+        return "sign", "danger_children", "Passage d'enfants"
+    if "chaussée glissante" in t or "verglas" in t or "route glissante" in t or ("glissant" in t):
+        return "sign", "danger_slippery", "Chaussée glissante"
+    if "virage" in t or "courbe dangereuse" in t:
+        return "sign", "danger_bend", "Virage dangereux"
+    if "carrefour" in t and "giratoire" in t:
+        return "sign", "danger_roundabout", "Carrefour à sens giratoire (annonce)"
+    if "autres dangers" in t or "danger non défini" in t or ("panneau" in t and "danger" in t and "triangle" in t):
+        return "sign", "danger_generic", "Autres dangers"
+
+    # ═══ FIN DE PRESCRIPTION ══════════════════════════════════════════════
+    if "fin de" in t and ("limitation" in t or "interdiction" in t or "toutes" in t):
+        return "sign", "end_restriction", "Fin de toutes interdictions"
+    if "parking" in t or ("stationnement" in t and "autorisé" in t):
+        return "sign", "parking", "Stationnement autorisé"
+
+    # ═══ SCÈNES DE CONDUITE (vue subjective) ══════════════════════════════
     if ("priorité" in t and "droite" in t) or ("intersection" in t and ("sans panneau" in t or "sans signalisation" in t)):
         return "scene", "intersection_priority_right", "Intersection — priorité à droite"
-    if "ambulance" in t or "gyrophare" in t or "véhicule prioritaire" in t or "samu" in t or "pompier" in t or "police" in t and "sirène" in t:
+    if "ambulance" in t or "gyrophare" in t or "véhicule prioritaire" in t or "samu" in t or "pompier" in t or "convoi" in t or ("sirène" in t):
         return "scene", "situation_emergency_vehicle", "Véhicule d'urgence prioritaire"
-    if "distance de sécurité" in t or "2 secondes" in t or ("freinage" in t and "distance" in t):
+    if "distance de sécurité" in t or "2 secondes" in t or "intervalle" in t or ("freinage" in t and "distance" in t):
         return "scene", "situation_safe_distance", "Distance de sécurité"
-    if "nuit" in t or "phare" in t and ("éclaire" in t or "croisement" in t or "route" in t) or "nocturne" in t:
+    if "nuit" in t or "nocturne" in t or ("phare" in t and ("éclaire" in t or "croisement" in t or "route" in t)) or "feux de route" in t:
         return "scene", "night_driving", "Conduite de nuit"
-    if "pluie" in t or "mouillée" in t or ("brouillard" in t and "visibilité" in t) or ("visibilité" in t and "50" in t):
+    if "pluie" in t or "mouillée" in t or "brouillard" in t or "inondation" in t or ("visibilité" in t and ("réduite" in t or "50" in t)):
         return "scene", "rain_driving", "Conditions météo dégradées"
-    if "alcool" in t or "ivresse" in t or "alcoolémie" in t or "taux" in t and "g/l" in t:
-        return "scene", "alcohol_scene", "Alcool et conduite"
-    if "premiers secours" in t or "arrêt cardiaque" in t or "rcp" in t or "massage cardiaque" in t or "pls" in t or "heimlich" in t or "brûlure" in t or "fracture" in t:
+    if "alcool" in t or "ivresse" in t or "alcoolémie" in t or "drogue" in t or "stupéfiant" in t or "g/l" in t or "cannabis" in t:
+        return "scene", "alcohol_scene", "Alcool, drogues et conduite"
+    if "premiers secours" in t or "arrêt cardiaque" in t or "massage cardiaque" in t or "pls" in t or "position latérale" in t or "hémorragie" in t or "brûlure" in t or "fracture" in t or "blessé" in t or "accident" in t:
         return "scene", "first_aid", "Premiers secours"
-    if "somnolence" in t or "fatigue" in t or "dormir" in t:
+    if "somnolence" in t or "fatigue" in t or "endormir" in t:
         return "scene", "night_driving", "Somnolence au volant"
-    if "dépassement" in t and ("col" in t or "côte" in t or "virage" in t or "tunnel" in t):
-        return "scene", "intersection_priority_right", "Scène de dépassement"
-    if "crevaison" in t or "pneu" in t and ("éclate" in t or "éclatement" in t):
-        return "scene", "situation_safe_distance", "Crevaison à grande vitesse"
-    if "frein" in t and ("bloque" in t or "fail" in t or "tombe en panne" in t):
-        return "scene", "situation_safe_distance", "Défaillance des freins"
-    if "inondation" in t or "eau" in t and "route" in t:
-        return "scene", "rain_driving", "Route inondée"
-    if "convoi" in t or "priorité.*militaire" in t:
-        return "scene", "situation_emergency_vehicle", "Convoi prioritaire"
-    if "piéton" in t and ("aveugle" in t or "canne" in t or "traverse" in t):
-        return "sign", "pedestrian_crossing", "Piéton traversant"
-    if "troupeau" in t or "animaux" in t or "bœufs" in t:
-        return "scene", "rain_driving", "Animaux sur la route"
-    if "enfant" in t and ("court" in t or "ballon" in t or "surgit" in t):
-        return "sign", "school_zone", "Enfant sur la chaussée"
-    if "incendie" in t or "feu de voiture" in t or "extincteur" in t:
-        return "scene", "first_aid", "Incendie de véhicule"
 
-    # ── CATÉGORIES SANS ILLUSTRATION SPÉCIFIQUE — fallbacks ─────────────
-    if category == "alcool_drogues":
-        return "scene", "alcohol_scene", "Alcool et conduite"
-    if category == "premiers_secours":
-        return "scene", "first_aid", "Premiers secours"
-    if category == "urgence":
-        return "scene", "situation_safe_distance", "Situation d'urgence"
+    # ═══ FALLBACKS PAR CATÉGORIE (variés, non répétitifs) ═════════════════
+    if category == "signalisation":
+        # Répartir sur plusieurs panneaux selon un hash du texte
+        panels = ["stop", "give_way", "no_entry", "priority", "roundabout",
+                  "pedestrian_crossing", "danger_generic", "no_overtaking"]
+        return "sign", panels[_stable_hash(text) % len(panels)], "Signalisation routière"
     if category == "vitesse":
-        return "sign", "speed_90", "Limitation de vitesse"
+        speeds = ["speed_50", "speed_90", "speed_30", "speed_110", "speed_70"]
+        return "sign", speeds[_stable_hash(text) % len(speeds)], "Limitation de vitesse"
     if category == "priorites":
         return "scene", "intersection_priority_right", "Règles de priorité"
     if category == "depassement":
         return "sign", "no_overtaking", "Règles de dépassement"
+    if category == "alcool_drogues":
+        return "scene", "alcohol_scene", "Alcool, drogues et conduite"
+    if category == "premiers_secours":
+        return "scene", "first_aid", "Premiers secours"
+    if category == "urgence":
+        return "scene", "situation_emergency_vehicle", "Situation d'urgence"
     if category == "securite_passive":
-        return "scene", "situation_safe_distance", "Sécurité passive"
+        return "scene", "situation_safe_distance", "Sécurité et distances"
 
     return None, None, None
 

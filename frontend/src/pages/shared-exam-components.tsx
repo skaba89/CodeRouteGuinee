@@ -146,6 +146,83 @@ export function SignSvg({ type, alt }: { type: string; alt?: string }) {
   if (type === 'traffic_light_green') return <TrafficLight state="green" alt={alt}/>;
   if (type === 'traffic_light_red_orange') return <TrafficLight state="red_orange" alt={alt}/>;
 
+  // ── Panneaux de danger (triangle rouge) ──────────────────────────────
+  if (type === 'danger_children') return (
+    <svg viewBox="0 0 120 120" width="110" height="110" style={S} role="img" aria-label={alt ?? 'Passage d\'enfants'}>
+      <polygon points="60,8 112,108 8,108" fill="#fff" stroke="#C0392B" strokeWidth="7" strokeLinejoin="round"/>
+      {/* Adulte + enfant stylisés (norme A13) */}
+      <circle cx="52" cy="55" r="6" fill="#1a1a1a"/>
+      <path d="M52 61 L50 82 M50 82 L44 98 M50 82 L56 98 M44 66 L60 72" stroke="#1a1a1a" strokeWidth="3.5" fill="none" strokeLinecap="round"/>
+      <circle cx="74" cy="62" r="5" fill="#1a1a1a"/>
+      <path d="M74 67 L73 84 M73 84 L68 97 M73 84 L79 97 M66 72 L80 76" stroke="#1a1a1a" strokeWidth="3" fill="none" strokeLinecap="round"/>
+    </svg>
+  );
+
+  if (type === 'danger_slippery') return (
+    <svg viewBox="0 0 120 120" width="110" height="110" style={S} role="img" aria-label={alt ?? 'Chaussée glissante'}>
+      <polygon points="60,8 112,108 8,108" fill="#fff" stroke="#C0392B" strokeWidth="7" strokeLinejoin="round"/>
+      <rect x="44" y="58" width="32" height="16" rx="3" fill="#1a1a1a"/>
+      <circle cx="50" cy="76" r="5" fill="#1a1a1a"/><circle cx="70" cy="76" r="5" fill="#1a1a1a"/>
+      <path d="M40 92 q6 -8 12 0 q6 8 12 0 q6 -8 12 0" stroke="#1a1a1a" strokeWidth="3" fill="none"/>
+      <path d="M78 62 q6 4 0 10 M84 58 q8 6 0 16" stroke="#1a1a1a" strokeWidth="2.5" fill="none"/>
+    </svg>
+  );
+
+  if (type === 'danger_bend') return (
+    <svg viewBox="0 0 120 120" width="110" height="110" style={S} role="img" aria-label={alt ?? 'Virage dangereux'}>
+      <polygon points="60,8 112,108 8,108" fill="#fff" stroke="#C0392B" strokeWidth="7" strokeLinejoin="round"/>
+      <path d="M60 96 L60 70 Q60 54 74 54 Q88 54 88 66" stroke="#1a1a1a" strokeWidth="8" fill="none" strokeLinecap="round"/>
+      <polygon points="60,54 50,72 70,72" fill="#1a1a1a"/>
+    </svg>
+  );
+
+  if (type === 'danger_roundabout') return (
+    <svg viewBox="0 0 120 120" width="110" height="110" style={S} role="img" aria-label={alt ?? 'Carrefour à sens giratoire'}>
+      <polygon points="60,8 112,108 8,108" fill="#fff" stroke="#C0392B" strokeWidth="7" strokeLinejoin="round"/>
+      <g transform="translate(0,6)">
+        <path d="M48 66 A16 16 0 1 1 60 78" fill="none" stroke="#1a1a1a" strokeWidth="6" strokeLinecap="round"/>
+        <polygon points="44,60 52,52 58,64" fill="#1a1a1a"/>
+        <path d="M72 78 A16 16 0 0 1 60 78" fill="none" stroke="#1a1a1a" strokeWidth="6" strokeLinecap="round"/>
+        <path d="M62 92 A16 16 0 0 1 48 82" fill="none" stroke="#1a1a1a" strokeWidth="6" strokeLinecap="round"/>
+      </g>
+    </svg>
+  );
+
+  if (type === 'danger_generic') return (
+    <svg viewBox="0 0 120 120" width="110" height="110" style={S} role="img" aria-label={alt ?? 'Autres dangers'}>
+      <polygon points="60,8 112,108 8,108" fill="#fff" stroke="#C0392B" strokeWidth="7" strokeLinejoin="round"/>
+      <text x="60" y="96" textAnchor="middle" fill="#1a1a1a" fontSize="52" fontWeight="bold" fontFamily="Arial Black">!</text>
+    </svg>
+  );
+
+  // ── Panneaux d'obligation (rond bleu) ────────────────────────────────
+  if (type === 'mandatory_right') return (
+    <svg viewBox="0 0 120 120" width="110" height="110" style={S} role="img" aria-label={alt ?? 'Obligation de tourner à droite'}>
+      <circle cx="60" cy="60" r="55" fill="#1A6FC4" stroke="#fff" strokeWidth="5"/>
+      <path d="M40 78 Q40 48 66 48 M52 36 L70 48 L52 60" stroke="#fff" strokeWidth="9" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  );
+
+  if (type === 'no_left_turn') return (
+    <svg viewBox="0 0 120 120" width="110" height="110" style={S} role="img" aria-label={alt ?? 'Interdiction de tourner à gauche'}>
+      <circle cx="60" cy="60" r="55" fill="#fff" stroke="#C0392B" strokeWidth="8"/>
+      <path d="M78 82 Q78 52 52 52 M64 40 L46 52 L64 64" stroke="#1a1a1a" strokeWidth="8" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+      <line x1="22" y1="22" x2="98" y2="98" stroke="#C0392B" strokeWidth="8"/>
+    </svg>
+  );
+
+  if (type === 'no_stopping') return (
+    <svg viewBox="0 0 120 120" width="110" height="110" style={S} role="img" aria-label={alt ?? 'Arrêt et stationnement interdits'}>
+      <circle cx="60" cy="60" r="55" fill="#1A6FC4" stroke="#C0392B" strokeWidth="6"/>
+      <line x1="22" y1="22" x2="98" y2="98" stroke="#C0392B" strokeWidth="7"/>
+      <line x1="98" y1="22" x2="22" y2="98" stroke="#C0392B" strokeWidth="7"/>
+    </svg>
+  );
+
+  if (type === 'speed_70') return <SpeedSign speed="70" alt={alt}/>;
+  if (type === 'speed_110') return <SpeedSign speed="110" alt={alt}/>;
+  if (type === 'speed_130') return <SpeedSign speed="130" alt={alt}/>;
+
   return (
     <div style={{ height: 110, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)', fontSize: 13, background: 'var(--bg)', borderRadius: 8 }}>
       Panneau non disponible
@@ -499,8 +576,23 @@ export function MediaBlock({ mediaType, media, alt }: { mediaType?: string; medi
     );
   }
 
-  // Fallback : ancien système SVG schématique pour les types non migrés
-  if (mediaType === 'sign' || media.match(/^(no_entry|mandatory|priority|no_overtaking|pedestrian|school|danger|parking|end_restriction)/)) {
+  // Fallback : SVG schématique. Les panneaux (type 'sign') passent par SignSvg,
+  // le reste (scènes non migrées) par SceneSvg.
+  if (mediaType === 'sign') {
+    return (
+      <div style={{
+        background: 'linear-gradient(135deg, #f8fafc, #f0f4f8)',
+        border: '1px solid var(--border)',
+        padding: '24px 20px 18px',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
+      }}>
+        <SignSvg type={media} alt={alt} />
+        {alt && <p style={{ fontSize: 11.5, color: 'var(--muted)', textAlign: 'center', maxWidth: 280, lineHeight: 1.5 }}>{alt}</p>}
+      </div>
+    );
+  }
+
+  if (media.match(/^(no_entry|mandatory|priority|no_overtaking|pedestrian|school|danger|parking|end_restriction|speed_|give_way|stop|roundabout|no_)/)) {
     return (
       <div style={{
         background: 'linear-gradient(135deg, #f8fafc, #f0f4f8)',
