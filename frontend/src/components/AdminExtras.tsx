@@ -37,6 +37,7 @@ import {
   getOperationalReadiness,
   getQuestions,
   updateQuestionMedia,
+  importWikimediaSigns,
   importOfficialPayments,
   submitCandidateIdentity,
   submitCandidateSubmission,
@@ -462,6 +463,39 @@ export function CenterManagementPanel({ center }: { center: Center | null }) {
 //    Fonctions : getQuestions
 // ══════════════════════════════════════════════════════════════════
 
+// ── Bouton d'import des panneaux Wikimedia (domaine public) ────────────────
+function WikimediaImportButton({ onDone }: { onDone: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  async function run() {
+    if (busy) return;
+    setBusy(true); setMsg(null);
+    try {
+      const r = await importWikimediaSigns(true);
+      if (r.signs_available === 0) {
+        setMsg("Aucun panneau n'a pu être vérifié (source injoignable). Réessayez plus tard.");
+      } else {
+        setMsg(`${r.questions_updated} question(s) associée(s) à un panneau officiel (${r.signs_available} panneaux vérifiés).`);
+        onDone();
+      }
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : "Import impossible.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+      <button className="btn-sm btn-outline" onClick={run} disabled={busy}>
+        {busy ? 'Import en cours…' : 'Importer les panneaux officiels'}
+      </button>
+      {msg && <span style={{ fontSize: 11, color: 'var(--muted)', maxWidth: 320, textAlign: 'right' }}>{msg}</span>}
+    </div>
+  );
+}
+
 export function QuestionsAdminPanel({ canAdmin }: { canAdmin: boolean }) {
   const [questions, setQuestions] = useState<ExamQuestion[]>([]);
   const [loading, setLoading] = useState(true);
@@ -502,6 +536,7 @@ export function QuestionsAdminPanel({ canAdmin }: { canAdmin: boolean }) {
       <div className="card">
         <div className="card-header">
           <span className="card-title"> Répartition ({questions.length} questions)</span>
+          <WikimediaImportButton onDone={reload} />
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
           {Object.entries(byCategory).map(([cat, n]) => (

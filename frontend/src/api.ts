@@ -1291,3 +1291,12 @@ export function updateQuestionMedia(
 ): Promise<ExamQuestion> {
   return patchPrivateJson(`/api/v1/questions/${encodeURIComponent(questionId)}/media`, media);
 }
+
+
+// ── Import des panneaux Wikimedia (domaine public) ─────────────────────────
+export function importWikimediaSigns(validate = true): Promise<{
+  status: string; validated: boolean; signs_available: number; signs_total: number;
+  questions_updated: number; skipped_manual_media: number;
+}> {
+  return postPrivateJson(`/api/v1/admin/ops/import-wikimedia-signs?validate=${validate}`, {});
+}

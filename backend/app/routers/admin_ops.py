@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.deps import require_roles
+from app.models_audit import AuditLog
 from app.models_booking import Booking
 from app.models_candidate import Candidate
 from app.models_session import ExamSession
@@ -98,3 +99,89 @@ def refresh_question_media(
             updated += 1
     db.commit()
     return {"status": "ok", "total": len(questions), "updated": updated}
+
+
+@router.post("/import-wikimedia-signs")
+def import_wikimedia_signs(
+    validate: bool = True,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "super_admin")),
+) -> dict:
+    """
+    Associe aux questions de signalisation les panneaux officiels français
+    depuis Wikimedia Commons (domaine public).
+
+    Pour chaque question dont le visuel SVG est un panneau connu, associe
+    l'image Wikimedia correspondante (media_type=image).
+
+    validate=True (défaut) : chaque URL est vérifiée (requête réelle) avant
+    d'être appliquée. Les panneaux dont l'image ne répond pas sont IGNORÉS
+    — la question garde alors son SVG. Aucune question n'est cassée.
+    validate=False : applique sans vérifier (plus rapide, à réserver si le
+    catalogue est déjà connu bon).
+    """
+    from app.models_question import Question
+    from app.seed_full import _get_media_for_question
+    from app.wikimedia_signs import WIKIMEDIA_SIGNS
+
+    # 1. Valider les URLs (une seule fois par panneau, pas par question)
+    valid_signs: dict[str, tuple[str, str]] = {}
+    validation_report: list[dict] = []
+
+    if validate:
+        import httpx
+        headers = {"User-Agent": "CodeRouteGuinee/1.0 (+https://coderoute.gov.gn)"}
+        with httpx.Client(timeout=12, follow_redirects=True, headers=headers) as http:
+            for sign, (url, desc) in WIKIMEDIA_SIGNS.items():
+                try:
+                    r = http.get(url)
+                    ct = r.headers.get("content-type", "")
+                    if r.status_code == 200 and ("svg" in ct or "image" in ct):
+                        valid_signs[sign] = (str(r.url), desc)  # URL finale résolue
+                        validation_report.append({"sign": sign, "status": "ok"})
+                    else:
+                        validation_report.append({"sign": sign, "status": f"skip_{r.status_code}"})
+                except Exception:
+                    validation_report.append({"sign": sign, "status": "skip_error"})
+    else:
+        valid_signs = dict(WIKIMEDIA_SIGNS)
+
+    # 2. Associer aux questions dont le SVG correspond à un panneau validé
+    #    On ne touche PAS aux questions ayant déjà un média réel (image/video
+    #    posé manuellement par un admin).
+    updated = 0
+    skipped_has_media = 0
+    questions = db.scalars(select(Question)).all()
+    for q in questions:
+        # Média réel déjà associé manuellement → ne pas écraser
+        if q.media_type in ("image", "video") and q.media_url and "wikimedia" not in (q.media_url or ""):
+            skipped_has_media += 1
+            continue
+        # Recalculer le panneau SVG "cible" de cette question
+        mt, sign_key, _alt = _get_media_for_question(q.text, q.category)
+        if mt == "sign" and sign_key in valid_signs:
+            url, desc = valid_signs[sign_key]
+            if q.media_url != url or q.media_type != "image":
+                q.media_type = "image"
+                q.media_url = url
+                q.media_alt = desc
+                updated += 1
+
+    db.add(AuditLog(
+        actor_id=current_user.id,
+        action="question.wikimedia_import",
+        entity="question",
+        entity_id=None,
+        details={"updated": updated, "validated_signs": len(valid_signs)},
+    ))
+    db.commit()
+
+    return {
+        "status": "ok",
+        "validated": validate,
+        "signs_available": len(valid_signs),
+        "signs_total": len(WIKIMEDIA_SIGNS),
+        "questions_updated": updated,
+        "skipped_manual_media": skipped_has_media,
+        "validation_report": validation_report,
+    }
