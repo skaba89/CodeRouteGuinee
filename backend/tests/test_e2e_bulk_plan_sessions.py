@@ -95,12 +95,16 @@ def test_bulk_plan_respecte_regle_3_par_semaine(client, admin_token, fresh_cente
 
 def test_bulk_plan_refuse_chevauchement(client, admin_token, fresh_center):
     """Re-planifier les mêmes créneaux → tout est refusé (chevauchement)."""
+    # start_from aligné sur un mardi futur (weekday=1), sinon le créneau
+    # unique demandé tombe hors de la fenêtre de la semaine.
+    today = date.today()
+    next_tuesday = today + timedelta(days=(1 - today.weekday()) % 7 + 21)
     body = {
         "center_id": fresh_center,
         "weeks": 1,
         "weekdays": [1],  # mardi
         "hours": [10],
-        "start_from": (date.today() + timedelta(days=28)).isoformat(),
+        "start_from": next_tuesday.isoformat(),
     }
     r1 = client.post("/api/v1/sessions/bulk-plan", json=body, headers=_auth(admin_token))
     assert r1.status_code == 201 and r1.json()["created_count"] == 1
