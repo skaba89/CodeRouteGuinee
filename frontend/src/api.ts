@@ -1101,6 +1101,30 @@ export function getConvocationPdfUrl(reference: string): string {
   return `${API_BASE_URL}/api/v1/documents/convocations/${encodeURIComponent(reference)}.pdf`;
 }
 
+/**
+ * Ouvre un PDF protégé (convocation, certificat) dans un nouvel onglet.
+ * window.open ne transmet pas le token → on télécharge le PDF avec le
+ * header d'auth, puis on ouvre le blob. Évite le « Not authenticated ».
+ */
+export async function openAuthedPdf(url: string): Promise<void> {
+  const r = await fetchWithAuth(url, { method: 'GET' });
+  if (!r.ok) {
+    if (r.status === 401 || r.status === 403) {
+      throw new Error("Session expirée ou accès refusé. Reconnectez-vous puis réessayez.");
+    }
+    throw new Error(`Impossible d'ouvrir le document (${r.status}).`);
+  }
+  const blob = await r.blob();
+  const blobUrl = URL.createObjectURL(blob);
+  window.open(blobUrl, '_blank', 'noopener');
+  // Libère la mémoire après ouverture
+  setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
+}
+
+export function openConvocationPdf(reference: string): Promise<void> {
+  return openAuthedPdf(getConvocationPdfUrl(reference));
+}
+
 export function getExamCertificatePdfUrl(attemptId: string): string {
   return `${API_BASE_URL}/api/v1/exams/${encodeURIComponent(attemptId)}/certificate.pdf`;
 }

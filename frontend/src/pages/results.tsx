@@ -39,7 +39,7 @@ import {
   updateInstitutionalUserRole, updateInstitutionalUserStatus,
   resetInstitutionalUserPassword,
   validateEntry, reportCenterIncident, getCenterIncidents, resolveCenterIncident,
-  createPayment, getConvocationPdfUrl, verifyExamCertificate,
+  createPayment, getConvocationPdfUrl, openAuthedPdf, verifyExamCertificate,
   downloadExamCertificatePdf, getExamResults,
   startExamFromBooking, submitExamAttempt, getExamLiveStatus,
   getCandidateIdentityChecks, getCandidateSubmissions,
@@ -142,7 +142,7 @@ export function ResultsPage() {
               {cert.candidate_name && <div style={{ fontSize: 12, marginTop: 2 }}>{cert.candidate_name} {cert.score !== undefined ? `· ${cert.score}/40` : ''}</div>}
               {cert.valid && cert.passed && (
                 <button type="button" className="btn-sm btn-success" style={{ marginTop: 8 }}
-                  onClick={() => { window.open(getExamCertificatePdfUrl(attemptId), '_blank', 'noopener'); }}>
+                  onClick={() => { openAuthedPdf(getExamCertificatePdfUrl(attemptId)).catch(e => alert(e.message)); }}>
                   ⬇ Télécharger le certificat PDF
                 </button>
               )}
