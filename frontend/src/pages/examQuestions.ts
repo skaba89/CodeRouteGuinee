@@ -95,6 +95,7 @@ export const DEMO_QUESTIONS: ExamQuestionData[] = [
     text: 'À un passage à niveau non gardé sans barrières, vous devez :',
     options: ['Traverser rapidement sans vous arrêter', "Marquer l'arrêt obligatoire, regarder des deux côtés, traverser vite", 'Klaxonner et traverser en accélérant', 'Céder uniquement si vous entendez le train'],
     correct_answer: "Marquer l'arrêt obligatoire, regarder des deux côtés, traverser vite",
+    media_type: 'svg', media_url: 'intersection_priority_right', media_alt: "Intersection — priorité à droite",
     explanation: "L'arrêt est obligatoire aux passages à niveau non gardés. Vérifiez de chaque côté avant de traverser.",
   },
   {
@@ -110,6 +111,7 @@ export const DEMO_QUESTIONS: ExamQuestionData[] = [
     text: 'Quelle est la vitesse maximale autorisée en agglomération en Guinée (sauf panneau contraire) ?',
     options: ['40 km/h', '50 km/h', '60 km/h', '70 km/h'],
     correct_answer: '50 km/h',
+    media_type: 'svg', media_url: 'speed_50', media_alt: "Limitation de vitesse",
     explanation: 'La limite légale en agglomération est de 50 km/h conformément à la réglementation guinéenne.',
   },
   {
@@ -117,6 +119,7 @@ export const DEMO_QUESTIONS: ExamQuestionData[] = [
     text: 'Sur route nationale hors agglomération, la vitesse maximale est :',
     options: ['80 km/h', '90 km/h', '100 km/h', '110 km/h'],
     correct_answer: '90 km/h',
+    media_type: 'svg', media_url: 'speed_90', media_alt: "Limitation de vitesse",
     explanation: 'La limite hors agglomération sur route nationale est de 90 km/h en Guinée.',
   },
   {
@@ -124,6 +127,7 @@ export const DEMO_QUESTIONS: ExamQuestionData[] = [
     text: 'Par pluie battante réduisant la visibilité, vous devez :',
     options: ['Maintenir votre vitesse habituelle', 'Réduire votre vitesse et augmenter vos distances de sécurité', 'Allumer les feux de route et maintenir la vitesse', 'Doubler la distance de freinage et rien d\'autre'],
     correct_answer: 'Réduire votre vitesse et augmenter vos distances de sécurité',
+    media_type: 'svg', media_url: 'speed_30', media_alt: "Limitation de vitesse",
     explanation: "La pluie réduit l'adhérence et la visibilité. Réduire la vitesse et augmenter les distances est impératif.",
   },
   {
@@ -131,6 +135,7 @@ export const DEMO_QUESTIONS: ExamQuestionData[] = [
     text: 'La distance d\'arrêt à 90 km/h sur route sèche est d\'environ :',
     options: ['30 mètres', '50 mètres', '75 mètres', '120 mètres'],
     correct_answer: '75 mètres',
+    media_type: 'svg', media_url: 'speed_110', media_alt: "Limitation de vitesse",
     explanation: 'À 90 km/h : environ 25 m de réaction (1 s) + 50 m de freinage = 75 m sur route sèche.',
   },
   {
@@ -146,6 +151,7 @@ export const DEMO_QUESTIONS: ExamQuestionData[] = [
     text: 'Avant de dépasser, vous devez vérifier (choisissez la réponse complète) :',
     options: ['Que votre klaxon fonctionne', 'Que la voie opposée est libre, que le dépassement est autorisé, que vous pouvez finir avant un obstacle', 'Que le conducteur devant vous vous a vu', 'Que vous avez assez de carburant'],
     correct_answer: 'Que la voie opposée est libre, que le dépassement est autorisé, que vous pouvez finir avant un obstacle',
+    media_type: 'svg', media_url: 'no_overtaking', media_alt: "Interdiction de dépasser",
     explanation: 'Un dépassement mal préparé est la cause de nombreux accidents graves. Les trois vérifications sont indispensables.',
   },
   {
@@ -153,6 +159,7 @@ export const DEMO_QUESTIONS: ExamQuestionData[] = [
     text: 'Vous souhaitez tourner à gauche. Quelle est la séquence correcte ?',
     options: ['Tourner directement sans signal', 'Signaler, se placer à gauche, ralentir, vérifier les rétroviseurs puis tourner', 'Klaxonner et tourner rapidement', 'Attendre que tous les véhicules s\'arrêtent'],
     correct_answer: 'Signaler, se placer à gauche, ralentir, vérifier les rétroviseurs puis tourner',
+    media_type: 'svg', media_url: 'no_overtaking', media_alt: "Interdiction de dépasser",
     explanation: 'Toute manœuvre exige : signal suffisamment tôt, positionnement correct, réduction de vitesse, vérification.',
   },
   {
@@ -160,6 +167,7 @@ export const DEMO_QUESTIONS: ExamQuestionData[] = [
     text: 'Une ligne blanche continue au sol signifie :',
     options: ['On peut la franchir si la voie est libre', 'Il est interdit de la franchir ou de la chevaucher', 'Zone de stationnement autorisé', 'Fin de voie prioritaire'],
     correct_answer: 'Il est interdit de la franchir ou de la chevaucher',
+    media_type: 'svg', media_url: 'danger_generic', media_alt: "Panneau de signalisation",
     explanation: 'La ligne continue est absolument infranchissable — aucun dépassement ni changement de file n\'est permis.',
   },
   {
@@ -167,6 +175,7 @@ export const DEMO_QUESTIONS: ExamQuestionData[] = [
     text: 'Un feu orange clignotant à une intersection vous indique :',
     options: ['Arrêt obligatoire', 'Passage libre sans précaution', 'Ralentir et traverser prudemment', 'Priorité à droite'],
     correct_answer: 'Ralentir et traverser prudemment',
+    media_type: 'svg', media_url: 'stop', media_alt: "Panneau de signalisation",
     explanation: 'Le feu orange clignotant signale un carrefour dangereux : traversez lentement en vous assurant que la voie est dégagée.',
   },
   {
@@ -198,6 +207,7 @@ export const DEMO_QUESTIONS: ExamQuestionData[] = [
     text: 'Le port de la ceinture de sécurité est :',
     options: ['Obligatoire uniquement sur les routes nationales', 'Obligatoire pour tous les occupants en toutes circonstances', 'Conseillé mais pas obligatoire en ville', 'Obligatoire seulement pour le conducteur'],
     correct_answer: 'Obligatoire pour tous les occupants en toutes circonstances',
+    media_type: 'svg', media_url: 'situation_safe_distance', media_alt: "Distance de sécurité",
     explanation: 'La ceinture est obligatoire pour TOUS les occupants (avant et arrière) dès que le véhicule est en mouvement.',
   },
   {
@@ -205,6 +215,7 @@ export const DEMO_QUESTIONS: ExamQuestionData[] = [
     text: 'À quelle distance devez-vous placer votre triangle de signalisation ?',
     options: ['5 mètres', 'Juste derrière le véhicule', '30 mètres minimum, davantage sur route rapide', '100 mètres exactement'],
     correct_answer: '30 mètres minimum, davantage sur route rapide',
+    media_type: 'svg', media_url: 'situation_safe_distance', media_alt: "Distance de sécurité",
     explanation: 'Le triangle se place à 30 m minimum. Sur route rapide ou à mauvaise visibilité, plus loin pour avertir à temps.',
   },
   {
@@ -212,6 +223,7 @@ export const DEMO_QUESTIONS: ExamQuestionData[] = [
     text: "L'usage du téléphone tenu en main en conduisant est :",
     options: ['Autorisé à l\'arrêt au feu rouge', 'Autorisé si vous roulez sous 30 km/h', 'Interdit — seul le kit mains-libres est toléré', 'Autorisé sur les routes peu fréquentées'],
     correct_answer: 'Interdit — seul le kit mains-libres est toléré',
+    media_type: 'svg', media_url: 'situation_safe_distance', media_alt: "Distance de sécurité",
     explanation: "Le téléphone tenu en main est interdit en conduisant. L'attention requise pour conduire ne supporte pas de distraction.",
   },
   {
@@ -219,6 +231,7 @@ export const DEMO_QUESTIONS: ExamQuestionData[] = [
     text: 'Un siège enfant homologué est obligatoire pour :',
     options: ['Les enfants de moins de 5 ans', 'Les enfants de moins de 10 ans ou mesurant moins de 1,35 m', 'Les enfants de moins de 3 ans uniquement', 'Les enfants de moins de 6 ans et moins de 15 kg'],
     correct_answer: 'Les enfants de moins de 10 ans ou mesurant moins de 1,35 m',
+    media_type: 'svg', media_url: 'situation_safe_distance', media_alt: "Distance de sécurité",
     explanation: 'Tout enfant de moins de 10 ans ou mesurant moins de 1,35 m doit être dans un dispositif de retenue homologué.',
   },
   {
@@ -226,6 +239,7 @@ export const DEMO_QUESTIONS: ExamQuestionData[] = [
     text: 'Vos freins semblent défaillants en descente. La bonne réaction est :',
     options: ['Couper le moteur immédiatement', 'Rétrograder, utiliser le frein à main progressivement, chercher un obstacle naturel', 'Accélérer pour passer le danger plus vite', 'Ouvrir la portière pour ralentir par friction'],
     correct_answer: 'Rétrograder, utiliser le frein à main progressivement, chercher un obstacle naturel',
+    media_type: 'svg', media_url: 'situation_emergency_vehicle', media_alt: "Véhicule d'urgence",
     explanation: 'Freinage moteur + frein à main progressif (sans bloquer) + sortie contrôlée sont les bons réflexes face à une défaillance de freins.',
   },
   {
@@ -233,6 +247,7 @@ export const DEMO_QUESTIONS: ExamQuestionData[] = [
     text: 'Votre voiture prend feu. La séquence correcte est :',
     options: ['Appeler les pompiers depuis le véhicule puis sortir', "S'arrêter, couper le moteur, sortir, s'éloigner, appeler les secours", "Tenter d'éteindre avec l'eau du radiateur", 'Continuer à rouler vers un poste de secours'],
     correct_answer: "S'arrêter, couper le moteur, sortir, s'éloigner, appeler les secours",
+    media_type: 'svg', media_url: 'situation_emergency_vehicle', media_alt: "Véhicule d'urgence",
     explanation: "Le risque d'explosion impose une évacuation immédiate. Éloignez-vous d'au moins 50 mètres avant d'appeler.",
   },
   {
@@ -240,6 +255,7 @@ export const DEMO_QUESTIONS: ExamQuestionData[] = [
     text: 'En cas d\'aquaplaning, vous devez :',
     options: ['Freiner fort pour regagner l\'adhérence', 'Tourner le volant en sens opposé au glissement', 'Lâcher l\'accélérateur doucement et tenir le volant sans brusquerie', 'Changer de voie rapidement'],
     correct_answer: "Lâcher l'accélérateur doucement et tenir le volant sans brusquerie",
+    media_type: 'svg', media_url: 'situation_emergency_vehicle', media_alt: "Véhicule d'urgence",
     explanation: 'Tout geste brusque aggraverait la perte de contrôle. Relâchez doucement l\'accélérateur et laissez les pneus reprendre contact.',
   },
   {
@@ -247,6 +263,7 @@ export const DEMO_QUESTIONS: ExamQuestionData[] = [
     text: 'Sur une chaussée verglacée, la distance de freinage est :',
     options: ['Identique à la route sèche', '1,5 fois plus longue', '5 à 10 fois plus longue', '2 fois plus longue exactement'],
     correct_answer: '5 à 10 fois plus longue',
+    media_type: 'svg', media_url: 'situation_emergency_vehicle', media_alt: "Véhicule d'urgence",
     explanation: 'Sur verglas, la distance de freinage peut être multipliée par 5 à 10. Adaptez impérativement votre vitesse et vos distances.',
   },
   {
@@ -254,6 +271,7 @@ export const DEMO_QUESTIONS: ExamQuestionData[] = [
     text: 'Le taux d\'alcoolémie maximal légal pour conduire en Guinée est :',
     options: ['0,0 g/L', '0,3 g/L de sang', '0,5 g/L de sang', '0,8 g/L de sang'],
     correct_answer: '0,5 g/L de sang',
+    media_type: 'svg', media_url: 'alcohol_scene', media_alt: "Alcool, drogues et conduite",
     explanation: 'La limite légale guinéenne est de 0,5 g/L de sang (0,25 mg/L d\'air expiré), conforme aux normes CEDEAO.',
   },
   {
@@ -261,6 +279,7 @@ export const DEMO_QUESTIONS: ExamQuestionData[] = [
     text: 'La consommation de cannabis avant de conduire :',
     options: ["N'a aucun effet sur la conduite", 'Perturbe réflexes, coordination et perception du temps — elle est interdite', 'Améliore la concentration', 'Est tolérée plusieurs heures après la consommation'],
     correct_answer: 'Perturbe réflexes, coordination et perception du temps — elle est interdite',
+    media_type: 'svg', media_url: 'alcohol_scene', media_alt: "Alcool, drogues et conduite",
     explanation: 'Le cannabis altère significativement les capacités de conduite et reste détectable plusieurs heures après consommation.',
   },
   {
@@ -268,6 +287,7 @@ export const DEMO_QUESTIONS: ExamQuestionData[] = [
     text: 'Les médicaments peuvent-ils affecter la conduite ?',
     options: ['Non, ils sont inoffensifs en doses normales', 'Oui — somnolence, réflexes diminués, troubles de vision ; lisez la notice', 'Seulement les médicaments à base de codéine', 'Seulement à forte dose'],
     correct_answer: 'Oui — somnolence, réflexes diminués, troubles de vision ; lisez la notice',
+    media_type: 'svg', media_url: 'alcohol_scene', media_alt: "Alcool, drogues et conduite",
     explanation: 'Antihistaminiques, anxiolytiques, antidouleurs… nombreux médicaments altèrent la vigilance. Vérifiez toujours la notice.',
   },
   {
@@ -275,6 +295,7 @@ export const DEMO_QUESTIONS: ExamQuestionData[] = [
     text: 'Vous arrivez sur un accident. Votre première action est :',
     options: ['Prendre des photos de la scène', 'Protéger, Alerter, Secourir (PAS) — sécuriser la zone, appeler, aider', 'Déplacer immédiatement tous les blessés', 'Chercher les responsables'],
     correct_answer: 'Protéger, Alerter, Secourir (PAS) — sécuriser la zone, appeler, aider',
+    media_type: 'svg', media_url: 'first_aid', media_alt: "Premiers secours",
     explanation: "La règle PAS : 1) Protéger (éviter sur-accident) 2) Alerter (secours) 3) Secourir (sans aggraver les blessures).",
   },
   {
@@ -282,6 +303,7 @@ export const DEMO_QUESTIONS: ExamQuestionData[] = [
     text: 'Une victime est inconsciente mais respire. Que faites-vous ?',
     options: ['La laisser sur le dos', 'La mettre en Position Latérale de Sécurité (PLS)', "Lui donner de l'eau", 'La faire marcher pour la réveiller'],
     correct_answer: 'La mettre en Position Latérale de Sécurité (PLS)',
+    media_type: 'svg', media_url: 'first_aid', media_alt: "Premiers secours",
     explanation: 'La PLS maintient les voies respiratoires libres et prévient l\'étouffement chez une victime inconsciente qui respire.',
   },
   {
@@ -289,6 +311,7 @@ export const DEMO_QUESTIONS: ExamQuestionData[] = [
     text: 'Pour réduire la pollution, le conducteur doit :',
     options: ['Garder le moteur au ralenti lors des arrêts', 'Couper le moteur pour les arrêts > 30 secondes et entretenir régulièrement son véhicule', 'Utiliser du carburant non filtré', 'Rouler vite pour consommer moins'],
     correct_answer: 'Couper le moteur pour les arrêts > 30 secondes et entretenir régulièrement son véhicule',
+    media_type: 'svg', media_url: 'first_aid', media_alt: "Premiers secours",
     explanation: 'Couper le moteur à l\'arrêt réduit les émissions et la consommation. Un véhicule bien entretenu pollue moins.',
   },
   {
@@ -296,6 +319,7 @@ export const DEMO_QUESTIONS: ExamQuestionData[] = [
     text: 'Un feu vert pour les piétons signifie pour le conducteur :',
     options: ['Il peut passer si aucun piéton n\'est visible', 'Priorité absolue aux piétons — le conducteur doit s\'arrêter', 'Il peut klaxonner et passer', 'Ce feu ne le concerne pas'],
     correct_answer: 'Priorité absolue aux piétons — le conducteur doit s\'arrêter',
+    media_type: 'svg', media_url: 'give_way', media_alt: "Panneau de signalisation",
     explanation: 'Feu vert piéton = le conducteur DOIT s\'arrêter et laisser traverser les piétons.',
   },
   {
@@ -303,6 +327,7 @@ export const DEMO_QUESTIONS: ExamQuestionData[] = [
     text: 'Vous êtes somnolent sur la route. Que faites-vous ?',
     options: ['Ouvrez la fenêtre et maintenez votre vitesse', 'Boire un café et conduire encore 2h', 'Vous arrêter dès que possible et vous reposer', 'Mettre de la musique forte'],
     correct_answer: 'Vous arrêter dès que possible et vous reposer',
+    media_type: 'svg', media_url: 'situation_safe_distance', media_alt: "Distance de sécurité",
     explanation: 'La somnolence est aussi dangereuse que l\'alcool. Seul le repos élimine le risque — aucune astuce ne compense.',
   },
   {
@@ -310,6 +335,7 @@ export const DEMO_QUESTIONS: ExamQuestionData[] = [
     text: 'Vous tournez à gauche à un carrefour. Un piéton traverse en face. Vous devez :',
     options: ['Passer rapidement avant le piéton', 'Céder le passage au piéton', 'Klaxonner pour qu\'il accélère', 'Continuer si votre feu est vert'],
     correct_answer: 'Céder le passage au piéton',
+    media_type: 'svg', media_url: 'intersection_priority_right', media_alt: "Intersection — priorité à droite",
     explanation: 'Tout véhicule tournant doit céder le passage aux piétons qui traversent la voie dans laquelle il s\'engage.',
   },
   {
@@ -317,55 +343,7 @@ export const DEMO_QUESTIONS: ExamQuestionData[] = [
     text: 'Le dépassement par la droite est :',
     options: ['Toujours interdit', 'Autorisé sur les routes à 3 voies', 'Interdit sauf en cas de file de gauche ralentissant ou lorsqu\'un conducteur tourne à gauche', 'Autorisé si vous roulez vite'],
     correct_answer: "Interdit sauf en cas de file de gauche ralentissant ou lorsqu'un conducteur tourne à gauche",
+    media_type: 'svg', media_url: 'no_overtaking', media_alt: "Interdiction de dépasser",
     explanation: 'Le dépassement par la droite est généralement interdit. Les exceptions sont strictement encadrées.',
-  },
-  // ── Questions additionnelles avec médias enrichis ──────────────────────────
-  {
-    id: 'q41_tl', number: 41, category: 'Signalisation',
-    text: "Ce feu passe à l'orange. Que devez-vous faire si vous pouvez vous arrêter en sécurité ?",
-    options: ['Accélérer pour passer avant le rouge', "Ralentir et s'arrêter avant la ligne", 'Continuer si moins de 10 m du feu', 'Klaxonner et passer'],
-    correct_answer: "Ralentir et s'arrêter avant la ligne",
-    media_type: 'svg', media_url: 'traffic_light_orange', media_alt: 'Feu tricolore — phase orange (transition vers rouge)',
-    explanation: "L'orange signale l'imminence du rouge. Arrêtez-vous si c'est possible sans freinage brusque dangereux.",
-  },
-  {
-    id: 'q42_tl', number: 42, category: 'Signalisation',
-    text: 'Ce feu est rouge et orange simultanément. Que signifie cette phase ?',
-    options: ['Vous pouvez passer prudemment', 'Le feu va passer au vert — préparez-vous', 'Feu défaillant — passez avec prudence', 'Demi-tour autorisé'],
-    correct_answer: 'Le feu va passer au vert — préparez-vous',
-    media_type: 'svg', media_url: 'traffic_light_red_orange', media_alt: 'Feu tricolore — rouge et orange simultanés (transition vers vert)',
-    explanation: 'Rouge + orange simultanément annonce le vert imminent. Passez en 1re vitesse et soyez prêt à démarrer.',
-  },
-  {
-    id: 'q43_nuit', number: 43, category: 'Sécurité',
-    text: "Vous conduisez de nuit à 90 km/h. Vos feux éclairent à 40 m. La distance d'arrêt est 70 m. Est-ce sûr ?",
-    options: ['Oui — vous êtes dans la zone sûre', "Non — 70 m > 40 m : ralentissez à 60 km/h", 'Oui — 40 m suffit à cette vitesse', 'Acceptable de nuit uniquement'],
-    correct_answer: "Non — 70 m > 40 m : ralentissez à 60 km/h",
-    media_type: 'svg', media_url: 'night_driving', media_alt: 'Conduite de nuit — portée des feux de croisement limitée à 40 m',
-    explanation: "À 90 km/h, la distance d'arrêt est ~70 m mais les feux n'éclairent qu'à 40 m : danger. Réduire à 60 km/h.",
-  },
-  {
-    id: 'q44_pluie', number: 44, category: 'Sécurité',
-    text: 'Pluie forte, visibilité < 50 m. Quelle vitesse maximale est autorisée toutes routes confondues ?',
-    options: ['110 km/h', '90 km/h', '80 km/h (règle visibilité < 50 m)', '50 km/h'],
-    correct_answer: '80 km/h (règle visibilité < 50 m)',
-    media_type: 'svg', media_url: 'rain_driving', media_alt: 'Conduite sous pluie forte — visibilité réduite, route glissante',
-    explanation: 'Visibilité < 50 m = 80 km/h maximum, quelle que soit la route. Doublez les distances de sécurité.',
-  },
-  {
-    id: 'q45_alcool', number: 45, category: 'Alcool & Drogues',
-    text: 'Taux maximal autorisé pour un conducteur expérimenté en Guinée (permis > 2 ans) ?',
-    options: ['0,0 g/L', '0,5 g/L de sang', '0,8 g/L', '1,0 g/L'],
-    correct_answer: '0,5 g/L de sang',
-    media_type: 'svg', media_url: 'alcohol_scene', media_alt: "Contrôle éthylomètre par les forces de l'ordre",
-    explanation: "Taux légal : 0,5 g/L de sang. Nouveaux conducteurs (< 2 ans) : 0,2 g/L. Dépassement = suspension + amende + prison.",
-  },
-  {
-    id: 'q46_urgence', number: 46, category: 'Premiers secours',
-    text: 'Accident avec victimes : quelle est la bonne séquence ?',
-    options: ['Secourir → Alerter → Protéger', 'Protéger → Alerter → Secourir', 'Alerter → Protéger → Secourir', 'Protéger → Secourir → Alerter'],
-    correct_answer: 'Protéger → Alerter → Secourir',
-    media_type: 'svg', media_url: 'first_aid', media_alt: "Premiers secours — triangle de signalisation, appel d'urgence",
-    explanation: 'PAS : Protéger (baliser, couper contact), Alerter (115 SAMU ou 17 Gendarmerie), Secourir (PLS, MCE si formé). Ne jamais déplacer sans raison.',
   },
 ];

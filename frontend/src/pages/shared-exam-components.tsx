@@ -529,6 +529,7 @@ export function VideoPlayer({ url, poster, alt }: { url: string; poster?: string
 // ── Bloc média unifié — style Ornikar ─────────────────────────────────────────
 
 export function MediaBlock({ mediaType, media, alt }: { mediaType?: string; media?: string; alt?: string }) {
+  const [imgFailed, setImgFailed] = useState(false);
   if (!media) return null;
 
   // Vidéo réelle
@@ -540,13 +541,15 @@ export function MediaBlock({ mediaType, media, alt }: { mediaType?: string; medi
     );
   }
 
-  // Image réelle (URL http/https)
-  if (mediaType === 'image') {
+  // Image réelle (URL http/https). Si le chargement échoue, on bascule sur
+  // l'illustration SVG au lieu d'afficher l'icône « image cassée ».
+  if (mediaType === 'image' && /^https?:\/\//.test(media) && !imgFailed) {
     return (
       <div style={{ borderRadius: 14, overflow: 'hidden', marginBottom: 0, background: '#f8fafc', textAlign: 'center', padding: 20 }}>
         <img
           src={media}
           alt={alt ?? 'Illustration de la question'}
+          onError={() => setImgFailed(true)}
           style={{ maxWidth: '100%', maxHeight: 300, borderRadius: 8, objectFit: 'contain' }}
         />
         {alt && <p style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 10, lineHeight: 1.5 }}>{alt}</p>}
