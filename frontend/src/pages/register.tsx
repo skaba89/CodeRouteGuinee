@@ -191,7 +191,7 @@ export function RegisterPage({ onRegistered }: { onRegistered: () => void }) {
               <label>Adresse email professionnelle
                 <input type="email" value={school.email} onChange={setS('email')} required autoComplete="off" placeholder="contact@auto-ecole.gn" />
               </label>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <div className="form-pair-grid">
                 <label>Téléphone
                   <input value={school.phone} onChange={setS('phone')} required autoComplete="off" placeholder="+224 6XX…" />
                 </label>
@@ -226,7 +226,7 @@ export function RegisterPage({ onRegistered }: { onRegistered: () => void }) {
             </form>
           ) : (
           <form className="login-form" onSubmit={handleSubmit}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <div className="form-pair-grid">
               <label>Prénom
                 <input value={form.first_name} onChange={set('first_name')} required autoComplete="off" />
               </label>
@@ -243,7 +243,7 @@ export function RegisterPage({ onRegistered }: { onRegistered: () => void }) {
             <label>Numéro d'identité (NNI / passeport)
               <input value={form.identity_number} onChange={set('identity_number')} required autoComplete="off" />
             </label>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <div className="form-pair-grid">
               <label>Catégorie
                 <select value={form.permit_category} onChange={set('permit_category')}>
                   <option value="A">A — Moto</option>

@@ -489,7 +489,7 @@ function PostBookingActions({ reference }: { reference: string }) {
       ) : (
         <>
           <p style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>Payer les frais d'examen (250 000 GNF)</p>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+          <div className="form-pair-grid" style={{ marginBottom: 10 }}>
             <label>Opérateur
               <select value={provider} onChange={e => setProvider(e.target.value)}>
                 <option value="orange_money">Orange Money</option>

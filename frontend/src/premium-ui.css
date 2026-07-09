@@ -3161,3 +3161,15 @@ tr:last-child td {
 .result-q-given strong, .result-q-correct strong { font-weight: 850; }
 .result-q-correct { font-size: 12px; color: #0f6e56; margin: 0; }
 .result-q-expl { font-size: 12px; color: #475569; background: rgba(6,43,82,.03); padding: 7px 10px; border-radius: 8px; line-height: 1.5; margin: 0; }
+
+/* ── Grille de paires de champs : 2 colonnes desktop, 1 colonne mobile ── */
+.form-pair-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+@media (max-width: 560px) {
+  .form-pair-grid {
+    grid-template-columns: 1fr;
+  }
+}

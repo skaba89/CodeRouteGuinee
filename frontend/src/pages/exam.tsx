@@ -4,6 +4,7 @@
 import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { getExamQuestions, startExamFromBooking, submitExamAttempt } from '../api';
 import type { ExamQuestion } from '../api';
+import { useIsMobile } from '../hooks/useIsMobile';
 import { isAudioLocale, speakFeedback, stop as stopAudio } from '../audio';
 import { AudioModeBanner, AudioToggle, LocaleAudioSwitcher, PlayButton } from '../components/AudioButton';
 import { type AuthUser } from '../authClient';
@@ -53,6 +54,7 @@ export function ExamPage({ locale, onLocaleChange }: Props) {
   const { currentUser } = useAuthSession();
   const isAuth = Boolean(currentUser);
   const canUseApi = canUseProtectedActions(currentUser, false, ['candidate','center','admin','super_admin']);
+  const isMobile = useIsMobile();
 
   // Questions
   const [liveQuestions, setLiveQuestions] = useState<ExamQuestion[] | null>(null);
@@ -279,7 +281,7 @@ export function ExamPage({ locale, onLocaleChange }: Props) {
         <div style={{ maxWidth: 780, margin: '0 auto' }}>
 
           {/* Score card */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: 24, padding: 28, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16, marginBottom: 20, boxShadow: 'var(--sh)', alignItems: 'center' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'auto 1fr', gap: isMobile ? 14 : 24, padding: isMobile ? 20 : 28, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16, marginBottom: 20, boxShadow: 'var(--sh)', alignItems: 'center', justifyItems: isMobile ? 'center' : 'stretch', textAlign: isMobile ? 'center' : 'left' }}>
             {/* Cercle score */}
             <div style={{ width: 120, height: 120, borderRadius: '50%', background: `conic-gradient(${scoreColor} ${(result.score / result.questions.length * 100).toFixed(1)}%, var(--border) 0)`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               <div style={{ width: 96, height: 96, borderRadius: '50%', background: 'var(--surface)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
@@ -381,11 +383,11 @@ export function ExamPage({ locale, onLocaleChange }: Props) {
         </div>
 
         {/* ── Layout principal ──────────────────────────────────────────── */}
-        <div style={{ display: 'grid', gridTemplateColumns: hasMedia ? '1fr 400px' : '1fr', gap: 16, alignItems: 'start' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: hasMedia && !isMobile ? '1fr 400px' : '1fr', gap: 16, alignItems: 'start' }}>
 
           {/* ── Colonne média (si présent) ──────────────────────────────── */}
           {hasMedia && (
-            <div style={{ position: 'sticky', top: 76 }}>
+            <div style={{ position: isMobile ? 'static' : 'sticky', top: 76 }}>
               <div key={idx} className="exam-media-fade" style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16, overflow: 'hidden', boxShadow: 'var(--sh)' }}>
                 {/* Entête zone média */}
                 <div style={{ padding: '10px 16px', background: 'var(--bg)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 6 }}>
