@@ -1,6 +1,7 @@
 // CenterPage — CodeRoute Guinée
 import { type FormEvent, useEffect, useRef, useCallback, useState } from 'react';
 import { AudioModeBanner, LocaleAudioSwitcher, PlayButton, AudioToggle } from '../components/AudioButton';
+import { QrScanner } from '../components/QrScanner';
 import {
   InstitutionalAuthsPanel,
   DeviceAlertsPanel,
@@ -91,6 +92,7 @@ export function CenterPage() {
   const [entryResult, setEntryResult] = useState<EntryValidationResult | null>(null);
   const [entryErr, setEntryErr] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
+  const [showScanner, setShowScanner] = useState(false);
 
   const [bookingRef, setBookingRef] = useState('');
   const [deviceKey, setDeviceKey] = useState('POSTE-01');
@@ -122,6 +124,20 @@ export function CenterPage() {
     setScanning(true); setEntryErr(null); setEntryResult(null);
     try {
       const r = await validateEntry({ reference: entryRef, verification_code: verifCode, center_code: centerCode });
+      setEntryResult(r);
+    } catch (err) {
+      setEntryErr(errMsg(err, 'Validation impossible.'));
+    } finally { setScanning(false); }
+  }
+
+  // QR scanné → remplit les champs et valide directement
+  async function handleScanned(reference: string, verificationCode: string) {
+    setShowScanner(false);
+    setEntryRef(reference);
+    setVerifCode(verificationCode);
+    setScanning(true); setEntryErr(null); setEntryResult(null);
+    try {
+      const r = await validateEntry({ reference, verification_code: verificationCode, center_code: centerCode });
       setEntryResult(r);
     } catch (err) {
       setEntryErr(errMsg(err, 'Validation impossible.'));
@@ -174,6 +190,19 @@ export function CenterPage() {
         <div className="card">
           <div className="card-header"><span className="card-title"> Valider l'entrée candidat</span></div>
           <form onSubmit={handleEntry} style={{ display: 'grid', gap: 12 }}>
+            <button type="button" className="btn-outline" onClick={() => setShowScanner(true)}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                <path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/>
+                <rect x="7" y="7" width="10" height="10" rx="1"/>
+              </svg>
+              Scanner la convocation (QR)
+            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '2px 0' }}>
+              <div style={{ flex: 1, height: 1, background: 'var(--line)' }} />
+              <span style={{ fontSize: 11, color: 'var(--muted)' }}>ou saisir manuellement</span>
+              <div style={{ flex: 1, height: 1, background: 'var(--line)' }} />
+            </div>
             <label>
               Code centre
               {centers.length > 0 ? (
@@ -295,6 +324,9 @@ export function CenterPage() {
         <DeviceAlertsPanel centerId={centers.find(c => c.code === centerCode)?.id} />
       </div>
 
+      {showScanner && (
+        <QrScanner onScan={handleScanned} onClose={() => setShowScanner(false)} />
+      )}
     </section>
   );
 }
