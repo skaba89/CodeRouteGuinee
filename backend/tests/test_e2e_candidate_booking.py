@@ -101,9 +101,15 @@ def test_candidate_booking_payment_convocation_and_entry_flow() -> None:
         )
         assert pdf_response.status_code == 200
         assert pdf_response.content.startswith(b"%PDF")
+        assert pdf_response.content.rstrip().endswith(b"%%EOF")
         assert pdf_response.headers["content-type"] == "application/pdf"
         assert f"coderoute-convocation-{booking['reference']}.pdf" in pdf_response.headers["content-disposition"]
-        assert b"Document administratif - Convocation candidat" in pdf_response.content
+        # Contenu vérifié via extraction de texte (format ReportLab)
+        from pypdf import PdfReader
+        from io import BytesIO
+        pdf_text = PdfReader(BytesIO(pdf_response.content)).pages[0].extract_text()
+        assert "CONVOCATION" in pdf_text.upper()
+        assert booking["reference"] in pdf_text
 
         entry_response = client.post(
             "/api/v1/entries/validate",

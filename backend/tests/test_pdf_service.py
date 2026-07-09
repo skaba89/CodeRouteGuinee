@@ -27,9 +27,19 @@ def test_build_convocation_pdf_contains_official_sections() -> None:
         }
     )
 
+    # PDF valide et non trivial
     assert content.startswith(b"%PDF")
-    assert b"Document administratif - Convocation candidat" in content
-    assert b"Controle d entree" in content
-    assert b"Consignes candidat" in content
-    assert b"QR verification centre" in content
-    assert b" re f" in content
+    assert content.rstrip().endswith(b"%%EOF")
+    assert len(content) > 3000  # QR + mise en page
+
+    # Contenu texte vérifié via extraction (accents corrects, sections)
+    from pypdf import PdfReader
+    from io import BytesIO
+    text = PdfReader(BytesIO(content)).pages[0].extract_text()
+    assert "CONVOCATION" in text.upper()
+    assert "Aminata Diallo" in text
+    assert "GN-CODE-2026-000001" in text
+    assert "CONTRÔLE D'ENTRÉE" in text.upper()
+    assert "CONSIGNES" in text.upper()
+    assert "123456" in text  # code de vérification
+    assert "RÉPUBLIQUE DE GUINÉE" in text  # accents préservés
