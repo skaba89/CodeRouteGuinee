@@ -290,29 +290,122 @@ def _format_status_counts(label: str, values: dict[str, int]) -> list[str]:
     return [f"{label} - {status}: {count}" for status, count in sorted(values.items())]
 
 
+def _status_table(c: canvas.Canvas, y: float, label: str, values: dict) -> float:
+    """Petit tableau de statuts (clé : nombre). Retourne le y sous le bloc."""
+    c.setFillColor(INK)
+    c.setFont("Helvetica-Bold", 9.5)
+    c.drawString(MARGIN + 2 * mm, y, label)
+    y -= 5.5 * mm
+    if not values:
+        c.setFillColor(MUTED)
+        c.setFont("Helvetica-Oblique", 9)
+        c.drawString(MARGIN + 6 * mm, y, "Aucune donnée consolidée")
+        return y - 6 * mm
+    for status_name, count in sorted(values.items()):
+        c.setFillColor(MUTED)
+        c.setFont("Helvetica", 9)
+        c.drawString(MARGIN + 6 * mm, y, str(status_name))
+        c.setFillColor(INK)
+        c.setFont("Helvetica-Bold", 9)
+        c.drawRightString(MARGIN + 70 * mm, y, str(count))
+        y -= 5 * mm
+    return y - 2 * mm
+
+
 def build_institutional_report_pdf(report: dict) -> bytes:
+    buf = io.BytesIO()
+    c = canvas.Canvas(buf, pagesize=A4)
+    c.setTitle("Rapport institutionnel — CodeRoute Guinée")
+
+    y = _header(c, "RAPPORT INSTITUTIONNEL — DISPOSITIF NATIONAL",
+                report.get("generated_for", "État guinéen"))
+
+    # ── Score de maturité (jauge visuelle) ──
+    score = int(report.get("readiness_score", 0))
+    label = report.get("readiness_label", "—")
+    score_color = GUINEA_GREEN if score >= 75 else (GUINEA_YELLOW if score >= 50 else GUINEA_RED)
+
+    c.setFillColor(LIGHT_BG)
+    c.rect(MARGIN, y - 20 * mm, PAGE_W - 2 * MARGIN, 20 * mm, stroke=0, fill=1)
+    c.setFillColor(INK)
+    c.setFont("Helvetica-Bold", 11)
+    c.drawString(MARGIN + 4 * mm, y - 7 * mm, "Score de maturité du dispositif")
+    c.setFillColor(score_color)
+    c.setFont("Helvetica-Bold", 24)
+    c.drawString(MARGIN + 4 * mm, y - 16 * mm, f"{score}%")
+    c.setFillColor(MUTED)
+    c.setFont("Helvetica", 10)
+    c.drawString(MARGIN + 32 * mm, y - 16 * mm, str(label))
+    # Barre de progression
+    bar_x = MARGIN + 90 * mm
+    bar_w = PAGE_W - MARGIN - bar_x - 4 * mm
+    c.setFillColor(colors.HexColor("#E3E9EE"))
+    c.rect(bar_x, y - 13 * mm, bar_w, 5 * mm, stroke=0, fill=1)
+    c.setFillColor(score_color)
+    c.rect(bar_x, y - 13 * mm, bar_w * min(score, 100) / 100, 5 * mm, stroke=0, fill=1)
+    y -= 26 * mm
+
+    # ── Indicateurs clés ──
+    y = _section(c, y, "1", "Indicateurs clés")
+    y = _row(c, y, "Candidats référencés", str(report.get("candidates", 0)))
+    y = _row(c, y, "Événements d'audit", str(report.get("audit_events", 0)))
+    y -= 2 * mm
+
+    # ── Répartitions par statut (2 colonnes) ──
+    y = _section(c, y, "2", "Répartitions consolidées")
+    y_start = y
+    y = _status_table(c, y, "Centres", report.get("centers_by_status", {}))
+    y = _status_table(c, y, "Questions", report.get("questions_by_status", {}))
+    # Colonne droite
+    y_right = y_start
+    c.setFillColor(INK)
+    for label2, values2 in (("Contrôles d'identité", report.get("identity_checks_by_status", {})),
+                            ("Habilitations", report.get("authorizations_by_status", {}))):
+        c.setFont("Helvetica-Bold", 9.5)
+        c.drawString(PAGE_W / 2 + 4 * mm, y_right, label2)
+        y_right -= 5.5 * mm
+        vals = values2 or {}
+        if not vals:
+            c.setFillColor(MUTED); c.setFont("Helvetica-Oblique", 9)
+            c.drawString(PAGE_W / 2 + 8 * mm, y_right, "Aucune donnée")
+            y_right -= 6 * mm
+        for sname, cnt in sorted(vals.items()):
+            c.setFillColor(MUTED); c.setFont("Helvetica", 9)
+            c.drawString(PAGE_W / 2 + 8 * mm, y_right, str(sname))
+            c.setFillColor(INK); c.setFont("Helvetica-Bold", 9)
+            c.drawRightString(PAGE_W - MARGIN - 4 * mm, y_right, str(cnt))
+            y_right -= 5 * mm
+        y_right -= 2 * mm
+    y = min(y, y_right) - 2 * mm
+
+    # ── Recommandations ──
+    y = _section(c, y, "3", "Recommandations prioritaires")
     recommendations = report.get("recommendations") or []
-    lines = [
-        "Document administratif - Rapport institutionnel",
-        f"Destinataire: {report['generated_for']}",
-        f"Score maturite: {report['readiness_score']}%",
-        f"Statut: {report['readiness_label']}",
-        f"Candidats references: {report['candidates']}",
-        f"Evenements d audit: {report['audit_events']}",
-        "",
-        "1. Synthese nationale",
-        "Plateforme de pilotage du code de la route.",
-        "",
-        "2. Indicateurs consolides",
-        *_format_status_counts("Centres", report.get("centers_by_status", {})),
-        *_format_status_counts("Questions", report.get("questions_by_status", {})),
-        *_format_status_counts("Identites", report.get("identity_checks_by_status", {})),
-        *_format_status_counts("Habilitations", report.get("authorizations_by_status", {})),
-        "",
-        "3. Recommandations prioritaires",
-        *[f"{index}. {recommendation}" for index, recommendation in enumerate(recommendations[:6], start=1)],
-        "",
-        "4. Decision proposee",
-        "Valider un pilote institutionnel encadre.",
-    ]
-    return build_simple_pdf("CodeRoute Guinee - Rapport institutionnel", lines)
+    c.setFont("Helvetica", 9.5)
+    for i, rec in enumerate(recommendations[:8], start=1):
+        if y < MARGIN + 25 * mm:
+            _footer(c, "Rapport institutionnel")
+            c.showPage()
+            y = PAGE_H - MARGIN
+        c.setFillColor(GUINEA_GREEN)
+        c.setFont("Helvetica-Bold", 9.5)
+        c.drawString(MARGIN + 2 * mm, y, f"{i}.")
+        c.setFillColor(INK)
+        c.setFont("Helvetica", 9.5)
+        # Découpe le texte long sur plusieurs lignes
+        text = str(rec)
+        max_chars = 95
+        while text:
+            chunk = text[:max_chars]
+            if len(text) > max_chars:
+                cut = chunk.rfind(" ")
+                if cut > 40:
+                    chunk = chunk[:cut]
+            c.drawString(MARGIN + 8 * mm, y, chunk)
+            text = text[len(chunk):].lstrip()
+            y -= 5.5 * mm
+
+    _footer(c, "Rapport institutionnel")
+    c.showPage()
+    c.save()
+    return buf.getvalue()
