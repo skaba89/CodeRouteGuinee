@@ -14,12 +14,23 @@ export default defineConfig({
         navigateFallbackDenylist: [/^\/api/, /\/docs/, /\/openapi/],
         runtimeCaching: [
           {
-            // Cache les appels API GET pendant 5 minutes (offline partiel)
-            urlPattern: /^\/api\/v1\/(training|questions|sessions|centres)/,
+            // Questions d'entraînement : cache long (CacheFirst) pour un
+            // usage hors-ligne réel — le contenu change rarement.
+            urlPattern: /^\/api\/v1\/(training|questions)/,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'training-cache',
+              expiration: { maxEntries: 100, maxAgeSeconds: 7 * 24 * 3600 },
+            },
+          },
+          {
+            // Autres lectures (sessions, centres) : fraîcheur privilégiée
+            // mais disponibles hors-ligne le temps du cache.
+            urlPattern: /^\/api\/v1\/(sessions|centres|centers)/,
             handler: 'StaleWhileRevalidate',
             options: {
               cacheName: 'api-cache',
-              expiration: { maxEntries: 50, maxAgeSeconds: 300 },
+              expiration: { maxEntries: 50, maxAgeSeconds: 3600 },
             },
           },
         ],

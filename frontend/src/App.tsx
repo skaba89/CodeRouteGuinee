@@ -25,6 +25,7 @@ import { LocaleSwitcher } from './components/LocaleSwitcher';
 import { AudioToggle, LocaleAudioSwitcher } from './components/AudioButton';
 import { t } from './i18n';
 import { AuthSessionProvider } from './authSession';
+import { OfflineBanner } from './components/OfflineBanner';
 import {
   AdminPage, CandidatePage, CenterPage, DrivingSchoolPage,
   ExamPage, HomePage, InstitutionalDossierPage, MinisterialPage,
@@ -480,6 +481,7 @@ export default function App() {
 
   return (
     <main className="app-shell">
+      <OfflineBanner />
       {showTopbar && (
         <header className="topbar">
           {/* Brand */}
