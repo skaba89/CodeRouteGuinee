@@ -54,7 +54,8 @@ jobs:
         run: |
           python scripts/postgres_backup.py \
             --backup-dir /tmp/coderoute-backups \
-            --retention-days 7
+            --retention-days 7 \
+            backup
 
       - name: Verify backup integrity
         env:
@@ -63,6 +64,34 @@ jobs:
           python scripts/postgres_backup.py \
             --backup-dir /tmp/coderoute-backups \
             --verify
+
+      - name: Round-trip restore test (prouve que le backup est restaurable)
+        env:
+          DATABASE_URL: postgresql+psycopg://coderoute:ci-backup-test@localhost:5432/coderoute
+          PGPASSWORD: ci-backup-test
+        run: |
+          # Détruire une table puis restaurer depuis le backup : prouve que
+          # la restauration fonctionne réellement (pas seulement l'intégrité
+          # du fichier). Un backup jamais restauré n'est pas un backup.
+          BACKUP=$(ls -t /tmp/coderoute-backups/*.backup | head -1)
+          psql "postgresql://coderoute:ci-backup-test@localhost:5432/coderoute" \
+            -c "INSERT INTO questions (id, category, text, options, correct_answer, is_active, validation_status, version, created_at) VALUES ('rt-test','signalisation','Round-trip','[\"A\",\"B\"]','A',true,'approved',1,now());"
+          # Re-backup avec la donnée témoin
+          python scripts/postgres_backup.py --backup-dir /tmp/coderoute-backups backup
+          BACKUP=$(ls -t /tmp/coderoute-backups/*.backup | head -1)
+          # Détruire la donnée
+          psql "postgresql://coderoute:ci-backup-test@localhost:5432/coderoute" \
+            -c "DELETE FROM questions WHERE id='rt-test';"
+          # Restaurer
+          python scripts/postgres_backup.py restore "$BACKUP" --confirm-restore --clean
+          # Vérifier que la donnée témoin est revenue
+          COUNT=$(psql "postgresql://coderoute:ci-backup-test@localhost:5432/coderoute" -t \
+            -c "SELECT count(*) FROM questions WHERE id='rt-test';" | tr -d ' ')
+          if [ "$COUNT" != "1" ]; then
+            echo "❌ ÉCHEC : la donnée témoin n'a pas été restaurée (count=$COUNT)"
+            exit 1
+          fi
+          echo "✅ Round-trip restore réussi : la donnée détruite a été restaurée à l'identique"
 
       - name: Upload backup artifact
         uses: actions/upload-artifact@v4

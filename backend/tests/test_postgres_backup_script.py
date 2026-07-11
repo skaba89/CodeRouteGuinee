@@ -65,3 +65,65 @@ def test_restore_dry_run_accepts_confirmation(tmp_path) -> None:
     result = backup.main(["--env-file", str(env_file), "--dry-run", "restore", "missing.backup", "--confirm-restore", "--clean"])
 
     assert result == 0
+
+
+def test_restore_command_uses_clean_if_exists() -> None:
+    """La restauration doit utiliser --clean --if-exists pour être fiable
+    sur une base partiellement peuplée (cas réel post-incident)."""
+    backup = load_backup_module()
+    cmd = backup.build_restore_command("postgresql://u:p@host/db", Path("b.backup"), clean=True)
+    assert "--clean" in cmd
+    assert "--if-exists" in cmd
+    # Sans --exit-on-error : ne doit pas s'arrêter à la première table existante
+    assert "--exit-on-error" not in cmd
+
+
+def test_verify_backup_file_rejects_missing() -> None:
+    backup = load_backup_module()
+    assert backup.verify_backup_file(Path("/tmp/inexistant-xyz.backup")) is False
+
+
+def test_verify_backup_file_rejects_empty(tmp_path) -> None:
+    backup = load_backup_module()
+    empty = tmp_path / "vide.backup"
+    empty.write_bytes(b"")
+    assert backup.verify_backup_file(empty) is False
+
+
+def test_latest_backup_returns_none_when_empty(tmp_path) -> None:
+    backup = load_backup_module()
+    assert backup.latest_backup(tmp_path, "coderoute-guinee") is None
+
+
+def test_latest_backup_returns_most_recent(tmp_path) -> None:
+    backup = load_backup_module()
+    (tmp_path / "coderoute-guinee-20260101T000000Z.backup").write_bytes(b"x")
+    (tmp_path / "coderoute-guinee-20260601T000000Z.backup").write_bytes(b"x")
+    latest = backup.latest_backup(tmp_path, "coderoute-guinee")
+    assert latest is not None and "20260601" in latest.name
+
+
+def test_retention_keeps_at_least_one(tmp_path) -> None:
+    """La rétention ne supprime jamais le dernier backup, même très ancien."""
+    backup = load_backup_module()
+    only = tmp_path / "coderoute-guinee-20200101T000000Z.backup"
+    only.write_bytes(b"x")
+    deleted = backup.apply_retention(tmp_path, "coderoute-guinee", retention_days=1)
+    assert deleted == []
+    assert only.exists()
+
+
+def test_retention_removes_old_keeps_recent(tmp_path) -> None:
+    import os
+    import time
+    backup = load_backup_module()
+    old = tmp_path / "coderoute-guinee-20200101T000000Z.backup"
+    recent = tmp_path / "coderoute-guinee-20260601T000000Z.backup"
+    old.write_bytes(b"x")
+    recent.write_bytes(b"x")
+    # Vieillir artificiellement le fichier 'old'
+    old_time = time.time() - 40 * 86400  # 40 jours
+    os.utime(old, (old_time, old_time))
+    deleted = backup.apply_retention(tmp_path, "coderoute-guinee", retention_days=7)
+    assert old in deleted
+    assert recent.exists()
