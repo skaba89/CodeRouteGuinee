@@ -23,6 +23,14 @@ class Question(Base):
     media_type: Mapped[str | None] = mapped_column(String(20), nullable=True)
     media_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     media_alt: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
+    # Traductions du contenu dans les langues nationales guinéennes.
+    # Structure : {"ff": {"text": "...", "options": [...], "explanation": "..."},
+    #              "man": {...}, "sus": {...}, ...}
+    # Le français (colonnes text/options/explanation) reste la source de
+    # référence ; les langues absentes retombent sur le français.
+    translations: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
     # ── Workflow de validation officielle (certification DNTT) ────────────

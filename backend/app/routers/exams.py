@@ -287,6 +287,7 @@ def start_exam_from_booking(
 @router.get("/{attempt_id}/questions", response_model=ExamQuestionsRead)
 def get_exam_questions(
     attempt_id: str,
+    lang: str | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("center", "candidate", "admin", "super_admin")),
 ) -> ExamQuestionsRead:
@@ -327,25 +328,20 @@ def get_exam_questions(
             select(Question).where(Question.is_active.is_(True)).limit(40)
         ).all())
 
-    items = [
-        ExamQuestionItem(
+    from app.question_i18n import resolve_question_content
+
+    items = []
+    for i, q in enumerate(questions):
+        content = resolve_question_content(q, lang)
+        items.append(ExamQuestionItem(
             id=q.id,
             number=i + 1,
             category=q.category,
-            text=q.text,
-            options=(
-                q.options if isinstance(q.options, list)
-                else (
-                    __import__('json').loads(q.options)
-                    if isinstance(q.options, str) and q.options.startswith('[')
-                    else []
-                )
-            ),
+            text=content["text"],
+            options=content["options"] if isinstance(content["options"], list) else [],
             media_url=getattr(q, "media_url", None),
             media_type=getattr(q, "media_type", None),
-        )
-        for i, q in enumerate(questions)
-    ]
+        ))
 
     return ExamQuestionsRead(
         attempt_id=attempt_id,
@@ -492,8 +488,50 @@ def submit_exam(
         questions = list(db.scalars(select(Question).where(Question.id.in_(trace.question_ids))).all())
     else:
         questions = list(db.scalars(select(Question).where(Question.is_active.is_(True))).all())
+
+    # Scoring robuste au multilingue : une réponse soumise peut être dans
+    # une langue traduite. On la ramène à l'option française canonique par
+    # son index avant de comparer à correct_answer (stocké en français).
+    from app.question_i18n import resolve_question_content, SUPPORTED_LANGUAGES
+    import json as _json
+
+    def _canonical_options(q) -> list[str]:
+        opts = q.options
+        if isinstance(opts, str) and opts.startswith("["):
+            try:
+                opts = _json.loads(opts)
+            except (ValueError, TypeError):
+                opts = [opts]
+        return opts if isinstance(opts, list) else []
+
+    def _to_canonical(q, submitted: str) -> str:
+        """Ramène une réponse (potentiellement traduite) vers l'option FR."""
+        if submitted is None:
+            return submitted
+        canonical = _canonical_options(q)
+        if submitted in canonical:
+            return submitted  # déjà en français
+        # Chercher dans chaque langue traduite : si la réponse correspond à
+        # une option traduite, renvoyer l'option française de même index.
+        translations = getattr(q, "translations", None) or {}
+        for lang_code, tr in translations.items():
+            if lang_code not in SUPPORTED_LANGUAGES:
+                continue
+            tr_opts = tr.get("options") if isinstance(tr, dict) else None
+            if isinstance(tr_opts, list) and submitted in tr_opts:
+                idx = tr_opts.index(submitted)
+                if 0 <= idx < len(canonical):
+                    return canonical[idx]
+        return submitted  # inconnu : laissé tel quel (comptera faux)
+
+    normalized_answers = {}
+    q_by_id = {q.id: q for q in questions}
+    for qid, ans in payload.answers.items():
+        q = q_by_id.get(qid)
+        normalized_answers[qid] = _to_canonical(q, ans) if q else ans
+
     answer_key = {question.id: question.correct_answer for question in questions}
-    result = score_answers(answer_key, payload.answers)
+    result = score_answers(answer_key, normalized_answers)
 
     candidate = db.get(Candidate, attempt.candidate_id)
     summary = build_score_summary(

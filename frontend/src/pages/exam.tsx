@@ -143,7 +143,7 @@ export function ExamPage({ locale, onLocaleChange }: Props) {
       if (canUseApi && bookRef.trim()) {
         const attempt = await startExamFromBooking(bookRef.trim());
         setAttemptId(attempt.id);
-        const qsResp = await getExamQuestions(attempt.id);
+        const qsResp = await getExamQuestions(attempt.id, locale);
         setLiveQuestions(qsResp.questions);
       }
       setPhase('running');

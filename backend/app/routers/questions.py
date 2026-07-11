@@ -324,3 +324,64 @@ def question_validation_summary(
         "category_coverage": coverage,
         "exam_ready": exam_ready,
     }
+
+
+@router.put("/{question_id}/translations", response_model=QuestionRead,
+            dependencies=[Depends(require_roles("admin", "super_admin"))])
+def set_question_translations(
+    question_id: str,
+    payload: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "super_admin")),
+) -> Question:
+    """
+    Définit ou met à jour les traductions d'une question.
+
+    Corps : {"ff": {"text": "...", "options": ["...","..."], "explanation": "..."},
+             "man": {...}, ...}
+    Les options traduites doivent avoir le MÊME nombre que l'original
+    (l'ordre porte l'index de la bonne réponse). Le français reste la
+    référence et n'est jamais écrasé.
+    """
+    from app.question_i18n import SUPPORTED_LANGUAGES
+
+    question = db.get(Question, question_id)
+    if not question:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question introuvable")
+
+    base_options = question.options
+    if isinstance(base_options, str) and base_options.startswith("["):
+        import json
+        base_options = json.loads(base_options)
+    n_options = len(base_options) if isinstance(base_options, list) else 0
+
+    cleaned: dict = dict(question.translations or {})
+    for lang_code, content in payload.items():
+        if lang_code == "fr" or lang_code not in SUPPORTED_LANGUAGES:
+            continue  # le français est la référence, pas une traduction
+        if not isinstance(content, dict):
+            continue
+        entry: dict = {}
+        if content.get("text"):
+            entry["text"] = str(content["text"])
+        opts = content.get("options")
+        if isinstance(opts, list):
+            if len(opts) != n_options:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=f"La langue '{lang_code}' doit avoir {n_options} options "
+                           f"(ordre = index de la bonne réponse).",
+                )
+            entry["options"] = [str(o) for o in opts]
+        if content.get("explanation"):
+            entry["explanation"] = str(content["explanation"])
+        if entry:
+            cleaned[lang_code] = entry
+
+    question.translations = cleaned
+    db.add(AuditLog(actor_id=current_user.id, action="question.translations_updated",
+                    entity="question", entity_id=question.id,
+                    details={"languages": list(cleaned.keys())}))
+    db.commit()
+    db.refresh(question)
+    return question

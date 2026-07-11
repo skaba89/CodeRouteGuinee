@@ -1055,8 +1055,9 @@ export type ExamQuestionsResponse = {
   threshold: number;
 };
 
-export function getExamQuestions(attemptId: string): Promise<ExamQuestionsResponse> {
-  return getPrivateJson<ExamQuestionsResponse>(`/api/v1/exams/${encodeURIComponent(attemptId)}/questions`);
+export function getExamQuestions(attemptId: string, lang?: string): Promise<ExamQuestionsResponse> {
+  const q = lang && lang !== 'fr' ? `?lang=${encodeURIComponent(lang)}` : '';
+  return getPrivateJson<ExamQuestionsResponse>(`/api/v1/exams/${encodeURIComponent(attemptId)}/questions${q}`);
 }
 
 export function getExamMonitoringSummaries(filters: ExamMonitoringFilters = {}): Promise<ExamMonitoringSummary[]> {

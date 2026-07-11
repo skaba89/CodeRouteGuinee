@@ -223,6 +223,7 @@ class QuestionRead(QuestionCreate):
     validated_at: datetime | None = None
     rejection_reason: str | None = None
     version: int = 1
+    translations: dict | None = None
     created_at: datetime
 
     model_config = {"from_attributes": True}
