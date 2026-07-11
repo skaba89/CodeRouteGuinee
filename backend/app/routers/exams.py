@@ -552,7 +552,8 @@ def submit_exam(
     if _cand and hasattr(_cand, "attempt_count"):
         _cand.attempt_count = (_cand.attempt_count or 0) + 1
         db.add(_cand)
-    db.add(AuditLog(
+    from app.audit_chain import append_audit
+    append_audit(db,
         actor_id=current_user.id,
         action="exam.submitted",
         entity="exam_attempt",
@@ -567,7 +568,7 @@ def submit_exam(
             "unanswered": result["unanswered"],
             "summary": summary,
         },
-    ))
+    )
     db.commit()
     db.refresh(attempt)
 

@@ -147,21 +147,21 @@ def create_payment(
         booking.status = "paid"
         booking.payment_reference = reference
 
-    db.add(
-        AuditLog(
-            actor_id=current_user.id,
-            action="payment.created",
-            entity="payment",
-            entity_id=reference,
-            details={
-                "booking_reference": payload.booking_reference,
-                "amount_gnf": payload.amount_gnf,
-                "provider": provider_result.provider,
-                "status": provider_result.status,
-                "receipt_number": payment.receipt_number,
-                "external_reference": provider_result.external_reference,
-            },
-        )
+    from app.audit_chain import append_audit
+    append_audit(
+        db,
+        actor_id=current_user.id,
+        action="payment.created",
+        entity="payment",
+        entity_id=reference,
+        details={
+            "booking_reference": payload.booking_reference,
+            "amount_gnf": payload.amount_gnf,
+            "provider": provider_result.provider,
+            "status": provider_result.status,
+            "receipt_number": payment.receipt_number,
+            "external_reference": provider_result.external_reference,
+        },
     )
     db.commit()
     db.refresh(payment)

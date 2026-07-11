@@ -247,3 +247,19 @@ def notifications_test(
         return {"ok": ok, "channel": channel, "to": to}
     except Exception as exc:  # noqa: BLE001
         return {"ok": False, "channel": channel, "error": str(exc)[:200]}
+
+
+@router.get("/audit-chain/verify")
+def verify_audit_chain_endpoint(
+    current_user: User = Depends(require_roles("admin", "super_admin")),
+    db: Session = Depends(get_db),
+) -> dict:
+    """
+    Vérifie l'intégrité du journal d'audit inviolable (chaînage
+    cryptographique). Une chaîne intacte prouve qu'aucun événement sensible
+    (résultat d'examen, paiement) n'a été altéré, inséré ou supprimé.
+
+    À présenter en cas de contestation d'un résultat : preuve d'intégrité.
+    """
+    from app.audit_chain import verify_audit_chain
+    return verify_audit_chain(db)
