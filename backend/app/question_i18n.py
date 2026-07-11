@@ -17,9 +17,13 @@ DEFAULT_LANGUAGE = "fr"
 
 def resolve_question_content(question: Any, lang: str | None) -> dict:
     """
-    Retourne {text, options, explanation} dans la langue demandée, avec
-    repli sur le français champ par champ (une traduction partielle reste
+    Retourne {text, options, explanation, audio_url} dans la langue demandée,
+    avec repli sur le français champ par champ (une traduction partielle reste
     utilisable : les champs non traduits restent en français).
+
+    audio_url : enregistrement par un locuteur natif (niveau 2). Absent si la
+    question n'a pas encore été enregistrée dans cette langue — le client
+    retombe alors sur la synthèse vocale.
     """
     # Base française (référence)
     base_options = question.options
@@ -34,6 +38,7 @@ def resolve_question_content(question: Any, lang: str | None) -> dict:
         "text": question.text,
         "options": base_options,
         "explanation": question.explanation,
+        "audio_url": None,
     }
 
     if not lang or lang == DEFAULT_LANGUAGE or lang not in SUPPORTED_LANGUAGES:
@@ -53,6 +58,8 @@ def resolve_question_content(question: Any, lang: str | None) -> dict:
         result["options"] = tr["options"]
     if tr.get("explanation"):
         result["explanation"] = tr["explanation"]
+    if tr.get("audio_url"):
+        result["audio_url"] = tr["audio_url"]
 
     return result
 

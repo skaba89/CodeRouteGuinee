@@ -1046,6 +1046,7 @@ export type ExamQuestion = {
   media_url?: string | null;
   media_type?: string | null;  // 'sign' | 'scene' | null
   media_alt?: string | null;
+  audio_url?: string | null;
 };
 
 export type ExamQuestionsResponse = {

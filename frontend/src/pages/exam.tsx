@@ -5,7 +5,7 @@ import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react'
 import { getExamQuestions, startExamFromBooking, submitExamAttempt } from '../api';
 import type { ExamQuestion } from '../api';
 import { useIsMobile } from '../hooks/useIsMobile';
-import { isAudioLocale, speakFeedback, stop as stopAudio } from '../audio';
+import { isAudioLocale, speakFeedback, stop as stopAudio, playQuestionAudio } from '../audio';
 import { AudioModeBanner, AudioToggle, LocaleAudioSwitcher, PlayButton } from '../components/AudioButton';
 import { type AuthUser } from '../authClient';
 import { type Locale } from '../i18n';
@@ -66,6 +66,7 @@ export function ExamPage({ locale, onLocaleChange }: Props) {
         media: q.media_url ?? undefined,
         mediaType: (q.media_type ?? undefined) as 'sign' | 'scene' | 'image' | 'video' | undefined,
         mediaAlt: q.media_alt ?? undefined,
+        audioUrl: q.audio_url ?? undefined,
       }))
     : DEMO_QUESTIONS.map((q: ExamQuestionData) => ({
         id: q.id, text: q.text, options: q.options,
@@ -97,10 +98,18 @@ export function ExamPage({ locale, onLocaleChange }: Props) {
   const answered = Object.keys(answers).length;
   const audioEnabled = isAudioLocale(locale as Locale);
 
-  // Lire question à voix haute si audio activé
+  // Lire la question à voix haute quand la langue du candidat l'exige.
+  // Privilégie l'enregistrement par un locuteur natif ; repli automatique
+  // sur la synthèse vocale si l'enregistrement n'existe pas.
   useEffect(() => {
     if (phase === 'running' && audioEnabled && q) {
-      // Audio: utiliser PlayButton pour lire la question
+      void playQuestionAudio(
+        q.id,
+        locale as Locale,
+        q.text,
+        q.options,
+        q.audioUrl,
+      );
     }
     return () => { if (audioEnabled) stopAudio(); };
   }, [idx, phase, audioEnabled, locale, q]);

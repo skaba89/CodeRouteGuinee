@@ -172,33 +172,47 @@ export function preloadVoices(): Promise<void> {
 // ── Audio pré-enregistré (Phase 2) ───────────────────────────────
 
 /**
- * Joue un fichier audio pré-enregistré si disponible.
- * Fallback automatique vers TTS si le fichier n'existe pas.
+ * Joue l'enregistrement d'une question par un locuteur natif, avec repli
+ * automatique sur la synthèse vocale.
  *
- * Structure attendue : /audio/{locale}/{questionId}.mp3
- * Ex : /audio/ff/q01.mp3 (question 1 en Pular, enregistrée par un locuteur natif)
+ * Deux sources possibles, dans l'ordre :
+ *   1. audioUrl fourni par le backend (traduction : translations[locale].audio_url).
+ *      Permet d'héberger les enregistrements n'importe où (Cloudinary, CDN…).
+ *   2. Convention de chemin : /audio/{locale}/{questionId}.mp3
+ *
+ * Si aucun enregistrement n'est disponible ou lisible, on retombe sur la
+ * synthèse vocale : aucune question n'est jamais muette.
+ *
+ * Entendre sa VRAIE langue (et non du français prononcé) est déterminant
+ * pour les candidats qui parlent Pular, Malinké ou Soussou sans les lire.
  */
 export async function playQuestionAudio(
   questionId: string,
   locale: Locale,
   fallbackText: string,
-  fallbackOptions: string[]
+  fallbackOptions: string[],
+  audioUrl?: string | null,
 ): Promise<void> {
-  const url = `/audio/${locale}/${questionId}.mp3`;
+  if (!_enabled) return;
+  stop(); // couper une synthèse vocale en cours
 
-  try {
-    const res = await fetch(url, { method: 'HEAD' });
-    if (res.ok) {
+  const candidates = [
+    audioUrl || null,                          // 1. URL fournie par le backend
+    `/audio/${locale}/${questionId}.mp3`,      // 2. convention de chemin
+  ].filter(Boolean) as string[];
+
+  for (const url of candidates) {
+    try {
       const audio = new Audio(url);
-      audio.playbackRate = 1.0;
+      // play() rejette si le fichier est absent/illisible → on essaie le suivant
       await audio.play();
       return;
+    } catch {
+      // Source indisponible → candidat suivant
     }
-  } catch {
-    // Fichier non disponible → fallback TTS
   }
 
-  // Fallback TTS (Phase 1)
+  // Repli final : synthèse vocale
   speakQuestion(fallbackText, fallbackOptions);
 }
 

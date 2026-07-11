@@ -42,6 +42,9 @@ class ExamQuestionItem(_BaseModel):
     options: list[str]
     media_url: str | None = None
     media_type: str | None = None  # 'sign' | 'scene' | None
+    # Enregistrement audio dans la langue du candidat (locuteur natif).
+    # Absent → le client utilise la synthèse vocale en repli.
+    audio_url: str | None = None
 
 
 class ExamQuestionsRead(_BaseModel):
@@ -341,6 +344,7 @@ def get_exam_questions(
             options=content["options"] if isinstance(content["options"], list) else [],
             media_url=getattr(q, "media_url", None),
             media_type=getattr(q, "media_type", None),
+            audio_url=content.get("audio_url"),
         ))
 
     return ExamQuestionsRead(

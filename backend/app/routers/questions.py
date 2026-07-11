@@ -375,6 +375,17 @@ def set_question_translations(
             entry["options"] = [str(o) for o in opts]
         if content.get("explanation"):
             entry["explanation"] = str(content["explanation"])
+        # Enregistrement audio par un locuteur natif (niveau 2).
+        # Permet d'entendre la question dans sa VRAIE langue, pas du français
+        # prononcé — essentiel pour les candidats non-lecteurs.
+        if content.get("audio_url"):
+            audio = str(content["audio_url"]).strip()
+            if not audio.startswith(("https://", "/audio/")):
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="audio_url doit être une URL https ou un chemin /audio/…",
+                )
+            entry["audio_url"] = audio
         if entry:
             cleaned[lang_code] = entry
 

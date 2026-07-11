@@ -117,3 +117,37 @@ def test_scoring_multilingue_reponse_pular() -> None:
     result = score_answers({q.id: q.correct_answer}, {q.id: submitted})
     assert result["correct_answers"] == 1
     db.close()
+
+
+def test_audio_url_par_langue() -> None:
+    """Une question peut porter un enregistrement audio par langue
+    (locuteur natif) — servi à l'examen, repli synthèse vocale si absent."""
+    init_db()
+    qid = _make_question()
+    with TestClient(app) as client:
+        H = get_admin_headers(client)
+        r = client.put(f"/api/v1/questions/{qid}/translations", json={
+            "ff": {
+                "text": "Hol ko maannouni STOP?",
+                "audio_url": "https://cdn.example.gn/audio/ff/q1.mp3",
+            }
+        }, headers=H)
+        assert r.status_code == 200
+
+    db = SessionLocal()
+    q = db.get(Question, qid)
+    content = resolve_question_content(q, "ff")
+    assert content["audio_url"] == "https://cdn.example.gn/audio/ff/q1.mp3"
+    # Sans traduction audio, pas d'URL (le client retombe sur la synthèse)
+    assert resolve_question_content(q, "man")["audio_url"] is None
+    db.close()
+
+
+def test_audio_url_rejette_url_invalide() -> None:
+    init_db()
+    qid = _make_question()
+    with TestClient(app) as client:
+        r = client.put(f"/api/v1/questions/{qid}/translations", json={
+            "ff": {"audio_url": "javascript:alert(1)"}
+        }, headers=get_admin_headers(client))
+        assert r.status_code == 422

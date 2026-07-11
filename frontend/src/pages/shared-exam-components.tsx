@@ -13,6 +13,7 @@ export type QData = {
   mediaType?: string;
   media?: string;
   mediaAlt?: string;
+  audioUrl?: string | null;
   expl?: string;
   explanation?: string;
 };
