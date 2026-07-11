@@ -42,10 +42,23 @@ def get_my_bookings(
         .limit(20)
     ).all()
 
+    # Charger sessions et centres en masse (évite un N+1 : sans cela,
+    # chaque réservation déclenche 2 requêtes supplémentaires).
+    session_ids = {bk.session_id for bk in bookings if bk.session_id}
+    sessions_by_id: dict[str, ExamSession] = {}
+    centers_by_id: dict[str, Center] = {}
+    if session_ids:
+        sess = db.scalars(select(ExamSession).where(ExamSession.id.in_(session_ids))).all()
+        sessions_by_id = {s.id: s for s in sess}
+        center_ids = {s.center_id for s in sess if s.center_id}
+        if center_ids:
+            centers = db.scalars(select(Center).where(Center.id.in_(center_ids))).all()
+            centers_by_id = {c.id: c for c in centers}
+
     result = []
     for bk in bookings:
-        session = db.get(ExamSession, bk.session_id)
-        center = db.get(Center, session.center_id) if session else None
+        session = sessions_by_id.get(bk.session_id)
+        center = centers_by_id.get(session.center_id) if session else None
         result.append({
             "reference":         bk.reference,
             "status":            bk.status,
@@ -223,14 +236,25 @@ def get_center_availability(
         .limit(30)
     ).all()
 
-    items = []
-    for s in sessions:
-        booked = db.scalar(
-            select(func.count(Booking.id)).where(
-                Booking.session_id == s.id,
+    # Comptage des réservations pour TOUTES les sessions en une seule requête
+    # (évite un N+1 : sans cela, 30 sessions = 30 requêtes COUNT séparées,
+    # ce qui sature la base le jour d'une session nationale).
+    session_ids = [s.id for s in sessions]
+    booked_by_session: dict[str, int] = {}
+    if session_ids:
+        rows = db.execute(
+            select(Booking.session_id, func.count(Booking.id))
+            .where(
+                Booking.session_id.in_(session_ids),
                 Booking.status.not_in(["cancelled"]),
             )
-        ) or 0
+            .group_by(Booking.session_id)
+        ).all()
+        booked_by_session = {sid: count for sid, count in rows}
+
+    items = []
+    for s in sessions:
+        booked = booked_by_session.get(s.id, 0)
         remaining = max(0, s.capacity - booked)
         items.append({
             "session_id": s.id,
