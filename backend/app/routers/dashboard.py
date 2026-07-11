@@ -605,3 +605,96 @@ def export_dashboard_csv(
     csv_content = "\n".join(rows) + "\n"
     headers = {"Content-Disposition": "attachment; filename=coderoute-dashboard-export.csv"}
     return Response(content=csv_content, media_type="text/csv", headers=headers)
+
+
+@router.get("/by-center", tags=["dashboard"])
+def dashboard_by_center(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "super_admin")),
+) -> dict:
+    """
+    Vue territoriale de supervision nationale (DNTT) : activité de chaque
+    centre agréé — sessions, réservations, examens, taux de réussite,
+    incidents. Permet à l'État de piloter les 135 centres d'un coup d'œil.
+
+    Toutes les métriques sont calculées par requêtes agrégées (GROUP BY),
+    sans N+1, pour rester rapide même à l'échelle nationale.
+    """
+    from app.models_exam_attempt import ExamAttempt
+
+    centers = db.scalars(select(Center).order_by(Center.name.asc())).all()
+
+    # ── Agrégats par centre en requêtes groupées (pas de N+1) ──
+    # Sessions par centre
+    sess_rows = db.execute(
+        select(ExamSession.center_id, func.count(ExamSession.id))
+        .group_by(ExamSession.center_id)
+    ).all()
+    sessions_by_center = {cid: n for cid, n in sess_rows}
+
+    # Réservations par centre (via la session)
+    book_rows = db.execute(
+        select(ExamSession.center_id, func.count(Booking.id))
+        .join(Booking, Booking.session_id == ExamSession.id)
+        .where(Booking.status.not_in(["cancelled"]))
+        .group_by(ExamSession.center_id)
+    ).all()
+    bookings_by_center = {cid: n for cid, n in book_rows}
+
+    # Examens réussis / échoués par centre (via session)
+    passed_rows = db.execute(
+        select(ExamSession.center_id, func.count(ExamAttempt.id))
+        .join(ExamAttempt, ExamAttempt.session_id == ExamSession.id)
+        .where(ExamAttempt.passed.is_(True))
+        .group_by(ExamSession.center_id)
+    ).all()
+    passed_by_center = {cid: n for cid, n in passed_rows}
+
+    failed_rows = db.execute(
+        select(ExamSession.center_id, func.count(ExamAttempt.id))
+        .join(ExamAttempt, ExamAttempt.session_id == ExamSession.id)
+        .where(ExamAttempt.passed.is_(False))
+        .group_by(ExamSession.center_id)
+    ).all()
+    failed_by_center = {cid: n for cid, n in failed_rows}
+
+    # Incidents ouverts par centre
+    incident_rows = db.execute(
+        select(CenterIncident.center_id, func.count(CenterIncident.id))
+        .where(CenterIncident.status == "open")
+        .group_by(CenterIncident.center_id)
+    ).all()
+    incidents_by_center = {cid: n for cid, n in incident_rows}
+
+    items = []
+    for c in centers:
+        passed = passed_by_center.get(c.id, 0)
+        failed = failed_by_center.get(c.id, 0)
+        total = passed + failed
+        pass_rate = round(passed / total * 100, 1) if total > 0 else None
+        items.append({
+            "center_id": c.id,
+            "code": c.code,
+            "name": c.name,
+            "city": c.city,
+            "prefecture": c.prefecture,
+            "status": c.status,
+            "sessions": sessions_by_center.get(c.id, 0),
+            "bookings": bookings_by_center.get(c.id, 0),
+            "exams_passed": passed,
+            "exams_failed": failed,
+            "exams_total": total,
+            "pass_rate_pct": pass_rate,
+            "open_incidents": incidents_by_center.get(c.id, 0),
+        })
+
+    # Synthèse nationale
+    national = {
+        "centers_total": len(centers),
+        "centers_active": sum(1 for c in centers if c.status in ("active", "accredited")),
+        "sessions_total": sum(sessions_by_center.values()),
+        "bookings_total": sum(bookings_by_center.values()),
+        "exams_total": sum(passed_by_center.values()) + sum(failed_by_center.values()),
+        "open_incidents_total": sum(incidents_by_center.values()),
+    }
+    return {"national": national, "centers": items}

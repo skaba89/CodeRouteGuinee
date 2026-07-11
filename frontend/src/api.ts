@@ -719,6 +719,24 @@ export function getDashboard(): Promise<DashboardData> {
   return getPrivateJson<DashboardData>('/api/v1/dashboard');
 }
 
+export type CenterDashboardRow = {
+  center_id: string; code: string; name: string; city: string;
+  prefecture: string | null; status: string;
+  sessions: number; bookings: number;
+  exams_passed: number; exams_failed: number; exams_total: number;
+  pass_rate_pct: number | null; open_incidents: number;
+};
+export type NationalDashboard = {
+  national: {
+    centers_total: number; centers_active: number; sessions_total: number;
+    bookings_total: number; exams_total: number; open_incidents_total: number;
+  };
+  centers: CenterDashboardRow[];
+};
+export function getDashboardByCenter(): Promise<NationalDashboard> {
+  return getPrivateJson<NationalDashboard>('/api/v1/dashboard/by-center');
+}
+
 export function getOperationalReadiness(): Promise<OperationalReadiness> {
   return getJson<OperationalReadiness>('/health/readiness');
 }

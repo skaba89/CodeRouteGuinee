@@ -1,5 +1,6 @@
 // AdminPage — CodeRoute Guinée
 import { LiveDashboard } from '../components/live-dashboard';
+import { NationalDashboard } from '../components/NationalDashboard';
 import { type FormEvent, useEffect, useRef, useCallback, useState } from 'react';
 import { AudioModeBanner, LocaleAudioSwitcher, PlayButton, AudioToggle } from '../components/AudioButton';
 import {
@@ -204,6 +205,11 @@ export function AdminPage() {
           {/* Live Dashboard — données temps réel, polling 15s */}
           <div className="card" style={{ marginBottom: 20 }}>
             <LiveDashboard />
+          </div>
+
+          {/* Supervision nationale — activité territoriale par centre */}
+          <div style={{ marginBottom: 20 }}>
+            <NationalDashboard />
           </div>
 
           {/* Tabs */}
