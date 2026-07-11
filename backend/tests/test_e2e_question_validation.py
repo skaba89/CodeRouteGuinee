@@ -109,3 +109,30 @@ def test_synthese_validation(client: TestClient):
     assert "category_coverage" in data
     assert "exam_ready" in data
     assert data["exam_questions_required"] == 40
+
+
+def test_gouvernance_synchronise_validation(client: TestClient):
+    """Une décision de gouvernance 'published' rend la question approved
+    (éligible à l'examen certifié) avec traçabilité."""
+    import uuid as _uuid
+    from app.db.session import SessionLocal
+    from app.models_question import Question
+
+    db = SessionLocal()
+    q = Question(category="signalisation", text=f"Gov sync {_uuid.uuid4().hex[:6]}",
+                 options=["A", "B"], correct_answer="A", is_active=False,
+                 validation_status="draft")
+    db.add(q); db.commit(); qid = q.id; db.close()
+
+    sa = _login(client, SA_EMAIL, SA_PASS)
+    r = client.post(f"/api/v1/question-governance/{qid}/decision",
+                    json={"status": "published", "reason": "Validée DNTT"}, headers=_auth(sa))
+    assert r.status_code == 200
+
+    db = SessionLocal()
+    q = db.get(Question, qid)
+    status_val, active, vby = q.validation_status, q.is_active, q.validated_by
+    db.close()
+    assert status_val == "approved"
+    assert active is True
+    assert vby is not None

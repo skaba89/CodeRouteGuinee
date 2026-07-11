@@ -67,6 +67,24 @@ def decide_question_governance(
 
     previous_active = question.is_active
     question.is_active = payload.status == "published"
+
+    # Synchroniser le statut de validation officiel (certification DNTT) :
+    # une décision de gouvernance met à jour le workflow certifiant pour que
+    # les deux systèmes restent cohérents. Une question "published" devient
+    # éligible au tirage de l'examen réel.
+    from datetime import UTC, datetime
+    if payload.status == "published":
+        question.validation_status = "approved"
+        question.validated_by = current_user.id
+        question.validated_at = datetime.now(UTC).replace(tzinfo=None)
+        question.rejection_reason = None
+    elif payload.status in ("needs_revision", "rejected"):
+        question.validation_status = "rejected"
+        question.rejection_reason = payload.reason
+        question.validated_by = current_user.id
+    elif payload.status == "suspended":
+        question.validation_status = "draft"
+
     decision = QuestionGovernanceDecision(
         question_id=question.id,
         status=payload.status,
