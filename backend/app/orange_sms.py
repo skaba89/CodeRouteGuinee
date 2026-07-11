@@ -210,3 +210,12 @@ def _normalize_phone(phone: str) -> str:
     if len(p) == 9:
         return "+224" + p
     return p
+
+
+def is_configured() -> bool:
+    """True si l'envoi de SMS réel est configuré (credentials Orange présents)."""
+    return bool(
+        os.environ.get("ORANGE_SMS_CLIENT_ID", "").strip()
+        and os.environ.get("ORANGE_SMS_CLIENT_SECRET", "").strip()
+        and os.environ.get("ORANGE_SMS_SENDER_ADDRESS", "").strip()
+    )

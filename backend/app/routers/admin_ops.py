@@ -185,3 +185,65 @@ def import_wikimedia_signs(
         "skipped_manual_media": skipped_has_media,
         "validation_report": validation_report,
     }
+
+
+@router.get("/notifications-status")
+def notifications_status(
+    current_user: User = Depends(require_roles("admin", "super_admin")),
+) -> dict:
+    """
+    État des canaux de notification : indique lesquels sont configurés
+    (clés présentes) et donc actifs en envoi réel. Les canaux non
+    configurés retombent en mode console (log) sans bloquer l'application.
+    """
+    from app.email_service import is_configured as email_ok
+    from app.orange_sms import is_configured as sms_ok
+    from app.whatsapp_service import is_configured as whatsapp_ok
+
+    channels = {
+        "email":    {"configured": email_ok(),    "provider": "Brevo",
+                     "env_keys": ["BREVO_API_KEY"]},
+        "sms":      {"configured": sms_ok(),       "provider": "Orange SMS Guinée",
+                     "env_keys": ["ORANGE_SMS_CLIENT_ID", "ORANGE_SMS_CLIENT_SECRET",
+                                  "ORANGE_SMS_SENDER_ADDRESS"]},
+        "whatsapp": {"configured": whatsapp_ok(),  "provider": "Meta WhatsApp Cloud API",
+                     "env_keys": ["WHATSAPP_PHONE_NUMBER_ID", "WHATSAPP_ACCESS_TOKEN"]},
+    }
+    active = [name for name, c in channels.items() if c["configured"]]
+    return {
+        "channels": channels,
+        "active_channels": active,
+        "any_active": bool(active),
+    }
+
+
+@router.post("/notifications-test")
+def notifications_test(
+    payload: dict,
+    current_user: User = Depends(require_roles("super_admin")),
+) -> dict:
+    """
+    Envoie une notification de test sur un canal donné, pour valider la
+    configuration avant l'ouverture aux candidats.
+
+    Corps : {"channel": "email"|"sms"|"whatsapp", "to": "<destinataire>"}
+    """
+    channel = str(payload.get("channel", "")).lower()
+    to = str(payload.get("to", "")).strip()
+    if channel not in ("email", "sms", "whatsapp") or not to:
+        return {"ok": False, "error": "Paramètres invalides (channel, to requis)."}
+
+    msg = "Test CodeRoute Guinée : ce canal de notification fonctionne."
+    try:
+        if channel == "email":
+            from app.email_service import _send
+            ok = _send(to, "Administrateur", "Test CodeRoute Guinée", f"<p>{msg}</p>")
+        elif channel == "sms":
+            from app.orange_sms import send_sms
+            ok = bool(send_sms(to, msg))
+        else:
+            from app.whatsapp_service import send_whatsapp_text
+            ok = bool(send_whatsapp_text(to, msg))
+        return {"ok": ok, "channel": channel, "to": to}
+    except Exception as exc:  # noqa: BLE001
+        return {"ok": False, "channel": channel, "error": str(exc)[:200]}

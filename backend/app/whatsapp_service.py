@@ -80,3 +80,11 @@ def send_exam_result_whatsapp(
            "Vous pourrez vous réinscrire pour une nouvelle session.")
     )
     return send_whatsapp_text(phone, body)
+
+
+def is_configured() -> bool:
+    """True si l'envoi WhatsApp réel est configuré (credentials Meta présents)."""
+    return bool(
+        os.environ.get("WHATSAPP_PHONE_NUMBER_ID", "").strip()
+        and os.environ.get("WHATSAPP_ACCESS_TOKEN", "").strip()
+    )

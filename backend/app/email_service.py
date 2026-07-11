@@ -249,3 +249,8 @@ def send_convocation(
 </div>
 </body></html>"""
     return _send(to_email, candidate_name, subject, html)
+
+
+def is_configured() -> bool:
+    """True si l'envoi d'emails réel est configuré (clé Brevo présente)."""
+    return bool(os.environ.get("BREVO_API_KEY", "").strip())
