@@ -218,9 +218,18 @@ class QuestionCreate(BaseModel):
 class QuestionRead(QuestionCreate):
     id: str
     is_active: bool
+    validation_status: str = "draft"
+    validated_by: str | None = None
+    validated_at: datetime | None = None
+    rejection_reason: str | None = None
+    version: int = 1
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class QuestionRejectionRequest(BaseModel):
+    reason: str = Field(min_length=5, max_length=500)
 
 
 class QuestionMediaUpdate(BaseModel):

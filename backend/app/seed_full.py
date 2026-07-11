@@ -2029,6 +2029,7 @@ def seed_questions(db) -> list[Question]:
                 media_url=_murl,
                 media_alt=_malt,
                 is_active=True,
+                validation_status="approved",
             )
             db.add(obj)
             questions_out.append(obj)
@@ -2053,6 +2054,7 @@ def seed_questions(db) -> list[Question]:
             media_url=_murl,
             media_alt=_malt,
             is_active=True,
+            validation_status="approved",
         )
         db.add(obj)
         questions.append(obj)

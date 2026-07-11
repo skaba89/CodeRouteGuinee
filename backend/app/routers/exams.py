@@ -60,8 +60,25 @@ def _is_attempt_expired(attempt: ExamAttempt, now: datetime) -> bool:
 
 
 def _create_exam_attempt(db: Session, candidate_id: str, session_id: str) -> ExamAttempt:
-    # Charger toute la banque active
-    all_questions = list(db.scalars(select(Question).where(Question.is_active.is_(True))).all())
+    # Charger uniquement les questions ACTIVES et APPROUVÉES (certifiées DNTT).
+    # Un examen officiel ne peut tirer que du contenu validé.
+    approved = list(db.scalars(
+        select(Question).where(
+            Question.is_active.is_(True),
+            Question.validation_status == "approved",
+        )
+    ).all())
+
+    # Filet de sécurité : si trop peu de questions approuvées existent
+    # (déploiement initial, banque non encore validée), on retombe sur les
+    # questions actives pour ne pas bloquer le service. En régime normal,
+    # la banque approuvée couvre les 40 questions.
+    from app.exam_engine import EXAM_QUESTIONS_TOTAL
+    if len(approved) >= EXAM_QUESTIONS_TOTAL:
+        all_questions = approved
+    else:
+        all_questions = list(db.scalars(select(Question).where(Question.is_active.is_(True))).all())
+
     # Sélectionner 40 questions selon la répartition officielle par catégorie
     selected = select_exam_questions(all_questions)
     attempt = ExamAttempt(candidate_id=candidate_id, session_id=session_id)

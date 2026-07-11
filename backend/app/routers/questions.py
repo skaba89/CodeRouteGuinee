@@ -7,7 +7,7 @@ from app.deps import require_roles
 from app.models_audit import AuditLog
 from app.models_question import Question
 from app.models_user import User
-from app.schemas import QuestionCreate, QuestionMediaUpdate, QuestionOfficialImportRequest, QuestionOfficialImportResult, QuestionRead
+from app.schemas import QuestionCreate, QuestionMediaUpdate, QuestionRejectionRequest, QuestionOfficialImportRequest, QuestionOfficialImportResult, QuestionRead
 
 router = APIRouter(prefix="/questions", tags=["questions"])
 
@@ -208,3 +208,119 @@ def sign_media_upload(
         )
 
     return build_upload_signature(resource_type)
+
+
+# ── Workflow de validation officielle des questions (certification DNTT) ─────
+
+@router.post("/{question_id}/submit-validation", response_model=QuestionRead,
+             dependencies=[Depends(require_roles("admin", "super_admin"))])
+def submit_question_for_validation(
+    question_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "super_admin")),
+) -> Question:
+    """Soumet une question à la validation DNTT (draft/rejected → submitted)."""
+    question = db.get(Question, question_id)
+    if not question:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question introuvable")
+    if question.validation_status == "approved":
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT,
+                            detail="Question déjà approuvée.")
+    question.validation_status = "submitted"
+    question.rejection_reason = None
+    db.add(AuditLog(actor_id=current_user.id, action="question.submitted_validation",
+                    entity="question", entity_id=question.id, details={}))
+    db.commit()
+    db.refresh(question)
+    return question
+
+
+@router.post("/{question_id}/approve", response_model=QuestionRead,
+             dependencies=[Depends(require_roles("super_admin"))])
+def approve_question(
+    question_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("super_admin")),
+) -> Question:
+    """
+    Valide officiellement une question (super_admin uniquement — autorité DNTT).
+    Seules les questions approuvées sont tirées à l'examen réel.
+    """
+    from datetime import UTC, datetime
+    question = db.get(Question, question_id)
+    if not question:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question introuvable")
+    question.validation_status = "approved"
+    question.validated_by = current_user.id
+    question.validated_at = datetime.now(UTC).replace(tzinfo=None)
+    question.rejection_reason = None
+    db.add(AuditLog(actor_id=current_user.id, action="question.approved",
+                    entity="question", entity_id=question.id,
+                    details={"version": question.version}))
+    db.commit()
+    db.refresh(question)
+    return question
+
+
+@router.post("/{question_id}/reject", response_model=QuestionRead,
+             dependencies=[Depends(require_roles("super_admin"))])
+def reject_question(
+    question_id: str,
+    payload: QuestionRejectionRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("super_admin")),
+) -> Question:
+    """Refuse une question avec motif (super_admin — autorité DNTT)."""
+    question = db.get(Question, question_id)
+    if not question:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question introuvable")
+    question.validation_status = "rejected"
+    question.rejection_reason = payload.reason.strip()
+    question.validated_by = current_user.id
+    db.add(AuditLog(actor_id=current_user.id, action="question.rejected",
+                    entity="question", entity_id=question.id,
+                    details={"reason": payload.reason.strip()}))
+    db.commit()
+    db.refresh(question)
+    return question
+
+
+@router.get("/validation-summary",
+            dependencies=[Depends(require_roles("admin", "super_admin"))])
+def question_validation_summary(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "super_admin")),
+) -> dict:
+    """Synthèse de l'état de validation de la banque de questions."""
+    from sqlalchemy import func
+    rows = db.execute(
+        select(Question.validation_status, func.count())
+        .group_by(Question.validation_status)
+    ).all()
+    by_status = {status_name: count for status_name, count in rows}
+    total = sum(by_status.values())
+    approved = by_status.get("approved", 0)
+    from app.exam_engine import EXAM_QUESTIONS_TOTAL, CATEGORY_DISTRIBUTION
+
+    # Couverture par catégorie parmi les questions approuvées
+    cat_rows = db.execute(
+        select(Question.category, func.count())
+        .where(Question.validation_status == "approved", Question.is_active.is_(True))
+        .group_by(Question.category)
+    ).all()
+    approved_by_cat = {cat: count for cat, count in cat_rows}
+    coverage = {
+        cat: {"required": required, "approved": approved_by_cat.get(cat, 0),
+              "sufficient": approved_by_cat.get(cat, 0) >= required}
+        for cat, required in CATEGORY_DISTRIBUTION.items()
+    }
+    exam_ready = all(c["sufficient"] for c in coverage.values())
+
+    return {
+        "total": total,
+        "by_status": by_status,
+        "approved": approved,
+        "exam_questions_required": EXAM_QUESTIONS_TOTAL,
+        "category_coverage": coverage,
+        "exam_ready": exam_ready,
+    }
