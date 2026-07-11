@@ -87,20 +87,30 @@ def create_payment(
                 action="payment.failed",
                 entity="payment",
                 entity_id=payload.booking_reference,
-                details={"reason": "booking_not_found", "booking_reference": payload.booking_reference, "amount_gnf": payload.amount_gnf, "provider": payload.provider},
-            )
+                details={"reason": "booking_not_found", "booking_reference": payload.booking_reference, "amount_gnf": payload.amount_gnf, "provider": payload.provider},            )
         )
         db.commit()
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Booking not found")
 
-    if current_user.role not in ("admin", "super_admin"):
-        candidate_by_id = db.scalar(select(Candidate).where(Candidate.id == booking.candidate_id))
-        if candidate_by_id is None or candidate_by_id.phone != payload.phone:
-            existing_payment = db.scalar(
-                select(Payment).where(Payment.booking_reference == payload.booking_reference, Payment.status == "paid")
-            )
-            if existing_payment:
-                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Payment already recorded for this booking")
+    # ── Garde d'idempotence universelle (protection anti double-paiement) ──
+    # S'applique à TOUS les utilisateurs (candidat, admin) AVANT tout appel
+    # au provider : un booking déjà réglé ne peut jamais être payé deux fois
+    # (double-clic, relance réseau, requêtes concurrentes). Sans cette garde,
+    # un citoyen pourrait être débité plusieurs fois.
+    already_paid = db.scalar(
+        select(Payment).where(
+            Payment.booking_reference == payload.booking_reference,
+            Payment.status == "paid",
+        )
+    )
+    if already_paid:
+        # Réponse idempotente : on renvoie le paiement existant (200-like via 409
+        # explicite) plutôt que d'en créer un second.
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Un paiement a déjà été enregistré pour cette réservation.",
+        )
+
     # Résoudre le montant via tarifs dynamiques si non spécifié
     try:
         from app.models_candidate import Candidate as _Cand
