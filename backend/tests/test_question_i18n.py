@@ -1,15 +1,14 @@
 """
-Test E2E — Contenu multilingue des questions (Pular, Malinké, Soussou…).
+Test — Audio des questions en langues nationales (Pular, Malinké, Soussou…).
 
-Vérifie le différenciateur clé : un candidat peut passer l'examen dans une
-langue nationale, et le scoring reste correct (la réponse traduite est
-ramenée à l'option française canonique par son index).
+CHOIX DE CONCEPTION : seul l'ORAL est localisé.
+Le texte affiché reste toujours en français (les langues nationales
+guinéennes n'ont pas de standard d'écriture partagé). Le candidat VOIT la
+question en français et l'ENTEND dans sa langue — ce qui inclut les
+citoyens qui parlent ces langues sans les lire.
 """
 from __future__ import annotations
 
-import uuid
-
-import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
@@ -33,121 +32,81 @@ def _make_question() -> str:
     return qid
 
 
-def test_resolve_fallback_francais() -> None:
-    """Sans traduction, on retombe sur le français."""
+def test_texte_reste_en_francais_quelle_que_soit_la_langue() -> None:
+    """Le texte et les options ne sont JAMAIS traduits — seul l'audio l'est."""
     init_db()
     qid = _make_question()
     db = SessionLocal()
     q = db.get(Question, qid)
-    content = resolve_question_content(q, "ff")  # Pular non traduit
-    assert content["text"] == "Que signifie un panneau STOP ?"
+    for lang in ("fr", "ff", "man", "sus"):
+        content = resolve_question_content(q, lang)
+        assert content["text"] == "Que signifie un panneau STOP ?"
+        assert content["options"][0] == "Arrêt obligatoire"
     db.close()
 
 
-def test_set_and_resolve_translation() -> None:
+def test_associer_un_enregistrement_audio() -> None:
     init_db()
     qid = _make_question()
     with TestClient(app) as client:
-        H = get_admin_headers(client)
-        # Ajouter une traduction Pular (ff)
-        r = client.put(f"/api/v1/questions/{qid}/translations", json={
-            "ff": {
-                "text": "Hol ko maannouni STOP?",
-                "options": ["Daragol waɗɗiiɗo", "Leeltude", "Rewde", "Huucude"],
-                "explanation": "STOP ina waɗɗina daragol timmungol.",
-            }
-        }, headers=H)
+        r = client.put(f"/api/v1/questions/{qid}/audio", json={
+            "ff": "https://cdn.example.gn/audio/ff/q1.mp3",
+            "man": "/audio/man/q1.mp3",
+        }, headers=get_admin_headers(client))
         assert r.status_code == 200, r.text[:200]
-        assert "ff" in r.json()["translations"]
 
     db = SessionLocal()
     q = db.get(Question, qid)
-    content = resolve_question_content(q, "ff")
-    assert content["text"] == "Hol ko maannouni STOP?"
-    assert content["options"][0] == "Daragol waɗɗiiɗo"
+    # L'audio suit la langue…
+    assert resolve_question_content(q, "ff")["audio_url"] == "https://cdn.example.gn/audio/ff/q1.mp3"
+    assert resolve_question_content(q, "man")["audio_url"] == "/audio/man/q1.mp3"
+    # …mais le texte reste français
+    assert resolve_question_content(q, "ff")["text"] == "Que signifie un panneau STOP ?"
+    # Langue sans enregistrement → pas d'audio (repli synthèse vocale côté client)
+    assert resolve_question_content(q, "sus")["audio_url"] is None
     assert "ff" in available_languages(q)
     db.close()
 
 
-def test_translation_rejette_mauvais_nombre_options() -> None:
-    """Le nombre d'options traduites doit correspondre (index = bonne réponse)."""
+def test_audio_rejette_url_malveillante() -> None:
     init_db()
     qid = _make_question()
     with TestClient(app) as client:
-        H = get_admin_headers(client)
-        r = client.put(f"/api/v1/questions/{qid}/translations", json={
-            "ff": {"text": "x", "options": ["une seule option"]}
-        }, headers=H)
+        r = client.put(f"/api/v1/questions/{qid}/audio",
+                       json={"ff": "javascript:alert(1)"},
+                       headers=get_admin_headers(client))
         assert r.status_code == 422
 
 
-def test_scoring_multilingue_reponse_pular() -> None:
-    """
-    Cœur du test : un candidat répond avec l'option Pular ; le scoring doit
-    la ramener à l'option française canonique et compter juste.
-    """
-    from app.exam_engine import score_answers
-    from app.question_i18n import SUPPORTED_LANGUAGES
-    import json as _json
-
-    init_db()
-    qid = _make_question()
-    db = SessionLocal()
-    q = db.get(Question, qid)
-    q.translations = {
-        "ff": {"options": ["Daragol waɗɗiiɗo", "Leeltude", "Rewde", "Huucude"]}
-    }
-    db.add(q); db.commit()
-
-    # Simuler la normalisation faite par submit_exam
-    def _to_canonical(question, submitted):
-        canonical = question.options
-        if submitted in canonical:
-            return submitted
-        for lang_code, tr in (question.translations or {}).items():
-            if lang_code in SUPPORTED_LANGUAGES and isinstance(tr.get("options"), list):
-                if submitted in tr["options"]:
-                    return canonical[tr["options"].index(submitted)]
-        return submitted
-
-    # Le candidat a répondu en Pular : "Daragol waɗɗiiɗo" (= Arrêt obligatoire)
-    submitted = _to_canonical(q, "Daragol waɗɗiiɗo")
-    assert submitted == "Arrêt obligatoire"
-
-    result = score_answers({q.id: q.correct_answer}, {q.id: submitted})
-    assert result["correct_answers"] == 1
-    db.close()
-
-
-def test_audio_url_par_langue() -> None:
-    """Une question peut porter un enregistrement audio par langue
-    (locuteur natif) — servi à l'examen, repli synthèse vocale si absent."""
+def test_audio_suppression() -> None:
+    """Une valeur vide supprime l'enregistrement d'une langue."""
     init_db()
     qid = _make_question()
     with TestClient(app) as client:
         H = get_admin_headers(client)
-        r = client.put(f"/api/v1/questions/{qid}/translations", json={
-            "ff": {
-                "text": "Hol ko maannouni STOP?",
-                "audio_url": "https://cdn.example.gn/audio/ff/q1.mp3",
-            }
-        }, headers=H)
+        client.put(f"/api/v1/questions/{qid}/audio",
+                   json={"ff": "https://cdn.example.gn/a.mp3"}, headers=H)
+        r = client.put(f"/api/v1/questions/{qid}/audio", json={"ff": ""}, headers=H)
         assert r.status_code == 200
 
     db = SessionLocal()
     q = db.get(Question, qid)
-    content = resolve_question_content(q, "ff")
-    assert content["audio_url"] == "https://cdn.example.gn/audio/ff/q1.mp3"
-    # Sans traduction audio, pas d'URL (le client retombe sur la synthèse)
-    assert resolve_question_content(q, "man")["audio_url"] is None
+    assert resolve_question_content(q, "ff")["audio_url"] is None
     db.close()
 
 
-def test_audio_url_rejette_url_invalide() -> None:
+def test_examen_sert_l_audio_dans_la_langue() -> None:
+    """L'examen expose audio_url pour la langue demandée."""
     init_db()
     qid = _make_question()
     with TestClient(app) as client:
-        r = client.put(f"/api/v1/questions/{qid}/translations", json={
-            "ff": {"audio_url": "javascript:alert(1)"}
-        }, headers=get_admin_headers(client))
-        assert r.status_code == 422
+        client.put(f"/api/v1/questions/{qid}/audio",
+                   json={"ff": "https://cdn.example.gn/audio/ff/q1.mp3"},
+                   headers=get_admin_headers(client))
+
+    db = SessionLocal()
+    q = db.get(Question, qid)
+    content = resolve_question_content(q, "ff")
+    assert content["audio_url"] is not None
+    assert content["text"] == "Que signifie un panneau STOP ?"  # français
+    db.close()

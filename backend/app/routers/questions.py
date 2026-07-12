@@ -326,22 +326,27 @@ def question_validation_summary(
     }
 
 
-@router.put("/{question_id}/translations", response_model=QuestionRead,
+@router.put("/{question_id}/audio", response_model=QuestionRead,
             dependencies=[Depends(require_roles("admin", "super_admin"))])
-def set_question_translations(
+def set_question_audio(
     question_id: str,
     payload: dict,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("admin", "super_admin")),
 ) -> Question:
     """
-    Définit ou met à jour les traductions d'une question.
+    Associe à une question ses enregistrements audio par langue nationale.
 
-    Corps : {"ff": {"text": "...", "options": ["...","..."], "explanation": "..."},
-             "man": {...}, ...}
-    Les options traduites doivent avoir le MÊME nombre que l'original
-    (l'ordre porte l'index de la bonne réponse). Le français reste la
-    référence et n'est jamais écrasé.
+    Corps : {"ff": "https://…/q01_pular.mp3", "man": "/audio/man/q01.mp3", …}
+
+    CHOIX DE CONCEPTION — seul l'ORAL est localisé :
+    le texte affiché reste toujours en français (les langues nationales
+    guinéennes n'ont pas de standard d'écriture largement partagé, et un
+    texte écrit y introduirait une ambiguïté juridique). Le candidat VOIT la
+    question en français et l'ENTEND dans sa langue.
+
+    Sécurité : seules les URL https:// ou les chemins /audio/… sont acceptés.
+    Passer une valeur vide pour une langue supprime son enregistrement.
     """
     from app.question_i18n import SUPPORTED_LANGUAGES
 
@@ -349,48 +354,24 @@ def set_question_translations(
     if not question:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question introuvable")
 
-    base_options = question.options
-    if isinstance(base_options, str) and base_options.startswith("["):
-        import json
-        base_options = json.loads(base_options)
-    n_options = len(base_options) if isinstance(base_options, list) else 0
-
     cleaned: dict = dict(question.translations or {})
-    for lang_code, content in payload.items():
+    for lang_code, audio_url in payload.items():
         if lang_code == "fr" or lang_code not in SUPPORTED_LANGUAGES:
-            continue  # le français est la référence, pas une traduction
-        if not isinstance(content, dict):
+            continue  # le français n'a pas besoin d'enregistrement
+        # Valeur vide → suppression de l'enregistrement pour cette langue
+        if not audio_url:
+            cleaned.pop(lang_code, None)
             continue
-        entry: dict = {}
-        if content.get("text"):
-            entry["text"] = str(content["text"])
-        opts = content.get("options")
-        if isinstance(opts, list):
-            if len(opts) != n_options:
-                raise HTTPException(
-                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                    detail=f"La langue '{lang_code}' doit avoir {n_options} options "
-                           f"(ordre = index de la bonne réponse).",
-                )
-            entry["options"] = [str(o) for o in opts]
-        if content.get("explanation"):
-            entry["explanation"] = str(content["explanation"])
-        # Enregistrement audio par un locuteur natif (niveau 2).
-        # Permet d'entendre la question dans sa VRAIE langue, pas du français
-        # prononcé — essentiel pour les candidats non-lecteurs.
-        if content.get("audio_url"):
-            audio = str(content["audio_url"]).strip()
-            if not audio.startswith(("https://", "/audio/")):
-                raise HTTPException(
-                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                    detail="audio_url doit être une URL https ou un chemin /audio/…",
-                )
-            entry["audio_url"] = audio
-        if entry:
-            cleaned[lang_code] = entry
+        audio = str(audio_url).strip()
+        if not audio.startswith(("https://", "/audio/")):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="L'enregistrement doit être une URL https:// ou un chemin /audio/…",
+            )
+        cleaned[lang_code] = {"audio_url": audio}
 
     question.translations = cleaned
-    db.add(AuditLog(actor_id=current_user.id, action="question.translations_updated",
+    db.add(AuditLog(actor_id=current_user.id, action="question.audio_updated",
                     entity="question", entity_id=question.id,
                     details={"languages": list(cleaned.keys())}))
     db.commit()

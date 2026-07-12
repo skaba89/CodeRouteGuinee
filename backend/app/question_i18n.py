@@ -17,15 +17,25 @@ DEFAULT_LANGUAGE = "fr"
 
 def resolve_question_content(question: Any, lang: str | None) -> dict:
     """
-    Retourne {text, options, explanation, audio_url} dans la langue demandée,
-    avec repli sur le français champ par champ (une traduction partielle reste
-    utilisable : les champs non traduits restent en français).
+    Retourne {text, options, explanation, audio_url} pour une question.
 
-    audio_url : enregistrement par un locuteur natif (niveau 2). Absent si la
-    question n'a pas encore été enregistrée dans cette langue — le client
-    retombe alors sur la synthèse vocale.
+    CHOIX DE CONCEPTION — l'écrit reste en français, l'oral suit la langue :
+
+      • Le TEXTE affiché est TOUJOURS en français. Les langues nationales
+        guinéennes (Pular, Malinké, Soussou…) n'ont pas de standard
+        d'écriture largement partagé : un texte écrit dans ces langues
+        dérouterait plus qu'il n'aiderait, et introduirait un risque
+        d'ambiguïté juridique sur le sens des questions.
+
+      • L'AUDIO suit la langue du candidat (audio_url : enregistrement par
+        un locuteur natif). C'est le canal qui porte réellement la valeur :
+        une grande part de la population PARLE ces langues sans les LIRE.
+
+    Un candidat pular voit donc la question en français et l'ENTEND en
+    pular. Si aucun enregistrement n'existe, le client retombe sur la
+    synthèse vocale : aucune question n'est jamais muette.
     """
-    # Base française (référence)
+    # Le texte de référence (français) est toujours celui qui est affiché.
     base_options = question.options
     if isinstance(base_options, str) and base_options.startswith("["):
         import json
@@ -49,15 +59,8 @@ def resolve_question_content(question: Any, lang: str | None) -> dict:
     if not isinstance(tr, dict):
         return result
 
-    # Repli champ par champ : n'écrase que ce qui est réellement traduit
-    if tr.get("text"):
-        result["text"] = tr["text"]
-    if isinstance(tr.get("options"), list) and len(tr["options"]) == len(base_options):
-        # On ne remplace les options que si le nombre correspond (sécurité :
-        # les indices de réponse doivent rester cohérents)
-        result["options"] = tr["options"]
-    if tr.get("explanation"):
-        result["explanation"] = tr["explanation"]
+    # Seul l'audio est localisé. Le texte, les options et l'explication
+    # restent en français (voir le choix de conception ci-dessus).
     if tr.get("audio_url"):
         result["audio_url"] = tr["audio_url"]
 

@@ -18,7 +18,21 @@ internationale ne le propose pour la Guinée.
 
 ---
 
-## 2. Comment le système fonctionne
+## 2. Choix de conception : l'écrit reste en français, l'oral suit la langue
+
+Le texte des questions est **toujours affiché en français**. Seul l'**audio**
+est en langue nationale.
+
+Ce choix est délibéré : les langues nationales guinéennes n'ont pas de
+standard d'écriture largement partagé. Un texte écrit en Pular ou en
+Malinké dérouterait beaucoup de lecteurs et introduirait un risque
+d'ambiguïté juridique sur le sens exact des questions d'examen. À l'inverse,
+l'oral est **immédiatement compris** par tous ceux qui parlent la langue.
+
+Un candidat pular **voit** donc la question en français et **l'entend** en
+pular.
+
+## 3. Comment le système fonctionne
 
 Trois niveaux, avec repli automatique — **aucune question n'est jamais
 muette** :
@@ -35,7 +49,7 @@ synthèse vocale prend le relais.
 
 ---
 
-## 3. Ce qu'il faut enregistrer
+## 4. Ce qu'il faut enregistrer
 
 Pour chaque question et chaque langue, un fichier audio contenant :
 
@@ -50,7 +64,7 @@ questions officielles** de l'examen et les **langues les plus parlées**
 
 ---
 
-## 4. Recommandations de production
+## 5. Recommandations de production
 
 - **Locuteurs natifs** de chaque langue, à la diction claire.
 - **Validation par la DNTT** : la traduction orale doit être fidèle au sens
@@ -62,7 +76,7 @@ questions officielles** de l'examen et les **langues les plus parlées**
 
 ---
 
-## 5. Où héberger les fichiers
+## 6. Où héberger les fichiers
 
 Deux options, toutes deux prises en charge :
 
@@ -78,31 +92,26 @@ configuration.
 
 ---
 
-## 6. Comment intégrer un enregistrement
+## 7. Comment intégrer un enregistrement
 
 Via l'API d'administration, sur une question donnée :
 
 ```
-PUT /api/v1/questions/{id}/translations
+PUT /api/v1/questions/{id}/audio
 {
-  "ff": {
-    "text": "…",                 (optionnel : le texte traduit)
-    "options": ["…", "…"],       (optionnel : mêmes nombre et ordre)
-    "audio_url": "https://…/q01_ff.mp3"
-  }
+  "ff":  "https://…/q01_pular.mp3",
+  "man": "/audio/man/q01.mp3"
 }
 ```
+
+Une valeur vide (`""`) supprime l'enregistrement d'une langue.
 
 Sécurité : seules les URL `https://` ou les chemins `/audio/…` sont
 acceptés (protection contre les injections).
 
-**Important** : si vous fournissez des options traduites, elles doivent être
-**dans le même ordre** que l'original — l'ordre porte l'indice de la bonne
-réponse. Le système refuse une traduction dont le nombre d'options diffère.
-
 ---
 
-## 7. Vérification
+## 8. Vérification
 
 Après intégration :
 
@@ -114,7 +123,7 @@ Après intégration :
 
 ---
 
-## 8. Feuille de route suggérée
+## 9. Feuille de route suggérée
 
 | Étape | Portée | Effort |
 |---|---|---|

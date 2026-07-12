@@ -493,49 +493,11 @@ def submit_exam(
     else:
         questions = list(db.scalars(select(Question).where(Question.is_active.is_(True))).all())
 
-    # Scoring robuste au multilingue : une réponse soumise peut être dans
-    # une langue traduite. On la ramène à l'option française canonique par
-    # son index avant de comparer à correct_answer (stocké en français).
-    from app.question_i18n import resolve_question_content, SUPPORTED_LANGUAGES
-    import json as _json
-
-    def _canonical_options(q) -> list[str]:
-        opts = q.options
-        if isinstance(opts, str) and opts.startswith("["):
-            try:
-                opts = _json.loads(opts)
-            except (ValueError, TypeError):
-                opts = [opts]
-        return opts if isinstance(opts, list) else []
-
-    def _to_canonical(q, submitted: str) -> str:
-        """Ramène une réponse (potentiellement traduite) vers l'option FR."""
-        if submitted is None:
-            return submitted
-        canonical = _canonical_options(q)
-        if submitted in canonical:
-            return submitted  # déjà en français
-        # Chercher dans chaque langue traduite : si la réponse correspond à
-        # une option traduite, renvoyer l'option française de même index.
-        translations = getattr(q, "translations", None) or {}
-        for lang_code, tr in translations.items():
-            if lang_code not in SUPPORTED_LANGUAGES:
-                continue
-            tr_opts = tr.get("options") if isinstance(tr, dict) else None
-            if isinstance(tr_opts, list) and submitted in tr_opts:
-                idx = tr_opts.index(submitted)
-                if 0 <= idx < len(canonical):
-                    return canonical[idx]
-        return submitted  # inconnu : laissé tel quel (comptera faux)
-
-    normalized_answers = {}
-    q_by_id = {q.id: q for q in questions}
-    for qid, ans in payload.answers.items():
-        q = q_by_id.get(qid)
-        normalized_answers[qid] = _to_canonical(q, ans) if q else ans
-
+    # Les options sont TOUJOURS affichées en français (seul l'audio est
+    # localisé — voir app/question_i18n.py). Une réponse soumise est donc
+    # nécessairement en français : comparaison directe, sans conversion.
     answer_key = {question.id: question.correct_answer for question in questions}
-    result = score_answers(answer_key, normalized_answers)
+    result = score_answers(answer_key, payload.answers)
 
     candidate = db.get(Candidate, attempt.candidate_id)
     summary = build_score_summary(
