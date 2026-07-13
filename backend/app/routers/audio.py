@@ -22,9 +22,34 @@ _STATIC_DIR = Path(__file__).parent.parent.parent / "static" / "audio"
 _VALID_LOCALES = {"ff", "man", "sus", "kss", "gkp", "lom", "fr", "en"}
 _MAX_MP3_SIZE  = 10 * 1024 * 1024  # 10 Mo
 
+# Identifiant de question autorisé : lettres, chiffres, tirets et underscores
+# uniquement. Interdit tout caractère de chemin (/ \ .. etc.) — protège
+# contre la traversée de répertoire (lire/écrire/supprimer hors du dossier).
+import re as _re
+_SAFE_QUESTION_ID = _re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+
+
+def _validate(locale: str, question_id: str) -> None:
+    """Valide locale et question_id. Lève une 400 si dangereux."""
+    if locale not in _VALID_LOCALES:
+        raise HTTPException(status_code=400,
+                            detail=f"Locale invalide. Valeurs : {sorted(_VALID_LOCALES)}")
+    if not _SAFE_QUESTION_ID.match(question_id):
+        raise HTTPException(
+            status_code=400,
+            detail="Identifiant de question invalide (lettres, chiffres, - et _ uniquement).",
+        )
+
 
 def _audio_path(locale: str, question_id: str) -> Path:
-    return _STATIC_DIR / locale / f"{question_id}.mp3"
+    # Défense en profondeur : on valide, puis on vérifie que le chemin résolu
+    # reste bien à l'intérieur du dossier audio (aucune échappée possible).
+    _validate(locale, question_id)
+    path = (_STATIC_DIR / locale / f"{question_id}.mp3").resolve()
+    base = _STATIC_DIR.resolve()
+    if not str(path).startswith(str(base)):
+        raise HTTPException(status_code=400, detail="Chemin de fichier invalide.")
+    return path
 
 
 @router.get("/check/{locale}/{question_id}")
