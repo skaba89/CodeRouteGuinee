@@ -5,7 +5,7 @@ import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react'
 import { getExamQuestions, startExamFromBooking, submitExamAttempt } from '../api';
 import type { ExamQuestion } from '../api';
 import { useIsMobile } from '../hooks/useIsMobile';
-import { isAudioLocale, speakFeedback, stop as stopAudio, playQuestionAudio } from '../audio';
+import { isAudioLocale, speakFeedback, stop as stopAudio, playQuestionAudio, announceResult, announceInstructions } from '../audio';
 import { AudioModeBanner, AudioToggle, LocaleAudioSwitcher, PlayButton } from '../components/AudioButton';
 import { type AuthUser } from '../authClient';
 import { type Locale } from '../i18n';
@@ -114,6 +114,19 @@ export function ExamPage({ locale, onLocaleChange }: Props) {
     return () => { if (audioEnabled) stopAudio(); };
   }, [idx, phase, audioEnabled, locale, q]);
 
+  // Annonce vocale du RÉSULTAT — indispensable pour un candidat non-lecteur :
+  // sans cela, il passe l'examen à l'oreille puis se retrouve devant un écran
+  // « ADMIS / NON ADMIS » qu'il ne peut pas lire.
+  useEffect(() => {
+    if (phase === 'done' && result && audioEnabled) {
+      void announceResult(
+        Boolean(result.passed),
+        Number(result.score ?? 0),
+        Number(result.questions?.length ?? questions.length),
+      );
+    }
+  }, [phase, result, audioEnabled]);
+
   // Navigation clavier
   useEffect(() => {
     if (phase !== 'running') return;
@@ -138,7 +151,9 @@ export function ExamPage({ locale, onLocaleChange }: Props) {
   function pick(opt: string) {
     if (answers[idx] !== undefined) return;
     const isCorrect = opt === q.correct_answer;
-    if (audioEnabled) speakFeedback(isCorrect);
+    // L'explication est lue aussi : un candidat qui ne lit pas doit pouvoir
+    // comprendre POURQUOI sa réponse est fausse, pas seulement qu'elle l'est.
+    if (audioEnabled) speakFeedback(isCorrect, q.explanation ?? q.expl);
     setAnswers(a => ({ ...a, [idx]: opt }));
     setReveal(true);
   }
@@ -250,6 +265,22 @@ export function ExamPage({ locale, onLocaleChange }: Props) {
           {/* Form */}
           <div className="card">
             <LocaleAudioSwitcher />
+
+            {/* Consignes à l'écoute — pour les candidats qui ne lisent pas */}
+            {audioEnabled && (
+              <button
+                type="button"
+                className="btn-outline"
+                onClick={() => { void announceInstructions(questions.length || 40, 30, 32); }}
+                style={{ width: '100%', marginTop: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+              >
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                  <path d="M11 5 6 9H2v6h4l5 4V5zM15.54 8.46a5 5 0 0 1 0 7.07M19.07 4.93a10 10 0 0 1 0 14.14" />
+                </svg>
+                Écouter les consignes
+              </button>
+            )}
+
             {isAuth && (
               <label style={{ marginBottom: 14, marginTop: 14 }}>
                 Référence de réservation <span style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 400 }}>(optionnel)</span>
@@ -310,10 +341,20 @@ export function ExamPage({ locale, onLocaleChange }: Props) {
               <p style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 14 }}>
                 Seuil d'admission : {result.threshold} / {result.questions.length} — {Math.round(result.score / result.questions.length * 100)}%
               </p>
-              <div style={{ display: 'flex', gap: 8 }}>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 <button className="btn-success btn-sm" onClick={() => { setPhase('setup'); setAnswers({}); setIdx(0); setResult(null); setLiveQuestions(null); }}>
                   Recommencer
                 </button>
+                {audioEnabled && (
+                  <button className="btn-outline btn-sm"
+                    onClick={() => { void announceResult(Boolean(result.passed), Number(result.score ?? 0), Number(result.questions?.length ?? 40)); }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                      <path d="M11 5 6 9H2v6h4l5 4V5zM15.54 8.46a5 5 0 0 1 0 7.07" />
+                    </svg>
+                    Réécouter le résultat
+                  </button>
+                )}
               </div>
             </div>
           </div>

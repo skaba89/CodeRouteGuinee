@@ -222,3 +222,71 @@ if (typeof window !== 'undefined') {
   _enabled = getAudioEnabled();
   preloadVoices().catch(() => {});
 }
+
+// ── Annonces vocales du parcours (au-delà des questions) ─────────────────
+//
+// Un examen audio dans une interface muette reste inutilisable : un
+// candidat non-lecteur doit aussi ENTENDRE les consignes, son résultat et
+// les explications. Ces fonctions rendent le parcours complet audible.
+//
+// Même architecture que les questions : enregistrement natif si disponible
+// (via audioUrl), repli automatique sur la synthèse vocale sinon.
+
+/**
+ * Annonce un texte d'interface (consigne, message, libellé).
+ * @param audioUrl enregistrement natif optionnel ; repli synthèse vocale.
+ */
+export async function announce(text: string, audioUrl?: string | null): Promise<void> {
+  if (!_enabled || !text) return;
+  stop();
+
+  if (audioUrl) {
+    try {
+      await new Audio(audioUrl).play();
+      return;  // enregistrement natif joué
+    } catch {
+      // fichier absent/illisible → repli synthèse vocale
+    }
+  }
+  speak(text, { rate: 0.88, priority: true });
+}
+
+/**
+ * Annonce le RÉSULTAT de l'examen — le point le plus critique.
+ * Sans cela, un candidat non-lecteur passe l'examen à l'oreille puis se
+ * retrouve devant un écran « ADMIS / NON ADMIS » qu'il ne peut pas lire.
+ */
+export function announceResult(
+  passed: boolean,
+  score: number,
+  total: number,
+  audioUrl?: string | null,
+): Promise<void> {
+  const verdict = passed ? 'Félicitations, vous êtes admis.' : "Vous n'êtes pas admis.";
+  const detail = `Votre score est de ${score} sur ${total}.`;
+  const suite = passed
+    ? 'Votre attestation est disponible.'
+    : 'Vous pouvez vous entraîner et repasser l’examen.';
+  return announce(`${verdict} ${detail} ${suite}`, audioUrl);
+}
+
+/** Annonce les consignes avant le démarrage de l'examen. */
+export function announceInstructions(
+  questionCount: number,
+  durationMinutes: number,
+  threshold: number,
+  audioUrl?: string | null,
+): Promise<void> {
+  const text =
+    `Examen du code de la route. ${questionCount} questions. ` +
+    `Vous avez ${durationMinutes} minutes. ` +
+    `Il faut ${threshold} bonnes réponses pour être admis. ` +
+    `Chaque question est lue à voix haute. Bonne chance.`;
+  return announce(text, audioUrl);
+}
+
+/** Annonce la navigation (numéro de question courant). */
+export function announceProgress(current: number, total: number): void {
+  if (!_enabled) return;
+  speak(`Question ${current} sur ${total}.`, { rate: 0.95 });
+}
