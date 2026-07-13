@@ -95,12 +95,22 @@ class Settings(BaseSettings):
         return self.environment.lower() == "production"
 
     def validate_production_secrets(self) -> None:
-        """Refuse de démarrer en production avec des placeholders ou secrets vides."""
+        """Refuse de démarrer en production avec des secrets absents, factices ou faibles."""
         if not self.is_production:
             return
 
         # Sous-chaînes interdites (jamais présentes dans un vrai secret/URL)
         PLACEHOLDER_SUBSTRINGS = ("CHANGE_ME", "change-me-in-production", "changeme")
+
+        # Secrets notoirement faibles : un secret peut ne pas être un
+        # placeholder tout en étant trivialement devinable. Un audit de
+        # sécurité externe (exigé pour un déploiement national) le relèverait.
+        WEAK_VALUES = {
+            "secret", "password", "passwd", "admin", "test", "dev", "default",
+            "secretkey", "secret_key", "mysecret", "coderoute", "guinee",
+            "123456", "12345678", "password123", "azerty", "qwerty",
+        }
+        MIN_SECRET_LENGTH = 32  # 256 bits en hexadécimal
 
         errors: list[str] = []
 
@@ -108,9 +118,31 @@ class Settings(BaseSettings):
             if not v or not v.strip() or any(p in v for p in PLACEHOLDER_SUBSTRINGS):
                 errors.append(f"{name} est vide ou placeholder — définir dans Render Dashboard")
 
+        def _check_strength(v: str, name: str) -> None:
+            """Un secret de production doit être long et non devinable."""
+            if not v or not v.strip():
+                return  # déjà signalé par _is_placeholder
+            if len(v) < MIN_SECRET_LENGTH:
+                errors.append(
+                    f"{name} est trop court ({len(v)} caractères, minimum "
+                    f"{MIN_SECRET_LENGTH}) — générer avec : openssl rand -hex 32"
+                )
+            if v.strip().lower() in WEAK_VALUES:
+                errors.append(f"{name} est une valeur faible et devinable — générer un secret aléatoire")
+            if len(set(v)) < 8:
+                errors.append(f"{name} a trop peu de caractères distincts — générer un secret aléatoire")
+
         _is_placeholder(self.secret_key,   "SECRET_KEY")
         _is_placeholder(self.csrf_secret,  "CSRF_SECRET")
         _is_placeholder(self.database_url, "DATABASE_URL")
+
+        _check_strength(self.secret_key,  "SECRET_KEY")
+        _check_strength(self.csrf_secret, "CSRF_SECRET")
+
+        # SECRET_KEY et CSRF_SECRET doivent être DISTINCTS : réutiliser le même
+        # secret pour deux usages cryptographiques est une faute classique.
+        if self.secret_key and self.secret_key == self.csrf_secret:
+            errors.append("SECRET_KEY et CSRF_SECRET doivent être différents")
 
         if self.enable_api_docs:
             errors.append("ENABLE_API_DOCS doit être false en production")
@@ -121,6 +153,11 @@ class Settings(BaseSettings):
         local_hosts = {"localhost", "127.0.0.1", "testserver"}
         if any(h in local_hosts for h in self.allowed_host_list):
             errors.append("ALLOWED_HOSTS ne doit pas contenir localhost/testserver en production")
+
+        # La base de production ne doit pas être un SQLite local (perte de
+        # données garantie sur un hébergement éphémère).
+        if self.database_url and self.database_url.strip().startswith("sqlite"):
+            errors.append("DATABASE_URL ne doit pas être SQLite en production — utiliser PostgreSQL")
 
         if errors:
             msg = "\n".join(f"  ❌ {e}" for e in errors)
