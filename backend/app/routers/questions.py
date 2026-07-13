@@ -377,3 +377,48 @@ def set_question_audio(
     db.commit()
     db.refresh(question)
     return question
+
+
+@router.get("/audio-coverage",
+            dependencies=[Depends(require_roles("admin", "super_admin"))])
+def audio_coverage(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "super_admin")),
+) -> dict:
+    """
+    Couverture des enregistrements audio par langue nationale : combien de
+    questions disposent d'un enregistrement par un locuteur natif.
+
+    Les questions sans enregistrement utilisent la synthèse vocale du
+    navigateur (repli automatique) — aucune n'est jamais muette.
+    """
+    LANGUAGE_NAMES = {
+        "ff": "Pular", "man": "Malinké", "sus": "Soussou",
+        "kss": "Kissi", "gkp": "Kpelle", "lom": "Toma",
+    }
+
+    questions = list(db.scalars(select(Question).where(Question.is_active.is_(True))).all())
+    total = len(questions)
+
+    languages = []
+    for code, name in LANGUAGE_NAMES.items():
+        recorded = sum(
+            1 for q in questions
+            if isinstance(q.translations, dict)
+            and isinstance(q.translations.get(code), dict)
+            and q.translations[code].get("audio_url")
+        )
+        languages.append({
+            "code": code,
+            "name": name,
+            "recorded": recorded,
+            "total": total,
+            "percent": round(recorded / total * 100, 1) if total else 0.0,
+        })
+
+    return {
+        "questions_total": total,
+        "languages": languages,
+        "note": "Les questions sans enregistrement utilisent la synthèse vocale "
+                "(repli automatique). Le texte reste affiché en français.",
+    }

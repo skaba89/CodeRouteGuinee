@@ -110,3 +110,52 @@ def test_examen_sert_l_audio_dans_la_langue() -> None:
     assert content["audio_url"] is not None
     assert content["text"] == "Que signifie un panneau STOP ?"  # français
     db.close()
+
+
+def test_audio_coverage_endpoint() -> None:
+    """L'admin peut consulter la couverture audio par langue."""
+    init_db()
+    qid = _make_question()
+    with TestClient(app) as client:
+        H = get_admin_headers(client)
+        client.put(f"/api/v1/questions/{qid}/audio",
+                   json={"ff": "https://cdn.example.gn/a.mp3"}, headers=H)
+
+        r = client.get("/api/v1/questions/audio-coverage", headers=H)
+        assert r.status_code == 200
+        data = r.json()
+        assert data["questions_total"] >= 1
+        langs = {l["code"]: l for l in data["languages"]}
+        assert set(langs) >= {"ff", "man", "sus"}
+        assert langs["ff"]["recorded"] >= 1
+        # Une langue sans enregistrement reste à 0
+        assert langs["kss"]["recorded"] == 0
+
+
+def test_import_audio_script_report() -> None:
+    """Le script d'import expose la couverture sans rien écrire."""
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
+    import import_audio
+
+    init_db()
+    _make_question()
+    db = SessionLocal()
+    try:
+        # Ne doit pas lever
+        import_audio.report_coverage(db)
+    finally:
+        db.close()
+
+
+def test_import_audio_valide_les_urls() -> None:
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
+    import import_audio
+
+    assert import_audio._valid_url("https://cdn.gn/a.mp3") is True
+    assert import_audio._valid_url("/audio/ff/1.mp3") is True
+    assert import_audio._valid_url("javascript:alert(1)") is False
+    assert import_audio._valid_url("http://insecure.gn/a.mp3") is False
