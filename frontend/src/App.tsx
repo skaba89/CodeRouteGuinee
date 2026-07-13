@@ -23,7 +23,8 @@ import {
 import { clearCsrfToken } from './api';
 import { LocaleSwitcher } from './components/LocaleSwitcher';
 import { AudioToggle, LocaleAudioSwitcher } from './components/AudioButton';
-import { t } from './i18n';
+import { t, getLocale } from './i18n';
+import { announce, isAudioLocale } from './audio';
 import { AuthSessionProvider } from './authSession';
 import { OfflineBanner } from './components/OfflineBanner';
 import {
@@ -512,7 +513,8 @@ export default function App() {
                 exam:        <IconTarget size={14} />,
               };
               return (
-                <a key={item.href} href={item.href} className={route === r ? 'active' : ''}>
+                <a key={item.href} href={item.href} className={route === r ? 'active' : ''}
+                   onClick={() => { if (isAudioLocale(getLocale())) announce(label); }}>
                   {NAV_ICONS[r] && <span className="nav-icon" aria-hidden="true">{NAV_ICONS[r]}</span>}
                   <span>{label}</span>
                 </a>

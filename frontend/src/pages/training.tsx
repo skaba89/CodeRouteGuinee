@@ -21,8 +21,8 @@ import {
 
   getTrainingQuestions, type TrainingQuestion,
 } from '../api';
-import { isAudioLocale, speakFeedback, stop as stopAudio } from '../audio';
-import { type Locale } from '../i18n';
+import { isAudioLocale, speakFeedback, stop as stopAudio, speakQuestion, announceTrainingSummary } from '../audio';
+import { type Locale, getLocale } from '../i18n';
 import { type AuthUser } from '../authClient';
 import { type UserRole } from '../auth';
 import { useAuthSession, canUseProtectedActions } from '../authSession';
@@ -85,6 +85,11 @@ function errMsg(e: unknown, fallback = 'Erreur inattendue'): string {
 export function TrainingPage() {
   const { currentUser } = useAuthSession();
   const canUseApi = canUseProtectedActions(currentUser, false, ['candidate','admin','super_admin','driving_school']);
+
+  // L'entraînement est le lieu où le candidat apprend SEUL : il doit être
+  // pleinement audible dans les langues nationales.
+  const locale = getLocale();
+  const audioEnabled = isAudioLocale(locale);
 
   type TrainingQ = {
     index: number; category: string; category_label: string;
@@ -170,6 +175,26 @@ export function TrainingPage() {
   }
 
   const q = questions[qi];
+
+  // Lecture automatique de la question (comme à l'examen) : un candidat qui
+  // ne lit pas doit entendre la question sans avoir à chercher un bouton.
+  useEffect(() => {
+    if (mode === 'training' && audioEnabled && q) {
+      speakQuestion(q.text, q.options);
+    }
+    return () => { if (audioEnabled) stopAudio(); };
+  }, [qi, mode, audioEnabled, q]);
+
+  // Annonce du bilan de session — sans cela, un non-lecteur ne sait pas
+  // s'il progresse.
+  useEffect(() => {
+    if (mode === 'done' && audioEnabled) {
+      const weak = Object.entries(stats.bycat)
+        .filter(([, v]) => v.total > 0 && v.ok / v.total < 0.7)
+        .map(([cat]) => cat);
+      void announceTrainingSummary(stats.correct, stats.total, weak);
+    }
+  }, [mode, audioEnabled]);
 
   // ── Menu ──────────────────────────────────────────────────────
   if (mode === 'menu') return (
@@ -276,6 +301,21 @@ export function TrainingPage() {
 
           <div className="actions">
             <button className="btn-success" onClick={() => { setMode('menu'); setQi(0); setAnswers({}); }}> Nouvelle session</button>
+            {audioEnabled && (
+              <button className="btn-outline"
+                onClick={() => {
+                  const weak = Object.entries(stats.bycat)
+                    .filter(([, v]) => v.total > 0 && v.ok / v.total < 0.7)
+                    .map(([cat]) => cat);
+                  void announceTrainingSummary(stats.correct, stats.total, weak);
+                }}
+                style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                  <path d="M11 5 6 9H2v6h4l5 4V5zM15.54 8.46a5 5 0 0 1 0 7.07" />
+                </svg>
+                Réécouter le bilan
+              </button>
+            )}
             <a href="#/exam"><button className="btn-primary"> Passer l'examen officiel →</button></a>
           </div>
         </div>

@@ -290,3 +290,23 @@ export function announceProgress(current: number, total: number): void {
   if (!_enabled) return;
   speak(`Question ${current} sur ${total}.`, { rate: 0.95 });
 }
+
+/**
+ * Annonce le bilan d'une session d'entraînement.
+ * L'entraînement est le lieu où le candidat apprend SEUL : sans bilan
+ * audible, un non-lecteur ne sait pas s'il progresse.
+ */
+export function announceTrainingSummary(
+  correct: number,
+  total: number,
+  weakCategories: string[] = [],
+): Promise<void> {
+  const pct = total > 0 ? Math.round((correct / total) * 100) : 0;
+  const appreciation =
+    pct >= 80 ? 'Excellent.' : pct >= 60 ? 'Vous progressez.' : 'Continuez à réviser.';
+  let text = `${appreciation} ${correct} bonnes réponses sur ${total}. ${pct} pour cent.`;
+  if (weakCategories.length > 0) {
+    text += ` À revoir : ${weakCategories.slice(0, 3).join(', ')}.`;
+  }
+  return announce(text);
+}
