@@ -13,11 +13,105 @@ Usage :
 from __future__ import annotations
 
 import json
+import re
 import logging
 import os
 import sys
 from datetime import UTC, datetime
 from typing import Any
+
+
+# ── Rédaction des données sensibles ──────────────────────────────────────────
+#
+# Les logs sont conservés, transmis à Sentry et potentiellement consultés par
+# des tiers. Un secret ou une donnée personnelle qui y atterrit en clair est
+# une fuite — et un manquement RGPD pour des données de citoyens.
+#
+# Ce filtre masque AVANT écriture :
+#   • les champs sensibles par leur nom (password, token, secret, api_key…)
+#   • les motifs sensibles dans le texte (JWT, clés API, téléphones, emails,
+#     numéros de pièce d'identité)
+
+_SENSITIVE_KEYS = {
+    "password", "passwd", "pwd", "current_password", "new_password",
+    "token", "access_token", "refresh_token", "id_token", "csrf_token",
+    "secret", "secret_key", "csrf_secret", "api_key", "apikey",
+    "authorization", "auth", "cookie", "set-cookie",
+    "client_secret", "private_key",
+    "identity_number", "nni", "card_number", "cvv", "pin",
+}
+
+_REDACTED = "***REDACTED***"
+
+# Motifs sensibles dans le texte libre
+_PATTERNS: list[tuple[re.Pattern[str], str]] = [
+    # JWT (trois segments base64 séparés par des points)
+    (re.compile(r"\beyJ[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{5,}"), _REDACTED),
+    # Bearer <token>
+    (re.compile(r"(?i)\b(bearer\s+)[A-Za-z0-9._~+/-]{8,}=*"), r"\1" + _REDACTED),
+    # Clés API usuelles (Brevo, Stripe, GitHub, Cloudinary…)
+    (re.compile(r"\b(xkeysib-|sk_live_|sk_test_|ghp_|AKIA)[A-Za-z0-9_-]{8,}"), _REDACTED),
+    # champ=valeur sensible (password=..., token=...)
+    (re.compile(r"(?i)\b(password|passwd|token|secret|api[_-]?key)\s*[=:]\s*\S+"),
+     r"\1=" + _REDACTED),
+    # Téléphones (donnée personnelle). Format international ou local. On ne
+    # conserve que les 3 derniers chiffres — suffisant pour le support, non
+    # identifiant.
+    # Le motif exige soit un préfixe '+', soit au moins 9 chiffres, et exclut
+    # les dates (AAAA-MM-JJ) pour ne pas rendre les logs illisibles.
+    (re.compile(r"(?<![\d-])(?:\+\d[\d\s.\-()]{6,}\d|\d{9,})(?![\d-])"),
+     lambda m: "***" + re.sub(r"\D", "", m.group(0))[-3:]),
+    # Emails — on ne garde que le domaine
+    (re.compile(r"\b[A-Za-z0-9._%+-]+@([A-Za-z0-9.-]+\.[A-Za-z]{2,})\b"), r"***@\1"),
+]
+
+
+def redact_text(text: str) -> str:
+    """Masque les motifs sensibles dans une chaîne."""
+    if not text:
+        return text
+    for pattern, replacement in _PATTERNS:
+        text = pattern.sub(replacement, text)
+    return text
+
+
+def redact_value(key: str, value: object) -> object:
+    """Masque une valeur si sa CLÉ est sensible ; sinon nettoie son contenu."""
+    if key.lower() in _SENSITIVE_KEYS:
+        return _REDACTED
+    if isinstance(value, str):
+        return redact_text(value)
+    if isinstance(value, dict):
+        return {k: redact_value(k, v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [redact_value(key, v) for v in value]
+    return value
+
+
+class RedactionFilter(logging.Filter):
+    """
+    Masque les données sensibles de CHAQUE enregistrement de log, quelle que
+    soit son origine (application, bibliothèques tierces, exceptions).
+    Appliqué au niveau des handlers : rien n'échappe au filtre.
+    """
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        # Message principal (après interpolation des %s)
+        try:
+            record.msg = redact_text(record.getMessage())
+            record.args = ()
+        except Exception:  # noqa: BLE001 — un log ne doit jamais casser l'app
+            pass
+
+        # Champs extra (structlog / logger.info(..., extra={...}))
+        for key, value in list(record.__dict__.items()):
+            if key.startswith("_") or key in ("msg", "args"):
+                continue
+            try:
+                record.__dict__[key] = redact_value(key, value)
+            except Exception:  # noqa: BLE001
+                pass
+        return True
 
 
 class JSONFormatter(logging.Formatter):
@@ -104,6 +198,11 @@ def setup_logging(level: str | None = None) -> None:
 
     handler = logging.StreamHandler(sys.stdout)
     handler.setLevel(getattr(logging, log_level, logging.INFO))
+
+    # Filtre de rédaction : masque secrets et données personnelles AVANT
+    # écriture. Appliqué au handler → couvre TOUS les logs, y compris ceux
+    # des bibliothèques tierces et les traces d'exception.
+    handler.addFilter(RedactionFilter())
 
     if env == "production":
         handler.setFormatter(JSONFormatter())
