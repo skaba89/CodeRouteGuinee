@@ -37,18 +37,26 @@ CSRF_COOKIE_NAME  = "csrf_token"
 CSRF_TOKEN_TTL    = 3600          # 1 heure
 CSRF_TOKEN_LENGTH = 32            # octets
 
-# Lire depuis Settings (qui a une valeur par défaut stable)
 from app.core.config import get_settings as _get_settings
-_SECRET_ENV = os.environ.get("CSRF_SECRET", "") or _get_settings().csrf_secret
 
-_SECRET_BYTES = _SECRET_ENV.encode()
+
+def _secret_bytes() -> bytes:
+    """
+    Secret HMAC lu à CHAQUE usage (et non figé à l'import).
+
+    Sans cela, une rotation de secret (procédure de sécurité obligatoire
+    après un incident — voir SECURITY_ROTATION.md) resterait sans effet
+    tant que le processus n'aurait pas redémarré.
+    """
+    secret = os.environ.get("CSRF_SECRET", "") or _get_settings().csrf_secret
+    return secret.encode()
 
 
 # ── Génération du token ───────────────────────────────────────────────────────
 
 def _sign(payload: str) -> str:
     """Signature HMAC-SHA256 du payload."""
-    return hmac.new(_SECRET_BYTES, payload.encode(), hashlib.sha256).hexdigest()
+    return hmac.new(_secret_bytes(), payload.encode(), hashlib.sha256).hexdigest()
 
 
 def generate_csrf_token() -> str:
@@ -91,14 +99,30 @@ def verify_csrf_token(token: str) -> bool:
 # ── Endpoint helper ───────────────────────────────────────────────────────────
 
 def set_csrf_cookie(response, token: str) -> None:
-    """Pose le cookie CSRF (httpOnly=False — le client JS doit le lire)."""
+    """
+    Pose le cookie CSRF (httpOnly=False — le client JS doit le lire pour le
+    recopier dans le header X-CSRF-Token).
+
+    SameSite :
+      • production  → "none" + Secure : le frontend et le backend sont sur
+        des domaines DIFFÉRENTS (…-frontend.onrender.com vs …-backend…).
+        Avec "lax", le navigateur n'enverrait PAS le cookie sur ces requêtes
+        cross-site et toutes les requêtes mutatives seraient rejetées.
+        "none" impose Secure (HTTPS), ce qui est le cas en production.
+      • développement → "lax" (même origine localhost, et "none" sans HTTPS
+        est refusé par les navigateurs).
+
+    La protection CSRF ne repose pas sur SameSite mais sur le double-submit :
+    un site tiers peut faire envoyer le cookie, mais ne peut pas le LIRE
+    (politique d'origine identique) pour le recopier dans le header.
+    """
     prod = os.environ.get("ENVIRONMENT", "development").lower() == "production"
     response.set_cookie(
         key      = CSRF_COOKIE_NAME,
         value    = token,
-        httponly = False,           # JS doit pouvoir lire le token
-        secure   = prod,            # HTTPS only en prod
-        samesite = "lax",           # Lax : balance sécurité/UX
+        httponly = False,                    # JS doit pouvoir lire le token
+        secure   = prod,                     # HTTPS only en prod (requis par SameSite=None)
+        samesite = "none" if prod else "lax",
         max_age  = CSRF_TOKEN_TTL,
         path     = "/",
     )
@@ -128,9 +152,21 @@ _MUTATIVE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 
 def check_csrf(request: Request) -> None:
     """
-    Vérifie le token CSRF sur les requêtes mutatives.
-    À appeler dans un Depends() ou un middleware Starlette.
-    Lève HTTP 403 si le token est absent ou invalide.
+    Vérifie le token CSRF sur les requêtes mutatives (pattern Double-Submit).
+
+    Trois contrôles :
+      1. Le header X-CSRF-Token est présent et sa signature HMAC est valide
+         (et le token n'est pas expiré).
+      2. Le cookie csrf_token est présent.
+      3. Le header et le cookie CORRESPONDENT (comparaison timing-safe).
+
+    Le point 3 est l'essence du double-submit : un site tiers peut forcer le
+    navigateur à envoyer le cookie (c'est le principe même du CSRF), mais il
+    ne peut PAS lire ce cookie pour le recopier dans le header (politique
+    d'origine identique). Sans cette comparaison, un token signé quelconque
+    suffirait — la protection serait illusoire.
+
+    Lève HTTP 403 si un contrôle échoue.
     """
     if request.method not in _MUTATIVE_METHODS:
         return
@@ -142,7 +178,7 @@ def check_csrf(request: Request) -> None:
     if path.startswith("/static"):
         return
 
-    # Récupérer le token dans le header X-CSRF-Token
+    # 1. Token du header
     token = request.headers.get(CSRF_HEADER_NAME, "")
     if not token:
         raise HTTPException(
@@ -154,4 +190,19 @@ def check_csrf(request: Request) -> None:
         raise HTTPException(
             status_code = status.HTTP_403_FORBIDDEN,
             detail      = "Token CSRF invalide ou expiré",
+        )
+
+    # 2. Token du cookie
+    cookie_token = request.cookies.get(CSRF_COOKIE_NAME, "")
+    if not cookie_token:
+        raise HTTPException(
+            status_code = status.HTTP_403_FORBIDDEN,
+            detail      = "Cookie CSRF manquant — appeler /api/v1/auth/csrf-token",
+        )
+
+    # 3. Correspondance header ↔ cookie (cœur du double-submit, timing-safe)
+    if not hmac.compare_digest(token, cookie_token):
+        raise HTTPException(
+            status_code = status.HTTP_403_FORBIDDEN,
+            detail      = "Token CSRF incohérent (header ≠ cookie)",
         )

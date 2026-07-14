@@ -110,6 +110,11 @@ async function refreshOnce(): Promise<boolean> {
 async function fetchWithAuth(input: RequestInfo, init?: RequestInit): Promise<Response> {
   const response = await fetch(input, {
     ...init,
+    // Les cookies (dont csrf_token) doivent accompagner la requête : le
+    // backend vérifie que le token du header CORRESPOND à celui du cookie
+    // (pattern double-submit). Sans cela, les requêtes mutatives sont
+    // rejetées en 403.
+    credentials: 'include',
     headers: { ...getAuthHeaders(), ...init?.headers },
   });
 
@@ -119,6 +124,7 @@ async function fetchWithAuth(input: RequestInfo, init?: RequestInit): Promise<Re
       // Renouvellement réussi → rejouer la requête avec le nouveau token
       return fetch(input, {
         ...init,
+        credentials: 'include',
         headers: { ...getAuthHeaders(), ...init?.headers },
       });
     }
