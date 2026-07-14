@@ -117,21 +117,41 @@ class LoginRateLimiter:
     def _ensure_table(self, db: Session) -> None:
         if LoginRateLimiter._table_ensured:
             return
-        db.execute(__import__('sqlalchemy').text("""
-            CREATE TABLE IF NOT EXISTS login_rate_limit (
-                id SERIAL PRIMARY KEY,
-                key VARCHAR(255) NOT NULL,
-                attempted_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-            )
-        """))
-        db.execute(__import__('sqlalchemy').text(
-            "CREATE INDEX IF NOT EXISTS idx_login_rate_limit_key_time ON login_rate_limit (key, attempted_at)"
+        from sqlalchemy import text
+
+        # SQL PORTABLE (PostgreSQL et SQLite). L'ancienne version utilisait
+        # SERIAL / TIMESTAMPTZ / NOW(), spécifiques à PostgreSQL : sur toute
+        # autre base, la création échouait et le limiteur retombait
+        # SILENCIEUSEMENT sur un compteur en mémoire — donc propre à chaque
+        # worker, et contournable en tombant sur un autre worker.
+        dialect = db.bind.dialect.name if db.bind is not None else "postgresql"
+        if dialect == "postgresql":
+            create_sql = """
+                CREATE TABLE IF NOT EXISTS login_rate_limit (
+                    id SERIAL PRIMARY KEY,
+                    key VARCHAR(255) NOT NULL,
+                    attempted_at TIMESTAMP NOT NULL
+                )
+            """
+        else:
+            create_sql = """
+                CREATE TABLE IF NOT EXISTS login_rate_limit (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    key VARCHAR(255) NOT NULL,
+                    attempted_at TIMESTAMP NOT NULL
+                )
+            """
+        db.execute(text(create_sql))
+        db.execute(text(
+            "CREATE INDEX IF NOT EXISTS idx_login_rate_limit_key_time "
+            "ON login_rate_limit (key, attempted_at)"
         ))
         db.commit()
         LoginRateLimiter._table_ensured = True
 
     def _cutoff(self) -> datetime:
-        return datetime.now(UTC) - timedelta(seconds=self.window_seconds)
+        # Naïf (sans fuseau) pour rester comparable sur les deux moteurs
+        return (datetime.now(UTC) - timedelta(seconds=self.window_seconds)).replace(tzinfo=None)
 
     def _db_count(self, db: Session, key: str) -> int:
         from sqlalchemy import text
@@ -143,14 +163,17 @@ class LoginRateLimiter:
 
     def _db_insert(self, db: Session, key: str) -> None:
         from sqlalchemy import text
+        # L'horodatage est fourni par l'application (et non NOW(), spécifique
+        # à PostgreSQL) : portable et cohérent avec _cutoff().
+        now = datetime.now(UTC).replace(tzinfo=None)
         db.execute(
-            text("INSERT INTO login_rate_limit (key, attempted_at) VALUES (:key, NOW())"),
-            {"key": key},
+            text("INSERT INTO login_rate_limit (key, attempted_at) VALUES (:key, :now)"),
+            {"key": key, "now": now},
         )
-        # Nettoyage des anciennes entrées (hors fenêtre * 2 pour marge)
+        # Nettoyage des anciennes entrées (hors fenêtre × 2 pour marge)
         db.execute(
             text("DELETE FROM login_rate_limit WHERE attempted_at < :cutoff"),
-            {"cutoff": datetime.now(UTC) - timedelta(seconds=self.window_seconds * 2)},
+            {"cutoff": (datetime.now(UTC) - timedelta(seconds=self.window_seconds * 2)).replace(tzinfo=None)},
         )
 
     def _db_delete(self, db: Session, key: str) -> None:

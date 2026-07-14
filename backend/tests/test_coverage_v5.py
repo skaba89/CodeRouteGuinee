@@ -96,17 +96,23 @@ class TestLoginRateLimiterDB:
     # ── _cutoff ────────────────────────────────────────────────────
 
     def test_cutoff_returns_past_datetime(self):
-        """_cutoff() retourne un datetime dans le passé."""
+        """_cutoff() retourne un datetime naïf dans le passé.
+
+        Naïf (sans fuseau) volontairement : l'horodatage doit être comparable
+        sur PostgreSQL ET SQLite (portabilité du limiteur en base).
+        """
         limiter = self._limiter(window=300)
         cutoff = limiter._cutoff()
         assert isinstance(cutoff, datetime)
-        assert cutoff < datetime.now(UTC)
+        assert cutoff.tzinfo is None
+        assert cutoff < datetime.now(UTC).replace(tzinfo=None)
 
     def test_cutoff_correct_window(self):
         """_cutoff() est à window_seconds dans le passé."""
         limiter = self._limiter(window=600)
-        before = datetime.now(UTC) - timedelta(seconds=605)
-        after  = datetime.now(UTC) - timedelta(seconds=595)
+        now = datetime.now(UTC).replace(tzinfo=None)
+        before = now - timedelta(seconds=605)
+        after  = now - timedelta(seconds=595)
         cutoff = limiter._cutoff()
         assert before < cutoff < after
 
