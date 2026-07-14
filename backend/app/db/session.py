@@ -174,10 +174,16 @@ def _sqlite_add_columns_if_missing() -> None:
             try:
                 existing_cols = [c["name"] for c in inspector.get_columns(table)]
                 if col not in existing_cols:
-                    # Utiliser un dictionnaire pour le type (pas d'interpolation du type)
+                    # Types autorisés (liste blanche — pas d'interpolation libre).
+                    # TEXT est requis par bookings.notes et candidates.address :
+                    # sans lui, ces colonnes étaient SILENCIEUSEMENT ignorées sur
+                    # une base préexistante (branche morte du `continue`).
                     _SAFE_TYPES = {
-                        "VARCHAR(120)", "VARCHAR(200)", "VARCHAR(100)", "VARCHAR(80)", "FLOAT", "INTEGER", "DATE",
-                        "INTEGER DEFAULT 3 NOT NULL", "DATETIME", "BOOLEAN",
+                        "VARCHAR(120)", "VARCHAR(200)", "VARCHAR(100)", "VARCHAR(80)",
+                        "VARCHAR(36)",
+                        "FLOAT", "INTEGER", "DATE", "TEXT",
+                        "INTEGER DEFAULT 3 NOT NULL", "INTEGER DEFAULT 0 NOT NULL",
+                        "DATETIME", "BOOLEAN",
                     }
                     safe_type = col_type if col_type in _SAFE_TYPES else None
                     if safe_type is None:
