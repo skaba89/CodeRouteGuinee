@@ -210,6 +210,7 @@ class QuestionCreate(BaseModel):
     options: list[str]
     correct_answer: str
     explanation: str | None = None
+    # Écriture externe volontairement stricte : seuls image/video sont acceptés.
     media_type: Literal["image", "video"] | None = None
     media_url: str | None = None
     media_alt: str | None = None
@@ -218,6 +219,9 @@ class QuestionCreate(BaseModel):
 class QuestionRead(QuestionCreate):
     id: str
     is_active: bool
+    # Lecture compatible avec les visuels internes calculés par le seed.
+    # `sign` et `scene` ne deviennent pas pour autant des types d'upload externes.
+    media_type: Literal["image", "video", "sign", "scene"] | None = None
     validation_status: str = "draft"
     validated_by: str | None = None
     validated_at: datetime | None = None
