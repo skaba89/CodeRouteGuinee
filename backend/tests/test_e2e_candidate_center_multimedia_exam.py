@@ -83,9 +83,7 @@ def test_candidate_registration_center_booking_and_40_question_multimedia_exam_t
         assert client.post("/api/v1/centers/import-official", headers=headers, json={**center_payload, "dry_run": True}).json()["created"] == 1
         center_import = client.post("/api/v1/centers/import-official", headers=headers, json={**center_payload, "dry_run": False})
         assert center_import.status_code == 200
-        # Récupérer le centre importé via DB (évite les problèmes de pagination)
         from sqlalchemy import select as _sel2
-
         from app.db.session import SessionLocal as _SL2
         from app.models_center import Center as _Ctr2
         with _SL2() as _db2:
@@ -140,7 +138,7 @@ def test_candidate_registration_center_booking_and_40_question_multimedia_exam_t
             headers=headers,
             json={
                 "center_id": center["id"],
-                "starts_at": (datetime.now(UTC) + timedelta(days=10)).isoformat(),
+                "starts_at": (datetime.now(UTC) + timedelta(minutes=5)).isoformat(),
                 "capacity": 35,
             },
         )
@@ -154,6 +152,19 @@ def test_candidate_registration_center_booking_and_40_question_multimedia_exam_t
         convocation_response = client.get(f"/api/v1/bookings/{booking['reference']}/convocation", headers=headers)
         assert convocation_response.status_code == 200
         assert convocation_response.json()["candidate"]["reference"] == candidate_reference
+
+        payment_response = client.post(
+            "/api/v1/payments",
+            headers=headers,
+            json={
+                "booking_reference": booking["reference"],
+                "amount_gnf": 250000,
+                "provider": "sandbox",
+                "phone": "+224621000202",
+            },
+        )
+        assert payment_response.status_code == 201
+        assert payment_response.json()["status"] == "paid"
 
         entry_response = client.post(
             "/api/v1/entries/validate",
@@ -179,13 +190,10 @@ def test_candidate_registration_center_booking_and_40_question_multimedia_exam_t
         assert start_response.status_code == 201
         attempt = start_response.json()
 
-        # Récupérer toutes les bonnes réponses via DB pour garantir la couverture complète
-        # Récupérer les questions VIA L'API de cet examen (isolation propre)
         q_resp = client.get(f"/api/v1/exams/{attempt['id']}/questions", headers=headers)
         assert q_resp.status_code == 200
         exam_qs = q_resp.json()["questions"]
-        # Utiliser correct_answer = options[0] pour les questions de ce test
-        # (toutes les questions créées par ce test ont "Action securisee" comme options[0])
+
         def _first_opt_mm(q: dict) -> str:
             opts = q.get("options", [])
             return opts[0] if isinstance(opts, list) and opts else "Action securisee"

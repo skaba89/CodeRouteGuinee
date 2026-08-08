@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.deps import require_roles
 from app.exam_attempt_locking import RECOVERABLE_ATTEMPT_STATUSES, find_latest_attempt, lock_exam_attempt
+from app.exam_center_gate import assert_exam_start_window, assert_station_allowed, require_operational_center
 from app.exam_engine import (
     EXAM_DURATION_MINUTES,
     EXAM_QUESTIONS_TOTAL,
@@ -43,16 +44,14 @@ class ExamQuestionItem(_BaseModel):
     text: str
     options: list[str]
     media_url: str | None = None
-    media_type: str | None = None  # 'sign' | 'scene' | None
-    # Enregistrement audio dans la langue du candidat (locuteur natif).
-    # Absent → le client utilise la synthèse vocale en repli.
+    media_type: str | None = None
     audio_url: str | None = None
 
 
 class ExamQuestionsRead(_BaseModel):
     attempt_id: str
     questions: list[ExamQuestionItem]
-    duration_seconds: int = 1800   # 30 min par défaut
+    duration_seconds: int = 1800
     threshold: int = 35
 
 
@@ -102,11 +101,7 @@ def _assert_attempt_access(db: Session, current_user: User, attempt: ExamAttempt
 
 
 def _require_official_bank_ready(approved: list[Question]) -> None:
-    """Refuse de démarrer un examen officiel avec une banque non homologuée.
-
-    Un manque de contenu approuvé est un incident de préparation de la banque,
-    jamais une raison de retomber silencieusement sur des questions non validées.
-    """
+    """Refuse de démarrer un examen officiel avec une banque non homologuée."""
     if len(approved) >= EXAM_QUESTIONS_TOTAL:
         return
     raise HTTPException(
@@ -136,7 +131,6 @@ def _require_official_trace(trace: ExamQuestionTrace | None) -> ExamQuestionTrac
 def _create_exam_attempt(
     db: Session, candidate_id: str, session_id: str, *, commit: bool = True
 ) -> ExamAttempt:
-    # Un examen officiel tire EXCLUSIVEMENT des questions actives et approuvées.
     approved = list(db.scalars(
         select(Question).where(
             Question.is_active.is_(True),
@@ -322,10 +316,10 @@ def _write_certificate_verification_log(
 def start_exam(
     payload: ExamStartRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("center", "admin", "super_admin")),
+    current_user: User = Depends(require_roles("admin", "super_admin")),
 ) -> ExamAttempt:
-    if current_user.role == "center":
-        _assert_center_session_access(current_user, db.get(ExamSession, payload.session_id))
+    # Override administratif explicite. Les agents centre passent obligatoirement
+    # par réservation -> paiement -> check-in -> start-from-booking.
     return _create_exam_attempt(db, payload.candidate_id, payload.session_id)
 
 
@@ -355,12 +349,21 @@ def start_exam_from_booking(
                 detail="Cette réservation ne vous appartient pas.",
             )
 
-    if booking.status not in {"confirmed", "paid", "checked_in"}:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Booking is not eligible for exam start")
+    if booking.status != "checked_in":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "CHECKIN_REQUIRED_BEFORE_EXAM",
+                "message": "Le candidat doit être contrôlé physiquement au centre avant le démarrage de l'examen.",
+                "booking_status": booking.status,
+            },
+        )
     session = db.get(ExamSession, booking.session_id)
     if not session:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Incomplete booking session")
     _assert_center_session_access(current_user, session)
+    center = require_operational_center(db, session)
+    station_gate = assert_station_allowed(db, session, payload.device_key)
 
     latest_attempt = find_latest_attempt(db, booking.candidate_id, booking.session_id)
     if latest_attempt is not None and latest_attempt.status in RECOVERABLE_ATTEMPT_STATUSES:
@@ -380,6 +383,8 @@ def start_exam_from_booking(
                     "session_id": booking.session_id,
                     "attempt_status": latest_attempt.status,
                     "recovery_mode": "booking_retry_or_device_replacement",
+                    "center_id": center.id,
+                    "station_gate": station_gate,
                 },
             )
         )
@@ -404,8 +409,27 @@ def start_exam_from_booking(
             },
         )
 
+    start_window = assert_exam_start_window(session)
     attempt = _create_exam_attempt(db, booking.candidate_id, booking.session_id)
     _register_exam_start_device(db, attempt, session, payload.device_key, payload.device_label)
+    db.add(
+        AuditLog(
+            actor_id=current_user.id,
+            action="exam.center_gate_passed",
+            entity="exam_attempt",
+            entity_id=attempt.id,
+            details={
+                "booking_reference": booking.reference,
+                "candidate_id": booking.candidate_id,
+                "session_id": session.id,
+                "center_id": center.id,
+                "device_key": payload.device_key,
+                "station_gate": station_gate,
+                "start_window_opens_at": start_window.opens_at.isoformat(),
+                "start_window_closes_at": start_window.closes_at.isoformat(),
+            },
+        )
+    )
     db.commit()
     db.refresh(attempt)
     return attempt
@@ -418,7 +442,6 @@ def get_exam_questions(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("center", "candidate", "admin", "super_admin")),
 ) -> ExamQuestionsRead:
-    """Retourne les questions de la trace officielle sans la réponse correcte."""
     attempt = db.scalar(select(ExamAttempt).where(ExamAttempt.id == attempt_id))
     if not attempt:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Attempt not found")
@@ -609,11 +632,12 @@ def submit_exam(
             },
         )
 
+    trace_ids = set(trace.question_ids)
     answer_key = {question.id: question.correct_answer for question in questions}
     sanitized_answers = {
         question_id: answer
         for question_id, answer in payload.answers.items()
-        if question_id in set(trace.question_ids)
+        if question_id in trace_ids
     }
     result = score_answers(answer_key, sanitized_answers)
 
@@ -707,7 +731,6 @@ def get_exam_status(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("candidate", "center", "admin", "super_admin")),
 ) -> dict:
-    """Statut temps réel et horloge de référence de la tentative."""
     attempt = db.get(ExamAttempt, attempt_id)
     if not attempt:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Exam attempt not found")
@@ -750,7 +773,6 @@ def get_exam_results(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("candidate", "center", "admin", "super_admin")),
 ) -> dict:
-    """Résultats détaillés uniquement après soumission et selon le périmètre d'accès."""
     attempt = db.get(ExamAttempt, attempt_id)
     if not attempt:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Exam attempt not found")

@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.deps import require_roles
+from app.exam_center_gate import assert_center_actor_scope
 from app.models_audit import AuditLog
 from app.models_center import Center
 from app.models_center_station import CenterStation
@@ -83,6 +84,7 @@ def register_device_heartbeat(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Exam session not found")
     if session.center_id != center.id:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Session does not belong to this center")
+    assert_center_actor_scope(current_user, session)
 
     attempt = db.get(ExamAttempt, payload.attempt_id) if payload.attempt_id else None
     if payload.attempt_id and not attempt:
