@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import base64
 import hmac
+import json
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, status
@@ -23,9 +25,20 @@ class ActivateRequest(BaseModel):
     lang: str = Field(default="fr", min_length=2, max_length=10)
 
 
+class ClaimRequest(BaseModel):
+    attempt_id: str
+    claim_token: str = Field(min_length=32, max_length=160)
+    station_device_key: str = Field(min_length=4, max_length=160)
+
+
 class AnswerRequest(BaseModel):
     question_id: str
     answer: str = Field(min_length=1, max_length=255)
+
+
+def _b64url_json(payload: dict) -> str:
+    raw = json.dumps(payload, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    return base64.urlsafe_b64encode(raw).decode("ascii").rstrip("=")
 
 
 def build_service(config: EdgeAgentConfig) -> EdgeAgentService:
@@ -102,11 +115,45 @@ def create_app(
     @app.post("/operator/leases", dependencies=[Depends(require_operator)])
     def operator_activate(payload: ActivateRequest) -> dict:
         try:
-            return service.activate_attempt(payload.attempt_id, payload.station_device_key, payload.lang)
+            result = service.activate_attempt(payload.attempt_id, payload.station_device_key, payload.lang)
+            bootstrap = {
+                "edge_url": config.public_url,
+                "attempt_id": result["attempt_id"],
+                "claim_token": result["claim_token"],
+                "claim_expires_at": result["claim_expires_at"],
+            }
+            encoded = _b64url_json(bootstrap)
+            frontend_origin = config.allowed_origins[0].rstrip("/")
+            return {
+                **result,
+                "claim_fragment": f"edge={encoded}",
+                "candidate_url": f"{frontend_origin}/#/exam?edge={encoded}",
+            }
         except ValueError as exc:
             raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
         except Exception as exc:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"Edge activation failed: {exc}") from exc
+
+    @app.post("/v1/claim")
+    def candidate_claim(payload: ClaimRequest) -> dict:
+        try:
+            result = service.claim_candidate_session(
+                payload.attempt_id,
+                payload.claim_token,
+                payload.station_device_key,
+            )
+            return {
+                **result,
+                "edge_url": config.public_url,
+                "node_id": config.node_id,
+                "center_id": config.center_id,
+            }
+        except KeyError as exc:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        except PermissionError as exc:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
+        except RuntimeError as exc:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
 
     @app.post("/operator/sync/{attempt_id}", dependencies=[Depends(require_operator)])
     def operator_sync(attempt_id: str) -> dict:

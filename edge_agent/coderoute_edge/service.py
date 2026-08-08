@@ -18,22 +18,31 @@ class EdgeAgentService:
         self.media = media
 
     def activate_attempt(self, attempt_id: str, station_device_key: str, lang: str = "fr") -> dict[str, Any]:
-        if len(station_device_key.strip()) < 4:
+        station_device_key = station_device_key.strip()
+        if len(station_device_key) < 4:
             raise ValueError("Identifiant du poste candidat invalide")
         self.central.heartbeat()
         bundle = self.central.issue_lease(attempt_id, lang)
         if not self.central.verify_lease_bundle(bundle):
             raise RuntimeError("Signature centrale du lease invalide")
 
+        lease = bundle["lease"]
+        station_binding = lease.get("station") or {}
+        if station_binding.get("device_key") != station_device_key:
+            raise RuntimeError("Le lease central n'est pas lié au poste candidat demandé")
+
         local_bundle = self.media.prefetch_bundle(bundle)
-        session = self.store.put_lease(local_bundle, station_device_key.strip())
-        lease = local_bundle["lease"]
+        session = self.store.put_lease(local_bundle, station_device_key)
         return {
             **session,
             "deadline_at": lease["deadline_at"],
             "duration_seconds": lease["duration_seconds"],
             "question_count": len(lease.get("questions", [])),
+            "station": station_binding,
         }
+
+    def claim_candidate_session(self, attempt_id: str, claim_token: str, station_key: str) -> dict[str, Any]:
+        return self.store.claim_candidate_session(attempt_id, claim_token, station_key)
 
     def _ticketed_questions(self, attempt_id: str, lease: dict, questions: list[dict]) -> list[dict]:
         rendered = json.loads(json.dumps(questions))
@@ -65,9 +74,12 @@ class EdgeAgentService:
             "lease_id": lease["lease_id"],
             "status": row["status"],
             "elapsed_ms": elapsed,
+            "duration_ms": int(row["duration_ms"]),
             "remaining_ms": max(0, int(row["duration_ms"]) - elapsed),
+            "answers": self.store.current_answers(attempt_id),
             "questions": self._ticketed_questions(attempt_id, lease, questions),
             "language": lease.get("language", "fr"),
+            "station": lease.get("station"),
         }
 
     def answer(self, attempt_id: str, access_token: str, station_key: str, question_id: str, answer: str) -> dict[str, Any]:
