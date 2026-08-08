@@ -1,0 +1,33 @@
+name: Agent CI Probe
+
+on:
+  push:
+    branches:
+      - 'agent/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  statuses: write
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Confirm workflow execution
+        run: |
+          echo "Agent branch workflow trigger is operational"
+          echo "ref=${GITHUB_REF}"
+          echo "sha=${GITHUB_SHA}"
+
+      - name: Publish observable commit status
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api \
+            --method POST \
+            -H "Accept: application/vnd.github+json" \
+            "/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+            -f state=success \
+            -f context=agent-ci-probe \
+            -f description='Agent branch push workflows are running'
