@@ -1,0 +1,178 @@
+name: Finalize Center Edge Frontend Bridge P5
+
+on:
+  push:
+    branches:
+      - agent/center-edge-frontend-bridge-p5
+    paths:
+      - .github/workflows/apply-edge-p5-finalize.yml
+
+permissions:
+  contents: write
+  statuses: write
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/center-edge-frontend-bridge-p5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Activate Edge root surface and documentation
+        run: |
+          cat > frontend/src/main.tsx <<'EOF'
+          import './edgeExamBootstrap';
+          import React, { useEffect, useState } from 'react';
+          import { InstallPWA } from './components/pwa-install-prompt';
+          import ReactDOM from 'react-dom/client';
+          import App from './App';
+          import { ErrorBoundary } from './ErrorBoundary';
+          import EdgeExamEntry from './pages/EdgeExamEntry';
+          import EdgePendingPage from './pages/EdgePendingPage';
+          import { hasPendingEdgeBootstrap } from './edgeExamSession';
+          import './examDeviceFetchBridge';
+          import './edgeExamFetchBridge';
+          import './styles.css';
+
+          function RootSurface() {
+            const [hash, setHash] = useState(() => window.location.hash || '#/');
+
+            useEffect(() => {
+              const onHashChange = () => setHash(window.location.hash || '#/');
+              window.addEventListener('hashchange', onHashChange);
+              return () => window.removeEventListener('hashchange', onHashChange);
+            }, []);
+
+            if (hash.startsWith('#/edge-pending')) return <EdgePendingPage />;
+            if (hash === '#/exam' && hasPendingEdgeBootstrap()) return <EdgeExamEntry />;
+            return <App />;
+          }
+
+          ReactDOM.createRoot(document.getElementById('root')!).render(
+            <React.StrictMode>
+              <ErrorBoundary><RootSurface /></ErrorBoundary>
+              <InstallPWA />
+            </React.StrictMode>,
+          );
+          EOF
+
+          mkdir -p docs
+          cat > docs/CENTER_EDGE_FRONTEND_BRIDGE.md <<'EOF'
+          # Center Edge — Frontend Bridge et Claim candidat
+
+          ## Objectif
+
+          Permettre au frontend national CodeRoute de basculer sur le gateway LAN sans exposer le token opérateur, sans dupliquer l'ExamPage et sans calculer le résultat dans le centre.
+
+          ## Chaîne de confiance
+
+          ```text
+          DNTT central
+             ↓ lease signé + poste signé
+          Gateway Edge
+             ↓ claim secret temporaire
+          Poste candidat correspondant
+             ↓ token session Edge
+          ExamPage existante
+             ↓ réponses locales hash-chaînées
+          Gateway Edge
+             ↓ sync signée au retour WAN
+          DNTT central → score officiel
+          ```
+
+          ## Activation et claim
+
+          `POST /operator/leases` retourne un claim temporaire et une `candidate_url`, jamais le token candidat. Le frontend lit le fragment `#/exam?edge=...` avant le rendu React, efface immédiatement le secret de l'URL, puis réclame la session auprès de `/v1/claim` avec le `device_key` persistant du poste.
+
+          Le claim est retryable tant que le premier appel candidat authentifié n'a pas réussi. Après ce premier appel, il devient définitivement inutilisable.
+
+          ## Stockage navigateur
+
+          Le token Edge reste uniquement dans `sessionStorage`, lié à `attempt_id`. Il n'est jamais écrit dans l'URL, le localStorage durable, les logs ou le cache Service Worker.
+
+          ## Bridge réseau
+
+          `edgeExamFetchBridge.ts` intercepte seulement questions, statut, snapshots/autosave, submit et timeout-submit pour la tentative Edge active. Les autres appels restent sur l'API nationale. L'ExamPage existante reste inchangée.
+
+          ## Finalisation et résultat
+
+          Une soumission Edge finalise le journal local puis affiche `Résultat officiel en attente de synchronisation DNTT`. Aucun score ni verdict n'est calculé dans le centre. `/results` n'est jamais intercepté : ADMIS/AJOURNÉ n'est affiché qu'après réponse du serveur central.
+
+          ## Tests
+
+          Les tests couvrent claim chiffré, mauvais poste, retry/consommation/expiration, suppression du secret de l'URL, session navigateur, redirection pending et absence de verdict local.
+
+          ## Étape suivante
+
+          P6 — Center Operations UI : état WAN/gateway, postes prêts, activation lease par poste, QR claim, cache média, sync/retry et incidents DNTT.
+          EOF
+
+      - name: Register Edge E2E in Agent CI
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('.github/workflows/agent-branch-ci.yml')
+          text = path.read_text(encoding='utf-8')
+          marker = '            tests/e2e/media-policy.spec.ts\n'
+          addition = marker + '            tests/e2e/edge-exam-bridge.spec.ts\n'
+          if 'tests/e2e/edge-exam-bridge.spec.ts' not in text:
+              if marker not in text:
+                  raise SystemExit('Agent CI Playwright candidate marker not found')
+              text = text.replace(marker, addition, 1)
+              path.write_text(text, encoding='utf-8')
+          PY
+
+      - name: Validate Edge Agent
+        run: |
+          pip install -q -r edge_agent/requirements.txt
+          PYTHONPATH=edge_agent python -m compileall -q edge_agent/coderoute_edge
+          PYTHONPATH=edge_agent pytest -q --tb=short --disable-warnings edge_agent/tests
+
+      - name: Validate frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run typecheck
+          npm run build
+          npx playwright install --with-deps chromium
+          CI=true VITE_API_BASE_URL=http://localhost:8000 npx playwright test tests/e2e/edge-exam-bridge.spec.ts --timeout=30000 --retries=1
+
+      - name: Publish validation status
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api --method POST -H "Accept: application/vnd.github+json" \
+            "/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+            -f state=success \
+            -f context=center-edge-p5/validation \
+            -f description='Edge claim + frontend typecheck/build + Playwright passed'
+
+      - name: Commit validated P5
+        run: |
+          git rm .github/workflows/apply-edge-p5-finalize.yml
+          git config user.name "CodeRoute Automation"
+          git config user.email "actions@users.noreply.github.com"
+          git add \
+            edge_agent/coderoute_edge/store.py \
+            edge_agent/coderoute_edge/service.py \
+            edge_agent/coderoute_edge/app.py \
+            edge_agent/tests/test_agent.py \
+            edge_agent/tests/test_claim.py \
+            frontend/src/edgeExamSession.ts \
+            frontend/src/edgeExamBootstrap.ts \
+            frontend/src/edgeExamFetchBridge.ts \
+            frontend/src/pages/EdgeExamEntry.tsx \
+            frontend/src/pages/EdgePendingPage.tsx \
+            frontend/src/main.tsx \
+            frontend/tests/e2e/edge-exam-bridge.spec.ts \
+            docs/CENTER_EDGE_FRONTEND_BRIDGE.md \
+            .github/workflows/agent-branch-ci.yml
+          git commit -m "feat: bridge official exam UI to Center Edge"
+          git push origin HEAD:agent/center-edge-frontend-bridge-p5
