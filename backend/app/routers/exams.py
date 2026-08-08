@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.deps import require_roles
+from app.exam_attempt_locking import find_recoverable_attempt, lock_exam_attempt
 from app.exam_engine import (
     EXAM_DURATION_MINUTES,
     EXAM_QUESTIONS_TOTAL,
@@ -329,7 +330,11 @@ def start_exam_from_booking(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("candidate", "center", "admin", "super_admin")),
 ) -> ExamAttempt:
-    booking = db.scalar(select(Booking).where(Booking.reference == payload.booking_reference))
+    booking = db.scalar(
+        select(Booking)
+        .where(Booking.reference == payload.booking_reference)
+        .with_for_update()
+    )
     if not booking:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Booking not found")
 
@@ -351,6 +356,31 @@ def start_exam_from_booking(
     if not session:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Incomplete booking session")
     _assert_center_session_access(current_user, session)
+
+    existing_attempt = find_recoverable_attempt(db, booking.candidate_id, booking.session_id)
+    if existing_attempt is not None:
+        _assert_attempt_access(db, current_user, existing_attempt)
+        _register_exam_start_device(
+            db, existing_attempt, session, payload.device_key, payload.device_label
+        )
+        db.add(
+            AuditLog(
+                actor_id=current_user.id,
+                action="exam.attempt_resumed",
+                entity="exam_attempt",
+                entity_id=existing_attempt.id,
+                details={
+                    "booking_reference": booking.reference,
+                    "candidate_id": booking.candidate_id,
+                    "session_id": booking.session_id,
+                    "attempt_status": existing_attempt.status,
+                    "recovery_mode": "booking_retry_or_device_replacement",
+                },
+            )
+        )
+        db.commit()
+        db.refresh(existing_attempt)
+        return existing_attempt
 
     attempt = _create_exam_attempt(db, booking.candidate_id, booking.session_id)
     _register_exam_start_device(db, attempt, session, payload.device_key, payload.device_label)
@@ -508,7 +538,7 @@ def submit_exam(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("candidate", "center", "admin", "super_admin")),
 ) -> ExamAttempt:
-    attempt = db.get(ExamAttempt, attempt_id)
+    attempt = lock_exam_attempt(db, attempt_id)
     if not attempt:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Exam attempt not found")
 
@@ -518,7 +548,8 @@ def submit_exam(
     if attempt.status == "submitted":
         _write_exam_guard_log(db, attempt, "exam.replay_submission", "already_submitted", now)
         db.commit()
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Exam attempt already submitted")
+        db.refresh(attempt)
+        return attempt
     if attempt.status == "expired":
         _write_exam_guard_log(db, attempt, "exam.expired_submission_replay", "already_expired", now)
         db.commit()

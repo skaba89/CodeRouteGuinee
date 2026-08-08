@@ -6,6 +6,7 @@ import {
   getExamLiveStatus,
   getExamQuestions,
   getExamResults,
+  getPrivateJson,
   postPrivateJson,
   startExamFromBooking,
   submitExamAttempt,
@@ -112,6 +113,27 @@ function toApiAnswers(answers: Record<number, string>, questions: QData[]): Reco
   return payload;
 }
 
+function fromApiAnswers(apiAnswers: Record<string, string>, questions: QData[]): Record<number, string> {
+  const indexById = new Map(questions.map((question, index) => [question.id, index]));
+  const restored: Record<number, string> = {};
+  Object.entries(apiAnswers).forEach(([questionId, answer]) => {
+    const index = indexById.get(questionId);
+    if (index !== undefined && typeof answer === 'string') restored[index] = answer;
+  });
+  return restored;
+}
+
+async function getServerAnswerSnapshot(attemptId: string): Promise<Record<string, string>> {
+  try {
+    const payload = await getPrivateJson<{ answers: Record<string, string> }>(
+      `/api/v1/exams/${encodeURIComponent(attemptId)}/answers`,
+    );
+    return payload.answers ?? {};
+  } catch {
+    return {};
+  }
+}
+
 function formatRemaining(seconds: number) {
   const safe = Math.max(0, seconds);
   const minutes = Math.floor(safe / 60);
@@ -183,7 +205,11 @@ export function ExamPage({ locale }: Props) {
   const [totalSeconds, setTotalSeconds] = useState(30 * 60);
   const [saveState, setSaveState] = useState<SaveState>('idle');
   const [timerSyncedAt, setTimerSyncedAt] = useState<Date | null>(null);
+  const [submitting, setSubmitting] = useState(false);
   const timeoutSubmitFired = useRef(false);
+  const submissionInFlight = useRef(false);
+  const autosaveQueue = useRef<Promise<void>>(Promise.resolve());
+  const latestAutosaveSnapshot = useRef<Record<number, string>>({});
 
   const q = questions[idx];
   const answered = Object.keys(answers).length;
@@ -233,11 +259,27 @@ export function ExamPage({ locale }: Props) {
           return;
         }
 
-        const response = await getExamQuestions(storedAttemptId, locale);
+        const [response, serverSnapshot] = await Promise.all([
+          getExamQuestions(storedAttemptId, locale),
+          getServerAnswerSnapshot(storedAttemptId),
+        ]);
         if (cancelled) return;
         setAttemptId(storedAttemptId);
         setLiveQuestions(response.questions);
-        setAnswers(readStoredAnswers(storedAttemptId));
+        const questionView: QData[] = response.questions.map((question, index) => ({
+          id: question.id, text: question.text, options: question.options, number: index + 1,
+          category: question.category, media: question.media_url ?? undefined,
+          mediaType: question.media_type ?? undefined, mediaAlt: question.media_alt ?? undefined,
+          audioUrl: question.audio_url ?? undefined,
+        }));
+        const restoredAnswers = {
+          ...fromApiAnswers(serverSnapshot, questionView),
+          ...readStoredAnswers(storedAttemptId),
+        };
+        setAnswers(restoredAnswers);
+        persistStoredAnswers(storedAttemptId, restoredAnswers);
+        latestAutosaveSnapshot.current = restoredAnswers;
+        autosaveQueue.current = Promise.resolve();
         setRemainingSeconds(status.remaining_seconds);
         setTotalSeconds(status.total_seconds || response.duration_seconds || 30 * 60);
         setTimerSyncedAt(new Date());
@@ -326,20 +368,28 @@ export function ExamPage({ locale }: Props) {
     return () => window.removeEventListener('keydown', handler);
   }, [phase, idx, q, answers, isOfficialExam]);
 
-  async function autosaveOfficialAnswers(nextAnswers: Record<number, string>) {
-    if (!attemptId) return;
-    persistStoredAnswers(attemptId, nextAnswers);
+  function autosaveOfficialAnswers(nextAnswers: Record<number, string>): Promise<void> {
+    if (!attemptId) return Promise.resolve();
+    const id = attemptId;
+    const snapshot = nextAnswers;
+    const apiAnswers = toApiAnswers(snapshot, questions);
+    persistStoredAnswers(id, snapshot);
+    latestAutosaveSnapshot.current = snapshot;
     setSaveState('saving');
-    try {
-      await postPrivateJson(`/api/v1/exams/${encodeURIComponent(attemptId)}/answers`, {
-        answers: toApiAnswers(nextAnswers, questions),
-      });
-      setSaveState('saved');
-    } catch {
-      // La session navigateur conserve la saisie ; la prochaine réponse retentera
-      // une sauvegarde serveur. Le résultat officiel n'est jamais calculé ici.
-      setSaveState('offline');
-    }
+
+    const saveSnapshot = async () => {
+      try {
+        await postPrivateJson(`/api/v1/exams/${encodeURIComponent(id)}/answers`, { answers: apiAnswers });
+        if (latestAutosaveSnapshot.current === snapshot) setSaveState('saved');
+      } catch {
+        // Une copie locale plus récente reste prioritaire. La file FIFO évite
+        // qu'un vieux snapshot arrivé tardivement écrase une réponse récente.
+        if (latestAutosaveSnapshot.current === snapshot) setSaveState('offline');
+      }
+    };
+
+    autosaveQueue.current = autosaveQueue.current.catch(() => undefined).then(saveSnapshot);
+    return autosaveQueue.current;
   }
 
   function pick(opt: string) {
@@ -376,6 +426,10 @@ export function ExamPage({ locale }: Props) {
     setTotalSeconds(30 * 60);
     setSaveState('idle');
     setTimerSyncedAt(null);
+    setSubmitting(false);
+    submissionInFlight.current = false;
+    autosaveQueue.current = Promise.resolve();
+    latestAutosaveSnapshot.current = {};
     timeoutSubmitFired.current = false;
   }
 
@@ -409,9 +463,10 @@ export function ExamPage({ locale }: Props) {
     setStartLoading(true);
     try {
       const attempt = await startExamFromBooking(bookRef.trim());
-      const [questionsResponse, status] = await Promise.all([
+      const [questionsResponse, status, serverSnapshot] = await Promise.all([
         getExamQuestions(attempt.id, locale),
         getExamLiveStatus(attempt.id),
+        getServerAnswerSnapshot(attempt.id),
       ]);
       if (!questionsResponse.questions.length) {
         throw new Error("La session officielle ne contient aucune question. Contactez le responsable du centre.");
@@ -420,8 +475,17 @@ export function ExamPage({ locale }: Props) {
       window.sessionStorage.setItem(ACTIVE_ATTEMPT_KEY, attempt.id);
       setAttemptId(attempt.id);
       setLiveQuestions(questionsResponse.questions);
-      setAnswers({});
-      persistStoredAnswers(attempt.id, {});
+      const questionView: QData[] = questionsResponse.questions.map((question, index) => ({
+        id: question.id, text: question.text, options: question.options, number: index + 1,
+        category: question.category, media: question.media_url ?? undefined,
+        mediaType: question.media_type ?? undefined, mediaAlt: question.media_alt ?? undefined,
+        audioUrl: question.audio_url ?? undefined,
+      }));
+      const restoredAnswers = fromApiAnswers(serverSnapshot, questionView);
+      setAnswers(restoredAnswers);
+      persistStoredAnswers(attempt.id, restoredAnswers);
+      latestAutosaveSnapshot.current = restoredAnswers;
+      autosaveQueue.current = Promise.resolve();
       setIdx(0);
       setReveal(false);
       setResult(null);
@@ -442,41 +506,52 @@ export function ExamPage({ locale }: Props) {
   }
 
   async function submitExam() {
+    if (submissionInFlight.current) return;
+    submissionInFlight.current = true;
+    setSubmitting(true);
     setSubmissionErr('');
 
-    if (attemptId) {
-      try {
+    try {
+      if (attemptId) {
         try {
-          await submitExamAttempt(attemptId, toApiAnswers(answers, questions));
-        } catch {
-          // En cas de timeout réseau ou de soumission déjà finalisée, on tente
-          // toujours de relire la vérité persistée côté serveur.
+          // Attendre la file d'autosauvegarde évite que la soumission finale
+          // dépasse encore un snapshot local en transit.
+          await autosaveQueue.current.catch(() => undefined);
+          try {
+            await submitExamAttempt(attemptId, toApiAnswers(answers, questions));
+          } catch {
+            // Un retry réseau ou une soumission déjà finalisée est idempotent :
+            // on relit toujours le résultat persistant comme source de vérité.
+          }
+          await loadServerResult(attemptId);
+        } catch (err: unknown) {
+          setSubmissionErr(errMsg(err, "Impossible d'enregistrer ou de récupérer le résultat officiel."));
+          timeoutSubmitFired.current = false;
         }
-        await loadServerResult(attemptId);
-      } catch (err: unknown) {
-        setSubmissionErr(errMsg(err, "Impossible d'enregistrer ou de récupérer le résultat officiel."));
-        timeoutSubmitFired.current = false;
+        return;
       }
-      return;
-    }
 
-    const score = questions.filter((_, index) => answers[index] === questions[index].correct_answer).length;
-    setResult({
-      score,
-      threshold: 35,
-      passed: score >= 35,
-      questions: questions.map((question, index) => ({
-        question_id: question.id,
-        question_text: question.text,
-        candidate_answer: answers[index] ?? '—',
-        correct_answer: question.correct_answer,
-        is_correct: answers[index] === question.correct_answer,
-        category: question.category,
-        options: question.options,
-        explanation: question.expl,
-      })),
-    });
-    setPhase('done');
+      const score = questions.filter((_, index) => answers[index] === questions[index].correct_answer).length;
+      setResult({
+        score,
+        threshold: 35,
+        passed: score >= 35,
+        questions: questions.map((question, index) => ({
+          question_id: question.id,
+          question_text: question.text,
+          candidate_answer: answers[index] ?? '—',
+          correct_answer: question.correct_answer,
+          is_correct: answers[index] === question.correct_answer,
+          category: question.category,
+          options: question.options,
+          explanation: question.expl,
+        })),
+      });
+      setPhase('done');
+    } finally {
+      submissionInFlight.current = false;
+      setSubmitting(false);
+    }
   }
 
   if (phase === 'setup') {
@@ -678,7 +753,7 @@ export function ExamPage({ locale }: Props) {
               <span style={{ fontSize: 12, color: 'var(--muted)' }}>{answered} / {questions.length} répondues</span>
               {idx < questions.length - 1
                 ? <button className="secondary-button btn-sm" onClick={() => { setReveal(false); setIdx(index => Math.min(questions.length - 1, index + 1)); }} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>Suivante <IconArrowRight size={15}/></button>
-                : <button className="btn-success btn-sm" onClick={() => { void submitExam(); }} style={{ display: 'flex', alignItems: 'center', gap: 5 }}><IconCheck size={15}/> Soumettre</button>}
+                : <button className="btn-success btn-sm" disabled={submitting} onClick={() => { void submitExam(); }} style={{ display: 'flex', alignItems: 'center', gap: 5 }}><IconCheck size={15}/> {submitting ? 'Soumission…' : 'Soumettre'}</button>}
             </div>
           </div>
         </div>
@@ -690,14 +765,14 @@ export function ExamPage({ locale }: Props) {
           </div>
           <QGrid total={questions.length} cur={idx} ans={answers} onSelect={index => { setReveal(false); setIdx(index); }}/>
           <div style={{ marginTop: 12, display: 'flex', justifyContent: 'flex-end' }}>
-            <button className="btn-success btn-sm" onClick={() => {
+            <button className="btn-success btn-sm" disabled={submitting} onClick={() => {
               if (answered < questions.length) {
                 setSubmissionErr(`${questions.length - answered} question(s) sans réponse. Vous pouvez les retrouver dans la grille avant de soumettre.`);
               } else {
                 void submitExam();
               }
             }} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-              <IconCheck size={14}/>{answered < questions.length ? `Vérifier (${questions.length - answered} restantes)` : "Soumettre l'examen"}
+              <IconCheck size={14}/>{submitting ? 'Soumission…' : answered < questions.length ? `Vérifier (${questions.length - answered} restantes)` : "Soumettre l'examen"}
             </button>
           </div>
         </div>
