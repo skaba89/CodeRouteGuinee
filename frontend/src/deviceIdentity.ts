@@ -5,6 +5,17 @@ function fallbackId(): string {
   return `${Date.now().toString(36)}-${random}`;
 }
 
+export function rememberExamDeviceKey(value: string): string | null {
+  const normalized = value.trim().slice(0, 160);
+  if (normalized.length < 4) return null;
+  try {
+    window.localStorage.setItem(EXAM_DEVICE_KEY_STORAGE, normalized);
+  } catch {
+    // Le stockage navigateur peut être bloqué ; l'appel courant reste valide.
+  }
+  return normalized;
+}
+
 export function getOrCreateExamDeviceKey(): string {
   try {
     const existing = window.localStorage.getItem(EXAM_DEVICE_KEY_STORAGE)?.trim();
@@ -23,8 +34,8 @@ export function getOrCreateExamDeviceKey(): string {
   }
 }
 
-export function getExamDeviceLabel(): string {
-  const key = getOrCreateExamDeviceKey();
+export function getExamDeviceLabel(deviceKey?: string): string {
+  const key = deviceKey?.trim() || getOrCreateExamDeviceKey();
   return `Poste CodeRoute ${key.slice(-8).toUpperCase()}`;
 }
 
