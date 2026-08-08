@@ -3,7 +3,7 @@ import { getExamResults, type ExamDetailedResult } from '../api';
 import { clearEdgeSession } from '../edgeExamSession';
 import { clearPendingEdgeResult, getPendingEdgeResultAttempt } from '../edgeExamFetchBridge';
 
-const ACTIVE_ATTEMPT_KEY = 'coderoute:official-exam:active-attempt:v1';
+const ACTIVE_ATTEMPT_KEY = 'coderoute:official-exam:active-attempt';
 
 export default function EdgePendingPage() {
   const [attemptId] = useState(() => getPendingEdgeResultAttempt());

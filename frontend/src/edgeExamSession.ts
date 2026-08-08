@@ -2,7 +2,7 @@ import { getOrCreateExamDeviceKey } from './deviceIdentity';
 
 const PENDING_BOOTSTRAP_KEY = 'coderoute:edge:pending-bootstrap:v1';
 const EDGE_SESSION_PREFIX = 'coderoute:edge:session:v1:';
-const ACTIVE_ATTEMPT_KEY = 'coderoute:official-exam:active-attempt:v1';
+const ACTIVE_ATTEMPT_KEY = 'coderoute:official-exam:active-attempt';
 
 type EdgeBootstrap = {
   edge_url: string;
