@@ -205,12 +205,12 @@ test.describe('Examen officiel — résilience runtime', () => {
 
     await openOfficialExam(page);
     await page.getByRole('button', { name: /Le véhicule blanc/ }).click();
-    await expect(page.getByText(/1 \/ 2 répondues/)).toBeVisible();
+    await expect(page.getByText('Navigation — 1 / 2 répondues')).toBeVisible();
 
     await page.reload();
 
     await expect(page.getByRole('main', { name: 'Examen officiel en cours' })).toBeVisible();
-    await expect(page.getByText(/1 \/ 2 répondues/)).toBeVisible();
+    await expect(page.getByText('Navigation — 1 / 2 répondues')).toBeVisible();
     await expect(page.getByText(/19:5\d/)).toBeVisible();
     expect(starts).toBe(1);
   });
@@ -241,7 +241,7 @@ test.describe('Examen officiel — résilience runtime', () => {
   test('à 00:00 finalise une seule fois depuis la dernière sauvegarde serveur', async ({ page }) => {
     let timeoutSubmits = 0;
     await mockOfficialExam(page, {
-      remainingSeconds: 0,
+      remainingSeconds: 1,
       onTimeoutSubmit: async route => {
         timeoutSubmits += 1;
         await route.fulfill({
