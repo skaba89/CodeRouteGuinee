@@ -1,4 +1,4 @@
-"""Tests de non-régression — contrôle horizontal des tentatives d'examen."""
+"""Tests de non-régression — sécurité et intégrité des tentatives d'examen."""
 from __future__ import annotations
 
 from types import SimpleNamespace
@@ -9,7 +9,11 @@ from fastapi import HTTPException
 from app.models_candidate import Candidate
 from app.models_session import ExamSession
 from app.routers.exam_runtime import _assert_runtime_access
-from app.routers.exams import _assert_attempt_access
+from app.routers.exams import (
+    _assert_attempt_access,
+    _require_official_bank_ready,
+    _require_official_trace,
+)
 
 
 class _FakeDb:
@@ -105,6 +109,30 @@ def test_missing_candidate_is_rejected():
     assert exc_info.value.status_code == 403
 
 
+def test_historical_center_guard_allows_own_center():
+    db = _FakeDb(session=_session(center_id="center-conakry"))
+
+    _assert_attempt_access(
+        db,
+        _user(role="center", center_id="center-conakry"),
+        _attempt(),
+    )
+
+
+def test_historical_center_guard_rejects_other_center():
+    db = _FakeDb(session=_session(center_id="center-kankan"))
+
+    with pytest.raises(HTTPException) as exc_info:
+        _assert_attempt_access(
+            db,
+            _user(role="center", center_id="center-conakry"),
+            _attempt(),
+        )
+
+    assert exc_info.value.status_code == 403
+    assert "autre centre" in str(exc_info.value.detail)
+
+
 def test_runtime_center_can_access_its_own_session():
     db = _FakeDb(session=_session(center_id="center-conakry"))
 
@@ -140,3 +168,25 @@ def test_runtime_candidate_cannot_access_foreign_attempt():
         )
 
     assert exc_info.value.status_code == 403
+
+
+def test_official_bank_accepts_exactly_40_approved_questions():
+    _require_official_bank_ready([object() for _ in range(40)])
+
+
+def test_official_bank_rejects_39_approved_questions():
+    with pytest.raises(HTTPException) as exc_info:
+        _require_official_bank_ready([object() for _ in range(39)])
+
+    assert exc_info.value.status_code == 503
+    assert exc_info.value.detail["code"] == "OFFICIAL_QUESTION_BANK_NOT_READY"
+    assert exc_info.value.detail["approved_questions"] == 39
+    assert exc_info.value.detail["required_questions"] == 40
+
+
+def test_missing_official_trace_is_never_reconstructed():
+    with pytest.raises(HTTPException) as exc_info:
+        _require_official_trace(None)
+
+    assert exc_info.value.status_code == 409
+    assert exc_info.value.detail["code"] == "OFFICIAL_EXAM_TRACE_MISSING"
