@@ -36,6 +36,7 @@ def build_service(config: EdgeAgentConfig) -> EdgeAgentService:
     media = MediaCache(
         config.media_cache_dir,
         central_url=config.central_url,
+        public_url=config.public_url,
         max_media_bytes=config.max_media_bytes,
     )
     return EdgeAgentService(store, central, media)

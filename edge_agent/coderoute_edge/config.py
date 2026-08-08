@@ -24,6 +24,7 @@ class EdgeAgentConfig:
     max_media_bytes: int = 50 * 1024 * 1024
     bind_host: str = "0.0.0.0"
     bind_port: int = 8443
+    public_url: str = ""
     tls_cert_path: Path | None = None
     tls_key_path: Path | None = None
     allow_insecure_http: bool = False
@@ -50,6 +51,7 @@ class EdgeAgentConfig:
         max_media = int(os.environ.get("CODEROUTE_EDGE_MAX_MEDIA_BYTES", str(50 * 1024 * 1024)))
         bind_host = os.environ.get("CODEROUTE_EDGE_BIND_HOST", "0.0.0.0").strip()
         bind_port = int(os.environ.get("CODEROUTE_EDGE_BIND_PORT", "8443"))
+        public_url = os.environ.get("CODEROUTE_EDGE_PUBLIC_URL", "").strip().rstrip("/")
         cert_raw = os.environ.get("CODEROUTE_EDGE_TLS_CERT_PATH", "").strip()
         key_raw = os.environ.get("CODEROUTE_EDGE_TLS_KEY_PATH", "").strip()
         tls_cert = Path(cert_raw) if cert_raw else None
@@ -71,6 +73,10 @@ class EdgeAgentConfig:
             errors.append("CODEROUTE_EDGE_MAX_MEDIA_BYTES est trop faible")
         if bind_port < 1 or bind_port > 65535:
             errors.append("CODEROUTE_EDGE_BIND_PORT invalide")
+        if not public_url:
+            errors.append("CODEROUTE_EDGE_PUBLIC_URL est obligatoire pour générer les URLs média LAN")
+        elif not insecure and not public_url.startswith("https://"):
+            errors.append("CODEROUTE_EDGE_PUBLIC_URL doit utiliser HTTPS en centre")
         if not insecure and (tls_cert is None or tls_key is None):
             errors.append(
                 "TLS LAN obligatoire : définir CODEROUTE_EDGE_TLS_CERT_PATH et CODEROUTE_EDGE_TLS_KEY_PATH "
@@ -93,6 +99,7 @@ class EdgeAgentConfig:
             max_media_bytes=max_media,
             bind_host=bind_host,
             bind_port=bind_port,
+            public_url=public_url,
             tls_cert_path=tls_cert,
             tls_key_path=tls_key,
             allow_insecure_http=insecure,

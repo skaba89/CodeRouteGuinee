@@ -12,9 +12,10 @@ _ALLOWED_PREFIXES = ("image/", "video/", "audio/")
 
 
 class MediaCache:
-    def __init__(self, root: Path, *, central_url: str, max_media_bytes: int):
+    def __init__(self, root: Path, *, central_url: str, public_url: str, max_media_bytes: int):
         self.root = root
         self.central_url = central_url.rstrip("/") + "/"
+        self.public_url = public_url.rstrip("/")
         self.max_media_bytes = max_media_bytes
         self.root.mkdir(parents=True, exist_ok=True)
 
@@ -41,7 +42,7 @@ class MediaCache:
                     if not value:
                         continue
                     digest = self._fetch_one(http, str(value))
-                    question[field] = f"/v1/exams/{attempt_id}/media/{digest}"
+                    question[field] = f"{self.public_url}/v1/exams/{attempt_id}/media/{digest}"
             # La signature couvre `lease`; cette projection LAN est locale et
             # volontairement située hors du paquet signé.
             cloned["local_questions"] = local_questions
