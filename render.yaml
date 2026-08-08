@@ -60,6 +60,18 @@ services:
       - key: EMAIL_FROM_NAME
         value: "CodeRoute Guinée — DNTT"
 
+      # Media Factory Cloudinary — secrets à saisir dans Render Dashboard.
+      # Les fichiers sont téléversés directement navigateur -> Cloudinary :
+      # le backend ne reçoit jamais le binaire, seulement la demande de signature.
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      - key: CLOUDINARY_UPLOAD_FOLDER
+        value: "coderoute/questions"
+
       # Mobile Money — sandbox pour le pilote
       - key: MOBILE_MONEY_MODE
         value: "sandbox"
