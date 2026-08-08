@@ -1,0 +1,108 @@
+name: Apply Institutional Retake Trace Patch
+
+on:
+  push:
+    branches:
+      - agent/institutional-retake-trace-p0
+    paths:
+      - .github/workflows/apply-retake-trace-patch.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/institutional-retake-trace-p0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Apply exact retake patches
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(text: str, old: str, new: str, label: str) -> str:
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"{label}: expected 1 match, found {count}")
+              return text.replace(old, new, 1)
+
+          def replace_in_function(text: str, func_name: str, old: str, new: str, label: str) -> str:
+              marker = f"def {func_name}("
+              start = text.find(marker)
+              if start < 0:
+                  raise SystemExit(f"{label}: function not found")
+              next_def = text.find("\ndef ", start + len(marker))
+              next_route = text.find("\n@router.", start + len(marker))
+              candidates = [idx for idx in (next_def, next_route) if idx >= 0]
+              end = min(candidates) if candidates else len(text)
+              chunk = text[start:end]
+              count = chunk.count(old)
+              if count != 1:
+                  raise SystemExit(f"{label}: expected 1 match in function, found {count}")
+              chunk = chunk.replace(old, new, 1)
+              return text[:start] + chunk + text[end:]
+
+          exams_path = Path('backend/app/routers/exams.py')
+          exams = exams_path.read_text(encoding='utf-8')
+          exams = replace_once(
+              exams,
+              'from app.exam_attempt_locking import find_recoverable_attempt, lock_exam_attempt\n',
+              'from app.exam_attempt_locking import RECOVERABLE_ATTEMPT_STATUSES, find_latest_attempt, lock_exam_attempt\n',
+              'locking imports',
+          )
+          exams = replace_once(
+              exams,
+              'def _create_exam_attempt(db: Session, candidate_id: str, session_id: str) -> ExamAttempt:\n',
+              'def _create_exam_attempt(\n    db: Session, candidate_id: str, session_id: str, *, commit: bool = True\n) -> ExamAttempt:\n',
+              'factory commit option',
+          )
+          exams = replace_in_function(
+              exams,
+              '_create_exam_attempt',
+              '''    db.commit()\n    db.refresh(attempt)\n    return attempt\n''',
+              '''    if commit:\n        db.commit()\n        db.refresh(attempt)\n    else:\n        db.flush()\n    return attempt\n''',
+              'factory transaction mode',
+          )
+
+          old_resume = '''    existing_attempt = find_recoverable_attempt(db, booking.candidate_id, booking.session_id)\n    if existing_attempt is not None:\n        _assert_attempt_access(db, current_user, existing_attempt)\n        _register_exam_start_device(\n            db, existing_attempt, session, payload.device_key, payload.device_label\n        )\n        db.add(\n            AuditLog(\n                actor_id=current_user.id,\n                action="exam.attempt_resumed",\n                entity="exam_attempt",\n                entity_id=existing_attempt.id,\n                details={\n                    "booking_reference": booking.reference,\n                    "candidate_id": booking.candidate_id,\n                    "session_id": booking.session_id,\n                    "attempt_status": existing_attempt.status,\n                    "recovery_mode": "booking_retry_or_device_replacement",\n                },\n            )\n        )\n        db.commit()\n        db.refresh(existing_attempt)\n        return existing_attempt\n\n    attempt = _create_exam_attempt(db, booking.candidate_id, booking.session_id)\n'''
+          new_resume = '''    latest_attempt = find_latest_attempt(db, booking.candidate_id, booking.session_id)\n    if latest_attempt is not None and latest_attempt.status in RECOVERABLE_ATTEMPT_STATUSES:\n        _assert_attempt_access(db, current_user, latest_attempt)\n        _register_exam_start_device(\n            db, latest_attempt, session, payload.device_key, payload.device_label\n        )\n        db.add(\n            AuditLog(\n                actor_id=current_user.id,\n                action="exam.attempt_resumed",\n                entity="exam_attempt",\n                entity_id=latest_attempt.id,\n                details={\n                    "booking_reference": booking.reference,\n                    "candidate_id": booking.candidate_id,\n                    "session_id": booking.session_id,\n                    "attempt_status": latest_attempt.status,\n                    "recovery_mode": "booking_retry_or_device_replacement",\n                },\n            )\n        )\n        db.commit()\n        db.refresh(latest_attempt)\n        return latest_attempt\n\n    if latest_attempt is not None:\n        code = (\n            "EXAM_ATTEMPT_BLOCKED_BY_INCIDENT"\n            if latest_attempt.status == "incident_blocked"\n            else "BOOKING_ALREADY_USED_FOR_EXAM"\n        )\n        raise HTTPException(\n            status_code=status.HTTP_409_CONFLICT,\n            detail={\n                "code": code,\n                "message": (\n                    "Cette tentative est bloquée par un incident. Une décision administrateur est requise."\n                    if latest_attempt.status == "incident_blocked"\n                    else "Cette réservation a déjà été utilisée pour un examen. Un nouveau passage exige un rattrapage institutionnel autorisé."\n                ),\n                "attempt_id": latest_attempt.id,\n                "attempt_status": latest_attempt.status,\n            },\n        )\n\n    attempt = _create_exam_attempt(db, booking.candidate_id, booking.session_id)\n'''
+          exams = replace_once(exams, old_resume, new_resume, 'booking single-use guard')
+          exams_path.write_text(exams, encoding='utf-8')
+
+          incident_path = Path('backend/app/routers/center_incidents.py')
+          incident = incident_path.read_text(encoding='utf-8')
+          incident = replace_once(
+              incident,
+              '''    if payload.allow_retake and attempt:\n        if attempt.status not in {"incident_blocked", "started", "expired"}:\n            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Attempt is not eligible for retake")\n        attempt.status = "cancelled_by_incident"\n        attempt.submitted_at = now\n        new_attempt = ExamAttempt(candidate_id=attempt.candidate_id, session_id=attempt.session_id)\n        db.add(attempt)\n        db.add(new_attempt)\n        db.flush()\n        incident.new_attempt_id = new_attempt.id\n''',
+              '''    if payload.allow_retake and attempt:\n        if attempt.status not in {"incident_blocked", "started", "expired"}:\n            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Attempt is not eligible for retake")\n\n        # Le rattrapage doit être un VRAI nouvel examen officiel : nouvelle\n        # sélection, nouveau hash et nouvelle ExamQuestionTrace. On réutilise\n        # la factory fail-closed sans commit intermédiaire afin de conserver\n        # tentative + trace + résolution d'incident dans la même transaction.\n        from app.routers.exams import _create_exam_attempt\n\n        new_attempt = _create_exam_attempt(\n            db, attempt.candidate_id, attempt.session_id, commit=False\n        )\n        attempt.status = "cancelled_by_incident"\n        attempt.submitted_at = now\n        db.add(attempt)\n        db.flush()\n        incident.new_attempt_id = new_attempt.id\n''',
+              'retake official factory',
+          )
+          incident_path.write_text(incident, encoding='utf-8')
+          PY
+
+      - name: Verify backend before commit
+        working-directory: backend
+        env:
+          PYTHONPATH: .
+          DATABASE_URL: sqlite+pysqlite:///:memory:
+          AUTO_CREATE_TABLES: 'true'
+          ENVIRONMENT: test
+        run: |
+          pip install -q -r requirements.txt
+          python -m compileall -q app
+
+      - name: Remove one-time workflow and commit
+        run: |
+          git rm .github/workflows/apply-retake-trace-patch.yml
+          git config user.name "CodeRoute Automation"
+          git config user.email "actions@users.noreply.github.com"
+          git add backend/app/routers/exams.py backend/app/routers/center_incidents.py
+          git commit -m "fix: create traced official attempts for authorized retakes"
+          git push origin HEAD:agent/institutional-retake-trace-p0
