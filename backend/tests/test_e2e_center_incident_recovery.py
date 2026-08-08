@@ -2,9 +2,13 @@ from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
+from sqlalchemy import delete, select
 
-from app.db.session import init_db
+from app.db.session import SessionLocal, init_db
 from app.main import app
+from app.models_exam_question_trace import ExamQuestionTrace
+from app.models_question import Question
+from app.question_bank_gn import QUESTIONS_GN
 
 
 def _auth_headers(client: TestClient, role: str) -> dict[str, str]:
@@ -33,12 +37,39 @@ def _auth_headers(client: TestClient, role: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
-def test_center_incident_blocks_attempt_and_allows_retake() -> None:
+def _seed_approved_official_bank(client: TestClient, admin_headers: dict[str, str], super_headers: dict[str, str]) -> None:
+    # Isolation : retirer la banque résiduelle des autres tests.
+    with SessionLocal() as db:
+        db.execute(delete(Question))
+        db.commit()
+
+    for index, row in enumerate(QUESTIONS_GN):
+        create_response = client.post(
+            "/api/v1/questions",
+            headers=admin_headers,
+            json={
+                "category": row["category"],
+                "text": f"{row['text']} [incident-e2e-{index}]",
+                "options": row["options"],
+                "correct_answer": row["correct_answer"],
+                "explanation": row.get("explanation", "Réponse de test incident"),
+            },
+        )
+        assert create_response.status_code == 201
+        question_id = create_response.json()["id"]
+        approve_response = client.post(
+            f"/api/v1/questions/{question_id}/approve",
+            headers=super_headers,
+        )
+        assert approve_response.status_code == 200
+
+
+def test_center_incident_blocks_attempt_and_creates_traced_official_retake() -> None:
     suffix = uuid4().hex[:8]
 
     with TestClient(app) as client:
         admin_headers = _auth_headers(client, "admin")
-        center_headers = _auth_headers(client, "center")
+        super_headers = _auth_headers(client, "super_admin")
 
         center_response = client.post(
             "/api/v1/centers",
@@ -67,27 +98,7 @@ def test_center_incident_blocks_attempt_and_allows_retake() -> None:
         assert session_response.status_code == 201
         session = session_response.json()
 
-        # Isolation : supprimer les questions résiduelles des tests précédents
-        from app.db.session import SessionLocal as _SL
-        from app.models_question import Question as _Q
-        from sqlalchemy import delete as _del
-        with _SL() as _db:
-            _db.execute(_del(_Q))
-            _db.commit()
-
-        for index in range(40):
-            question_response = client.post(
-                "/api/v1/questions",
-                headers=admin_headers,
-                json={
-                    "category": "priorite",
-                    "text": f"Question incident {suffix}-{index}",
-                    "options": ["A", "B", "C"],
-                    "correct_answer": "A",
-                    "explanation": "Reponse de test incident",
-                },
-            )
-            assert question_response.status_code == 201
+        _seed_approved_official_bank(client, admin_headers, super_headers)
 
         candidate_response = client.post(
             "/api/v1/candidates",
@@ -103,18 +114,27 @@ def test_center_incident_blocks_attempt_and_allows_retake() -> None:
         assert candidate_response.status_code == 201
         candidate = candidate_response.json()
 
+        # L'admin national peut lancer la tentative sans dépendre de l'affectation
+        # d'un compte centre : le test vise ici le workflow d'incident/rattrapage.
         start_response = client.post(
             "/api/v1/exams/start",
-            headers=center_headers,
+            headers=admin_headers,
             json={"candidate_id": candidate["id"], "session_id": session["id"]},
         )
         assert start_response.status_code == 201
         initial_attempt = start_response.json()
         assert initial_attempt["status"] == "started"
 
+        with SessionLocal() as db:
+            initial_trace = db.scalar(
+                select(ExamQuestionTrace).where(ExamQuestionTrace.attempt_id == initial_attempt["id"])
+            )
+            assert initial_trace is not None
+            assert initial_trace.question_count == 40
+
         incident_response = client.post(
             "/api/v1/center-incidents",
-            headers=center_headers,
+            headers=admin_headers,
             json={
                 "center_id": center["id"],
                 "session_id": session["id"],
@@ -131,7 +151,7 @@ def test_center_incident_blocks_attempt_and_allows_retake() -> None:
 
         blocked_submit_response = client.post(
             f"/api/v1/exams/{initial_attempt['id']}/submit",
-            headers=center_headers,
+            headers=admin_headers,
             json={"answers": {}},
         )
         assert blocked_submit_response.status_code == 409
@@ -141,7 +161,7 @@ def test_center_incident_blocks_attempt_and_allows_retake() -> None:
             f"/api/v1/center-incidents/{incident['id']}/resolve",
             headers=admin_headers,
             json={
-                "resolution_notes": "Incident confirme par le superviseur. Nouvelle tentative autorisee.",
+                "resolution_notes": "Incident confirmé par le superviseur. Nouvelle tentative autorisée.",
                 "allow_retake": True,
             },
         )
@@ -151,25 +171,34 @@ def test_center_incident_blocks_attempt_and_allows_retake() -> None:
         assert resolved_incident["new_attempt_id"]
         assert resolved_incident["new_attempt_id"] != initial_attempt["id"]
 
-        # Récupérer les bonnes réponses depuis la DB (bypass pagination API)
         new_attempt_id = resolved_incident["new_attempt_id"]
-        # Récupérer les questions de ce nouvel examen via l'API
+        with SessionLocal() as db:
+            new_trace = db.scalar(
+                select(ExamQuestionTrace).where(ExamQuestionTrace.attempt_id == new_attempt_id)
+            )
+            assert new_trace is not None
+            assert new_trace.question_count == 40
+            assert len(new_trace.question_ids) == 40
+            assert new_trace.bank_hash
+            assert "official-" in new_trace.version_label
+
+        # Le nouvel examen doit être immédiatement exploitable par l'API fail-closed.
         q_resp = client.get(
             f"/api/v1/exams/{new_attempt_id}/questions",
-            headers=center_headers,
+            headers=admin_headers,
         )
         assert q_resp.status_code == 200
         exam_questions = q_resp.json()["questions"]
-        def _first_opt_ci(q: dict) -> str:
-            opts = q.get("options", [])
-            if isinstance(opts, list) and opts:
-                return opts[0]
-            return "A"
-        answers = {q["id"]: _first_opt_ci(q) for q in exam_questions}
-        assert len(answers) >= 40
+        assert len(exam_questions) == 40
+
+        def _first_opt_ci(question: dict) -> str:
+            options = question.get("options", [])
+            return options[0] if isinstance(options, list) and options else "A"
+
+        answers = {question["id"]: _first_opt_ci(question) for question in exam_questions}
         submit_response = client.post(
             f"/api/v1/exams/{new_attempt_id}/submit",
-            headers=center_headers,
+            headers=admin_headers,
             json={"answers": answers},
         )
         assert submit_response.status_code == 200
@@ -178,7 +207,10 @@ def test_center_incident_blocks_attempt_and_allows_retake() -> None:
         assert submitted_attempt["status"] == "submitted"
         assert submitted_attempt["passed"] is True
 
-        incidents_response = client.get("/api/v1/center-incidents?status_filter=resolved", headers=admin_headers)
+        incidents_response = client.get(
+            "/api/v1/center-incidents?status_filter=resolved",
+            headers=admin_headers,
+        )
         assert incidents_response.status_code == 200
         assert any(item["id"] == incident["id"] for item in incidents_response.json()["items"])
 
