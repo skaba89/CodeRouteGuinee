@@ -46,6 +46,16 @@ services:
       - key: ENABLE_API_DOCS
         value: "false"
 
+      # Portique centre — paramètres opérationnels ajustables après homologation DNTT
+      - key: EXAM_CHECKIN_OPEN_MINUTES_BEFORE
+        value: "60"
+      - key: EXAM_CHECKIN_CLOSE_MINUTES_AFTER
+        value: "30"
+      - key: EXAM_START_OPEN_MINUTES_BEFORE
+        value: "10"
+      - key: EXAM_START_CLOSE_MINUTES_AFTER
+        value: "45"
+
       # CORS / Hosts — uniquement le domaine Render (pas de localhost)
       - key: CORS_ORIGINS
         value: "https://coderouteguinee-frontend.onrender.com"
