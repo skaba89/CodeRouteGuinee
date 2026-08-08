@@ -22,11 +22,12 @@ jobs:
 
   backend-tests:
     runs-on: ubuntu-latest
-    needs: [backend-lint]
     strategy:
       fail-fast: false
       matrix:
         include:
+          - name: exam-attempt-access
+            test_file: tests/test_exam_attempt_access.py
           - name: admin-finance
             test_file: tests/test_e2e_admin_finance.py
           - name: antifraud-dashboard
@@ -113,7 +114,6 @@ jobs:
 
   backend-coverage:
     runs-on: ubuntu-latest
-    needs: [backend-lint]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
