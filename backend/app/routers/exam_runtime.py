@@ -1,7 +1,8 @@
 """Runtime sécurisé des examens officiels.
 
-Ce module complète le routeur historique `exams` avec deux garanties importantes :
+Ce module complète le routeur historique `exams` avec trois garanties importantes :
 - autosauvegarde serveur des réponses pendant l'épreuve ;
+- lecture sécurisée de la dernière copie serveur pour la reprise après incident ;
 - finalisation à l'expiration à partir de la dernière sauvegarde serveur,
   sans accepter de nouvelles réponses après la limite.
 """
@@ -60,8 +61,58 @@ def _trace_questions(db: Session, attempt: ExamAttempt) -> tuple[ExamQuestionTra
     return trace, questions
 
 
+def _sanitize_trace_answers(trace: ExamQuestionTrace, answers: dict | None) -> dict[str, str]:
+    """Ne conserve que les réponses appartenant à la trace officielle.
+
+    Cette fonction est utilisée à l'écriture, à la reprise et à la finalisation,
+    afin qu'une ancienne donnée ou une clé injectée hors examen ne puisse jamais
+    être renvoyée au candidat ni compter dans les métriques de l'épreuve.
+    """
+    if not answers:
+        return {}
+    allowed_ids = set(trace.question_ids or [])
+    return {
+        str(question_id): str(answer)
+        for question_id, answer in answers.items()
+        if question_id in allowed_ids and isinstance(answer, str)
+    }
+
+
 def _deadline(attempt: ExamAttempt) -> datetime:
     return attempt.started_at + timedelta(minutes=EXAM_DURATION_MINUTES)
+
+
+@router.get("/{attempt_id}/answers")
+def get_saved_exam_answers(
+    attempt_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("candidate", "center", "admin", "super_admin")),
+) -> dict:
+    """Retourne uniquement la dernière copie serveur autorisée de l'épreuve.
+
+    Aucune bonne réponse, explication ou clé de correction n'est exposée. Cet
+    endpoint sert à reconstruire l'état du poste candidat après refresh, crash du
+    navigateur ou remplacement contrôlé d'un poste en centre d'examen.
+    """
+    attempt = db.get(ExamAttempt, attempt_id)
+    if not attempt:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Exam attempt not found")
+
+    _assert_runtime_access(db, current_user, attempt)
+    if attempt.status not in {"started", "expired"}:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Saved answers are available only while the exam can still be recovered",
+        )
+
+    trace, _questions = _trace_questions(db, attempt)
+    answers = _sanitize_trace_answers(trace, attempt.answers)
+    return {
+        "attempt_id": attempt.id,
+        "answers": answers,
+        "saved": len(answers),
+        "status": attempt.status,
+    }
 
 
 @router.post("/{attempt_id}/answers")
@@ -90,12 +141,7 @@ def save_exam_answers(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Exam attempt expired")
 
     trace, _questions = _trace_questions(db, attempt)
-    allowed_ids = set(trace.question_ids)
-    sanitized_answers = {
-        question_id: answer
-        for question_id, answer in payload.answers.items()
-        if question_id in allowed_ids
-    }
+    sanitized_answers = _sanitize_trace_answers(trace, payload.answers)
 
     attempt.answers = sanitized_answers
     db.add(attempt)
@@ -138,7 +184,7 @@ def timeout_submit_exam(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Exam time has not elapsed")
 
     trace, questions = _trace_questions(db, attempt)
-    saved_answers = attempt.answers or {}
+    saved_answers = _sanitize_trace_answers(trace, attempt.answers)
     answer_key = {question.id: question.correct_answer for question in questions}
     result = score_answers(answer_key, saved_answers)
 
