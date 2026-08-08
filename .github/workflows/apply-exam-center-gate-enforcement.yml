@@ -1,0 +1,189 @@
+name: Apply Exam Center Gate Enforcement
+
+on:
+  push:
+    branches:
+      - agent/exam-center-gate-enforcement-p0
+    paths:
+      - .github/workflows/apply-exam-center-gate-enforcement.yml
+
+permissions:
+  contents: write
+  statuses: write
+
+jobs:
+  patch-and-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/exam-center-gate-enforcement-p0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Apply exact center gate patches
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def one(text: str, old: str, new: str, label: str) -> str:
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"{label}: expected 1 match, got {count}")
+              return text.replace(old, new, 1)
+
+          # Exam start gate
+          path = Path('backend/app/routers/exams.py')
+          text = path.read_text(encoding='utf-8')
+          text = one(
+              text,
+              'from app.exam_attempt_locking import RECOVERABLE_ATTEMPT_STATUSES, find_latest_attempt, lock_exam_attempt\n',
+              'from app.exam_attempt_locking import RECOVERABLE_ATTEMPT_STATUSES, find_latest_attempt, lock_exam_attempt\nfrom app.exam_center_gate import assert_exam_start_window, assert_station_allowed, require_operational_center\n',
+              'exam gate import',
+          )
+          text = one(
+              text,
+              '''    current_user: User = Depends(require_roles("center", "admin", "super_admin")),\n) -> ExamAttempt:\n    if current_user.role == "center":\n        _assert_center_session_access(current_user, db.get(ExamSession, payload.session_id))\n    return _create_exam_attempt(db, payload.candidate_id, payload.session_id)\n''',
+              '''    current_user: User = Depends(require_roles("admin", "super_admin")),\n) -> ExamAttempt:\n    # Démarrage administratif explicite. Les agents centre passent toujours\n    # par réservation -> check-in -> start-from-booking.\n    return _create_exam_attempt(db, payload.candidate_id, payload.session_id)\n''',
+              'restrict direct start',
+          )
+          text = one(
+              text,
+              '''    if booking.status not in {"confirmed", "paid", "checked_in"}:\n        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Booking is not eligible for exam start")\n    session = db.get(ExamSession, booking.session_id)\n''',
+              '''    if booking.status != "checked_in":\n        raise HTTPException(\n            status_code=status.HTTP_409_CONFLICT,\n            detail={\n                "code": "CHECKIN_REQUIRED_BEFORE_EXAM",\n                "message": "Le candidat doit être contrôlé physiquement au centre avant le démarrage de l'examen.",\n                "booking_status": booking.status,\n            },\n        )\n    session = db.get(ExamSession, booking.session_id)\n''',
+              'require checkin',
+          )
+          text = one(
+              text,
+              '''    _assert_center_session_access(current_user, session)\n\n    latest_attempt = find_latest_attempt(db, booking.candidate_id, booking.session_id)\n''',
+              '''    _assert_center_session_access(current_user, session)\n    center = require_operational_center(db, session)\n    station_gate = assert_station_allowed(db, session, payload.device_key)\n\n    latest_attempt = find_latest_attempt(db, booking.candidate_id, booking.session_id)\n''',
+              'center station gate',
+          )
+          text = one(
+              text,
+              '''                    "attempt_status": latest_attempt.status,\n                    "recovery_mode": "booking_retry_or_device_replacement",\n''',
+              '''                    "attempt_status": latest_attempt.status,\n                    "recovery_mode": "booking_retry_or_device_replacement",\n                    "center_id": center.id,\n                    "station_gate": station_gate,\n''',
+              'resume audit gate',
+          )
+          text = one(
+              text,
+              '''    attempt = _create_exam_attempt(db, booking.candidate_id, booking.session_id)\n    _register_exam_start_device(db, attempt, session, payload.device_key, payload.device_label)\n    db.commit()\n''',
+              '''    start_window = assert_exam_start_window(session)\n    attempt = _create_exam_attempt(db, booking.candidate_id, booking.session_id)\n    _register_exam_start_device(db, attempt, session, payload.device_key, payload.device_label)\n    db.add(\n        AuditLog(\n            actor_id=current_user.id,\n            action="exam.center_gate_passed",\n            entity="exam_attempt",\n            entity_id=attempt.id,\n            details={\n                "booking_reference": booking.reference,\n                "candidate_id": booking.candidate_id,\n                "session_id": session.id,\n                "center_id": center.id,\n                "device_key": payload.device_key,\n                "station_gate": station_gate,\n                "start_window_opens_at": start_window.opens_at.isoformat(),\n                "start_window_closes_at": start_window.closes_at.isoformat(),\n            },\n        )\n    )\n    db.commit()\n''',
+              'new attempt start window and audit',
+          )
+          path.write_text(text, encoding='utf-8')
+
+          # Heartbeat center scope
+          path = Path('backend/app/routers/device_sessions.py')
+          text = path.read_text(encoding='utf-8')
+          text = one(text, 'from app.deps import require_roles\n', 'from app.deps import require_roles\nfrom app.exam_center_gate import assert_center_actor_scope\n', 'heartbeat import')
+          text = one(
+              text,
+              '''    if session.center_id != center.id:\n        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Session does not belong to this center")\n\n    attempt = db.get(ExamAttempt, payload.attempt_id) if payload.attempt_id else None\n''',
+              '''    if session.center_id != center.id:\n        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Session does not belong to this center")\n    assert_center_actor_scope(current_user, session)\n\n    attempt = db.get(ExamAttempt, payload.attempt_id) if payload.attempt_id else None\n''',
+              'heartbeat scope',
+          )
+          path.write_text(text, encoding='utf-8')
+
+          # Incident center scope
+          path = Path('backend/app/routers/center_incidents.py')
+          text = path.read_text(encoding='utf-8')
+          text = one(
+              text,
+              '''    if not center:\n        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Center not found")\n\n    session = db.get(ExamSession, payload.session_id) if payload.session_id else None\n''',
+              '''    if not center:\n        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Center not found")\n    if current_user.role == "center" and current_user.center_id != center.id:\n        raise HTTPException(\n            status_code=status.HTTP_403_FORBIDDEN,\n            detail={"code": "CENTER_SCOPE_MISMATCH", "message": "Cet incident concerne un autre centre."},\n        )\n\n    session = db.get(ExamSession, payload.session_id) if payload.session_id else None\n''',
+              'incident scope',
+          )
+          path.write_text(text, encoding='utf-8')
+
+          # Candidate browser sends persistent station identity
+          path = Path('frontend/src/pages/exam.tsx')
+          text = path.read_text(encoding='utf-8')
+          text = one(text, "import { useIsMobile } from '../hooks/useIsMobile';\n", "import { useIsMobile } from '../hooks/useIsMobile';\nimport { getExamDeviceLabel, getOrCreateExamDeviceKey } from '../deviceIdentity';\n", 'exam device import')
+          text = one(
+              text,
+              '      const attempt = await startExamFromBooking(bookRef.trim());\n',
+              '      const attempt = await startExamFromBooking(\n        bookRef.trim(),\n        getOrCreateExamDeviceKey(),\n        getExamDeviceLabel(),\n      );\n',
+              'exam device start',
+          )
+          path.write_text(text, encoding='utf-8')
+
+          # Center page uses same immutable browser station identity
+          path = Path('frontend/src/pages/center.tsx')
+          text = path.read_text(encoding='utf-8')
+          text = one(text, "import { useAuthSession, canUseProtectedActions } from '../authSession';\n", "import { useAuthSession, canUseProtectedActions } from '../authSession';\nimport { getExamDeviceLabel, getOrCreateExamDeviceKey } from '../deviceIdentity';\n", 'center device import')
+          text = one(text, "  const [deviceKey, setDeviceKey] = useState('POSTE-01');\n", "  const [deviceKey] = useState(() => getOrCreateExamDeviceKey());\n", 'center persistent device')
+          text = one(text, '      const r = await startExamFromBooking(bookingRef, deviceKey, deviceKey);\n', '      const r = await startExamFromBooking(bookingRef, deviceKey, getExamDeviceLabel());\n', 'center device label')
+          text = one(
+              text,
+              '''            <label>Code du poste<input value={deviceKey} onChange={e => setDeviceKey(e.target.value)} placeholder="POSTE-01" /></label>\n''',
+              '''            <label>Identifiant sécurisé de ce poste\n              <input value={deviceKey} readOnly aria-label="Identifiant sécurisé du poste" />\n              <span style={{ fontSize: 10.5, color: 'var(--muted)', marginTop: 4, display: 'block' }}>\n                Enregistrez cet identifiant dans le registre des postes du centre avant d'activer le contrôle strict.\n              </span>\n            </label>\n''',
+              'center station identity field',
+          )
+          path.write_text(text, encoding='utf-8')
+
+          # Existing multimedia E2E must follow payment + check-in window
+          path = Path('backend/tests/test_e2e_candidate_center_multimedia_exam.py')
+          text = path.read_text(encoding='utf-8')
+          text = one(text, '                "starts_at": (datetime.now(UTC) + timedelta(days=10)).isoformat(),\n', '                "starts_at": (datetime.now(UTC) + timedelta(minutes=5)).isoformat(),\n', 'multimedia window')
+          text = one(
+              text,
+              '''        convocation_response = client.get(f"/api/v1/bookings/{booking['reference']}/convocation", headers=headers)\n        assert convocation_response.status_code == 200\n        assert convocation_response.json()["candidate"]["reference"] == candidate_reference\n\n        entry_response = client.post(\n''',
+              '''        convocation_response = client.get(f"/api/v1/bookings/{booking['reference']}/convocation", headers=headers)\n        assert convocation_response.status_code == 200\n        assert convocation_response.json()["candidate"]["reference"] == candidate_reference\n\n        payment_response = client.post(\n            "/api/v1/payments",\n            headers=headers,\n            json={\n                "booking_reference": booking["reference"],\n                "amount_gnf": 250000,\n                "provider": "sandbox",\n                "phone": "+224621000202",\n            },\n        )\n        assert payment_response.status_code == 201\n        assert payment_response.json()["status"] == "paid"\n\n        entry_response = client.post(\n''',
+              'multimedia payment',
+          )
+          path.write_text(text, encoding='utf-8')
+          PY
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: pip install -q -r requirements.txt
+
+      - name: Run Center Gate backend tests
+        working-directory: backend
+        env:
+          PYTHONPATH: .
+          DATABASE_URL: sqlite+pysqlite:///:memory:
+          AUTO_CREATE_TABLES: 'true'
+          ENVIRONMENT: test
+        run: |
+          python -m compileall -q app
+          pytest -q --tb=short --disable-warnings \
+            tests/test_exam_center_gate.py \
+            tests/test_e2e_exam_center_gate.py \
+            tests/test_e2e_candidate_booking.py
+
+      - name: Typecheck and build frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run typecheck
+          npm run build
+
+      - name: Publish validation status
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api --method POST -H "Accept: application/vnd.github+json" \
+            "/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+            -f state=success -f context=exam-center-gate/validation \
+            -f description='Center Gate tests + frontend typecheck/build passed'
+
+      - name: Commit validated application changes
+        run: |
+          git rm .github/workflows/apply-exam-center-gate-enforcement.yml
+          git config user.name "CodeRoute Automation"
+          git config user.email "actions@users.noreply.github.com"
+          git add \
+            backend/app/routers/exams.py \
+            backend/app/routers/device_sessions.py \
+            backend/app/routers/center_incidents.py \
+            frontend/src/pages/exam.tsx \
+            frontend/src/pages/center.tsx \
+            backend/tests/test_e2e_candidate_center_multimedia_exam.py
+          git commit -m "security: enforce physical check-in and registered exam stations"
+          git push origin HEAD:agent/exam-center-gate-enforcement-p0
