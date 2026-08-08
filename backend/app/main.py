@@ -43,6 +43,7 @@ from app.routers import (
     exam_monitoring,
     exam_question_traces,
     exam_reviews,
+    exam_runtime,
     exams,
     health,
     institutional_authorizations,
@@ -229,6 +230,7 @@ app.include_router(questions.router, prefix=settings.api_v1_prefix)
 app.include_router(question_governance.router, prefix=settings.api_v1_prefix)
 app.include_router(sessions.router, prefix=settings.api_v1_prefix)
 app.include_router(exams.router, prefix=settings.api_v1_prefix)
+app.include_router(exam_runtime.router, prefix=settings.api_v1_prefix)
 app.include_router(institutional_authorizations.router, prefix=settings.api_v1_prefix)
 app.include_router(bookings.router, prefix=settings.api_v1_prefix)
 app.include_router(documents.router, prefix=settings.api_v1_prefix)
