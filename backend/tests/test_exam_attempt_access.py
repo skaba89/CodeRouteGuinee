@@ -6,8 +6,10 @@ from types import SimpleNamespace
 import pytest
 from fastapi import HTTPException
 
+from app.exam_engine import filter_official_exam_pool
 from app.models_candidate import Candidate
 from app.models_session import ExamSession
+from app.question_bank_gn import QUESTIONS_TRAINING_FULL
 from app.routers.exam_runtime import _assert_runtime_access
 from app.routers.exams import (
     _assert_attempt_access,
@@ -182,6 +184,24 @@ def test_official_bank_rejects_39_approved_questions():
     assert exc_info.value.detail["code"] == "OFFICIAL_QUESTION_BANK_NOT_READY"
     assert exc_info.value.detail["approved_questions"] == 39
     assert exc_info.value.detail["required_questions"] == 40
+
+
+def test_legacy_training_question_is_excluded_even_if_approved_upstream():
+    training = SimpleNamespace(id="training-1", text=QUESTIONS_TRAINING_FULL[0]["text"])
+    official = SimpleNamespace(id="official-1", text="Question officielle nouvellement certifiée DNTT")
+
+    filtered = filter_official_exam_pool([training, official])
+
+    assert filtered == [official]
+
+
+def test_future_approved_official_import_remains_eligible():
+    imported = SimpleNamespace(
+        id="official-import-1",
+        text="Question officielle importée après le seed historique",
+    )
+
+    assert filter_official_exam_pool([imported]) == [imported]
 
 
 def test_missing_official_trace_is_never_reconstructed():
