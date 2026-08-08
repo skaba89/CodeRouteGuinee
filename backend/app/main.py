@@ -33,6 +33,7 @@ from app.routers import (
     candidate_identity,
     candidate_submissions,
     candidates,
+    center_edge,
     center_incidents,
     center_stations,
     centers,
@@ -240,6 +241,7 @@ app.include_router(operations.router, prefix=settings.api_v1_prefix)
 app.include_router(entries.router, prefix=settings.api_v1_prefix)
 app.include_router(center_incidents.router, prefix=settings.api_v1_prefix)
 app.include_router(center_stations.router, prefix=settings.api_v1_prefix)
+app.include_router(center_edge.router, prefix=settings.api_v1_prefix)
 app.include_router(device_sessions.router, prefix=settings.api_v1_prefix)
 app.include_router(exam_monitoring.router, prefix=settings.api_v1_prefix)
 app.include_router(exam_reviews.router, prefix=settings.api_v1_prefix)

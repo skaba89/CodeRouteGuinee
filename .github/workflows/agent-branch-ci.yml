@@ -31,6 +31,7 @@ jobs:
           candidates=(
             tests/test_exam_attempt_access.py
             tests/test_exam_runtime_recovery.py
+            tests/test_center_edge.py
             tests/test_media_policy.py
             tests/test_question_media_schema_compat.py
             tests/test_e2e_exam_question_trace.py
