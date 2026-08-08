@@ -9,7 +9,7 @@ from fastapi import HTTPException
 from app.exam_engine import filter_official_exam_pool
 from app.models_candidate import Candidate
 from app.models_session import ExamSession
-from app.question_bank_gn import QUESTIONS_TRAINING_FULL
+from app.question_bank_gn import QUESTIONS_GN, QUESTIONS_TRAINING_FULL
 from app.routers.exam_runtime import _assert_runtime_access
 from app.routers.exams import (
     _assert_attempt_access,
@@ -193,6 +193,20 @@ def test_legacy_training_question_is_excluded_even_if_approved_upstream():
     filtered = filter_official_exam_pool([training, official])
 
     assert filtered == [official]
+
+
+def test_seeded_200_question_dataset_reduces_to_40_official_items():
+    seeded = [
+        SimpleNamespace(id=f"seed-{index}", text=item["text"])
+        for index, item in enumerate(QUESTIONS_GN + QUESTIONS_TRAINING_FULL)
+    ]
+
+    filtered = filter_official_exam_pool(seeded)
+    official_texts = {item["text"] for item in QUESTIONS_GN}
+
+    assert len(seeded) == 200
+    assert len(filtered) == 40
+    assert {item.text for item in filtered} == official_texts
 
 
 def test_future_approved_official_import_remains_eligible():
