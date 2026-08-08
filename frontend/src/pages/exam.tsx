@@ -1,12 +1,12 @@
 // ExamPage — CodeRoute Guinée v4
 // Interface niveau professionnel : layout 2 colonnes, média full-width,
 // timer circulaire, barre de progression, grille de navigation.
-import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react';
-import { getExamQuestions, startExamFromBooking, submitExamAttempt } from '../api';
+import { type FormEvent, useCallback, useEffect, useState } from 'react';
+import { getExamQuestions, getExamResults, startExamFromBooking, submitExamAttempt } from '../api';
 import type { ExamQuestion } from '../api';
 import { useIsMobile } from '../hooks/useIsMobile';
 import { isAudioLocale, speakFeedback, stop as stopAudio, playQuestionAudio, announceResult, announceInstructions } from '../audio';
-import { AudioModeBanner, AudioToggle, LocaleAudioSwitcher, PlayButton } from '../components/AudioButton';
+import { AudioModeBanner, LocaleAudioSwitcher, PlayButton } from '../components/AudioButton';
 import { type AuthUser } from '../authClient';
 import { type Locale } from '../i18n';
 import { useAuthSession, canUseProtectedActions } from '../authSession';
@@ -16,6 +16,24 @@ import { MediaBlock, Timer, QGrid } from './shared-exam-components';
 import type { QData } from './shared-exam-components';
 
 interface Props { user?: AuthUser | null; locale?: Locale; onLocaleChange?: (l: Locale) => void; }
+
+type DisplayResultQuestion = {
+  question_id: string;
+  question_text: string;
+  candidate_answer: string;
+  correct_answer?: string;
+  is_correct: boolean;
+  category?: string;
+  options?: string[];
+  explanation?: string | null;
+};
+
+type DisplayResult = {
+  score: number;
+  threshold: number;
+  passed: boolean;
+  questions: DisplayResultQuestion[];
+};
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 function errMsg(e: unknown, fallback: string): string {
@@ -50,7 +68,7 @@ const CATEGORY_BG: Record<string, string> = {
 };
 
 // ── Composant principal ───────────────────────────────────────────────────────
-export function ExamPage({ locale, onLocaleChange }: Props) {
+export function ExamPage({ locale }: Props) {
   const { currentUser } = useAuthSession();
   const isAuth = Boolean(currentUser);
   const canUseApi = canUseProtectedActions(currentUser, false, ['candidate','center','admin','super_admin']);
@@ -61,7 +79,7 @@ export function ExamPage({ locale, onLocaleChange }: Props) {
   const questions: QData[] = (liveQuestions ?? []).length > 0
     ? liveQuestions!.map((q, i) => ({
         id: q.id, text: q.text, options: q.options,
-        correct_answer: q.correct_answer, number: i + 1,
+        number: i + 1,
         category: q.category,
         media: q.media_url ?? undefined,
         mediaType: (q.media_type ?? undefined) as 'sign' | 'scene' | 'image' | 'video' | undefined,
@@ -89,14 +107,16 @@ export function ExamPage({ locale, onLocaleChange }: Props) {
   const [reveal, setReveal]       = useState(false);
   const [bookRef, setBookRef]     = useState('');
   const [attemptId, setAttemptId] = useState<string | null>(null);
-  const [result, setResult]       = useState<any>(null);
+  const [result, setResult]       = useState<DisplayResult | null>(null);
   const [startLoading, setStartLoading] = useState(false);
   const [startErr, setStartErr]   = useState('');
+  const [submissionErr, setSubmissionErr] = useState('');
   const [filter, setFilter]       = useState<'all' | 'ok' | 'ko'>('all');
 
   const q = questions[idx];
   const answered = Object.keys(answers).length;
   const audioEnabled = isAudioLocale(locale as Locale);
+  const isOfficialExam = attemptId !== null;
 
   // Lire la question à voix haute quand la langue du candidat l'exige.
   // Privilégie l'enregistrement par un locuteur natif ; repli automatique
@@ -114,9 +134,8 @@ export function ExamPage({ locale, onLocaleChange }: Props) {
     return () => { if (audioEnabled) stopAudio(); };
   }, [idx, phase, audioEnabled, locale, q]);
 
-  // Annonce vocale du RÉSULTAT — indispensable pour un candidat non-lecteur :
-  // sans cela, il passe l'examen à l'oreille puis se retrouve devant un écran
-  // « ADMIS / NON ADMIS » qu'il ne peut pas lire.
+  // Annonce vocale du résultat uniquement une fois la vérité serveur (officiel)
+  // ou le résultat local (examen blanc) réellement disponible.
   useEffect(() => {
     if (phase === 'done' && result && audioEnabled) {
       void announceResult(
@@ -125,7 +144,7 @@ export function ExamPage({ locale, onLocaleChange }: Props) {
         Number(result.questions?.length ?? questions.length),
       );
     }
-  }, [phase, result, audioEnabled]);
+  }, [phase, result, audioEnabled, questions.length]);
 
   // Navigation clavier
   useEffect(() => {
@@ -140,45 +159,91 @@ export function ExamPage({ locale, onLocaleChange }: Props) {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [phase, idx, q, answers]);
+  }, [phase, idx, q, answers, isOfficialExam]);
 
-  // Timer expiration
+  // Timer expiration — le prochain lot P0 remplacera ce timer local par
+  // l'horloge serveur. Pour l'instant on bascule en revue sans inventer de score.
   const onTimerExpire = useCallback(() => {
     if (phase === 'running') { setPhase('review'); }
   }, [phase]);
 
   // ── Sélection réponse ───────────────────────────────────────────────────────
   function pick(opt: string) {
+    if (!q) return;
+
+    // Examen officiel : aucune correction côté navigateur, aucune annonce
+    // vrai/faux et possibilité de modifier sa réponse avant soumission.
+    if (isOfficialExam) {
+      setAnswers(a => ({ ...a, [idx]: opt }));
+      setReveal(false);
+      return;
+    }
+
+    // Examen blanc : feedback pédagogique immédiat conservé.
     if (answers[idx] !== undefined) return;
     const isCorrect = opt === q.correct_answer;
-    // L'explication est lue aussi : un candidat qui ne lit pas doit pouvoir
-    // comprendre POURQUOI sa réponse est fausse, pas seulement qu'elle l'est.
     if (audioEnabled) speakFeedback(isCorrect, q.explanation ?? q.expl);
     setAnswers(a => ({ ...a, [idx]: opt }));
     setReveal(true);
   }
 
-  // ── Démarrer l'examen ────────────────────────────────────────────────────────
+  function resetExamState() {
+    setPhase('setup');
+    setAnswers({});
+    setIdx(0);
+    setResult(null);
+    setLiveQuestions(null);
+    setAttemptId(null);
+    setReveal(false);
+    setSubmissionErr('');
+    setFilter('all');
+  }
+
+  function startDemoExam() {
+    setStartErr('');
+    setSubmissionErr('');
+    setAttemptId(null);
+    setLiveQuestions(null);
+    setAnswers({});
+    setIdx(0);
+    setReveal(false);
+    setResult(null);
+    setFilter('all');
+    setPhase('running');
+  }
+
+  // ── Démarrer l'examen officiel ──────────────────────────────────────────────
   async function handleStartExam(e?: FormEvent) {
     e?.preventDefault();
-    setStartLoading(true);
     setStartErr('');
+    setSubmissionErr('');
+
+    if (!canUseApi || !bookRef.trim()) {
+      setStartErr("Connectez-vous et saisissez une référence de réservation valide pour démarrer l'examen officiel.");
+      return;
+    }
+
+    setStartLoading(true);
     try {
-      if (canUseApi && bookRef.trim()) {
-        const attempt = await startExamFromBooking(bookRef.trim());
-        setAttemptId(attempt.id);
-        const qsResp = await getExamQuestions(attempt.id, locale);
-        setLiveQuestions(qsResp.questions);
+      const attempt = await startExamFromBooking(bookRef.trim());
+      const qsResp = await getExamQuestions(attempt.id, locale);
+      if (!qsResp.questions.length) {
+        throw new Error("La session officielle ne contient aucune question. Contactez le responsable du centre.");
       }
+      setAttemptId(attempt.id);
+      setLiveQuestions(qsResp.questions);
+      setAnswers({});
+      setIdx(0);
+      setReveal(false);
+      setResult(null);
+      setFilter('all');
       setPhase('running');
     } catch (err: unknown) {
-      const msg = errMsg(err, "Impossible de démarrer l'examen");
-      if (msg.includes('404') || msg.includes('401') || msg.includes('not found')) {
-        setStartErr('Référence introuvable — passage en mode démonstration');
-        setTimeout(() => { setStartErr(''); setPhase('running'); }, 1800);
-      } else {
-        setStartErr(msg);
-      }
+      // IMPORTANT : aucun fallback automatique vers la démonstration.
+      // Une référence invalide doit rester une erreur d'examen officiel.
+      setAttemptId(null);
+      setLiveQuestions(null);
+      setStartErr(errMsg(err, "Impossible de démarrer l'examen officiel"));
     } finally {
       setStartLoading(false);
     }
@@ -186,29 +251,64 @@ export function ExamPage({ locale, onLocaleChange }: Props) {
 
   // ── Soumettre l'examen ───────────────────────────────────────────────────────
   async function submitExam() {
-    setPhase('done');
+    setSubmissionErr('');
+
     if (attemptId) {
-      try {
-        const payload: Record<string, string> = {};
-        Object.entries(answers).forEach(([i, ans]) => { payload[questions[parseInt(i)].id] = ans; });
-        const r = await submitExamAttempt(attemptId, payload);
-        setResult(r);
-      } catch { /* afficher résultats locaux */ }
-    }
-    if (!result) {
-      const score = questions.filter((_, i) => answers[i] === questions[i].correct_answer).length;
-      setResult({
-        score, threshold: 35, passed: score >= 35,
-        questions: questions.map((q2, i) => ({
-          question_id: q2.id, question_text: q2.text,
-          candidate_answer: answers[i] ?? '—',
-          correct_answer: q2.correct_answer,
-          is_correct: answers[i] === q2.correct_answer,
-          category: q2.category, options: q2.options,
-          explanation: q2.expl,
-        })),
+      const payload: Record<string, string> = {};
+      Object.entries(answers).forEach(([i, ans]) => {
+        const question = questions[parseInt(i)];
+        if (question) payload[question.id] = ans;
       });
+
+      try {
+        // La vérité du score appartient exclusivement au backend.
+        // Même si la réponse HTTP de soumission est perdue, on tente ensuite
+        // de relire le résultat détaillé déjà persisté côté serveur.
+        try {
+          await submitExamAttempt(attemptId, payload);
+        } catch {
+          // getExamResults ci-dessous distinguera un examen déjà soumis
+          // d'une tentative réellement non soumise/expirée.
+        }
+
+        const serverResult = await getExamResults(attemptId);
+        setResult({
+          score: serverResult.score,
+          threshold: serverResult.threshold,
+          passed: serverResult.passed,
+          questions: serverResult.questions.map(item => ({
+            question_id: item.question_id,
+            question_text: item.text,
+            candidate_answer: item.given_answer ?? '—',
+            correct_answer: item.correct_answer,
+            is_correct: item.is_correct,
+            category: item.category,
+            options: item.options,
+            explanation: item.explanation,
+          })),
+        });
+        setPhase('done');
+      } catch (err: unknown) {
+        // Jamais de scoring local de secours pour un examen officiel.
+        setSubmissionErr(errMsg(err, "Impossible d'enregistrer ou de récupérer le résultat officiel."));
+      }
+      return;
     }
+
+    // Examen blanc uniquement : scoring local autorisé.
+    const score = questions.filter((_, i) => answers[i] === questions[i].correct_answer).length;
+    setResult({
+      score, threshold: 35, passed: score >= 35,
+      questions: questions.map((q2, i) => ({
+        question_id: q2.id, question_text: q2.text,
+        candidate_answer: answers[i] ?? '—',
+        correct_answer: q2.correct_answer,
+        is_correct: answers[i] === q2.correct_answer,
+        category: q2.category, options: q2.options,
+        explanation: q2.expl,
+      })),
+    });
+    setPhase('done');
   }
 
   // ── PHASE SETUP ─────────────────────────────────────────────────────────────
@@ -266,12 +366,12 @@ export function ExamPage({ locale, onLocaleChange }: Props) {
           <div className="card">
             <LocaleAudioSwitcher />
 
-            {/* Consignes à l'écoute — pour les candidats qui ne lisent pas */}
+            {/* Consignes à l'écoute — seuil cohérent avec le moteur backend */}
             {audioEnabled && (
               <button
                 type="button"
                 className="btn-outline"
-                onClick={() => { void announceInstructions(questions.length || 40, 30, 32); }}
+                onClick={() => { void announceInstructions(40, 30, 35); }}
                 style={{ width: '100%', marginTop: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
               >
                 <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
@@ -283,7 +383,7 @@ export function ExamPage({ locale, onLocaleChange }: Props) {
 
             {isAuth && (
               <label style={{ marginBottom: 14, marginTop: 14 }}>
-                Référence de réservation <span style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 400 }}>(optionnel)</span>
+                Référence de réservation <span style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 400 }}>(obligatoire pour l'examen officiel)</span>
                 <input value={bookRef} onChange={e => setBookRef(e.target.value)} placeholder="GN-CONV-2026-000001" style={{ marginTop: 6 }}/>
               </label>
             )}
@@ -293,15 +393,31 @@ export function ExamPage({ locale, onLocaleChange }: Props) {
                 <span>{startErr}</span>
               </div>
             )}
+
+            {isAuth && (
+              <button
+                className="btn-success btn-block"
+                style={{ minHeight: 48, fontSize: 14, fontWeight: 700, letterSpacing: '.02em' }}
+                onClick={handleStartExam}
+                disabled={startLoading || !canUseApi || !bookRef.trim()}
+              >
+                {startLoading ? 'Chargement des questions…' : "Démarrer l'examen officiel"}
+              </button>
+            )}
+
             <button
-              className="btn-success btn-block"
-              style={{ minHeight: 48, fontSize: 14, fontWeight: 700, letterSpacing: '.02em' }}
-              onClick={handleStartExam}
+              className="secondary-button btn-block"
+              style={{ minHeight: 44, marginTop: 10, fontSize: 13, fontWeight: 700 }}
+              onClick={startDemoExam}
               disabled={startLoading}
             >
-              {startLoading ? 'Chargement des questions…' : isAuth && bookRef.trim() ? 'Démarrer l\'examen officiel' : 'Commencer la démonstration'}
+              Commencer un examen blanc
             </button>
+
             <p style={{ fontSize: 12, color: 'var(--muted)', textAlign: 'center', marginTop: 12 }}>
+              Examen officiel : réservation requise · Examen blanc : entraînement sans valeur administrative
+            </p>
+            <p style={{ fontSize: 12, color: 'var(--muted)', textAlign: 'center', marginTop: 6 }}>
               Touches clavier : ← → pour naviguer · 1 2 3 4 pour répondre
             </p>
           </div>
@@ -312,7 +428,7 @@ export function ExamPage({ locale, onLocaleChange }: Props) {
 
   // ── PHASE DONE / RÉSULTATS ───────────────────────────────────────────────────
   if (phase === 'done' && result) {
-    const filtered = result.questions.filter((q2: any) =>
+    const filtered = result.questions.filter(q2 =>
       filter === 'all' ? true : filter === 'ok' ? q2.is_correct : !q2.is_correct
     );
     const scoreColor = result.passed ? 'var(--guinea-green)' : 'var(--red)';
@@ -342,7 +458,7 @@ export function ExamPage({ locale, onLocaleChange }: Props) {
                 Seuil d'admission : {result.threshold} / {result.questions.length} — {Math.round(result.score / result.questions.length * 100)}%
               </p>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <button className="btn-success btn-sm" onClick={() => { setPhase('setup'); setAnswers({}); setIdx(0); setResult(null); setLiveQuestions(null); }}>
+                <button className="btn-success btn-sm" onClick={resetExamState}>
                   Recommencer
                 </button>
                 {audioEnabled && (
@@ -361,8 +477,8 @@ export function ExamPage({ locale, onLocaleChange }: Props) {
 
           {/* Filtres */}
           <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-            {([['all', `Toutes (${result.questions.length})`], ['ok', `Correctes (${result.questions.filter((q:any)=>q.is_correct).length})`], ['ko', `Erreurs (${result.questions.filter((q:any)=>!q.is_correct).length})`]] as [string,string][]).map(([f, label]) => (
-              <button key={f} className={filter === f ? 'btn-success btn-sm' : 'secondary-button btn-sm'} onClick={() => setFilter(f as any)}>
+            {([['all', `Toutes (${result.questions.length})`], ['ok', `Correctes (${result.questions.filter(q2=>q2.is_correct).length})`], ['ko', `Erreurs (${result.questions.filter(q2=>!q2.is_correct).length})`]] as [string,string][]).map(([f, label]) => (
+              <button key={f} className={filter === f ? 'btn-success btn-sm' : 'secondary-button btn-sm'} onClick={() => setFilter(f as 'all' | 'ok' | 'ko')}>
                 {label}
               </button>
             ))}
@@ -370,7 +486,7 @@ export function ExamPage({ locale, onLocaleChange }: Props) {
 
           {/* Liste des questions */}
           <div style={{ display: 'grid', gap: 10 }}>
-            {filtered.map((q2: any, i: number) => (
+            {filtered.map((q2, i) => (
               <div key={i} style={{ background: 'var(--surface)', border: `1.5px solid ${q2.is_correct ? '#86efac' : '#fca5a5'}`, borderRadius: 12, padding: '14px 18px', display: 'grid', gap: 8 }}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
                   <p style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--ink)', flex: 1, lineHeight: 1.5 }}>{q2.question_text}</p>
@@ -401,14 +517,28 @@ export function ExamPage({ locale, onLocaleChange }: Props) {
     );
   }
 
-  // ── PHASE RUNNING ────────────────────────────────────────────────────────────
+  // ── PHASE RUNNING / REVIEW ──────────────────────────────────────────────────
   const catColor = CATEGORY_COLOR[q?.category ?? ''] ?? '#006B3F';
   const catBg    = CATEGORY_BG[q?.category ?? '']    ?? '#E6F3EC';
   const hasMedia = Boolean(q?.media);
+  const canRevealAnswer = !isOfficialExam;
 
   return (
-    <section className="screen" role="main" aria-label="Examen en cours" style={{ padding: '20px 16px' }}>
+    <section className="screen" role="main" aria-label={isOfficialExam ? 'Examen officiel en cours' : 'Examen blanc en cours'} style={{ padding: '20px 16px' }}>
       <div style={{ maxWidth: 1060, margin: '0 auto' }}>
+
+        {isOfficialExam && (
+          <div style={{ marginBottom: 12, padding: '9px 12px', borderRadius: 8, background: '#E6F3EC', border: '1px solid #86efac', color: '#006B3F', fontSize: 12.5, fontWeight: 700 }}>
+            Examen officiel — les bonnes réponses et explications ne sont révélées qu'après la soumission enregistrée par le serveur.
+          </div>
+        )}
+
+        {submissionErr && (
+          <div style={{ display: 'flex', gap: 8, padding: '10px 14px', background: '#FDECEA', border: '1px solid #fca5a5', borderRadius: 8, fontSize: 13, color: '#991B1B', marginBottom: 12, alignItems: 'flex-start' }}>
+            <IconAlertTriangle size={16} style={{ flexShrink: 0, marginTop: 1 }}/>
+            <span>{submissionErr}</span>
+          </div>
+        )}
 
         {/* ── Barre supérieure ─────────────────────────────────────────── */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
@@ -476,9 +606,9 @@ export function ExamPage({ locale, onLocaleChange }: Props) {
             <div style={{ display: 'grid', gap: 9 }}>
               {q?.options.map((opt, i) => {
                 const isSelected = answers[idx] === opt;
-                const isCorrect  = opt === q.correct_answer;
-                const showResult = reveal && isSelected;
-                const showCorrect= reveal && isCorrect && !isSelected;
+                const isCorrect  = canRevealAnswer && opt === q.correct_answer;
+                const showResult = canRevealAnswer && reveal && isSelected;
+                const showCorrect= canRevealAnswer && reveal && isCorrect && !isSelected;
 
                 let borderColor = 'var(--border)';
                 let bgColor     = 'var(--surface)';
@@ -486,7 +616,7 @@ export function ExamPage({ locale, onLocaleChange }: Props) {
                 let letterBg    = 'var(--bg)';
                 let letterColor = 'var(--muted)';
 
-                if (isSelected && !reveal) { borderColor = 'var(--guinea-green)'; bgColor = '#E6F3EC'; textColor = '#006B3F'; letterBg = '#006B3F'; letterColor = '#fff'; }
+                if (isSelected && (!reveal || isOfficialExam)) { borderColor = 'var(--guinea-green)'; bgColor = '#E6F3EC'; textColor = '#006B3F'; letterBg = '#006B3F'; letterColor = '#fff'; }
                 if (showResult && isCorrect) { borderColor = '#006B3F'; bgColor = '#E6F3EC'; textColor = '#006B3F'; letterBg = '#006B3F'; letterColor = '#fff'; }
                 if (showResult && !isCorrect){ borderColor = '#C0392B'; bgColor = '#FDECEA'; textColor = '#C0392B'; letterBg = '#C0392B'; letterColor = '#fff'; }
                 if (showCorrect)             { borderColor = '#006B3F'; bgColor = '#E6F3EC'; textColor = '#006B3F'; letterBg = '#E6F3EC'; letterColor = '#006B3F'; }
@@ -499,7 +629,7 @@ export function ExamPage({ locale, onLocaleChange }: Props) {
                       border: `2px solid ${borderColor}`,
                       borderRadius: 10,
                       background: bgColor,
-                      cursor: answers[idx] !== undefined ? 'default' : 'pointer',
+                      cursor: isOfficialExam || answers[idx] === undefined ? 'pointer' : 'default',
                       textAlign: 'left', width: '100%',
                       color: textColor, fontSize: 14, fontWeight: 500,
                       minHeight: 'unset', transition: 'all .12s ease',
@@ -511,17 +641,17 @@ export function ExamPage({ locale, onLocaleChange }: Props) {
                     </span>
                     {/* Texte */}
                     <span style={{ flex: 1 }}>{opt}</span>
-                    {/* Icône résultat */}
-                    {showResult && isCorrect  && <IconCheck size={18} style={{ color: '#006B3F', flexShrink: 0 }}/>}
+                    {/* Icône résultat — uniquement examen blanc */}
+                    {showResult && isCorrect  && <IconCheck size={18} style={{ color: '#006B3F', flexShrink: 0 }}/>} 
                     {showResult && !isCorrect && <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#C0392B" strokeWidth="2.5" style={{ flexShrink: 0 }}><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>}
-                    {showCorrect && <IconCheck size={18} style={{ color: '#006B3F', flexShrink: 0 }}/>}
+                    {showCorrect && <IconCheck size={18} style={{ color: '#006B3F', flexShrink: 0 }}/>} 
                   </button>
                 );
               })}
             </div>
 
-            {/* Explication */}
-            {reveal && q?.expl && (
+            {/* Explication — jamais pendant l'examen officiel */}
+            {canRevealAnswer && reveal && q?.expl && (
               <div style={{ marginTop: 14, padding: '12px 16px', background: '#E6F3EC', borderLeft: '3px solid var(--guinea-green)', borderRadius: '0 8px 8px 0', fontSize: 13, color: '#006B3F', lineHeight: 1.65 }}>
                 <strong>Explication : </strong>{q.expl}
               </div>
@@ -574,10 +704,10 @@ export function ExamPage({ locale, onLocaleChange }: Props) {
           <QGrid total={questions.length} cur={idx} ans={answers} onSelect={i => { setReveal(false); setIdx(i); }} />
           <div style={{ marginTop: 12, display: 'flex', justifyContent: 'flex-end' }}>
             <button className="btn-success btn-sm"
-              onClick={() => answered < questions.length ? setPhase('review') : submitExam()}
+              onClick={() => answered < questions.length ? setPhase('review') : void submitExam()}
               style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
               <IconCheck size={14}/>
-              {answered < questions.length ? `Soumettre (${questions.length - answered} sans réponse)` : 'Soumettre l\'examen'}
+              {answered < questions.length ? `Soumettre (${questions.length - answered} sans réponse)` : "Soumettre l'examen"}
             </button>
           </div>
         </div>
