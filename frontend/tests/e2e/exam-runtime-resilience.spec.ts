@@ -64,7 +64,9 @@ async function mockOfficialExam(
   page: Page,
   options: {
     remainingSeconds?: number;
+    savedAnswers?: Record<string, string>;
     onAutosave?: (route: Route) => Promise<void> | void;
+    onSubmit?: (route: Route) => Promise<void> | void;
     onTimeoutSubmit?: (route: Route) => Promise<void> | void;
   } = {},
 ) {
@@ -97,12 +99,30 @@ async function mockOfficialExam(
   }));
 
   await page.route(`**/api/v1/exams/${ATTEMPT_ID}/answers`, async route => {
+    if (route.request().method() === 'GET') {
+      const savedAnswers = options.savedAnswers ?? {};
+      await route.fulfill({
+        json: {
+          attempt_id: ATTEMPT_ID,
+          answers: savedAnswers,
+          saved: Object.keys(savedAnswers).length,
+          status: 'started',
+        },
+      });
+      return;
+    }
+
     if (options.onAutosave) {
       await options.onAutosave(route);
       return;
     }
+    const payload = route.request().postDataJSON() as { answers?: Record<string, string> } | null;
     await route.fulfill({
-      json: { attempt_id: ATTEMPT_ID, saved: Object.keys(route.request().postDataJSON()?.answers ?? {}).length, status: 'started' },
+      json: {
+        attempt_id: ATTEMPT_ID,
+        saved: Object.keys(payload?.answers ?? {}).length,
+        status: 'started',
+      },
     });
   });
 
@@ -123,16 +143,22 @@ async function mockOfficialExam(
     });
   });
 
-  await page.route(`**/api/v1/exams/${ATTEMPT_ID}/submit`, route => route.fulfill({
-    json: {
-      id: ATTEMPT_ID,
-      candidate_id: 'candidate-record-e2e',
-      session_id: 'session-e2e',
-      status: 'submitted',
-      score: 1,
-      passed: true,
-    },
-  }));
+  await page.route(`**/api/v1/exams/${ATTEMPT_ID}/submit`, async route => {
+    if (options.onSubmit) {
+      await options.onSubmit(route);
+      return;
+    }
+    await route.fulfill({
+      json: {
+        id: ATTEMPT_ID,
+        candidate_id: 'candidate-record-e2e',
+        session_id: 'session-e2e',
+        status: 'submitted',
+        score: 1,
+        passed: true,
+      },
+    });
+  });
 
   await page.route(`**/api/v1/exams/${ATTEMPT_ID}/results`, route => route.fulfill({
     json: {
@@ -176,7 +202,7 @@ test.describe('Examen officiel — résilience runtime', () => {
     let savedPayload: Record<string, string> | null = null;
     await mockOfficialExam(page, {
       onAutosave: async route => {
-        savedPayload = route.request().postDataJSON().answers;
+        savedPayload = (route.request().postDataJSON() as { answers: Record<string, string> }).answers;
         await route.fulfill({ json: { attempt_id: ATTEMPT_ID, saved: 1, status: 'started' } });
       },
     });
@@ -215,6 +241,21 @@ test.describe('Examen officiel — résilience runtime', () => {
     expect(starts).toBe(1);
   });
 
+  test('restaure la copie serveur sur un poste sans sessionStorage', async ({ page }) => {
+    await mockOfficialExam(page, {
+      savedAnswers: { 'q-priority-1': 'Le véhicule blanc' },
+    });
+
+    await page.goto('/#/exam');
+    await page.evaluate(() => window.sessionStorage.clear());
+    await page.getByPlaceholder('GN-CONV-2026-000001').fill('GN-CONV-E2E-001');
+    await page.getByRole('button', { name: "Démarrer l'examen officiel" }).click();
+
+    await expect(page.getByRole('main', { name: 'Examen officiel en cours' })).toBeVisible();
+    await expect(page.getByText('Navigation — 1 / 2 répondues')).toBeVisible();
+    await expect(page.getByRole('button', { name: /Le véhicule blanc/ })).toHaveCSS('border-color', 'rgb(0, 107, 63)');
+  });
+
   test('conserve une copie locale pendant une coupure puis reprend la sauvegarde serveur', async ({ page }) => {
     let saveAttempt = 0;
     await mockOfficialExam(page, {
@@ -236,6 +277,75 @@ test.describe('Examen officiel — résilience runtime', () => {
     await page.getByRole('button', { name: /^STOP$/ }).click();
     await expect(page.getByText('● Réponses sauvegardées')).toBeVisible();
     expect(saveAttempt).toBe(2);
+  });
+
+  test('sérialise les autosauvegardes pour préserver l’ordre des snapshots', async ({ page }) => {
+    let autosaveCalls = 0;
+    const payloads: Record<string, string>[] = [];
+    let releaseFirst!: () => void;
+    const firstBlocked = new Promise<void>(resolve => { releaseFirst = resolve; });
+
+    await mockOfficialExam(page, {
+      onAutosave: async route => {
+        autosaveCalls += 1;
+        const body = route.request().postDataJSON() as { answers: Record<string, string> };
+        payloads.push(body.answers);
+        if (autosaveCalls === 1) await firstBlocked;
+        await route.fulfill({ json: { attempt_id: ATTEMPT_ID, saved: Object.keys(body.answers).length, status: 'started' } });
+      },
+    });
+
+    await openOfficialExam(page);
+    await page.getByRole('button', { name: /Le véhicule blanc/ }).click();
+    await expect.poll(() => autosaveCalls).toBe(1);
+
+    await page.getByRole('button', { name: /Suivante/ }).click();
+    await page.getByRole('button', { name: /^STOP$/ }).click();
+    await page.waitForTimeout(120);
+    expect(autosaveCalls).toBe(1);
+
+    releaseFirst();
+    await expect.poll(() => autosaveCalls).toBe(2);
+    expect(payloads[0]).toEqual({ 'q-priority-1': 'Le véhicule blanc' });
+    expect(payloads[1]).toEqual({
+      'q-priority-1': 'Le véhicule blanc',
+      'q-signal-2': 'STOP',
+    });
+  });
+
+  test('un double clic ne produit qu’une seule soumission officielle', async ({ page }) => {
+    let submits = 0;
+    await mockOfficialExam(page, {
+      onSubmit: async route => {
+        submits += 1;
+        await new Promise(resolve => setTimeout(resolve, 150));
+        await route.fulfill({
+          json: {
+            id: ATTEMPT_ID,
+            candidate_id: 'candidate-record-e2e',
+            session_id: 'session-e2e',
+            status: 'submitted',
+            score: 1,
+            passed: true,
+          },
+        });
+      },
+    });
+
+    await openOfficialExam(page);
+    await page.getByRole('button', { name: /Le véhicule blanc/ }).click();
+    await page.getByRole('button', { name: /Suivante/ }).click();
+    await page.getByRole('button', { name: /^STOP$/ }).click();
+    await expect(page.getByText('● Réponses sauvegardées')).toBeVisible();
+
+    const submit = page.getByRole('button', { name: "Soumettre l'examen" });
+    await submit.evaluate((element: HTMLButtonElement) => {
+      element.click();
+      element.click();
+    });
+
+    await expect(page.getByText('ADMIS')).toBeVisible();
+    expect(submits).toBe(1);
   });
 
   test('à 00:00 finalise une seule fois depuis la dernière sauvegarde serveur', async ({ page }) => {
