@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.deps import require_roles
-from app.exam_attempt_locking import find_recoverable_attempt, lock_exam_attempt
+from app.exam_attempt_locking import RECOVERABLE_ATTEMPT_STATUSES, find_latest_attempt, lock_exam_attempt
 from app.exam_engine import (
     EXAM_DURATION_MINUTES,
     EXAM_QUESTIONS_TOTAL,
@@ -133,7 +133,9 @@ def _require_official_trace(trace: ExamQuestionTrace | None) -> ExamQuestionTrac
     )
 
 
-def _create_exam_attempt(db: Session, candidate_id: str, session_id: str) -> ExamAttempt:
+def _create_exam_attempt(
+    db: Session, candidate_id: str, session_id: str, *, commit: bool = True
+) -> ExamAttempt:
     # Un examen officiel tire EXCLUSIVEMENT des questions actives et approuvées.
     approved = list(db.scalars(
         select(Question).where(
@@ -189,8 +191,11 @@ def _create_exam_attempt(db: Session, candidate_id: str, session_id: str) -> Exa
             },
         )
     )
-    db.commit()
-    db.refresh(attempt)
+    if commit:
+        db.commit()
+        db.refresh(attempt)
+    else:
+        db.flush()
     return attempt
 
 
@@ -357,30 +362,47 @@ def start_exam_from_booking(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Incomplete booking session")
     _assert_center_session_access(current_user, session)
 
-    existing_attempt = find_recoverable_attempt(db, booking.candidate_id, booking.session_id)
-    if existing_attempt is not None:
-        _assert_attempt_access(db, current_user, existing_attempt)
+    latest_attempt = find_latest_attempt(db, booking.candidate_id, booking.session_id)
+    if latest_attempt is not None and latest_attempt.status in RECOVERABLE_ATTEMPT_STATUSES:
+        _assert_attempt_access(db, current_user, latest_attempt)
         _register_exam_start_device(
-            db, existing_attempt, session, payload.device_key, payload.device_label
+            db, latest_attempt, session, payload.device_key, payload.device_label
         )
         db.add(
             AuditLog(
                 actor_id=current_user.id,
                 action="exam.attempt_resumed",
                 entity="exam_attempt",
-                entity_id=existing_attempt.id,
+                entity_id=latest_attempt.id,
                 details={
                     "booking_reference": booking.reference,
                     "candidate_id": booking.candidate_id,
                     "session_id": booking.session_id,
-                    "attempt_status": existing_attempt.status,
+                    "attempt_status": latest_attempt.status,
                     "recovery_mode": "booking_retry_or_device_replacement",
                 },
             )
         )
         db.commit()
-        db.refresh(existing_attempt)
-        return existing_attempt
+        db.refresh(latest_attempt)
+        return latest_attempt
+
+    if latest_attempt is not None:
+        code = "EXAM_ATTEMPT_BLOCKED_BY_INCIDENT" if latest_attempt.status == "incident_blocked" else "BOOKING_ALREADY_USED_FOR_EXAM"
+        message = (
+            "Cette tentative est bloquée par un incident. Une décision administrateur est requise."
+            if latest_attempt.status == "incident_blocked"
+            else "Cette réservation a déjà été utilisée pour un examen. Un nouveau passage exige un rattrapage institutionnel autorisé."
+        )
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": code,
+                "message": message,
+                "attempt_id": latest_attempt.id,
+                "attempt_status": latest_attempt.status,
+            },
+        )
 
     attempt = _create_exam_attempt(db, booking.candidate_id, booking.session_id)
     _register_exam_start_device(db, attempt, session, payload.device_key, payload.device_label)

@@ -123,11 +123,17 @@ def resolve_center_incident(
     if payload.allow_retake and attempt:
         if attempt.status not in {"incident_blocked", "started", "expired"}:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Attempt is not eligible for retake")
+
+        # Crée un vrai nouvel examen officiel avec sa propre trace, sans
+        # commit intermédiaire : la résolution et le rattrapage restent atomiques.
+        from app.routers.exams import _create_exam_attempt
+
+        new_attempt = _create_exam_attempt(
+            db, attempt.candidate_id, attempt.session_id, commit=False
+        )
         attempt.status = "cancelled_by_incident"
         attempt.submitted_at = now
-        new_attempt = ExamAttempt(candidate_id=attempt.candidate_id, session_id=attempt.session_id)
         db.add(attempt)
-        db.add(new_attempt)
         db.flush()
         incident.new_attempt_id = new_attempt.id
     elif attempt and attempt.status == "incident_blocked":
