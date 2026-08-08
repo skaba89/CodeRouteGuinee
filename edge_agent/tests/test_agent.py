@@ -36,6 +36,7 @@ def _lease_bundle(attempt_id: str | None = None) -> dict:
             "deadline_at": (started + timedelta(minutes=30)).isoformat().replace("+00:00", "Z"),
             "duration_seconds": 1800,
             "language": "fr",
+            "station": {"device_key": "CRG-STATION-EDGE-001"},
             "trace": {"trace_id": str(uuid4()), "question_count": 1, "bank_hash": "a" * 64, "version_label": "test"},
             "questions": [
                 {
@@ -80,8 +81,13 @@ def test_store_encrypts_lease_and_journal_and_binds_candidate_station(tmp_path: 
     bundle = _lease_bundle()
     attempt_id = bundle["lease"]["attempt_id"]
 
-    session = store.put_lease(bundle, "CRG-STATION-EDGE-001")
-    access_token = session["access_token"]
+    activation = store.put_lease(bundle, "CRG-STATION-EDGE-001")
+    claim = store.claim_candidate_session(
+        attempt_id,
+        activation["claim_token"],
+        "CRG-STATION-EDGE-001",
+    )
+    access_token = claim["access_token"]
     store.verify_candidate_access(attempt_id, access_token, "CRG-STATION-EDGE-001")
 
     try:
@@ -93,6 +99,7 @@ def test_store_encrypts_lease_and_journal_and_binds_candidate_station(tmp_path: 
     event = store.append_answer(attempt_id, "question-secret-001", "Alpha")
     assert event["sequence"] == 1
     assert len(event["event_hash"]) == 64
+    assert store.current_answers(attempt_id) == {"question-secret-001": "Alpha"}
     final = store.finalize(attempt_id)
     assert final["journal_head_hash"] == event["event_hash"]
     sync = store.sync_payload(attempt_id)
@@ -105,6 +112,8 @@ def test_store_encrypts_lease_and_journal_and_binds_candidate_station(tmp_path: 
             raw += path.read_bytes()
     assert b"QUESTION CONFIDENTIELLE EDGE TEST" not in raw
     assert b"Alpha" not in raw
+    assert activation["claim_token"].encode() not in raw
+    assert access_token.encode() not in raw
 
 
 def test_active_lease_requires_central_revalidation_after_agent_restart(tmp_path: Path) -> None:
@@ -169,6 +178,14 @@ class _FakeService:
 
     def activate_attempt(self, attempt_id, station_device_key, lang):
         self.calls.append("activate")
+        return {
+            "attempt_id": attempt_id,
+            "lease_id": "lease-1",
+            "claim_token": "c" * 43,
+            "claim_expires_at": 2_000_000_000,
+        }
+
+    def claim_candidate_session(self, attempt_id, claim_token, station_key):
         return {"attempt_id": attempt_id, "lease_id": "lease-1", "access_token": "candidate-token"}
 
     def sync_attempt(self, attempt_id):
@@ -176,7 +193,7 @@ class _FakeService:
         return {"accepted": True, "attempt_id": attempt_id}
 
     def candidate_exam(self, attempt_id, access_token, station_key):
-        return {"attempt_id": attempt_id, "status": "active", "questions": []}
+        return {"attempt_id": attempt_id, "status": "active", "duration_ms": 1_800_000, "remaining_ms": 1_000_000, "answers": {}, "questions": []}
 
     def answer(self, *args):
         return {"saved": True, "sequence": 1}
@@ -185,7 +202,7 @@ class _FakeService:
         return {"queued_for_sync": True}
 
 
-def test_local_api_separates_operator_and_candidate_credentials(tmp_path: Path) -> None:
+def test_local_api_separates_operator_claim_and_candidate_credentials(tmp_path: Path) -> None:
     config = _config(tmp_path)
     service = _FakeService(tmp_path)
     app = create_app(config=config, service=service)
@@ -199,6 +216,26 @@ def test_local_api_separates_operator_and_candidate_credentials(tmp_path: Path) 
         assert ok.status_code == 200
 
         attempt_id = str(uuid4())
+        activation = client.post(
+            "/operator/leases",
+            headers={"X-Edge-Operator-Token": config.operator_token},
+            json={"attempt_id": attempt_id, "station_device_key": "CRG-STATION-EDGE-003", "lang": "fr"},
+        )
+        assert activation.status_code == 200
+        assert "access_token" not in activation.json()
+        assert "candidate_url" in activation.json()
+
+        claim = client.post(
+            "/v1/claim",
+            json={
+                "attempt_id": attempt_id,
+                "claim_token": "c" * 43,
+                "station_device_key": "CRG-STATION-EDGE-003",
+            },
+        )
+        assert claim.status_code == 200
+        assert claim.json()["access_token"] == "candidate-token"
+
         assert client.get(f"/v1/exams/{attempt_id}").status_code == 401
         candidate = client.get(
             f"/v1/exams/{attempt_id}",
