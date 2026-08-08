@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.deps import require_roles
+from app.exam_attempt_locking import lock_exam_attempt
 from app.exam_engine import EXAM_DURATION_MINUTES, build_score_summary, score_answers
 from app.models_audit import AuditLog
 from app.models_candidate import Candidate
@@ -126,9 +127,11 @@ def save_exam_answers(
 
     Seules les questions sélectionnées dans la trace officielle sont conservées.
     Une réponse reçue après l'échéance est refusée et ne peut donc pas modifier
-    la copie qui servira à la finalisation automatique.
+    la copie qui servira à la finalisation automatique. Le verrou de ligne évite
+    aussi qu'une sauvegarde et une soumission finale modifient la tentative en
+    parallèle.
     """
-    attempt = db.get(ExamAttempt, attempt_id)
+    attempt = lock_exam_attempt(db, attempt_id)
     if not attempt:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Exam attempt not found")
 
@@ -167,8 +170,10 @@ def timeout_submit_exam(
     a été autosauvegardé avant l'échéance. Une petite fenêtre de 2 secondes avant
     la deadline permet au navigateur synchronisé de déclencher proprement la
     finalisation malgré la latence réseau, sans offrir de temps de réponse en plus.
+    Le verrou de ligne rend cette finalisation idempotente face à une soumission
+    manuelle concurrente.
     """
-    attempt = db.get(ExamAttempt, attempt_id)
+    attempt = lock_exam_attempt(db, attempt_id)
     if not attempt:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Exam attempt not found")
 
