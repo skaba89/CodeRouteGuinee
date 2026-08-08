@@ -198,6 +198,17 @@ export function ExamPage({ locale }: Props) {
     setPhase('done');
   }
 
+  async function finalizeTimedOutExam(id: string) {
+    setSubmissionErr('Temps écoulé — finalisation sécurisée à partir de la dernière sauvegarde serveur…');
+    try {
+      await postPrivateJson(`/api/v1/exams/${encodeURIComponent(id)}/timeout-submit`, {});
+      await loadServerResult(id);
+    } catch (err: unknown) {
+      setSubmissionErr(errMsg(err, 'Finalisation automatique momentanément indisponible. La dernière sauvegarde serveur est conservée.'));
+      timeoutSubmitFired.current = false;
+    }
+  }
+
   // Reprise automatique d'une tentative officielle après refresh/retour écran.
   useEffect(() => {
     if (!canUseApi || phase !== 'setup') return;
@@ -281,12 +292,11 @@ export function ExamPage({ locale }: Props) {
     return () => window.clearInterval(tick);
   }, [phase]);
 
-  // À 00:00 : soumission automatique. Le backend reste seul juge du délai.
+  // À 00:00 : finalisation automatique avec la dernière copie serveur.
   useEffect(() => {
     if (!attemptId || phase !== 'running' || remainingSeconds > 0 || timeoutSubmitFired.current) return;
     timeoutSubmitFired.current = true;
-    setSubmissionErr('Temps écoulé — enregistrement automatique de votre dernière sauvegarde…');
-    void submitExam();
+    void finalizeTimedOutExam(attemptId);
   }, [attemptId, phase, remainingSeconds]);
 
   useEffect(() => {
