@@ -7,7 +7,7 @@ from app.db.session import SessionLocal, init_db
 from app.main import app
 from app.models_center import Center
 from app.models_session import ExamSession
-from tests.conftest import get_admin_headers, get_center_headers
+from tests.conftest import get_admin_headers
 
 
 def _seed_center_and_session() -> tuple[str, str, str]:
@@ -27,10 +27,11 @@ def _seed_center_and_session() -> tuple[str, str, str]:
         db.add(center)
         db.commit()
         db.refresh(center)
+        # Le test de check-in doit être dans la fenêtre opérationnelle du centre.
         session = ExamSession(
             reference=f"GN-SESSION-E2E-{suffix}",
             center_id=center.id,
-            starts_at=datetime.now(UTC) + timedelta(days=7),
+            starts_at=datetime.now(UTC) + timedelta(minutes=5),
             capacity=20,
         )
         db.add(session)
@@ -42,12 +43,13 @@ def _seed_center_and_session() -> tuple[str, str, str]:
 
 
 def test_candidate_booking_payment_convocation_and_entry_flow() -> None:
-    center_id, center_code, session_id = _seed_center_and_session()
+    _center_id, center_code, session_id = _seed_center_and_session()
     suffix = uuid4().hex[:8]
 
     with TestClient(app) as client:
+        # Ce test couvre le parcours citoyen, pas le RBAC d'un agent centre.
+        # Le cloisonnement center_id est testé dans test_exam_center_gate.py.
         admin_headers = get_admin_headers(client)
-        center_headers = get_center_headers(client)
 
         candidate_response = client.post(
             "/api/v1/candidates",
@@ -104,7 +106,6 @@ def test_candidate_booking_payment_convocation_and_entry_flow() -> None:
         assert pdf_response.content.rstrip().endswith(b"%%EOF")
         assert pdf_response.headers["content-type"] == "application/pdf"
         assert f"coderoute-convocation-{booking['reference']}.pdf" in pdf_response.headers["content-disposition"]
-        # Contenu vérifié via extraction de texte (format ReportLab)
         from pypdf import PdfReader
         from io import BytesIO
         pdf_text = PdfReader(BytesIO(pdf_response.content)).pages[0].extract_text()
@@ -118,7 +119,7 @@ def test_candidate_booking_payment_convocation_and_entry_flow() -> None:
                 "verification_code": booking["verification_code"],
                 "center_code": center_code,
             },
-            headers=center_headers,
+            headers=admin_headers,
         )
         assert entry_response.status_code == 200
         assert entry_response.json()["allowed"] is True
@@ -130,7 +131,7 @@ def test_candidate_booking_payment_convocation_and_entry_flow() -> None:
                 "verification_code": booking["verification_code"],
                 "center_code": center_code,
             },
-            headers=center_headers,
+            headers=admin_headers,
         )
         assert duplicate_entry_response.status_code == 200
         assert duplicate_entry_response.json()["reason"] == "already_checked_in"
