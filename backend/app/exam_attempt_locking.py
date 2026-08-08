@@ -27,6 +27,29 @@ def lock_exam_attempt(db: Session, attempt_id: str) -> ExamAttempt | None:
     )
 
 
+def find_latest_attempt(
+    db: Session,
+    candidate_id: str,
+    session_id: str,
+) -> ExamAttempt | None:
+    """Verrouille la tentative la plus récente d'un candidat pour une session.
+
+    Cette requête sert de garde « réservation déjà consommée ». Si la dernière
+    tentative est récupérable, le caller la reprend ; sinon il doit refuser un
+    nouveau démarrage et passer par le workflow institutionnel de rattrapage.
+    """
+    return db.scalar(
+        select(ExamAttempt)
+        .where(
+            ExamAttempt.candidate_id == candidate_id,
+            ExamAttempt.session_id == session_id,
+        )
+        .order_by(ExamAttempt.started_at.desc())
+        .limit(1)
+        .with_for_update()
+    )
+
+
 def find_recoverable_attempt(
     db: Session,
     candidate_id: str,
