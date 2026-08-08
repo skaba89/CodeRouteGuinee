@@ -37,6 +37,29 @@ def _machine_payload(
     return payload
 
 
+def _fleet_telemetry(value: dict[str, Any] | None) -> dict[str, int] | None:
+    if value is None:
+        return None
+
+    def safe(key: str, maximum: int) -> int:
+        try:
+            parsed = int(value.get(key, 0) or 0)
+        except (TypeError, ValueError):
+            parsed = 0
+        return min(max(parsed, 0), maximum)
+
+    return {
+        "active_leases": safe("active_leases", 100_000),
+        "finalized_leases": safe("finalized_leases", 100_000),
+        "synced_leases": safe("synced_leases", 10_000_000),
+        "sync_pending": safe("sync_pending", 100_000),
+        "revalidation_required": safe("revalidation_required", 100_000),
+        "corrupt_leases": safe("corrupt_leases", 100_000),
+        "media_files": safe("media_files", 1_000_000),
+        "media_bytes": safe("media_bytes", 10_000_000_000_000),
+    }
+
+
 class CentralClient:
     def __init__(
         self,
@@ -80,11 +103,17 @@ class CentralClient:
         response.raise_for_status()
         return response
 
-    def heartbeat(self) -> dict[str, Any]:
+    def heartbeat(self, telemetry: dict[str, Any] | None = None) -> dict[str, Any]:
         sequence = self.store.next_node_sequence()
         sent_at = datetime.now(UTC).replace(microsecond=0)
-        capabilities = ["answer-journal-v1", "exam-lease-v1", "media-prefetch-v1"]
-        signing_payload = {
+        capabilities = [
+            "answer-journal-v1",
+            "exam-lease-v1",
+            "fleet-telemetry-v1",
+            "media-prefetch-v1",
+            "operator-status-v1",
+        ]
+        signing_payload: dict[str, Any] = {
             "capabilities": sorted(capabilities),
             "center_id": self.config.center_id,
             "node_id": self.config.node_id,
@@ -92,6 +121,9 @@ class CentralClient:
             "sequence": sequence,
             "software_version": self.config.software_version,
         }
+        normalized = _fleet_telemetry(telemetry)
+        if normalized is not None:
+            signing_payload["telemetry"] = normalized
         payload = {**signing_payload, "signature_b64": sign_payload(self.private_key, signing_payload)}
         return self._post("/api/v1/center-edge/heartbeat", payload).json()
 

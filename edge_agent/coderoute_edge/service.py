@@ -18,11 +18,26 @@ class EdgeAgentService:
         self.central = central
         self.media = media
 
+    def _fleet_telemetry(self) -> dict[str, int]:
+        status = self.operator_status()
+        counts = status.get("lease_counts") or {}
+        media = status.get("media_cache") or {}
+        return {
+            "active_leases": int(counts.get("active") or 0),
+            "finalized_leases": int(counts.get("finalized") or 0),
+            "synced_leases": int(counts.get("synced") or 0),
+            "sync_pending": int(status.get("sync_pending") or 0),
+            "revalidation_required": int(status.get("revalidation_required") or 0),
+            "corrupt_leases": int(status.get("corrupt_leases") or 0),
+            "media_files": int(media.get("files") or 0),
+            "media_bytes": int(media.get("bytes") or 0),
+        }
+
     def activate_attempt(self, attempt_id: str, station_device_key: str, lang: str = "fr") -> dict[str, Any]:
         station_device_key = station_device_key.strip()
         if len(station_device_key) < 4:
             raise ValueError("Identifiant du poste candidat invalide")
-        self.central.heartbeat()
+        self.heartbeat()
         bundle = self.central.issue_lease(attempt_id, lang)
         if not self.central.verify_lease_bundle(bundle):
             raise RuntimeError("Signature centrale du lease invalide")
@@ -99,7 +114,7 @@ class EdgeAgentService:
         return {**proof, "queued_for_sync": True}
 
     def sync_attempt(self, attempt_id: str) -> dict[str, Any]:
-        self.central.heartbeat()
+        self.heartbeat()
         payload = self.store.sync_payload(attempt_id)
         result = self.central.sync_offline(payload)
         if result.get("accepted"):
@@ -107,7 +122,7 @@ class EdgeAgentService:
         return result
 
     def heartbeat(self) -> dict[str, Any]:
-        return self.central.heartbeat()
+        return self.central.heartbeat(self._fleet_telemetry())
 
     def status(self) -> dict[str, Any]:
         """Statut public minimal utilisé par /health."""
