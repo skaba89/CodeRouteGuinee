@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import base64
+import hashlib
+import hmac
 import json
 import secrets
 import sqlite3
@@ -11,6 +14,7 @@ from typing import Any
 from .crypto import compare_secret, decrypt_json, encrypt_json, secret_hash
 
 JOURNAL_GENESIS_HASH = "0" * 64
+CLAIM_TTL_SECONDS = 10 * 60
 
 
 def _canonical_event_hash(
@@ -22,7 +26,6 @@ def _canonical_event_hash(
     answer: str,
     prev_hash: str,
 ) -> str:
-    import hashlib
     payload = {
         "answer": answer,
         "elapsed_ms": int(elapsed_ms),
@@ -33,6 +36,12 @@ def _canonical_event_hash(
     }
     raw = json.dumps(payload, sort_keys=True, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
     return hashlib.sha256(raw).hexdigest()
+
+
+def _derive_access_token(storage_key: bytes, attempt_id: str, claim_token: str) -> str:
+    message = f"coderoute-edge-access-v1\x00{attempt_id}\x00{claim_token}".encode("utf-8")
+    digest = hmac.new(storage_key, message, hashlib.sha256).digest()
+    return base64.urlsafe_b64encode(digest).decode("ascii").rstrip("=")
 
 
 class EdgeStore:
@@ -51,6 +60,12 @@ class EdgeStore:
         conn.execute("PRAGMA synchronous=FULL")
         conn.execute("PRAGMA foreign_keys=ON")
         return conn
+
+    @staticmethod
+    def _ensure_column(conn: sqlite3.Connection, table: str, column: str, ddl: str) -> None:
+        columns = {str(row[1]) for row in conn.execute(f"PRAGMA table_info({table})").fetchall()}
+        if column not in columns:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}")
 
     def _init_schema(self) -> None:
         with self._connect() as conn:
@@ -72,6 +87,9 @@ class EdgeStore:
                     duration_ms INTEGER NOT NULL,
                     journal_head_hash TEXT NOT NULL,
                     finalized_elapsed_ms INTEGER,
+                    claim_token_hash TEXT,
+                    claim_expires_at REAL,
+                    claim_consumed_at REAL,
                     created_at REAL NOT NULL,
                     updated_at REAL NOT NULL
                 );
@@ -86,6 +104,9 @@ class EdgeStore:
                 );
                 """
             )
+            self._ensure_column(conn, "leases", "claim_token_hash", "TEXT")
+            self._ensure_column(conn, "leases", "claim_expires_at", "REAL")
+            self._ensure_column(conn, "leases", "claim_consumed_at", "REAL")
 
     def next_node_sequence(self) -> int:
         with self._lock, self._connect() as conn:
@@ -99,7 +120,7 @@ class EdgeStore:
             conn.commit()
             return value
 
-    def put_lease(self, bundle: dict[str, Any], station_key: str) -> dict[str, str]:
+    def put_lease(self, bundle: dict[str, Any], station_key: str) -> dict[str, Any]:
         lease = bundle["lease"]
         attempt_id = str(lease["attempt_id"])
         lease_id = str(lease["lease_id"])
@@ -107,20 +128,23 @@ class EdgeStore:
         issued = _parse_iso(str(lease["issued_at"]))
         base_elapsed_ms = max(0, int((issued - started) * 1000))
         duration_ms = int(lease["duration_seconds"]) * 1000
-        access_token = secrets.token_urlsafe(32)
+        claim_token = secrets.token_urlsafe(32)
+        access_token = _derive_access_token(self.storage_key, attempt_id, claim_token)
+        claim_expires_at = time.time() + CLAIM_TTL_SECONDS
         nonce, ciphertext = encrypt_json(self.storage_key, bundle, aad=f"lease:{lease_id}")
         now = time.time()
         with self._lock, self._connect() as conn:
             conn.execute("BEGIN IMMEDIATE")
-            existing = conn.execute("SELECT lease_id,status FROM leases WHERE attempt_id=?", (attempt_id,)).fetchone()
+            existing = conn.execute("SELECT lease_id FROM leases WHERE attempt_id=?", (attempt_id,)).fetchone()
             if existing and existing["lease_id"] != lease_id:
                 raise RuntimeError("Une autre identité de lease existe déjà pour cette tentative")
             conn.execute(
                 """
                 INSERT INTO leases(
                     attempt_id,lease_id,nonce,ciphertext,access_token_hash,station_key_hash,status,
-                    base_elapsed_ms,duration_ms,journal_head_hash,finalized_elapsed_ms,created_at,updated_at
-                ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)
+                    base_elapsed_ms,duration_ms,journal_head_hash,finalized_elapsed_ms,
+                    claim_token_hash,claim_expires_at,claim_consumed_at,created_at,updated_at
+                ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                 ON CONFLICT(attempt_id) DO UPDATE SET
                     lease_id=excluded.lease_id,
                     nonce=excluded.nonce,
@@ -132,6 +156,9 @@ class EdgeStore:
                     duration_ms=excluded.duration_ms,
                     journal_head_hash=excluded.journal_head_hash,
                     finalized_elapsed_ms=NULL,
+                    claim_token_hash=excluded.claim_token_hash,
+                    claim_expires_at=excluded.claim_expires_at,
+                    claim_consumed_at=NULL,
                     updated_at=excluded.updated_at
                 """,
                 (
@@ -146,6 +173,9 @@ class EdgeStore:
                     duration_ms,
                     JOURNAL_GENESIS_HASH,
                     None,
+                    secret_hash(claim_token, domain="edge-claim-token"),
+                    claim_expires_at,
+                    None,
                     now,
                     now,
                 ),
@@ -153,18 +183,63 @@ class EdgeStore:
             conn.execute("DELETE FROM journal_events WHERE attempt_id=?", (attempt_id,))
             conn.commit()
         self._monotonic_origins[attempt_id] = (time.monotonic(), base_elapsed_ms)
-        return {"attempt_id": attempt_id, "lease_id": lease_id, "access_token": access_token}
+        return {
+            "attempt_id": attempt_id,
+            "lease_id": lease_id,
+            "claim_token": claim_token,
+            "claim_expires_at": int(claim_expires_at),
+        }
+
+    def claim_candidate_session(self, attempt_id: str, claim_token: str, station_key: str) -> dict[str, Any]:
+        now = time.time()
+        with self._lock, self._connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            row = conn.execute("SELECT * FROM leases WHERE attempt_id=?", (attempt_id,)).fetchone()
+            if not row:
+                raise KeyError("Lease local introuvable")
+            if row["status"] != "active":
+                raise RuntimeError("Le claim n'est disponible que pour une tentative active")
+            if not row["claim_token_hash"] or not compare_secret(
+                claim_token, row["claim_token_hash"], domain="edge-claim-token"
+            ):
+                raise PermissionError("Claim Edge invalide")
+            if float(row["claim_expires_at"] or 0) < now:
+                raise PermissionError("Claim Edge expiré")
+            if row["claim_consumed_at"] is not None:
+                raise PermissionError("Claim Edge déjà consommé")
+            if not compare_secret(station_key, row["station_key_hash"], domain="edge-station-key"):
+                raise PermissionError("Ce claim appartient à un autre poste candidat")
+
+            access_token = _derive_access_token(self.storage_key, attempt_id, claim_token)
+            if not compare_secret(access_token, row["access_token_hash"], domain="edge-access-token"):
+                raise RuntimeError("Dérivation du token Edge incohérente")
+            conn.commit()
+            return {
+                "attempt_id": attempt_id,
+                "lease_id": str(row["lease_id"]),
+                "access_token": access_token,
+                "claim_expires_at": int(row["claim_expires_at"]),
+            }
 
     def verify_candidate_access(self, attempt_id: str, access_token: str, station_key: str) -> sqlite3.Row:
-        with self._connect() as conn:
+        with self._lock, self._connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
             row = conn.execute("SELECT * FROM leases WHERE attempt_id=?", (attempt_id,)).fetchone()
-        if not row:
-            raise KeyError("Lease local introuvable")
-        if not compare_secret(access_token, row["access_token_hash"], domain="edge-access-token"):
-            raise PermissionError("Token de session Edge invalide")
-        if not compare_secret(station_key, row["station_key_hash"], domain="edge-station-key"):
-            raise PermissionError("Poste candidat différent de celui activé")
-        return row
+            if not row:
+                raise KeyError("Lease local introuvable")
+            if not compare_secret(access_token, row["access_token_hash"], domain="edge-access-token"):
+                raise PermissionError("Token de session Edge invalide")
+            if not compare_secret(station_key, row["station_key_hash"], domain="edge-station-key"):
+                raise PermissionError("Poste candidat différent de celui activé")
+            if row["claim_consumed_at"] is None:
+                now = time.time()
+                conn.execute(
+                    "UPDATE leases SET claim_consumed_at=?,updated_at=? WHERE attempt_id=?",
+                    (now, now, attempt_id),
+                )
+                row = conn.execute("SELECT * FROM leases WHERE attempt_id=?", (attempt_id,)).fetchone()
+            conn.commit()
+            return row
 
     def lease_bundle(self, attempt_id: str) -> dict[str, Any]:
         with self._connect() as conn:
@@ -243,6 +318,23 @@ class EdgeStore:
             )
             conn.commit()
         return event
+
+    def current_answers(self, attempt_id: str) -> dict[str, str]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT sequence,nonce,ciphertext FROM journal_events WHERE attempt_id=? ORDER BY sequence ASC",
+                (attempt_id,),
+            ).fetchall()
+        answers: dict[str, str] = {}
+        for row in rows:
+            event = decrypt_json(
+                self.storage_key,
+                row["nonce"],
+                row["ciphertext"],
+                aad=f"event:{attempt_id}:{row['sequence']}",
+            )
+            answers[str(event["question_id"])] = str(event["answer"])
+        return answers
 
     def finalize(self, attempt_id: str) -> dict[str, Any]:
         elapsed = self.elapsed_ms(attempt_id)
