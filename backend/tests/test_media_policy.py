@@ -31,6 +31,11 @@ def test_embedded_credentials_are_rejected():
         validate_media_url("https://admin:secret@cdn.coderoute.example/question.jpg", "image")
 
 
+def test_malformed_port_is_rejected_as_validation_error():
+    with pytest.raises(ValueError, match="port"):
+        validate_media_url("https://cdn.coderoute.example:abc/question.jpg", "image")
+
+
 def test_cloudinary_upload_api_cannot_be_persisted_as_delivery_url():
     with pytest.raises(ValueError, match="upload Cloudinary"):
         validate_media_url("https://api.cloudinary.com/v1_1/demo/image/upload", "image")
