@@ -11,6 +11,7 @@ from app.db.session import get_db
 from app.deps import require_roles
 from app.exam_engine import (
     EXAM_DURATION_MINUTES,
+    EXAM_QUESTIONS_TOTAL,
     build_question_bank_hash,
     build_score_summary,
     build_selected_questions_hash,
@@ -61,58 +62,106 @@ def _is_attempt_expired(attempt: ExamAttempt, now: datetime) -> bool:
     return now - attempt.started_at > timedelta(minutes=EXAM_DURATION_MINUTES)
 
 
-def _assert_attempt_access(db: Session, current_user: User, attempt: ExamAttempt) -> None:
-    """Protège les ressources d'une tentative contre les accès horizontaux.
+def _assert_center_session_access(current_user: User, session: ExamSession | None) -> None:
+    """Empêche un agent centre d'opérer sur une session d'un autre centre."""
+    if current_user.role != "center":
+        return
+    if session and current_user.center_id and session.center_id == current_user.center_id:
+        return
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Cette session appartient à un autre centre.",
+    )
 
-    Les candidats ne peuvent consulter ou soumettre que leur propre tentative.
-    Les rôles centre/admin/super_admin conservent leurs droits opérationnels ;
-    le cloisonnement des agents de centre par center_id sera traité séparément.
-    """
-    if current_user.role != "candidate":
+
+def _assert_attempt_access(db: Session, current_user: User, attempt: ExamAttempt) -> None:
+    """Protège toutes les ressources d'une tentative contre les accès horizontaux."""
+    if current_user.role in {"admin", "super_admin"}:
         return
 
-    candidate = db.get(Candidate, attempt.candidate_id)
-    owns_attempt = candidate is not None and (
-        candidate.user_id == current_user.id
-        or bool(candidate.email and candidate.email == current_user.email)
-    )
-    if not owns_attempt:
+    if current_user.role == "candidate":
+        candidate = db.get(Candidate, attempt.candidate_id)
+        owns_attempt = candidate is not None and (
+            candidate.user_id == current_user.id
+            or bool(candidate.email and candidate.email == current_user.email)
+        )
+        if owns_attempt:
+            return
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Cette tentative ne vous appartient pas.",
         )
 
+    if current_user.role == "center":
+        session = db.get(ExamSession, attempt.session_id)
+        _assert_center_session_access(current_user, session)
+        return
+
+    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Accès refusé.")
+
+
+def _require_official_bank_ready(approved: list[Question]) -> None:
+    """Refuse de démarrer un examen officiel avec une banque non homologuée.
+
+    Un manque de contenu approuvé est un incident de préparation de la banque,
+    jamais une raison de retomber silencieusement sur des questions non validées.
+    """
+    if len(approved) >= EXAM_QUESTIONS_TOTAL:
+        return
+    raise HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail={
+            "code": "OFFICIAL_QUESTION_BANK_NOT_READY",
+            "message": "La banque officielle ne contient pas assez de questions approuvées pour démarrer l'examen.",
+            "approved_questions": len(approved),
+            "required_questions": EXAM_QUESTIONS_TOTAL,
+        },
+    )
+
+
+def _require_official_trace(trace: ExamQuestionTrace | None) -> ExamQuestionTrace:
+    """Toute lecture ou notation officielle doit reposer sur la trace créée au départ."""
+    if trace and trace.question_ids:
+        return trace
+    raise HTTPException(
+        status_code=status.HTTP_409_CONFLICT,
+        detail={
+            "code": "OFFICIAL_EXAM_TRACE_MISSING",
+            "message": "La trace officielle de cette tentative est introuvable. Aucune reconstruction automatique n'est autorisée.",
+        },
+    )
+
 
 def _create_exam_attempt(db: Session, candidate_id: str, session_id: str) -> ExamAttempt:
-    # Charger uniquement les questions ACTIVES et APPROUVÉES (certifiées DNTT).
-    # Un examen officiel ne peut tirer que du contenu validé.
+    # Un examen officiel tire EXCLUSIVEMENT des questions actives et approuvées.
     approved = list(db.scalars(
         select(Question).where(
             Question.is_active.is_(True),
             Question.validation_status == "approved",
         )
     ).all())
+    _require_official_bank_ready(approved)
 
-    # Filet de sécurité historique : si trop peu de questions approuvées existent,
-    # l'application retombe encore sur les questions actives. Ce comportement sera
-    # supprimé dans le lot "banque officielle fail-closed" après vérification des
-    # seeds/migrations existants afin d'éviter une régression de déploiement.
-    from app.exam_engine import EXAM_QUESTIONS_TOTAL
-    if len(approved) >= EXAM_QUESTIONS_TOTAL:
-        all_questions = approved
-    else:
-        all_questions = list(db.scalars(select(Question).where(Question.is_active.is_(True))).all())
+    selected = select_exam_questions(approved)
+    if len(selected) != EXAM_QUESTIONS_TOTAL:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={
+                "code": "OFFICIAL_QUESTION_SELECTION_INCOMPLETE",
+                "message": "La banque approuvée ne permet pas de constituer un examen officiel complet.",
+                "selected_questions": len(selected),
+                "required_questions": EXAM_QUESTIONS_TOTAL,
+            },
+        )
 
-    # Sélectionner 40 questions selon la répartition officielle par catégorie
-    selected = select_exam_questions(all_questions)
     attempt = ExamAttempt(candidate_id=candidate_id, session_id=session_id)
     db.add(attempt)
     db.flush()
 
     question_ids = [q.id for q in selected]
-    bank_hash = build_question_bank_hash(all_questions)
+    bank_hash = build_question_bank_hash(approved)
     selection_hash = build_selected_questions_hash(selected)
-    version_label = f"official-{bank_hash[:12]}" if question_ids else "bank-empty"
+    version_label = f"official-{bank_hash[:12]}"
     trace = ExamQuestionTrace(
         attempt_id=attempt.id,
         question_ids=question_ids,
@@ -135,6 +184,7 @@ def _create_exam_attempt(db: Session, candidate_id: str, session_id: str) -> Exa
                 "question_count": len(question_ids),
                 "bank_hash": bank_hash,
                 "version_label": trace.version_label,
+                "approved_bank_size": len(approved),
             },
         )
     )
@@ -268,6 +318,8 @@ def start_exam(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("center", "admin", "super_admin")),
 ) -> ExamAttempt:
+    if current_user.role == "center":
+        _assert_center_session_access(current_user, db.get(ExamSession, payload.session_id))
     return _create_exam_attempt(db, payload.candidate_id, payload.session_id)
 
 
@@ -281,13 +333,11 @@ def start_exam_from_booking(
     if not booking:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Booking not found")
 
-    # Un candidat ne peut démarrer QUE sa propre réservation
-    # (sur les appareils du centre, il se connecte avec SON compte)
     if current_user.role == "candidate":
         cand = db.get(Candidate, booking.candidate_id)
         owns = cand is not None and (
             cand.user_id == current_user.id
-            or (cand.email and cand.email == current_user.email)
+            or bool(cand.email and cand.email == current_user.email)
         )
         if not owns:
             raise HTTPException(
@@ -300,6 +350,8 @@ def start_exam_from_booking(
     session = db.get(ExamSession, booking.session_id)
     if not session:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Incomplete booking session")
+    _assert_center_session_access(current_user, session)
+
     attempt = _create_exam_attempt(db, booking.candidate_id, booking.session_id)
     _register_exam_start_device(db, attempt, session, payload.device_key, payload.device_label)
     db.commit()
@@ -314,38 +366,35 @@ def get_exam_questions(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("center", "candidate", "admin", "super_admin")),
 ) -> ExamQuestionsRead:
-    """
-    Retourne les questions de l'examen pour un attempt donné.
-    Les réponses correctes ne sont PAS incluses (sécurité).
-    Accessible au candidat propriétaire ou à un agent autorisé.
-    """
+    """Retourne les questions de la trace officielle sans la réponse correcte."""
     attempt = db.scalar(select(ExamAttempt).where(ExamAttempt.id == attempt_id))
     if not attempt:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Attempt not found")
 
     _assert_attempt_access(db, current_user, attempt)
 
-    # Bloquer après soumission — les questions ne sont plus accessibles
     if attempt.status in ("submitted", "passed", "failed", "cancelled"):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Exam already {attempt.status} — questions no longer accessible",
         )
 
-    # Récupérer le trace pour connaître les question_ids sélectionnés
-    trace = db.scalar(select(ExamQuestionTrace).where(ExamQuestionTrace.attempt_id == attempt_id))
-    if trace and trace.question_ids:
-        questions = list(db.scalars(
-            select(Question).where(Question.id.in_(trace.question_ids))
-        ).all())
-        # Respecter l'ordre d'origine
-        id_order = {qid: i for i, qid in enumerate(trace.question_ids)}
-        questions.sort(key=lambda q: id_order.get(q.id, 999))
-    else:
-        # Fallback historique : sera supprimé avec le lot fail-closed banque officielle.
-        questions = list(db.scalars(
-            select(Question).where(Question.is_active.is_(True)).limit(40)
-        ).all())
+    trace = _require_official_trace(
+        db.scalar(select(ExamQuestionTrace).where(ExamQuestionTrace.attempt_id == attempt_id))
+    )
+    questions = list(db.scalars(
+        select(Question).where(Question.id.in_(trace.question_ids))
+    ).all())
+    if len(questions) != trace.question_count:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "OFFICIAL_EXAM_TRACE_INCOMPLETE",
+                "message": "Certaines questions de la trace officielle sont introuvables.",
+            },
+        )
+    id_order = {qid: i for i, qid in enumerate(trace.question_ids)}
+    questions.sort(key=lambda q: id_order.get(q.id, 999))
 
     from app.question_i18n import resolve_question_content
 
@@ -366,7 +415,7 @@ def get_exam_questions(
     return ExamQuestionsRead(
         attempt_id=attempt_id,
         questions=items,
-        duration_seconds=1800,
+        duration_seconds=EXAM_DURATION_MINUTES * 60,
         threshold=35,
     )
 
@@ -494,17 +543,26 @@ def submit_exam(
         db.commit()
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Exam attempt expired")
 
-    trace = db.scalar(select(ExamQuestionTrace).where(ExamQuestionTrace.attempt_id == attempt.id))
-    if trace and trace.question_ids:
-        questions = list(db.scalars(select(Question).where(Question.id.in_(trace.question_ids))).all())
-    else:
-        questions = list(db.scalars(select(Question).where(Question.is_active.is_(True))).all())
+    trace = _require_official_trace(
+        db.scalar(select(ExamQuestionTrace).where(ExamQuestionTrace.attempt_id == attempt.id))
+    )
+    questions = list(db.scalars(select(Question).where(Question.id.in_(trace.question_ids))).all())
+    if len(questions) != trace.question_count:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "OFFICIAL_EXAM_TRACE_INCOMPLETE",
+                "message": "La notation est bloquée car la trace officielle est incomplète.",
+            },
+        )
 
-    # Les options sont TOUJOURS affichées en français (seul l'audio est
-    # localisé — voir app/question_i18n.py). Une réponse soumise est donc
-    # nécessairement en français : comparaison directe, sans conversion.
     answer_key = {question.id: question.correct_answer for question in questions}
-    result = score_answers(answer_key, payload.answers)
+    sanitized_answers = {
+        question_id: answer
+        for question_id, answer in payload.answers.items()
+        if question_id in set(trace.question_ids)
+    }
+    result = score_answers(answer_key, sanitized_answers)
 
     candidate = db.get(Candidate, attempt.candidate_id)
     summary = build_score_summary(
@@ -512,14 +570,13 @@ def submit_exam(
         candidate_name=f"{candidate.first_name} {candidate.last_name}" if candidate else "",
     )
 
-    attempt.answers = payload.answers
+    attempt.answers = sanitized_answers
     attempt.score = result["correct_answers"]
     attempt.passed = result["passed"]
     attempt.status = "submitted"
     attempt.submitted_at = now
     db.add(attempt)
 
-    # Incrémenter le compteur de tentatives du candidat
     _cand = db.get(Candidate, attempt.candidate_id)
     if _cand and hasattr(_cand, "attempt_count"):
         _cand.attempt_count = (_cand.attempt_count or 0) + 1
@@ -544,7 +601,6 @@ def submit_exam(
     db.commit()
     db.refresh(attempt)
 
-    # Email de résultat — best effort
     try:
         if candidate and candidate.email:
             cert_url = None
@@ -552,47 +608,42 @@ def submit_exam(
                 cert_url = f"https://api.coderoute.gov.gn/api/v1/exams/{attempt.id}/certificate/verify"
             from app.email_service import send_exam_result
             send_exam_result(
-                to_email       = candidate.email,
-                candidate_name = f"{candidate.first_name} {candidate.last_name}",
-                booking_reference = attempt.booking_reference if hasattr(attempt, "booking_reference") else attempt.id,
-                passed         = result["passed"],
-                score          = result["correct_answers"],
-                total          = result["total_questions"],
-                certificate_url = cert_url,
+                to_email=candidate.email,
+                candidate_name=f"{candidate.first_name} {candidate.last_name}",
+                booking_reference=attempt.booking_reference if hasattr(attempt, "booking_reference") else attempt.id,
+                passed=result["passed"],
+                score=result["correct_answers"],
+                total=result["total_questions"],
+                certificate_url=cert_url,
             )
     except Exception as _sentry_exc:
         _sentry_capture(_sentry_exc, context={"file": __file__, "endpoint": "submit_exam_email"})
-        pass  # Email non bloquant
 
-    # SMS de résultat — best effort
     try:
         if candidate and candidate.phone:
             from app.orange_sms import send_exam_result_sms
             send_exam_result_sms(
-                phone          = candidate.phone,
-                candidate_name = f"{candidate.first_name} {candidate.last_name}",
-                passed         = result["passed"],
-                score          = result["correct_answers"],
-                total          = result["total_questions"],
+                phone=candidate.phone,
+                candidate_name=f"{candidate.first_name} {candidate.last_name}",
+                passed=result["passed"],
+                score=result["correct_answers"],
+                total=result["total_questions"],
             )
     except Exception as _sms_exc:
-        _sentry_cap(_sms_exc, context={'endpoint': 'submit_exam_sms'})
-        pass  # SMS non bloquant
+        _sentry_cap(_sms_exc, context={"endpoint": "submit_exam_sms"})
 
-    # WhatsApp de résultat — best effort
     try:
         if candidate and candidate.phone:
             from app.whatsapp_service import send_exam_result_whatsapp
             send_exam_result_whatsapp(
-                phone          = candidate.phone,
-                candidate_name = f"{candidate.first_name} {candidate.last_name}",
-                passed         = result["passed"],
-                score          = result["correct_answers"],
-                total          = result["total_questions"],
+                phone=candidate.phone,
+                candidate_name=f"{candidate.first_name} {candidate.last_name}",
+                passed=result["passed"],
+                score=result["correct_answers"],
+                total=result["total_questions"],
             )
     except Exception as _wa_exc:
-        _sentry_cap(_wa_exc, context={'endpoint': 'submit_exam_whatsapp'})
-        pass  # WhatsApp non bloquant
+        _sentry_cap(_wa_exc, context={"endpoint": "submit_exam_whatsapp"})
 
     return attempt
 
@@ -603,10 +654,7 @@ def get_exam_status(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("candidate", "center", "admin", "super_admin")),
 ) -> dict:
-    """
-    Statut en temps réel d'un examen en cours.
-    Retourne le temps restant, le nombre de questions, et le statut.
-    """
+    """Statut temps réel et horloge de référence de la tentative."""
     attempt = db.get(ExamAttempt, attempt_id)
     if not attempt:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Exam attempt not found")
@@ -649,10 +697,7 @@ def get_exam_results(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("candidate", "center", "admin", "super_admin")),
 ) -> dict:
-    """
-    Résultats détaillés après soumission (avec bonnes réponses et explications).
-    Accessible uniquement après soumission et au propriétaire/agents autorisés.
-    """
+    """Résultats détaillés uniquement après soumission et selon le périmètre d'accès."""
     attempt = db.get(ExamAttempt, attempt_id)
     if not attempt:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Exam attempt not found")
@@ -665,11 +710,12 @@ def get_exam_results(
             detail="Résultats disponibles seulement après soumission",
         )
 
-    trace = db.scalar(select(ExamQuestionTrace).where(ExamQuestionTrace.attempt_id == attempt.id))
-    if not trace or not trace.question_ids:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Trace introuvable")
-
+    trace = _require_official_trace(
+        db.scalar(select(ExamQuestionTrace).where(ExamQuestionTrace.attempt_id == attempt.id))
+    )
     questions = list(db.scalars(select(Question).where(Question.id.in_(trace.question_ids))).all())
+    if len(questions) != trace.question_count:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Trace officielle incomplète")
     order_map = {qid: i for i, qid in enumerate(trace.question_ids)}
     questions.sort(key=lambda q: order_map.get(q.id, 9999))
 
@@ -784,7 +830,6 @@ def verify_exam_certificate(attempt_id: str, db: Session = Depends(get_db)) -> E
         status=attempt.status,
         candidate_reference=candidate.reference,
         candidate_name=f"{candidate.first_name} {candidate.last_name}",
-        # Le numéro d'identité n'est jamais exposé par l'endpoint public QR.
         identity_number=None,
         permit_category=candidate.permit_category,
         session_reference=session.reference,
