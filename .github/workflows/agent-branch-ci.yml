@@ -32,6 +32,7 @@ jobs:
             tests/test_exam_attempt_access.py
             tests/test_exam_runtime_recovery.py
             tests/test_center_edge.py
+            tests/test_center_edge_offline.py
             tests/test_media_policy.py
             tests/test_question_media_schema_compat.py
             tests/test_e2e_exam_question_trace.py
@@ -52,6 +53,22 @@ jobs:
           fi
           printf 'Running targeted backend tests:\n - %s\n' "${selected[@]}"
           pytest -q --tb=short --disable-warnings "${selected[@]}"
+
+  edge-agent:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install Center Edge Agent dependencies
+        run: pip install -q -r edge_agent/requirements.txt
+      - name: Compile Center Edge Agent
+        run: python -m compileall -q edge_agent/coderoute_edge
+      - name: Test encrypted offline agent
+        env:
+          PYTHONPATH: edge_agent
+        run: pytest -q --tb=short --disable-warnings edge_agent/tests
 
   frontend-build:
     runs-on: ubuntu-latest
@@ -108,13 +125,14 @@ jobs:
   publish-agent-statuses:
     if: always()
     runs-on: ubuntu-latest
-    needs: [backend-targeted, frontend-build, frontend-targeted-e2e]
+    needs: [backend-targeted, edge-agent, frontend-build, frontend-targeted-e2e]
     permissions:
       contents: read
       statuses: write
     env:
       GH_TOKEN: ${{ github.token }}
       BACKEND_RESULT: ${{ needs.backend-targeted.result }}
+      EDGE_AGENT_RESULT: ${{ needs.edge-agent.result }}
       FRONTEND_BUILD_RESULT: ${{ needs.frontend-build.result }}
       FRONTEND_E2E_RESULT: ${{ needs.frontend-targeted-e2e.result }}
     steps:
@@ -140,10 +158,11 @@ jobs:
           }
 
           publish_status "$BACKEND_RESULT" "agent-ci/backend-targeted" "Targeted backend regression suite"
+          publish_status "$EDGE_AGENT_RESULT" "agent-ci/edge-agent" "Center Edge Agent encrypted offline suite"
           publish_status "$FRONTEND_BUILD_RESULT" "agent-ci/frontend-build" "Frontend typecheck and production build"
           publish_status "$FRONTEND_E2E_RESULT" "agent-ci/frontend-e2e" "Targeted Playwright regressions"
 
-          if [ "$BACKEND_RESULT" = success ] && [ "$FRONTEND_BUILD_RESULT" = success ] && [ "$FRONTEND_E2E_RESULT" = success ]; then
+          if [ "$BACKEND_RESULT" = success ] && [ "$EDGE_AGENT_RESULT" = success ] && [ "$FRONTEND_BUILD_RESULT" = success ] && [ "$FRONTEND_E2E_RESULT" = success ]; then
             overall=success
           else
             overall=failure

@@ -1,0 +1,99 @@
+from __future__ import annotations
+
+import os
+from dataclasses import dataclass
+from pathlib import Path
+
+
+def _truthy(value: str | None) -> bool:
+    return (value or "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+@dataclass(frozen=True)
+class EdgeAgentConfig:
+    central_url: str
+    node_id: str
+    center_id: str
+    private_key_path: Path
+    database_path: Path
+    storage_key_path: Path
+    media_cache_dir: Path
+    operator_token: str
+    allowed_origins: tuple[str, ...]
+    software_version: str = "edge-agent-0.1.0"
+    max_media_bytes: int = 50 * 1024 * 1024
+    bind_host: str = "0.0.0.0"
+    bind_port: int = 8443
+    tls_cert_path: Path | None = None
+    tls_key_path: Path | None = None
+    allow_insecure_http: bool = False
+
+    @classmethod
+    def from_env(cls) -> "EdgeAgentConfig":
+        central_url = os.environ.get("CODEROUTE_EDGE_CENTRAL_URL", "").strip().rstrip("/")
+        node_id = os.environ.get("CODEROUTE_EDGE_NODE_ID", "").strip()
+        center_id = os.environ.get("CODEROUTE_EDGE_CENTER_ID", "").strip()
+        private_key_path = Path(os.environ.get("CODEROUTE_EDGE_PRIVATE_KEY_PATH", ".coderoute-edge/private-key.pem"))
+        database_path = Path(os.environ.get("CODEROUTE_EDGE_DB_PATH", ".coderoute-edge/edge.db"))
+        storage_key_path = Path(os.environ.get("CODEROUTE_EDGE_STORAGE_KEY_PATH", ".coderoute-edge/storage.key"))
+        media_cache_dir = Path(os.environ.get("CODEROUTE_EDGE_MEDIA_DIR", ".coderoute-edge/media"))
+        operator_token = os.environ.get("CODEROUTE_EDGE_OPERATOR_TOKEN", "").strip()
+        origins = tuple(
+            origin.strip()
+            for origin in os.environ.get(
+                "CODEROUTE_EDGE_ALLOWED_ORIGINS",
+                "https://coderouteguinee-frontend.onrender.com",
+            ).split(",")
+            if origin.strip()
+        )
+        version = os.environ.get("CODEROUTE_EDGE_SOFTWARE_VERSION", "edge-agent-0.1.0").strip()
+        max_media = int(os.environ.get("CODEROUTE_EDGE_MAX_MEDIA_BYTES", str(50 * 1024 * 1024)))
+        bind_host = os.environ.get("CODEROUTE_EDGE_BIND_HOST", "0.0.0.0").strip()
+        bind_port = int(os.environ.get("CODEROUTE_EDGE_BIND_PORT", "8443"))
+        cert_raw = os.environ.get("CODEROUTE_EDGE_TLS_CERT_PATH", "").strip()
+        key_raw = os.environ.get("CODEROUTE_EDGE_TLS_KEY_PATH", "").strip()
+        tls_cert = Path(cert_raw) if cert_raw else None
+        tls_key = Path(key_raw) if key_raw else None
+        insecure = _truthy(os.environ.get("CODEROUTE_EDGE_ALLOW_INSECURE_HTTP"))
+
+        errors: list[str] = []
+        if not central_url.startswith("https://"):
+            errors.append("CODEROUTE_EDGE_CENTRAL_URL doit utiliser HTTPS")
+        if not node_id:
+            errors.append("CODEROUTE_EDGE_NODE_ID est obligatoire")
+        if not center_id:
+            errors.append("CODEROUTE_EDGE_CENTER_ID est obligatoire")
+        if len(operator_token) < 32:
+            errors.append("CODEROUTE_EDGE_OPERATOR_TOKEN doit contenir au moins 32 caractères")
+        if not origins or any(origin == "*" for origin in origins):
+            errors.append("CODEROUTE_EDGE_ALLOWED_ORIGINS doit être une liste explicite sans wildcard")
+        if max_media < 1024 * 1024:
+            errors.append("CODEROUTE_EDGE_MAX_MEDIA_BYTES est trop faible")
+        if bind_port < 1 or bind_port > 65535:
+            errors.append("CODEROUTE_EDGE_BIND_PORT invalide")
+        if not insecure and (tls_cert is None or tls_key is None):
+            errors.append(
+                "TLS LAN obligatoire : définir CODEROUTE_EDGE_TLS_CERT_PATH et CODEROUTE_EDGE_TLS_KEY_PATH "
+                "(ou CODEROUTE_EDGE_ALLOW_INSECURE_HTTP=true uniquement en développement)"
+            )
+        if errors:
+            raise RuntimeError("Configuration Edge invalide : " + "; ".join(errors))
+
+        return cls(
+            central_url=central_url,
+            node_id=node_id,
+            center_id=center_id,
+            private_key_path=private_key_path,
+            database_path=database_path,
+            storage_key_path=storage_key_path,
+            media_cache_dir=media_cache_dir,
+            operator_token=operator_token,
+            allowed_origins=origins,
+            software_version=version,
+            max_media_bytes=max_media,
+            bind_host=bind_host,
+            bind_port=bind_port,
+            tls_cert_path=tls_cert,
+            tls_key_path=tls_key,
+            allow_insecure_http=insecure,
+        )
