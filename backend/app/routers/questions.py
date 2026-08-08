@@ -1,15 +1,29 @@
+from urllib.parse import urlsplit
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.deps import require_roles
+from app.media_policy import validate_media_url
 from app.models_audit import AuditLog
 from app.models_question import Question
 from app.models_user import User
 from app.schemas import QuestionCreate, QuestionMediaUpdate, QuestionRejectionRequest, QuestionOfficialImportRequest, QuestionOfficialImportResult, QuestionRead
 
 router = APIRouter(prefix="/questions", tags=["questions"])
+
+
+def _validated_media_url(media_url: str, media_type: str | None) -> str:
+    """Traduit la politique média centrale en erreur API 422 exploitable par l'UI."""
+    try:
+        return validate_media_url(media_url, media_type or "image")
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={"code": "INVALID_EXAM_MEDIA", "message": str(exc)},
+        ) from exc
 
 
 @router.get("", response_model=dict)
@@ -38,7 +52,12 @@ def list_questions(
 
 @router.post("", response_model=QuestionRead, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_roles("admin", "super_admin"))])
 def create_question(payload: QuestionCreate, db: Session = Depends(get_db)) -> Question:
-    question = Question(**payload.model_dump())
+    data = payload.model_dump()
+    if payload.media_url:
+        media_type = payload.media_type or "image"
+        data["media_type"] = media_type
+        data["media_url"] = _validated_media_url(payload.media_url, media_type)
+    question = Question(**data)
     db.add(question)
     db.commit()
     db.refresh(question)
@@ -57,6 +76,8 @@ def import_official_questions(
 ) -> QuestionOfficialImportResult:
     seen_keys: set[tuple[str, str]] = set()
     duplicate_texts: list[str] = []
+    validated_media: dict[tuple[str, str], tuple[str, str]] = {}
+
     for row in payload.questions:
         key = _question_key(row.category, row.text)
         if key in seen_keys:
@@ -67,6 +88,10 @@ def import_official_questions(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail={"message": "Correct answer must be present in options", "question": row.text[:80]},
             )
+        if row.media_url:
+            media_type = row.media_type or "image"
+            validated_media[key] = (media_type, _validated_media_url(row.media_url, media_type))
+
     if duplicate_texts:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -104,8 +129,11 @@ def import_official_questions(
         question.options = [option.strip() for option in row.options]
         question.correct_answer = row.correct_answer.strip()
         question.explanation = row.explanation.strip() if row.explanation else None
-        question.media_type = row.media_type
-        question.media_url = row.media_url.strip() if row.media_url else None
+        if key in validated_media:
+            question.media_type, question.media_url = validated_media[key]
+        else:
+            question.media_type = None
+            question.media_url = None
         question.media_alt = row.media_alt.strip() if row.media_alt else None
         question.is_active = row.is_active
         db.add(question)
@@ -124,6 +152,7 @@ def import_official_questions(
                 "imported": len(question_ids),
                 "created": created,
                 "updated": updated,
+                "with_media": len(validated_media),
                 "question_ids": question_ids[:50],
             },
         )
@@ -147,24 +176,19 @@ def update_question_media(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("admin", "super_admin")),
 ) -> Question:
-    """
-    Associe un média (image/vidéo réelle, hébergée sur une URL) à une question,
-    ou l'efface (media_url=None) pour revenir au visuel SVG par défaut.
-
-    N'altère JAMAIS le texte, les options ni la réponse : uniquement le média.
-    """
+    """Associe un média sûr à une question sans modifier son contenu métier."""
     question = db.get(Question, question_id)
     if not question:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question introuvable")
 
     if payload.media_url is None:
-        # Effacement : retour au visuel SVG calculé automatiquement
         question.media_type = None
         question.media_url = None
         question.media_alt = None
     else:
-        question.media_type = payload.media_type or "image"
-        question.media_url = payload.media_url
+        media_type = payload.media_type or "image"
+        question.media_type = media_type
+        question.media_url = _validated_media_url(payload.media_url, media_type)
         question.media_alt = (payload.media_alt or "").strip() or None
 
     db.add(AuditLog(
@@ -175,6 +199,8 @@ def update_question_media(
         details={
             "media_type": question.media_type,
             "has_media": question.media_url is not None,
+            "media_host": urlsplit(question.media_url).hostname if question.media_url else None,
+            "has_alt": bool(question.media_alt),
         },
     ))
     db.commit()
@@ -188,13 +214,7 @@ def sign_media_upload(
     resource_type: str = "image",
     current_user: User = Depends(require_roles("admin", "super_admin")),
 ) -> dict:
-    """
-    Génère une signature d'upload Cloudinary pour que l'admin téléverse
-    une photo ou vidéo directement depuis le navigateur (les fichiers ne
-    transitent pas par le serveur).
-
-    Renvoie 503 si Cloudinary n'est pas configuré (clés absentes).
-    """
+    """Génère la signature Cloudinary et la politique de validation pré-upload."""
     from app.cloudinary_service import build_upload_signature, is_configured
 
     if resource_type not in ("image", "video"):
@@ -209,8 +229,6 @@ def sign_media_upload(
 
     return build_upload_signature(resource_type)
 
-
-# ── Workflow de validation officielle des questions (certification DNTT) ─────
 
 @router.post("/{question_id}/submit-validation", response_model=QuestionRead,
              dependencies=[Depends(require_roles("admin", "super_admin"))])
@@ -242,10 +260,7 @@ def approve_question(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("super_admin")),
 ) -> Question:
-    """
-    Valide officiellement une question (super_admin uniquement — autorité DNTT).
-    Seules les questions approuvées sont tirées à l'examen réel.
-    """
+    """Valide officiellement une question (super_admin uniquement — autorité DNTT)."""
     from datetime import UTC, datetime
     question = db.get(Question, question_id)
     if not question:
@@ -292,7 +307,6 @@ def question_validation_summary(
     current_user: User = Depends(require_roles("admin", "super_admin")),
 ) -> dict:
     """Synthèse de l'état de validation de la banque de questions."""
-    from sqlalchemy import func
     rows = db.execute(
         select(Question.validation_status, func.count())
         .group_by(Question.validation_status)
@@ -302,7 +316,6 @@ def question_validation_summary(
     approved = by_status.get("approved", 0)
     from app.exam_engine import EXAM_QUESTIONS_TOTAL, CATEGORY_DISTRIBUTION
 
-    # Couverture par catégorie parmi les questions approuvées
     cat_rows = db.execute(
         select(Question.category, func.count())
         .where(Question.validation_status == "approved", Question.is_active.is_(True))
@@ -323,6 +336,38 @@ def question_validation_summary(
         "exam_questions_required": EXAM_QUESTIONS_TOTAL,
         "category_coverage": coverage,
         "exam_ready": exam_ready,
+    }
+
+
+@router.get("/media-coverage",
+            dependencies=[Depends(require_roles("admin", "super_admin"))])
+def media_coverage(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "super_admin")),
+) -> dict:
+    """Mesure la couverture et la qualité minimale des médias de la banque active."""
+    questions = list(db.scalars(select(Question).where(Question.is_active.is_(True))).all())
+    total = len(questions)
+    with_media = [q for q in questions if q.media_url]
+    images = [q for q in with_media if q.media_type == "image"]
+    videos = [q for q in with_media if q.media_type == "video"]
+    missing_alt = [q for q in with_media if not (q.media_alt or "").strip()]
+    insecure_urls = [q for q in with_media if not str(q.media_url).startswith("https://")]
+    approved = [q for q in questions if q.validation_status == "approved"]
+    approved_with_media = [q for q in approved if q.media_url]
+
+    return {
+        "questions_total": total,
+        "with_media": len(with_media),
+        "without_media": total - len(with_media),
+        "coverage_percent": round(len(with_media) / total * 100, 1) if total else 0.0,
+        "images": len(images),
+        "videos": len(videos),
+        "missing_alt": len(missing_alt),
+        "insecure_legacy_urls": len(insecure_urls),
+        "approved_questions": len(approved),
+        "approved_with_media": len(approved_with_media),
+        "approved_media_percent": round(len(approved_with_media) / len(approved) * 100, 1) if approved else 0.0,
     }
 
 
@@ -357,8 +402,7 @@ def set_question_audio(
     cleaned: dict = dict(question.translations or {})
     for lang_code, audio_url in payload.items():
         if lang_code == "fr" or lang_code not in SUPPORTED_LANGUAGES:
-            continue  # le français n'a pas besoin d'enregistrement
-        # Valeur vide → suppression de l'enregistrement pour cette langue
+            continue
         if not audio_url:
             cleaned.pop(lang_code, None)
             continue
@@ -385,13 +429,7 @@ def audio_coverage(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("admin", "super_admin")),
 ) -> dict:
-    """
-    Couverture des enregistrements audio par langue nationale : combien de
-    questions disposent d'un enregistrement par un locuteur natif.
-
-    Les questions sans enregistrement utilisent la synthèse vocale du
-    navigateur (repli automatique) — aucune n'est jamais muette.
-    """
+    """Couverture des enregistrements audio par langue nationale."""
     LANGUAGE_NAMES = {
         "ff": "Pular", "man": "Malinké", "sus": "Soussou",
         "kss": "Kissi", "gkp": "Kpelle", "lom": "Toma",
