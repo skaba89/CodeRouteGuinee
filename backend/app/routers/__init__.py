@@ -10,9 +10,9 @@ from app.routers import national_readiness as national_readiness
 # L'initialisation du package n'a lieu qu'une fois par processus Python.
 dashboard.router.include_router(national_readiness.router)
 
-# Center Edge : le protocole Offline Lease reste un sous-espace du routeur
-# de confiance `/api/v1/center-edge`.
+# Center Edge : le protocole offline est exposé via le garde strict qui lie
+# chaque lease au DeviceSession + CenterStation officiels de la tentative.
 from app.routers import center_edge as center_edge
-from app.routers import center_edge_offline as center_edge_offline
+from app.routers import center_edge_station_guard as center_edge_station_guard
 
-center_edge.router.include_router(center_edge_offline.router)
+center_edge.router.include_router(center_edge_station_guard.router)

@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from datetime import datetime
 from typing import Any
+from urllib.parse import urlsplit, urlunsplit
 
 from .central import CentralClient
 from .media import MediaCache
@@ -24,8 +25,6 @@ class EdgeAgentService:
         if not self.central.verify_lease_bundle(bundle):
             raise RuntimeError("Signature centrale du lease invalide")
 
-        # Fail closed : tous les médias du paquet doivent être disponibles sur
-        # le LAN avant de déclarer la tentative offline-capable.
         local_bundle = self.media.prefetch_bundle(bundle)
         session = self.store.put_lease(local_bundle, station_device_key.strip())
         lease = local_bundle["lease"]
@@ -38,17 +37,21 @@ class EdgeAgentService:
 
     def _ticketed_questions(self, attempt_id: str, lease: dict, questions: list[dict]) -> list[dict]:
         rendered = json.loads(json.dumps(questions))
-        prefix = f"/v1/exams/{attempt_id}/media/"
+        marker = f"/v1/exams/{attempt_id}/media/"
         deadline = datetime.fromisoformat(str(lease["deadline_at"]).replace("Z", "+00:00"))
         expires_at = int(deadline.timestamp()) + 3600
         for question in rendered:
             for field in ("media_url", "audio_url"):
                 value = question.get(field)
-                if not isinstance(value, str) or not value.startswith(prefix):
+                if not isinstance(value, str):
                     continue
-                digest = value[len(prefix):].split("?", 1)[0]
+                parsed = urlsplit(value)
+                if marker not in parsed.path:
+                    continue
+                digest = parsed.path.rsplit("/", 1)[-1]
                 ticket = media_ticket(self.store.storage_key, attempt_id, digest, expires_at)
-                question[field] = f"{prefix}{digest}?expires={expires_at}&ticket={ticket}"
+                query = f"expires={expires_at}&ticket={ticket}"
+                question[field] = urlunsplit((parsed.scheme, parsed.netloc, parsed.path, query, ""))
         return rendered
 
     def candidate_exam(self, attempt_id: str, access_token: str, station_key: str) -> dict[str, Any]:

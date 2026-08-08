@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import os
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
@@ -70,6 +69,7 @@ def _config(tmp_path: Path) -> EdgeAgentConfig:
         media_cache_dir=tmp_path / "media",
         operator_token="operator-token-that-is-longer-than-32-characters",
         allowed_origins=("https://frontend.test",),
+        public_url="https://edge.test:8443",
         allow_insecure_http=True,
     )
 
@@ -98,7 +98,6 @@ def test_store_encrypts_lease_and_journal_and_binds_candidate_station(tmp_path: 
     sync = store.sync_payload(attempt_id)
     assert sync["events"][0]["answer"] == "Alpha"
 
-    # Les contenus sensibles ne doivent apparaître ni dans SQLite ni dans WAL.
     raw = b""
     for suffix in ("", "-wal", "-shm"):
         path = Path(str(tmp_path / "edge.db") + suffix)
@@ -125,7 +124,7 @@ def test_active_lease_requires_central_revalidation_after_agent_restart(tmp_path
         assert "EDGE_REVALIDATION_REQUIRED" in str(exc)
 
 
-def test_media_prefetch_preserves_signed_lease_and_builds_local_projection(tmp_path: Path) -> None:
+def test_media_prefetch_preserves_signed_lease_and_builds_absolute_lan_projection(tmp_path: Path) -> None:
     body = b"fake-image-content"
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -133,7 +132,12 @@ def test_media_prefetch_preserves_signed_lease_and_builds_local_projection(tmp_p
         return httpx.Response(200, content=body, headers={"content-type": "image/jpeg"})
 
     http = httpx.Client(transport=httpx.MockTransport(handler))
-    cache = MediaCache(tmp_path / "media", central_url="https://central.test", max_media_bytes=1024 * 1024)
+    cache = MediaCache(
+        tmp_path / "media",
+        central_url="https://central.test",
+        public_url="https://edge.test:8443",
+        max_media_bytes=1024 * 1024,
+    )
     bundle = _lease_bundle()
     bundle["lease"]["questions"][0]["media_url"] = "https://cdn.test/question.jpg"
     original = json.loads(json.dumps(bundle["lease"]))
@@ -141,7 +145,7 @@ def test_media_prefetch_preserves_signed_lease_and_builds_local_projection(tmp_p
     local = cache.prefetch_bundle(bundle, client=http)
     assert local["lease"] == original
     assert local["local_questions"][0]["media_url"].startswith(
-        f"/v1/exams/{bundle['lease']['attempt_id']}/media/"
+        f"https://edge.test:8443/v1/exams/{bundle['lease']['attempt_id']}/media/"
     )
     digest = local["local_questions"][0]["media_url"].rsplit("/", 1)[-1]
     path, content_type = cache.resolve(digest)
@@ -154,7 +158,7 @@ class _FakeService:
     def __init__(self, tmp_path: Path):
         self.calls: list[str] = []
         self.media = SimpleNamespace(resolve=lambda digest: (tmp_path / "missing", "image/jpeg"))
-        self.store = SimpleNamespace(verify_candidate_access=lambda *args: True)
+        self.store = SimpleNamespace(verify_candidate_access=lambda *args: True, storage_key=b"k" * 32)
 
     def status(self):
         return {"lease_counts": {"active": 1}}

@@ -8,6 +8,7 @@ Daemon local sécurisé pour assurer la continuité d'un examen officiel pendant
 - aucune `correct_answer` / explication dans le lease ;
 - scoring final uniquement sur la plateforme centrale ;
 - lease central Ed25519 conservé inchangé ;
+- lease lié au `CenterStation` et `DeviceSession` centraux avant activation offline ;
 - projection média LAN séparée du paquet signé ;
 - SQLite WAL avec payloads sensibles chiffrés AES-256-GCM ;
 - journal de réponses append-only/hash-chaîné ;
@@ -37,17 +38,18 @@ Postes candidats / VLAN EXAM
 
 ## Pré-requis
 
-1. gateway enrôlé via la fondation Center Edge (#110) ;
-2. Offline Lease v1 disponible (#111) ;
-3. identité Ed25519 locale :
+1. gateway enrôlé auprès du serveur central ;
+2. poste candidat présent dans le registre `CenterStation` et `active` ;
+3. tentative ayant un `DeviceSession` actif sur ce même `device_key` ;
+4. identité Ed25519 locale :
 
 ```bash
 python scripts/generate_edge_identity.py --label "Gateway Edge Ratoma"
 ```
 
-4. certificat TLS LAN émis par une CA approuvée sur les postes du centre ;
-5. machine dédiée + stockage persistant + UPS ;
-6. VLAN EXAM isolé.
+5. certificat TLS LAN émis par une CA approuvée sur les postes du centre ;
+6. machine dédiée + stockage persistant + UPS ;
+7. VLAN EXAM isolé.
 
 ## Variables principales
 
@@ -61,11 +63,14 @@ CODEROUTE_EDGE_STORAGE_KEY_PATH=/var/lib/coderoute-edge/storage.key
 CODEROUTE_EDGE_MEDIA_DIR=/var/lib/coderoute-edge/media
 CODEROUTE_EDGE_OPERATOR_TOKEN=<secret aléatoire 32+ caractères>
 CODEROUTE_EDGE_ALLOWED_ORIGINS=https://coderouteguinee-frontend.onrender.com
+CODEROUTE_EDGE_PUBLIC_URL=https://edge-ratoma.coderoute.local:8443
 CODEROUTE_EDGE_TLS_CERT_PATH=/var/lib/coderoute-edge/tls/edge.crt
 CODEROUTE_EDGE_TLS_KEY_PATH=/var/lib/coderoute-edge/tls/edge.key
 CODEROUTE_EDGE_BIND_HOST=0.0.0.0
 CODEROUTE_EDGE_BIND_PORT=8443
 ```
+
+`CODEROUTE_EDGE_PUBLIC_URL` est obligatoire : un frontend national chargé depuis un autre domaine doit recevoir des URLs média **absolues** pointant vers le gateway LAN. En centre réel cette URL doit être HTTPS et son certificat doit être approuvé par les postes candidats.
 
 `CODEROUTE_EDGE_ALLOW_INSECURE_HTTP=true` est réservé au laboratoire/CI.
 
@@ -115,6 +120,8 @@ X-Edge-Operator-Token: <secret opérateur>
 }
 ```
 
+Le serveur central ne délivre le lease que si le `DeviceSession` de la tentative correspond à un `CenterStation` actif et non ambigu. Le binding du poste est inclus dans le lease puis signé par le central.
+
 L'agent :
 
 1. envoie un heartbeat ;
@@ -162,20 +169,21 @@ Aucun score n'est retourné localement.
 
 ## Médias compatibles `<img>` / `<video>`
 
-Les balises HTML natives ne peuvent pas joindre les headers candidats. L'agent fournit donc, uniquement dans la réponse authentifiée de l'examen, des URLs de la forme :
+Après authentification de la session locale, les questions contiennent des URLs absolues LAN :
 
 ```text
-/v1/exams/{attempt_id}/media/{sha256}?ticket=<HMAC>
+https://edge-ratoma.coderoute.local:8443/v1/exams/{attempt_id}/media/{sha256}?expires=...&ticket=...
 ```
 
-Le ticket :
+Le ticket HMAC :
 
-- est calculé avec `storage.key` ;
-- est lié à `attempt_id + digest` ;
+- utilise `storage.key` ;
+- est lié à `attempt_id + digest + expiration` ;
+- expire au plus tard environ une heure après la deadline ;
 - n'autorise aucun autre média ;
 - n'est jamais présent dans le lease central signé.
 
-Le serveur local vérifie le ticket puis recalcule le SHA-256 du fichier avant de le servir.
+Le serveur local recalcule aussi le SHA-256 du fichier avant de le servir.
 
 ## Retour du WAN
 
@@ -183,6 +191,8 @@ Le serveur local vérifie le ticket puis recalcule le SHA-256 du fichier avant d
 POST /operator/sync/{attempt_id}
 X-Edge-Operator-Token: <secret opérateur>
 ```
+
+Avant de scorer, le central reverrouille le `DeviceSession` et le `CenterStation` signés dans le lease. Si le poste a été désactivé, rendu suspect, supprimé ou modifié pendant la panne, la synchronisation automatique est bloquée et doit passer par le traitement d'incident institutionnel.
 
 Le daemon :
 
@@ -211,6 +221,7 @@ Ce comportement fail-closed empêche de gagner du temps d'examen en modifiant l'
 - firewall entrant : VLAN EXAM uniquement ;
 - firewall sortant : API centrale + CDN autorisés ;
 - CA TLS de centre/DNTT ;
+- DNS local résolvant le nom `CODEROUTE_EDGE_PUBLIC_URL` vers l'IP LAN du gateway ;
 - UPS gateway + switch + routeur ;
 - rotation du token opérateur ;
 - révocation du nœud en cas de vol ;
@@ -219,8 +230,7 @@ Ce comportement fail-closed empêche de gagner du temps d'examen en modifiant l'
 ## Prochains lots
 
 1. intégration automatique du frontend candidat Central ↔ Edge ;
-2. liaison du lease au `CenterStation` central ;
-3. UI opérateur santé/cache/sync ;
-4. synchronisation automatique avec backoff ;
-5. quota/LRU média multi-session ;
-6. attestation TPM et double gateway pour grands centres.
+2. UI opérateur santé/cache/sync ;
+3. synchronisation automatique avec backoff ;
+4. quota/LRU média multi-session ;
+5. attestation TPM et double gateway pour grands centres.
