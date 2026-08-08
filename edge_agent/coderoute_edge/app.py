@@ -167,7 +167,8 @@ def create_app(
         return {
             "node_id": config.node_id,
             "center_id": config.center_id,
-            **service.status(),
+            "software_version": config.software_version,
+            **service.operator_status(),
         }
 
     @app.get("/v1/exams/{attempt_id}")
