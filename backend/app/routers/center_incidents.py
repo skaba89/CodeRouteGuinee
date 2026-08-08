@@ -26,6 +26,14 @@ def report_center_incident(
     center = db.get(Center, payload.center_id)
     if not center:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Center not found")
+    if current_user.role == "center" and current_user.center_id != center.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "code": "CENTER_SCOPE_MISMATCH",
+                "message": "Cet incident concerne un autre centre.",
+            },
+        )
 
     session = db.get(ExamSession, payload.session_id) if payload.session_id else None
     if payload.session_id and not session:
