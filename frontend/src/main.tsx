@@ -4,6 +4,7 @@ import { InstallPWA } from './components/pwa-install-prompt';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import { ErrorBoundary } from './ErrorBoundary';
+import CenterEdgeOperationsPage from './pages/CenterEdgeOperationsPage';
 import EdgeExamEntry from './pages/EdgeExamEntry';
 import EdgePendingPage from './pages/EdgePendingPage';
 import { hasPendingEdgeBootstrap } from './edgeExamSession';
@@ -20,9 +21,28 @@ function RootSurface() {
     return () => window.removeEventListener('hashchange', onHashChange);
   }, []);
 
+  if (hash.startsWith('#/center-edge')) return <CenterEdgeOperationsPage />;
   if (hash.startsWith('#/edge-pending')) return <EdgePendingPage />;
   if (hash === '#/exam' && hasPendingEdgeBootstrap()) return <EdgeExamEntry />;
-  return <App />;
+
+  return (
+    <>
+      <App />
+      {hash === '#/center' && (
+        <a
+          href="#/center-edge"
+          className="btn-success"
+          style={{
+            position: 'fixed', right: 20, bottom: 20, zIndex: 90,
+            textDecoration: 'none', boxShadow: 'var(--sh)',
+            display: 'inline-flex', alignItems: 'center', gap: 7,
+          }}
+        >
+          Console Edge
+        </a>
+      )}
+    </>
+  );
 }
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
