@@ -19,6 +19,10 @@ frontend/.env.local
 .env
 *.db
 
+# Identité locale du gateway Center Edge — contient private-key.pem.
+# Elle ne doit JAMAIS entrer dans Git ni être copiée vers le serveur central.
+.coderoute-edge/
+
 # Certificats TLS (ne jamais commiter les clés privées)
 nginx/certs/*.pem
 nginx/certs/*.key
