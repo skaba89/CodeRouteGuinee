@@ -1,8 +1,15 @@
-// ExamPage — CodeRoute Guinée v4
-// Interface niveau professionnel : layout 2 colonnes, média full-width,
-// timer circulaire, barre de progression, grille de navigation.
-import { type FormEvent, useCallback, useEffect, useState } from 'react';
-import { getExamQuestions, getExamResults, startExamFromBooking, submitExamAttempt } from '../api';
+// ExamPage — CodeRoute Guinée v5
+// Examen officiel durci : temps serveur, reprise après refresh, autosauvegarde
+// des réponses et séparation stricte avec l'examen blanc.
+import { type FormEvent, useEffect, useRef, useState } from 'react';
+import {
+  getExamLiveStatus,
+  getExamQuestions,
+  getExamResults,
+  postPrivateJson,
+  startExamFromBooking,
+  submitExamAttempt,
+} from '../api';
 import type { ExamQuestion } from '../api';
 import { useIsMobile } from '../hooks/useIsMobile';
 import { isAudioLocale, speakFeedback, stop as stopAudio, playQuestionAudio, announceResult, announceInstructions } from '../audio';
@@ -12,7 +19,7 @@ import { type Locale } from '../i18n';
 import { useAuthSession, canUseProtectedActions } from '../authSession';
 import { IconArrowLeft, IconArrowRight, IconCheck, IconClock, IconTarget, IconFileCheck, IconClipboard, IconAlertTriangle } from '../icons';
 import { DEMO_QUESTIONS, type ExamQuestionData } from './examQuestions';
-import { MediaBlock, Timer, QGrid } from './shared-exam-components';
+import { MediaBlock, QGrid } from './shared-exam-components';
 import type { QData } from './shared-exam-components';
 
 interface Props { user?: AuthUser | null; locale?: Locale; onLocaleChange?: (l: Locale) => void; }
@@ -35,159 +42,316 @@ type DisplayResult = {
   questions: DisplayResultQuestion[];
 };
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
+type SaveState = 'idle' | 'saving' | 'saved' | 'offline';
+
+const ACTIVE_ATTEMPT_KEY = 'coderoute:official-exam:active-attempt';
+const answerStorageKey = (attemptId: string) => `coderoute:official-exam:answers:${attemptId}`;
+
 function errMsg(e: unknown, fallback: string): string {
   if (e instanceof Error) return e.message;
   if (typeof e === 'string') return e;
   return fallback;
 }
 
+function readStoredAnswers(attemptId: string): Record<number, string> {
+  try {
+    const raw = window.sessionStorage.getItem(answerStorageKey(attemptId));
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    return Object.fromEntries(
+      Object.entries(parsed)
+        .filter(([, value]) => typeof value === 'string')
+        .map(([key, value]) => [Number(key), value as string]),
+    );
+  } catch {
+    return {};
+  }
+}
+
+function persistStoredAnswers(attemptId: string, answers: Record<number, string>) {
+  try {
+    window.sessionStorage.setItem(answerStorageKey(attemptId), JSON.stringify(answers));
+  } catch {
+    // Le stockage navigateur ne doit jamais bloquer l'examen.
+  }
+}
+
+function clearStoredAttempt(attemptId?: string | null) {
+  try {
+    window.sessionStorage.removeItem(ACTIVE_ATTEMPT_KEY);
+    if (attemptId) window.sessionStorage.removeItem(answerStorageKey(attemptId));
+  } catch {
+    // Best effort.
+  }
+}
+
+function mapResult(serverResult: Awaited<ReturnType<typeof getExamResults>>): DisplayResult {
+  return {
+    score: serverResult.score,
+    threshold: serverResult.threshold,
+    passed: serverResult.passed,
+    questions: serverResult.questions.map(item => ({
+      question_id: item.question_id,
+      question_text: item.text,
+      candidate_answer: item.given_answer ?? '—',
+      correct_answer: item.correct_answer,
+      is_correct: item.is_correct,
+      category: item.category,
+      options: item.options,
+      explanation: item.explanation,
+    })),
+  };
+}
+
+function toApiAnswers(answers: Record<number, string>, questions: QData[]): Record<string, string> {
+  const payload: Record<string, string> = {};
+  Object.entries(answers).forEach(([index, answer]) => {
+    const question = questions[Number(index)];
+    if (question) payload[question.id] = answer;
+  });
+  return payload;
+}
+
+function formatRemaining(seconds: number) {
+  const safe = Math.max(0, seconds);
+  const minutes = Math.floor(safe / 60);
+  const secs = safe % 60;
+  return `${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+}
+
 const CATEGORY_COLOR: Record<string, string> = {
-  'Signalisation':    '#1A6FC4',
-  'Priorités':        '#7C3AED',
-  'Vitesse':          '#D4A017',
-  'Dépassement':      '#C0392B',
-  'Sécurité':         '#006B3F',
-  'Conduite de nuit': '#0E7490',
-  'Conditions météo': '#0E7490',
-  'Alcool & Drogues': '#C0392B',
-  'Premiers secours': '#BE185D',
-  'Feux tricolores':  '#D97706',
+  'Signalisation': '#1A6FC4', 'Priorités': '#7C3AED', 'Vitesse': '#D4A017',
+  'Dépassement': '#C0392B', 'Sécurité': '#006B3F', 'Conduite de nuit': '#0E7490',
+  'Conditions météo': '#0E7490', 'Alcool & Drogues': '#C0392B',
+  'Premiers secours': '#BE185D', 'Feux tricolores': '#D97706',
 };
 const CATEGORY_BG: Record<string, string> = {
-  'Signalisation':    '#EBF3FC',
-  'Priorités':        '#EDE9FE',
-  'Vitesse':          '#FDF6E0',
-  'Dépassement':      '#FDECEA',
-  'Sécurité':         '#E6F3EC',
-  'Conduite de nuit': '#E0F7FA',
-  'Conditions météo': '#E0F7FA',
-  'Alcool & Drogues': '#FDECEA',
-  'Premiers secours': '#FCE7F3',
-  'Feux tricolores':  '#FEF3C7',
+  'Signalisation': '#EBF3FC', 'Priorités': '#EDE9FE', 'Vitesse': '#FDF6E0',
+  'Dépassement': '#FDECEA', 'Sécurité': '#E6F3EC', 'Conduite de nuit': '#E0F7FA',
+  'Conditions météo': '#E0F7FA', 'Alcool & Drogues': '#FDECEA',
+  'Premiers secours': '#FCE7F3', 'Feux tricolores': '#FEF3C7',
 };
 
-// ── Composant principal ───────────────────────────────────────────────────────
 export function ExamPage({ locale }: Props) {
   const { currentUser } = useAuthSession();
   const isAuth = Boolean(currentUser);
   const canUseApi = canUseProtectedActions(currentUser, false, ['candidate','center','admin','super_admin']);
   const isMobile = useIsMobile();
 
-  // Questions
   const [liveQuestions, setLiveQuestions] = useState<ExamQuestion[] | null>(null);
   const questions: QData[] = (liveQuestions ?? []).length > 0
-    ? liveQuestions!.map((q, i) => ({
-        id: q.id, text: q.text, options: q.options,
-        number: i + 1,
-        category: q.category,
-        media: q.media_url ?? undefined,
-        mediaType: (q.media_type ?? undefined) as 'sign' | 'scene' | 'image' | 'video' | undefined,
-        mediaAlt: q.media_alt ?? undefined,
-        audioUrl: q.audio_url ?? undefined,
+    ? liveQuestions!.map((question, index) => ({
+        id: question.id,
+        text: question.text,
+        options: question.options,
+        number: index + 1,
+        category: question.category,
+        media: question.media_url ?? undefined,
+        mediaType: (question.media_type ?? undefined) as 'sign' | 'scene' | 'image' | 'video' | undefined,
+        mediaAlt: question.media_alt ?? undefined,
+        audioUrl: question.audio_url ?? undefined,
       }))
-    : DEMO_QUESTIONS.map((q: ExamQuestionData) => ({
-        id: q.id, text: q.text, options: q.options,
-        correct_answer: q.correct_answer, number: q.number,
-        category: q.category,
-        media: q.media_url ?? undefined,
-        mediaType: q.media_url
-          ? (q.media_url.startsWith('intersection') || q.media_url.startsWith('situation')
-              || q.media_url.endsWith('_driving') || q.media_url.endsWith('_scene')
-              || q.media_url.endsWith('_priority_right') ? 'scene' : 'sign')
+    : DEMO_QUESTIONS.map((question: ExamQuestionData) => ({
+        id: question.id,
+        text: question.text,
+        options: question.options,
+        correct_answer: question.correct_answer,
+        number: question.number,
+        category: question.category,
+        media: question.media_url ?? undefined,
+        mediaType: question.media_url
+          ? (question.media_url.startsWith('intersection') || question.media_url.startsWith('situation')
+              || question.media_url.endsWith('_driving') || question.media_url.endsWith('_scene')
+              || question.media_url.endsWith('_priority_right') ? 'scene' : 'sign')
           : undefined,
-        mediaAlt: q.media_alt ?? undefined,
-        expl: q.explanation,
+        mediaAlt: question.media_alt ?? undefined,
+        expl: question.explanation,
       }));
 
-  // State
-  const [phase, setPhase]         = useState<'setup' | 'running' | 'review' | 'done'>('setup');
-  const [idx, setIdx]             = useState(0);
-  const [answers, setAnswers]     = useState<Record<number, string>>({});
-  const [reveal, setReveal]       = useState(false);
-  const [bookRef, setBookRef]     = useState('');
+  const [phase, setPhase] = useState<'setup' | 'running' | 'done'>('setup');
+  const [idx, setIdx] = useState(0);
+  const [answers, setAnswers] = useState<Record<number, string>>({});
+  const [reveal, setReveal] = useState(false);
+  const [bookRef, setBookRef] = useState('');
   const [attemptId, setAttemptId] = useState<string | null>(null);
-  const [result, setResult]       = useState<DisplayResult | null>(null);
+  const [result, setResult] = useState<DisplayResult | null>(null);
   const [startLoading, setStartLoading] = useState(false);
-  const [startErr, setStartErr]   = useState('');
+  const [startErr, setStartErr] = useState('');
   const [submissionErr, setSubmissionErr] = useState('');
-  const [filter, setFilter]       = useState<'all' | 'ok' | 'ko'>('all');
+  const [filter, setFilter] = useState<'all' | 'ok' | 'ko'>('all');
+  const [remainingSeconds, setRemainingSeconds] = useState(30 * 60);
+  const [totalSeconds, setTotalSeconds] = useState(30 * 60);
+  const [saveState, setSaveState] = useState<SaveState>('idle');
+  const [timerSyncedAt, setTimerSyncedAt] = useState<Date | null>(null);
+  const timeoutSubmitFired = useRef(false);
 
   const q = questions[idx];
   const answered = Object.keys(answers).length;
   const audioEnabled = isAudioLocale(locale as Locale);
   const isOfficialExam = attemptId !== null;
 
-  // Lire la question à voix haute quand la langue du candidat l'exige.
-  // Privilégie l'enregistrement par un locuteur natif ; repli automatique
-  // sur la synthèse vocale si l'enregistrement n'existe pas.
+  async function loadServerResult(id: string) {
+    const serverResult = await getExamResults(id);
+    setResult(mapResult(serverResult));
+    clearStoredAttempt(id);
+    setSaveState('saved');
+    setPhase('done');
+  }
+
+  // Reprise automatique d'une tentative officielle après refresh/retour écran.
+  useEffect(() => {
+    if (!canUseApi || phase !== 'setup') return;
+    let cancelled = false;
+    const storedAttemptId = window.sessionStorage.getItem(ACTIVE_ATTEMPT_KEY);
+    if (!storedAttemptId) return;
+
+    void (async () => {
+      setStartLoading(true);
+      try {
+        const status = await getExamLiveStatus(storedAttemptId);
+        if (cancelled) return;
+
+        if (status.status === 'submitted') {
+          setAttemptId(storedAttemptId);
+          await loadServerResult(storedAttemptId);
+          return;
+        }
+
+        if (!['started', 'expired'].includes(status.status)) {
+          clearStoredAttempt(storedAttemptId);
+          return;
+        }
+
+        const response = await getExamQuestions(storedAttemptId, locale);
+        if (cancelled) return;
+        setAttemptId(storedAttemptId);
+        setLiveQuestions(response.questions);
+        setAnswers(readStoredAnswers(storedAttemptId));
+        setRemainingSeconds(status.remaining_seconds);
+        setTotalSeconds(status.total_seconds || response.duration_seconds || 30 * 60);
+        setTimerSyncedAt(new Date());
+        timeoutSubmitFired.current = false;
+        setPhase('running');
+      } catch {
+        // Une tentative inaccessible/ancienne ne doit pas bloquer le candidat.
+        clearStoredAttempt(storedAttemptId);
+      } finally {
+        if (!cancelled) setStartLoading(false);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [canUseApi, locale, phase]);
+
+  // Le backend est l'horloge de référence. Resynchronisation toutes les 10 s.
+  useEffect(() => {
+    if (!attemptId || phase !== 'running') return;
+    let cancelled = false;
+
+    const syncServerClock = async () => {
+      try {
+        const status = await getExamLiveStatus(attemptId);
+        if (cancelled) return;
+        setRemainingSeconds(status.remaining_seconds);
+        setTotalSeconds(status.total_seconds || 30 * 60);
+        setTimerSyncedAt(new Date());
+        if (status.status === 'submitted') {
+          await loadServerResult(attemptId);
+        }
+      } catch {
+        // Le compteur local continue visuellement, mais aucune décision de score
+        // n'est prise côté navigateur. La prochaine synchro recale l'horloge.
+      }
+    };
+
+    void syncServerClock();
+    const poll = window.setInterval(() => { void syncServerClock(); }, 10_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(poll);
+    };
+  }, [attemptId, phase]);
+
+  // Tick d'affichage entre deux synchronisations serveur.
+  useEffect(() => {
+    if (phase !== 'running') return;
+    const tick = window.setInterval(() => {
+      setRemainingSeconds(current => Math.max(0, current - 1));
+    }, 1000);
+    return () => window.clearInterval(tick);
+  }, [phase]);
+
+  // À 00:00 : soumission automatique. Le backend reste seul juge du délai.
+  useEffect(() => {
+    if (!attemptId || phase !== 'running' || remainingSeconds > 0 || timeoutSubmitFired.current) return;
+    timeoutSubmitFired.current = true;
+    setSubmissionErr('Temps écoulé — enregistrement automatique de votre dernière sauvegarde…');
+    void submitExam();
+  }, [attemptId, phase, remainingSeconds]);
+
   useEffect(() => {
     if (phase === 'running' && audioEnabled && q) {
-      void playQuestionAudio(
-        q.id,
-        locale as Locale,
-        q.text,
-        q.options,
-        q.audioUrl,
-      );
+      void playQuestionAudio(q.id, locale as Locale, q.text, q.options, q.audioUrl);
     }
     return () => { if (audioEnabled) stopAudio(); };
   }, [idx, phase, audioEnabled, locale, q]);
 
-  // Annonce vocale du résultat uniquement une fois la vérité serveur (officiel)
-  // ou le résultat local (examen blanc) réellement disponible.
   useEffect(() => {
     if (phase === 'done' && result && audioEnabled) {
-      void announceResult(
-        Boolean(result.passed),
-        Number(result.score ?? 0),
-        Number(result.questions?.length ?? questions.length),
-      );
+      void announceResult(Boolean(result.passed), Number(result.score ?? 0), Number(result.questions?.length ?? questions.length));
     }
   }, [phase, result, audioEnabled, questions.length]);
 
-  // Navigation clavier
   useEffect(() => {
     if (phase !== 'running') return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowRight') setIdx(i => Math.min(questions.length - 1, i + 1));
-      if (e.key === 'ArrowLeft')  setIdx(i => Math.max(0, i - 1));
-      if (['1','2','3','4'].includes(e.key)) {
-        const i = parseInt(e.key) - 1;
-        if (q?.options[i]) pick(q.options[i]);
+    const handler = (event: KeyboardEvent) => {
+      if (event.key === 'ArrowRight') setIdx(index => Math.min(questions.length - 1, index + 1));
+      if (event.key === 'ArrowLeft') setIdx(index => Math.max(0, index - 1));
+      if (['1','2','3','4'].includes(event.key)) {
+        const optionIndex = parseInt(event.key) - 1;
+        if (q?.options[optionIndex]) pick(q.options[optionIndex]);
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [phase, idx, q, answers, isOfficialExam]);
 
-  // Timer expiration — le prochain lot P0 remplacera ce timer local par
-  // l'horloge serveur. Pour l'instant on bascule en revue sans inventer de score.
-  const onTimerExpire = useCallback(() => {
-    if (phase === 'running') { setPhase('review'); }
-  }, [phase]);
+  async function autosaveOfficialAnswers(nextAnswers: Record<number, string>) {
+    if (!attemptId) return;
+    persistStoredAnswers(attemptId, nextAnswers);
+    setSaveState('saving');
+    try {
+      await postPrivateJson(`/api/v1/exams/${encodeURIComponent(attemptId)}/answers`, {
+        answers: toApiAnswers(nextAnswers, questions),
+      });
+      setSaveState('saved');
+    } catch {
+      // La session navigateur conserve la saisie ; la prochaine réponse retentera
+      // une sauvegarde serveur. Le résultat officiel n'est jamais calculé ici.
+      setSaveState('offline');
+    }
+  }
 
-  // ── Sélection réponse ───────────────────────────────────────────────────────
   function pick(opt: string) {
     if (!q) return;
 
-    // Examen officiel : aucune correction côté navigateur, aucune annonce
-    // vrai/faux et possibilité de modifier sa réponse avant soumission.
     if (isOfficialExam) {
-      setAnswers(a => ({ ...a, [idx]: opt }));
+      const nextAnswers = { ...answers, [idx]: opt };
+      setAnswers(nextAnswers);
       setReveal(false);
+      void autosaveOfficialAnswers(nextAnswers);
       return;
     }
 
-    // Examen blanc : feedback pédagogique immédiat conservé.
     if (answers[idx] !== undefined) return;
     const isCorrect = opt === q.correct_answer;
     if (audioEnabled) speakFeedback(isCorrect, q.explanation ?? q.expl);
-    setAnswers(a => ({ ...a, [idx]: opt }));
+    setAnswers(current => ({ ...current, [idx]: opt }));
     setReveal(true);
   }
 
   function resetExamState() {
+    clearStoredAttempt(attemptId);
     setPhase('setup');
     setAnswers({});
     setIdx(0);
@@ -196,10 +360,17 @@ export function ExamPage({ locale }: Props) {
     setAttemptId(null);
     setReveal(false);
     setSubmissionErr('');
+    setStartErr('');
     setFilter('all');
+    setRemainingSeconds(30 * 60);
+    setTotalSeconds(30 * 60);
+    setSaveState('idle');
+    setTimerSyncedAt(null);
+    timeoutSubmitFired.current = false;
   }
 
   function startDemoExam() {
+    clearStoredAttempt(attemptId);
     setStartErr('');
     setSubmissionErr('');
     setAttemptId(null);
@@ -209,12 +380,14 @@ export function ExamPage({ locale }: Props) {
     setReveal(false);
     setResult(null);
     setFilter('all');
+    setRemainingSeconds(30 * 60);
+    setTotalSeconds(30 * 60);
+    setSaveState('idle');
     setPhase('running');
   }
 
-  // ── Démarrer l'examen officiel ──────────────────────────────────────────────
-  async function handleStartExam(e?: FormEvent) {
-    e?.preventDefault();
+  async function handleStartExam(event?: FormEvent) {
+    event?.preventDefault();
     setStartErr('');
     setSubmissionErr('');
 
@@ -226,21 +399,30 @@ export function ExamPage({ locale }: Props) {
     setStartLoading(true);
     try {
       const attempt = await startExamFromBooking(bookRef.trim());
-      const qsResp = await getExamQuestions(attempt.id, locale);
-      if (!qsResp.questions.length) {
+      const [questionsResponse, status] = await Promise.all([
+        getExamQuestions(attempt.id, locale),
+        getExamLiveStatus(attempt.id),
+      ]);
+      if (!questionsResponse.questions.length) {
         throw new Error("La session officielle ne contient aucune question. Contactez le responsable du centre.");
       }
+
+      window.sessionStorage.setItem(ACTIVE_ATTEMPT_KEY, attempt.id);
       setAttemptId(attempt.id);
-      setLiveQuestions(qsResp.questions);
+      setLiveQuestions(questionsResponse.questions);
       setAnswers({});
+      persistStoredAnswers(attempt.id, {});
       setIdx(0);
       setReveal(false);
       setResult(null);
       setFilter('all');
+      setRemainingSeconds(status.remaining_seconds);
+      setTotalSeconds(status.total_seconds || questionsResponse.duration_seconds || 30 * 60);
+      setTimerSyncedAt(new Date());
+      setSaveState('saved');
+      timeoutSubmitFired.current = false;
       setPhase('running');
     } catch (err: unknown) {
-      // IMPORTANT : aucun fallback automatique vers la démonstration.
-      // Une référence invalide doit rester une erreur d'examen officiel.
       setAttemptId(null);
       setLiveQuestions(null);
       setStartErr(errMsg(err, "Impossible de démarrer l'examen officiel"));
@@ -249,87 +431,56 @@ export function ExamPage({ locale }: Props) {
     }
   }
 
-  // ── Soumettre l'examen ───────────────────────────────────────────────────────
   async function submitExam() {
     setSubmissionErr('');
 
     if (attemptId) {
-      const payload: Record<string, string> = {};
-      Object.entries(answers).forEach(([i, ans]) => {
-        const question = questions[parseInt(i)];
-        if (question) payload[question.id] = ans;
-      });
-
       try {
-        // La vérité du score appartient exclusivement au backend.
-        // Même si la réponse HTTP de soumission est perdue, on tente ensuite
-        // de relire le résultat détaillé déjà persisté côté serveur.
         try {
-          await submitExamAttempt(attemptId, payload);
+          await submitExamAttempt(attemptId, toApiAnswers(answers, questions));
         } catch {
-          // getExamResults ci-dessous distinguera un examen déjà soumis
-          // d'une tentative réellement non soumise/expirée.
+          // En cas de timeout réseau ou de soumission déjà finalisée, on tente
+          // toujours de relire la vérité persistée côté serveur.
         }
-
-        const serverResult = await getExamResults(attemptId);
-        setResult({
-          score: serverResult.score,
-          threshold: serverResult.threshold,
-          passed: serverResult.passed,
-          questions: serverResult.questions.map(item => ({
-            question_id: item.question_id,
-            question_text: item.text,
-            candidate_answer: item.given_answer ?? '—',
-            correct_answer: item.correct_answer,
-            is_correct: item.is_correct,
-            category: item.category,
-            options: item.options,
-            explanation: item.explanation,
-          })),
-        });
-        setPhase('done');
+        await loadServerResult(attemptId);
       } catch (err: unknown) {
-        // Jamais de scoring local de secours pour un examen officiel.
         setSubmissionErr(errMsg(err, "Impossible d'enregistrer ou de récupérer le résultat officiel."));
+        timeoutSubmitFired.current = false;
       }
       return;
     }
 
-    // Examen blanc uniquement : scoring local autorisé.
-    const score = questions.filter((_, i) => answers[i] === questions[i].correct_answer).length;
+    const score = questions.filter((_, index) => answers[index] === questions[index].correct_answer).length;
     setResult({
-      score, threshold: 35, passed: score >= 35,
-      questions: questions.map((q2, i) => ({
-        question_id: q2.id, question_text: q2.text,
-        candidate_answer: answers[i] ?? '—',
-        correct_answer: q2.correct_answer,
-        is_correct: answers[i] === q2.correct_answer,
-        category: q2.category, options: q2.options,
-        explanation: q2.expl,
+      score,
+      threshold: 35,
+      passed: score >= 35,
+      questions: questions.map((question, index) => ({
+        question_id: question.id,
+        question_text: question.text,
+        candidate_answer: answers[index] ?? '—',
+        correct_answer: question.correct_answer,
+        is_correct: answers[index] === question.correct_answer,
+        category: question.category,
+        options: question.options,
+        explanation: question.expl,
       })),
     });
     setPhase('done');
   }
 
-  // ── PHASE SETUP ─────────────────────────────────────────────────────────────
   if (phase === 'setup') {
     const stats = [
-      { icon: <IconClipboard size={18}/>,  label: '40 questions', desc: 'illustrées' },
-      { icon: <IconClock size={18}/>,      label: '30 minutes',   desc: 'minuterie' },
-      { icon: <IconTarget size={18}/>,     label: '35 / 40',      desc: 'pour réussir' },
-      { icon: <IconFileCheck size={18}/>,  label: 'Résultats',    desc: 'détaillés' },
+      { icon: <IconClipboard size={18}/>, label: '40 questions', desc: 'illustrées' },
+      { icon: <IconClock size={18}/>, label: '30 minutes', desc: 'temps serveur' },
+      { icon: <IconTarget size={18}/>, label: '35 / 40', desc: 'pour réussir' },
+      { icon: <IconFileCheck size={18}/>, label: 'Reprise sûre', desc: 'après coupure' },
     ];
     return (
       <section className="screen" role="main">
         <div style={{ maxWidth: 560, margin: '0 auto' }}>
           <AudioModeBanner />
-
-          {/* Hero */}
-          <div style={{
-            background: 'linear-gradient(135deg, #0D2137 0%, #1B3254 55%, #0F4A2A 100%)',
-            borderRadius: 20, padding: '32px 28px', color: '#fff', marginBottom: 20,
-            textAlign: 'center', position: 'relative', overflow: 'hidden',
-          }}>
+          <div style={{ background: 'linear-gradient(135deg, #0D2137 0%, #1B3254 55%, #0F4A2A 100%)', borderRadius: 20, padding: '32px 28px', color: '#fff', marginBottom: 20, textAlign: 'center', position: 'relative', overflow: 'hidden' }}>
             <div style={{ position: 'absolute', top: -40, right: -40, width: 180, height: 180, borderRadius: '50%', background: 'rgba(255,255,255,.04)' }}/>
             <div style={{ position: 'absolute', bottom: -50, left: 30, width: 140, height: 140, borderRadius: '50%', background: 'rgba(0,107,63,.18)' }}/>
             <div style={{ position: 'relative', zIndex: 1 }}>
@@ -340,43 +491,25 @@ export function ExamPage({ locale }: Props) {
                   <path d="M12 21h3l2 4 3-7 2 4h4" stroke="#fff" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
               </div>
-              <h2 style={{ color: '#fff', fontSize: 22, fontWeight: 800, letterSpacing: '-.03em', marginBottom: 6 }}>
-                Code de la Route — Catégorie B
-              </h2>
-              <p style={{ color: 'rgba(255,255,255,.65)', fontSize: 13 }}>
-                République de Guinée · Direction Nationale des Transports Terrestres
-              </p>
+              <h2 style={{ color: '#fff', fontSize: 22, fontWeight: 800, letterSpacing: '-.03em', marginBottom: 6 }}>Code de la Route — Catégorie B</h2>
+              <p style={{ color: 'rgba(255,255,255,.65)', fontSize: 13 }}>République de Guinée · Direction Nationale des Transports Terrestres</p>
             </div>
           </div>
 
-          {/* Stats */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
             {stats.map(({ icon, label, desc }) => (
               <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, boxShadow: 'var(--sh-xs)' }}>
                 <div style={{ color: 'var(--guinea-green)', flexShrink: 0 }}>{icon}</div>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)', letterSpacing: '-.01em' }}>{label}</div>
-                  <div style={{ fontSize: 11, color: 'var(--muted)' }}>{desc}</div>
-                </div>
+                <div><div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)' }}>{label}</div><div style={{ fontSize: 11, color: 'var(--muted)' }}>{desc}</div></div>
               </div>
             ))}
           </div>
 
-          {/* Form */}
           <div className="card">
             <LocaleAudioSwitcher />
-
-            {/* Consignes à l'écoute — seuil cohérent avec le moteur backend */}
             {audioEnabled && (
-              <button
-                type="button"
-                className="btn-outline"
-                onClick={() => { void announceInstructions(40, 30, 35); }}
-                style={{ width: '100%', marginTop: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
-              >
-                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-                  <path d="M11 5 6 9H2v6h4l5 4V5zM15.54 8.46a5 5 0 0 1 0 7.07M19.07 4.93a10 10 0 0 1 0 14.14" />
-                </svg>
+              <button type="button" className="btn-outline" onClick={() => { void announceInstructions(40, 30, 35); }} style={{ width: '100%', marginTop: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M11 5 6 9H2v6h4l5 4V5zM15.54 8.46a5 5 0 0 1 0 7.07M19.07 4.93a10 10 0 0 1 0 14.14" /></svg>
                 Écouter les consignes
               </button>
             )}
@@ -384,131 +517,65 @@ export function ExamPage({ locale }: Props) {
             {isAuth && (
               <label style={{ marginBottom: 14, marginTop: 14 }}>
                 Référence de réservation <span style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 400 }}>(obligatoire pour l'examen officiel)</span>
-                <input value={bookRef} onChange={e => setBookRef(e.target.value)} placeholder="GN-CONV-2026-000001" style={{ marginTop: 6 }}/>
+                <input value={bookRef} onChange={event => setBookRef(event.target.value)} placeholder="GN-CONV-2026-000001" style={{ marginTop: 6 }}/>
               </label>
             )}
             {startErr && (
               <div style={{ display: 'flex', gap: 8, padding: '10px 14px', background: 'var(--gold-l)', border: '1px solid var(--gold)', borderRadius: 8, fontSize: 13, color: 'var(--ink2)', marginBottom: 12, alignItems: 'flex-start' }}>
-                <IconAlertTriangle size={16} style={{ color: 'var(--gold)', flexShrink: 0, marginTop: 1 }}/>
-                <span>{startErr}</span>
+                <IconAlertTriangle size={16} style={{ color: 'var(--gold)', flexShrink: 0, marginTop: 1 }}/><span>{startErr}</span>
               </div>
             )}
 
             {isAuth && (
-              <button
-                className="btn-success btn-block"
-                style={{ minHeight: 48, fontSize: 14, fontWeight: 700, letterSpacing: '.02em' }}
-                onClick={handleStartExam}
-                disabled={startLoading || !canUseApi || !bookRef.trim()}
-              >
-                {startLoading ? 'Chargement des questions…' : "Démarrer l'examen officiel"}
+              <button className="btn-success btn-block" style={{ minHeight: 48, fontSize: 14, fontWeight: 700 }} onClick={handleStartExam} disabled={startLoading || !canUseApi || !bookRef.trim()}>
+                {startLoading ? 'Vérification de la session…' : "Démarrer l'examen officiel"}
               </button>
             )}
-
-            <button
-              className="secondary-button btn-block"
-              style={{ minHeight: 44, marginTop: 10, fontSize: 13, fontWeight: 700 }}
-              onClick={startDemoExam}
-              disabled={startLoading}
-            >
-              Commencer un examen blanc
-            </button>
-
-            <p style={{ fontSize: 12, color: 'var(--muted)', textAlign: 'center', marginTop: 12 }}>
-              Examen officiel : réservation requise · Examen blanc : entraînement sans valeur administrative
-            </p>
-            <p style={{ fontSize: 12, color: 'var(--muted)', textAlign: 'center', marginTop: 6 }}>
-              Touches clavier : ← → pour naviguer · 1 2 3 4 pour répondre
-            </p>
+            <button className="secondary-button btn-block" style={{ minHeight: 44, marginTop: 10, fontSize: 13, fontWeight: 700 }} onClick={startDemoExam} disabled={startLoading}>Commencer un examen blanc</button>
+            <p style={{ fontSize: 12, color: 'var(--muted)', textAlign: 'center', marginTop: 12 }}>Examen officiel : réservation requise · Examen blanc : entraînement sans valeur administrative</p>
           </div>
         </div>
       </section>
     );
   }
 
-  // ── PHASE DONE / RÉSULTATS ───────────────────────────────────────────────────
   if (phase === 'done' && result) {
-    const filtered = result.questions.filter(q2 =>
-      filter === 'all' ? true : filter === 'ok' ? q2.is_correct : !q2.is_correct
-    );
+    const filtered = result.questions.filter(question => filter === 'all' ? true : filter === 'ok' ? question.is_correct : !question.is_correct);
     const scoreColor = result.passed ? 'var(--guinea-green)' : 'var(--red)';
     return (
       <section className="screen" role="main">
         <div style={{ maxWidth: 780, margin: '0 auto' }}>
-
-          {/* Score card */}
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'auto 1fr', gap: isMobile ? 14 : 24, padding: isMobile ? 20 : 28, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16, marginBottom: 20, boxShadow: 'var(--sh)', alignItems: 'center', justifyItems: isMobile ? 'center' : 'stretch', textAlign: isMobile ? 'center' : 'left' }}>
-            {/* Cercle score */}
-            <div style={{ width: 120, height: 120, borderRadius: '50%', background: `conic-gradient(${scoreColor} ${(result.score / result.questions.length * 100).toFixed(1)}%, var(--border) 0)`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <div style={{ width: 96, height: 96, borderRadius: '50%', background: 'var(--surface)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
-                <span style={{ fontSize: 28, fontWeight: 800, color: scoreColor, lineHeight: 1, letterSpacing: '-.03em' }}>{result.score}</span>
-                <span style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 600 }}>/ {result.questions.length}</span>
+            <div style={{ width: 120, height: 120, borderRadius: '50%', background: `conic-gradient(${scoreColor} ${(result.score / Math.max(1, result.questions.length) * 100).toFixed(1)}%, var(--border) 0)`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ width: 96, height: 96, borderRadius: '50%', background: 'var(--surface)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                <span style={{ fontSize: 28, fontWeight: 800, color: scoreColor }}>{result.score}</span><span style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 600 }}>/ {result.questions.length}</span>
               </div>
             </div>
-            {/* Détails */}
             <div>
               <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 12px', borderRadius: 20, background: result.passed ? '#E6F3EC' : '#FDECEA', color: scoreColor, fontSize: 12, fontWeight: 700, marginBottom: 10 }}>
-                {result.passed ? <IconCheck size={14}/> : <IconAlertTriangle size={14}/>}
-                {result.passed ? 'ADMIS' : 'NON ADMIS'}
+                {result.passed ? <IconCheck size={14}/> : <IconAlertTriangle size={14}/>} {result.passed ? 'ADMIS' : 'NON ADMIS'}
               </div>
-              <h2 style={{ fontSize: 20, fontWeight: 800, letterSpacing: '-.03em', marginBottom: 4 }}>
-                {result.score} réponses correctes sur {result.questions.length}
-              </h2>
-              <p style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 14 }}>
-                Seuil d'admission : {result.threshold} / {result.questions.length} — {Math.round(result.score / result.questions.length * 100)}%
-              </p>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <button className="btn-success btn-sm" onClick={resetExamState}>
-                  Recommencer
-                </button>
-                {audioEnabled && (
-                  <button className="btn-outline btn-sm"
-                    onClick={() => { void announceResult(Boolean(result.passed), Number(result.score ?? 0), Number(result.questions?.length ?? 40)); }}
-                    style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-                      <path d="M11 5 6 9H2v6h4l5 4V5zM15.54 8.46a5 5 0 0 1 0 7.07" />
-                    </svg>
-                    Réécouter le résultat
-                  </button>
-                )}
-              </div>
+              <h2 style={{ fontSize: 20, fontWeight: 800, marginBottom: 4 }}>{result.score} réponses correctes sur {result.questions.length}</h2>
+              <p style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 14 }}>Seuil d'admission : {result.threshold} / {result.questions.length}</p>
+              <button className="btn-success btn-sm" onClick={resetExamState}>Nouvel examen</button>
             </div>
           </div>
 
-          {/* Filtres */}
           <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-            {([['all', `Toutes (${result.questions.length})`], ['ok', `Correctes (${result.questions.filter(q2=>q2.is_correct).length})`], ['ko', `Erreurs (${result.questions.filter(q2=>!q2.is_correct).length})`]] as [string,string][]).map(([f, label]) => (
-              <button key={f} className={filter === f ? 'btn-success btn-sm' : 'secondary-button btn-sm'} onClick={() => setFilter(f as 'all' | 'ok' | 'ko')}>
-                {label}
-              </button>
+            {([['all', `Toutes (${result.questions.length})`], ['ok', `Correctes (${result.questions.filter(item => item.is_correct).length})`], ['ko', `Erreurs (${result.questions.filter(item => !item.is_correct).length})`]] as [string,string][]).map(([value, label]) => (
+              <button key={value} className={filter === value ? 'btn-success btn-sm' : 'secondary-button btn-sm'} onClick={() => setFilter(value as 'all' | 'ok' | 'ko')}>{label}</button>
             ))}
           </div>
 
-          {/* Liste des questions */}
           <div style={{ display: 'grid', gap: 10 }}>
-            {filtered.map((q2, i) => (
-              <div key={i} style={{ background: 'var(--surface)', border: `1.5px solid ${q2.is_correct ? '#86efac' : '#fca5a5'}`, borderRadius: 12, padding: '14px 18px', display: 'grid', gap: 8 }}>
-                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
-                  <p style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--ink)', flex: 1, lineHeight: 1.5 }}>{q2.question_text}</p>
-                  <div style={{ flexShrink: 0, color: q2.is_correct ? 'var(--guinea-green)' : 'var(--red)' }}>
-                    {q2.is_correct ? <IconCheck size={18}/> : <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>}
-                  </div>
-                </div>
-                {!q2.is_correct && (
-                  <div style={{ display: 'grid', gap: 4 }}>
-                    <div style={{ fontSize: 12, color: 'var(--red)', background: '#FDECEA', padding: '4px 10px', borderRadius: 6 }}>
-                      Votre réponse : {q2.candidate_answer}
-                    </div>
-                    <div style={{ fontSize: 12, color: 'var(--guinea-green)', background: '#E6F3EC', padding: '4px 10px', borderRadius: 6 }}>
-                      Bonne réponse : {q2.correct_answer}
-                    </div>
-                    {q2.explanation && (
-                      <div style={{ fontSize: 12, color: 'var(--ink2)', padding: '6px 10px', background: 'var(--bg)', borderRadius: 6, lineHeight: 1.6 }}>
-                        {q2.explanation}
-                      </div>
-                    )}
-                  </div>
-                )}
+            {filtered.map((item, index) => (
+              <div key={index} style={{ background: 'var(--surface)', border: `1.5px solid ${item.is_correct ? '#86efac' : '#fca5a5'}`, borderRadius: 12, padding: '14px 18px', display: 'grid', gap: 8 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><p style={{ fontSize: 13.5, fontWeight: 600, flex: 1 }}>{item.question_text}</p>{item.is_correct ? <IconCheck size={18}/> : <IconAlertTriangle size={18}/>}</div>
+                {!item.is_correct && <>
+                  <div style={{ fontSize: 12, color: 'var(--red)', background: '#FDECEA', padding: '4px 10px', borderRadius: 6 }}>Votre réponse : {item.candidate_answer}</div>
+                  <div style={{ fontSize: 12, color: 'var(--guinea-green)', background: '#E6F3EC', padding: '4px 10px', borderRadius: 6 }}>Bonne réponse : {item.correct_answer}</div>
+                  {item.explanation && <div style={{ fontSize: 12, padding: '6px 10px', background: 'var(--bg)', borderRadius: 6 }}>{item.explanation}</div>}
+                </>}
               </div>
             ))}
           </div>
@@ -517,201 +584,113 @@ export function ExamPage({ locale }: Props) {
     );
   }
 
-  // ── PHASE RUNNING / REVIEW ──────────────────────────────────────────────────
   const catColor = CATEGORY_COLOR[q?.category ?? ''] ?? '#006B3F';
-  const catBg    = CATEGORY_BG[q?.category ?? '']    ?? '#E6F3EC';
+  const catBg = CATEGORY_BG[q?.category ?? ''] ?? '#E6F3EC';
   const hasMedia = Boolean(q?.media);
   const canRevealAnswer = !isOfficialExam;
+  const timerUrgent = remainingSeconds <= 300;
+  const timerCritical = remainingSeconds <= 60;
+  const timerColor = timerCritical ? '#C0392B' : timerUrgent ? '#D4A017' : '#006B3F';
 
   return (
     <section className="screen" role="main" aria-label={isOfficialExam ? 'Examen officiel en cours' : 'Examen blanc en cours'} style={{ padding: '20px 16px' }}>
       <div style={{ maxWidth: 1060, margin: '0 auto' }}>
-
         {isOfficialExam && (
-          <div style={{ marginBottom: 12, padding: '9px 12px', borderRadius: 8, background: '#E6F3EC', border: '1px solid #86efac', color: '#006B3F', fontSize: 12.5, fontWeight: 700 }}>
-            Examen officiel — les bonnes réponses et explications ne sont révélées qu'après la soumission enregistrée par le serveur.
+          <div style={{ marginBottom: 12, padding: '10px 12px', borderRadius: 9, background: '#E6F3EC', border: '1px solid #86efac', color: '#006B3F', fontSize: 12.5, fontWeight: 700, display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+            <span>Examen officiel · correction et score exclusivement côté serveur</span>
+            <span style={{ fontWeight: 600, color: saveState === 'offline' ? '#C0392B' : '#166534' }}>
+              {saveState === 'saving' ? '● Sauvegarde…' : saveState === 'offline' ? '● Réseau instable — copie locale conservée' : '● Réponses sauvegardées'}
+            </span>
           </div>
         )}
 
         {submissionErr && (
-          <div style={{ display: 'flex', gap: 8, padding: '10px 14px', background: '#FDECEA', border: '1px solid #fca5a5', borderRadius: 8, fontSize: 13, color: '#991B1B', marginBottom: 12, alignItems: 'flex-start' }}>
-            <IconAlertTriangle size={16} style={{ flexShrink: 0, marginTop: 1 }}/>
-            <span>{submissionErr}</span>
+          <div style={{ display: 'flex', gap: 8, padding: '10px 14px', background: '#FDECEA', border: '1px solid #fca5a5', borderRadius: 8, fontSize: 13, color: '#991B1B', marginBottom: 12 }}>
+            <IconAlertTriangle size={16}/><span>{submissionErr}</span>
           </div>
         )}
 
-        {/* ── Barre supérieure ─────────────────────────────────────────── */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
-          {/* Progression textuelle */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>
-            <span style={{ color: 'var(--guinea-green)', fontWeight: 800, fontSize: 16 }}>{idx + 1}</span>
-            <span style={{ color: 'var(--muted)' }}>/ {questions.length}</span>
-          </div>
-          {/* Barre progression */}
-          <div style={{ flex: 1, height: 6, background: 'var(--border)', borderRadius: 8, overflow: 'hidden', minWidth: 100 }}>
-            <div style={{ height: '100%', background: 'linear-gradient(90deg, var(--guinea-green), #009460)', borderRadius: 'inherit', width: `${(idx + 1) / questions.length * 100}%`, transition: 'width .35s ease' }} />
-          </div>
-          {/* Badge catégorie */}
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 12px', borderRadius: 20, background: catBg, color: catColor, fontSize: 11.5, fontWeight: 700 }}>
-            {q?.category}
-          </div>
-          {/* Timer */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px', borderRadius: 20, border: '1px solid var(--border)', fontSize: 12.5, fontWeight: 600, color: 'var(--muted)', background: 'var(--surface)', flexShrink: 0 }}>
-            <IconClock size={14} style={{ color: 'var(--muted)' }}/>
-            <Timer secs={30 * 60} total={30 * 60} onExpire={onTimerExpire} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600 }}><span style={{ color: 'var(--guinea-green)', fontWeight: 800, fontSize: 16 }}>{idx + 1}</span><span style={{ color: 'var(--muted)' }}>/ {questions.length}</span></div>
+          <div style={{ flex: 1, height: 6, background: 'var(--border)', borderRadius: 8, overflow: 'hidden', minWidth: 100 }}><div style={{ height: '100%', background: 'linear-gradient(90deg, var(--guinea-green), #009460)', width: `${(idx + 1) / Math.max(1, questions.length) * 100}%` }}/></div>
+          <div style={{ padding: '4px 12px', borderRadius: 20, background: catBg, color: catColor, fontSize: 11.5, fontWeight: 700 }}>{q?.category}</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 11px', borderRadius: 10, border: `1px solid ${timerColor}33`, background: timerCritical ? '#FDECEA' : timerUrgent ? '#FDF6E0' : '#E6F3EC', flexShrink: 0 }}>
+            <IconClock size={15} style={{ color: timerColor }}/>
+            <div style={{ display: 'grid', lineHeight: 1.05 }}>
+              <strong style={{ color: timerColor, fontVariantNumeric: 'tabular-nums', fontSize: 15 }}>{formatRemaining(isOfficialExam ? remainingSeconds : totalSeconds)}</strong>
+              <span style={{ fontSize: 9.5, color: 'var(--muted)', marginTop: 3 }}>{isOfficialExam ? `Serveur${timerSyncedAt ? ' · synchronisé' : ''}` : 'Examen blanc'}</span>
+            </div>
           </div>
         </div>
 
-        {/* ── Layout principal ──────────────────────────────────────────── */}
         <div style={{ display: 'grid', gridTemplateColumns: hasMedia && !isMobile ? '1fr 400px' : '1fr', gap: 16, alignItems: 'start' }}>
-
-          {/* ── Colonne média (si présent) ──────────────────────────────── */}
           {hasMedia && (
             <div style={{ position: isMobile ? 'static' : 'sticky', top: 76 }}>
               <div key={idx} className="exam-media-fade" style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16, overflow: 'hidden', boxShadow: 'var(--sh)' }}>
-                {/* Entête zone média */}
-                <div style={{ padding: '10px 16px', background: 'var(--bg)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.07em' }}>
-                    {q.mediaType === 'sign' ? 'Panneau de signalisation' : q.mediaType === 'video' ? 'Vidéo pédagogique' : q.mediaType === 'image' ? 'Photo réelle' : 'Situation de conduite'}
-                  </span>
-                  <span style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--muted)', opacity: .6 }}>
-                    Question {idx + 1}
-                  </span>
+                <div style={{ padding: '10px 16px', background: 'var(--bg)', borderBottom: '1px solid var(--border)', display: 'flex', gap: 6 }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.07em' }}>{q.mediaType === 'sign' ? 'Panneau de signalisation' : q.mediaType === 'video' ? 'Vidéo pédagogique' : q.mediaType === 'image' ? 'Photo réelle' : 'Situation de conduite'}</span>
+                  <span style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--muted)' }}>Question {idx + 1}</span>
                 </div>
-                {/* Média */}
-                <div style={{ padding: q.mediaType === 'scene' ? 0 : '20px 16px 16px' }}>
-                  <MediaBlock mediaType={q.mediaType} media={q.media} alt={q.mediaAlt} />
-                </div>
+                <div style={{ padding: q.mediaType === 'scene' ? 0 : '20px 16px 16px' }}><MediaBlock mediaType={q.mediaType} media={q.media} alt={q.mediaAlt}/></div>
               </div>
             </div>
           )}
 
-          {/* ── Colonne question + réponses ─────────────────────────────── */}
           <div>
-            {/* Numéro question */}
-            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.09em', marginBottom: 10 }}>
-              Question {idx + 1}
-            </div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.09em', marginBottom: 10 }}>Question {idx + 1}</div>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 18 }}><p style={{ fontSize: 17, fontWeight: 600, color: 'var(--ink)', lineHeight: 1.6, flex: 1 }}>{q?.text}</p><PlayButton text={q?.text ?? ''} options={q?.options ?? []} size={36}/></div>
 
-            {/* Texte question */}
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 18 }}>
-              <p style={{ fontSize: 17, fontWeight: 600, color: 'var(--ink)', lineHeight: 1.6, flex: 1 }}>
-                {q?.text}
-              </p>
-              <PlayButton text={q?.text ?? ''} options={q?.options ?? []} size={36} />
-            </div>
-
-            {/* Options */}
             <div style={{ display: 'grid', gap: 9 }}>
-              {q?.options.map((opt, i) => {
-                const isSelected = answers[idx] === opt;
-                const isCorrect  = canRevealAnswer && opt === q.correct_answer;
-                const showResult = canRevealAnswer && reveal && isSelected;
-                const showCorrect= canRevealAnswer && reveal && isCorrect && !isSelected;
-
-                let borderColor = 'var(--border)';
-                let bgColor     = 'var(--surface)';
-                let textColor   = 'var(--ink2)';
-                let letterBg    = 'var(--bg)';
-                let letterColor = 'var(--muted)';
-
-                if (isSelected && (!reveal || isOfficialExam)) { borderColor = 'var(--guinea-green)'; bgColor = '#E6F3EC'; textColor = '#006B3F'; letterBg = '#006B3F'; letterColor = '#fff'; }
-                if (showResult && isCorrect) { borderColor = '#006B3F'; bgColor = '#E6F3EC'; textColor = '#006B3F'; letterBg = '#006B3F'; letterColor = '#fff'; }
-                if (showResult && !isCorrect){ borderColor = '#C0392B'; bgColor = '#FDECEA'; textColor = '#C0392B'; letterBg = '#C0392B'; letterColor = '#fff'; }
-                if (showCorrect)             { borderColor = '#006B3F'; bgColor = '#E6F3EC'; textColor = '#006B3F'; letterBg = '#E6F3EC'; letterColor = '#006B3F'; }
-
+              {q?.options.map((opt, optionIndex) => {
+                const selected = answers[idx] === opt;
+                const correct = canRevealAnswer && opt === q.correct_answer;
+                const showResult = canRevealAnswer && reveal && selected;
+                const showCorrect = canRevealAnswer && reveal && correct && !selected;
+                let borderColor = 'var(--border)', bgColor = 'var(--surface)', textColor = 'var(--ink2)', letterBg = 'var(--bg)', letterColor = 'var(--muted)';
+                if (selected && (!reveal || isOfficialExam)) { borderColor = '#006B3F'; bgColor = '#E6F3EC'; textColor = '#006B3F'; letterBg = '#006B3F'; letterColor = '#fff'; }
+                if (showResult && correct) { borderColor = '#006B3F'; bgColor = '#E6F3EC'; textColor = '#006B3F'; letterBg = '#006B3F'; letterColor = '#fff'; }
+                if (showResult && !correct) { borderColor = '#C0392B'; bgColor = '#FDECEA'; textColor = '#C0392B'; letterBg = '#C0392B'; letterColor = '#fff'; }
+                if (showCorrect) { borderColor = '#006B3F'; bgColor = '#E6F3EC'; textColor = '#006B3F'; }
                 return (
-                  <button key={i} type="button" onClick={() => pick(opt)}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 12,
-                      padding: '13px 16px',
-                      border: `2px solid ${borderColor}`,
-                      borderRadius: 10,
-                      background: bgColor,
-                      cursor: isOfficialExam || answers[idx] === undefined ? 'pointer' : 'default',
-                      textAlign: 'left', width: '100%',
-                      color: textColor, fontSize: 14, fontWeight: 500,
-                      minHeight: 'unset', transition: 'all .12s ease',
-                      lineHeight: 1.5,
-                    }}>
-                    {/* Lettre */}
-                    <span style={{ width: 30, height: 30, borderRadius: 8, background: letterBg, color: letterColor, border: `2px solid ${borderColor}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 800, flexShrink: 0, transition: 'all .12s' }}>
-                      {String.fromCharCode(65 + i)}
-                    </span>
-                    {/* Texte */}
+                  <button key={optionIndex} type="button" onClick={() => pick(opt)} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 16px', border: `2px solid ${borderColor}`, borderRadius: 10, background: bgColor, cursor: isOfficialExam || answers[idx] === undefined ? 'pointer' : 'default', textAlign: 'left', width: '100%', color: textColor, fontSize: 14, fontWeight: 500, minHeight: 'unset' }}>
+                    <span style={{ width: 30, height: 30, borderRadius: 8, background: letterBg, color: letterColor, border: `2px solid ${borderColor}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 800, flexShrink: 0 }}>{String.fromCharCode(65 + optionIndex)}</span>
                     <span style={{ flex: 1 }}>{opt}</span>
-                    {/* Icône résultat — uniquement examen blanc */}
-                    {showResult && isCorrect  && <IconCheck size={18} style={{ color: '#006B3F', flexShrink: 0 }}/>} 
-                    {showResult && !isCorrect && <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#C0392B" strokeWidth="2.5" style={{ flexShrink: 0 }}><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>}
-                    {showCorrect && <IconCheck size={18} style={{ color: '#006B3F', flexShrink: 0 }}/>} 
+                    {showResult && correct && <IconCheck size={18}/>} {showResult && !correct && <IconAlertTriangle size={18}/>} {showCorrect && <IconCheck size={18}/>} 
                   </button>
                 );
               })}
             </div>
 
-            {/* Explication — jamais pendant l'examen officiel */}
-            {canRevealAnswer && reveal && q?.expl && (
-              <div style={{ marginTop: 14, padding: '12px 16px', background: '#E6F3EC', borderLeft: '3px solid var(--guinea-green)', borderRadius: '0 8px 8px 0', fontSize: 13, color: '#006B3F', lineHeight: 1.65 }}>
-                <strong>Explication : </strong>{q.expl}
-              </div>
-            )}
+            {canRevealAnswer && reveal && q?.expl && <div style={{ marginTop: 14, padding: '12px 16px', background: '#E6F3EC', borderLeft: '3px solid var(--guinea-green)', borderRadius: '0 8px 8px 0', fontSize: 13, color: '#006B3F' }}><strong>Explication : </strong>{q.expl}</div>}
 
-            {/* Navigation */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
-              <button className="secondary-button btn-sm" disabled={idx === 0}
-                onClick={() => { setReveal(false); setIdx(i => Math.max(0, i - 1)); }}
-                style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                <IconArrowLeft size={15}/> Précédente
-              </button>
-              <span style={{ fontSize: 12, color: 'var(--muted)' }}>{answered} répondue{answered > 1 ? 's' : ''}</span>
+              <button className="secondary-button btn-sm" disabled={idx === 0} onClick={() => { setReveal(false); setIdx(index => Math.max(0, index - 1)); }} style={{ display: 'flex', alignItems: 'center', gap: 5 }}><IconArrowLeft size={15}/> Précédente</button>
+              <span style={{ fontSize: 12, color: 'var(--muted)' }}>{answered} / {questions.length} répondues</span>
               {idx < questions.length - 1
-                ? <button className="secondary-button btn-sm"
-                    onClick={() => { setReveal(false); setIdx(i => Math.min(questions.length - 1, i + 1)); }}
-                    style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                    Suivante <IconArrowRight size={15}/>
-                  </button>
-                : <button className="btn-success btn-sm" onClick={submitExam}
-                    style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                    <IconCheck size={15}/> Soumettre
-                  </button>
-              }
+                ? <button className="secondary-button btn-sm" onClick={() => { setReveal(false); setIdx(index => Math.min(questions.length - 1, index + 1)); }} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>Suivante <IconArrowRight size={15}/></button>
+                : <button className="btn-success btn-sm" onClick={() => { void submitExam(); }} style={{ display: 'flex', alignItems: 'center', gap: 5 }}><IconCheck size={15}/> Soumettre</button>}
             </div>
           </div>
         </div>
 
-        {/* ── Grille navigation questions ───────────────────────────────── */}
         <div style={{ marginTop: 20, padding: 16, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, boxShadow: 'var(--sh-xs)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-            <span style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.07em' }}>
-              Navigation — {answered} / {questions.length} répondues
-            </span>
-            <div style={{ display: 'flex', gap: 12, fontSize: 11, color: 'var(--muted)' }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                <span style={{ width: 10, height: 10, borderRadius: 3, background: '#dcfce7', border: '1.5px solid #86efac', display: 'inline-block' }}/>
-                Répondue
-              </span>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                <span style={{ width: 10, height: 10, borderRadius: 3, background: '#0D2137', display: 'inline-block' }}/>
-                Actuelle
-              </span>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                <span style={{ width: 10, height: 10, borderRadius: 3, background: 'var(--bg)', border: '1.5px solid var(--border)', display: 'inline-block' }}/>
-                Non répondue
-              </span>
-            </div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, gap: 10, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.07em' }}>Navigation — {answered} / {questions.length} répondues</span>
+            {isOfficialExam && <span style={{ fontSize: 10.5, color: saveState === 'offline' ? '#C0392B' : '#166534' }}>{saveState === 'offline' ? 'Sauvegarde serveur à reprendre' : 'Session sécurisée'}</span>}
           </div>
-          <QGrid total={questions.length} cur={idx} ans={answers} onSelect={i => { setReveal(false); setIdx(i); }} />
+          <QGrid total={questions.length} cur={idx} ans={answers} onSelect={index => { setReveal(false); setIdx(index); }}/>
           <div style={{ marginTop: 12, display: 'flex', justifyContent: 'flex-end' }}>
-            <button className="btn-success btn-sm"
-              onClick={() => answered < questions.length ? setPhase('review') : void submitExam()}
-              style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-              <IconCheck size={14}/>
-              {answered < questions.length ? `Soumettre (${questions.length - answered} sans réponse)` : "Soumettre l'examen"}
+            <button className="btn-success btn-sm" onClick={() => {
+              if (answered < questions.length) {
+                setSubmissionErr(`${questions.length - answered} question(s) sans réponse. Vous pouvez les retrouver dans la grille avant de soumettre.`);
+              } else {
+                void submitExam();
+              }
+            }} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+              <IconCheck size={14}/>{answered < questions.length ? `Vérifier (${questions.length - answered} restantes)` : "Soumettre l'examen"}
             </button>
           </div>
         </div>
-
       </div>
     </section>
   );
