@@ -1,4 +1,4 @@
-"""Tests de non-régression — contrôle horizontal des tentatives d'examen."""
+"""Tests de non-régression — sécurité et intégrité des tentatives d'examen."""
 from __future__ import annotations
 
 from types import SimpleNamespace
@@ -6,10 +6,16 @@ from types import SimpleNamespace
 import pytest
 from fastapi import HTTPException
 
+from app.exam_engine import filter_official_exam_pool
 from app.models_candidate import Candidate
 from app.models_session import ExamSession
+from app.question_bank_gn import QUESTIONS_GN, QUESTIONS_TRAINING_FULL
 from app.routers.exam_runtime import _assert_runtime_access
-from app.routers.exams import _assert_attempt_access
+from app.routers.exams import (
+    _assert_attempt_access,
+    _require_official_bank_ready,
+    _require_official_trace,
+)
 
 
 class _FakeDb:
@@ -105,6 +111,30 @@ def test_missing_candidate_is_rejected():
     assert exc_info.value.status_code == 403
 
 
+def test_historical_center_guard_allows_own_center():
+    db = _FakeDb(session=_session(center_id="center-conakry"))
+
+    _assert_attempt_access(
+        db,
+        _user(role="center", center_id="center-conakry"),
+        _attempt(),
+    )
+
+
+def test_historical_center_guard_rejects_other_center():
+    db = _FakeDb(session=_session(center_id="center-kankan"))
+
+    with pytest.raises(HTTPException) as exc_info:
+        _assert_attempt_access(
+            db,
+            _user(role="center", center_id="center-conakry"),
+            _attempt(),
+        )
+
+    assert exc_info.value.status_code == 403
+    assert "autre centre" in str(exc_info.value.detail)
+
+
 def test_runtime_center_can_access_its_own_session():
     db = _FakeDb(session=_session(center_id="center-conakry"))
 
@@ -140,3 +170,57 @@ def test_runtime_candidate_cannot_access_foreign_attempt():
         )
 
     assert exc_info.value.status_code == 403
+
+
+def test_official_bank_accepts_exactly_40_approved_questions():
+    _require_official_bank_ready([object() for _ in range(40)])
+
+
+def test_official_bank_rejects_39_approved_questions():
+    with pytest.raises(HTTPException) as exc_info:
+        _require_official_bank_ready([object() for _ in range(39)])
+
+    assert exc_info.value.status_code == 503
+    assert exc_info.value.detail["code"] == "OFFICIAL_QUESTION_BANK_NOT_READY"
+    assert exc_info.value.detail["approved_questions"] == 39
+    assert exc_info.value.detail["required_questions"] == 40
+
+
+def test_legacy_training_question_is_excluded_even_if_approved_upstream():
+    training = SimpleNamespace(id="training-1", text=QUESTIONS_TRAINING_FULL[0]["text"])
+    official = SimpleNamespace(id="official-1", text="Question officielle nouvellement certifiée DNTT")
+
+    filtered = filter_official_exam_pool([training, official])
+
+    assert filtered == [official]
+
+
+def test_seeded_200_question_dataset_reduces_to_40_official_items():
+    seeded = [
+        SimpleNamespace(id=f"seed-{index}", text=item["text"])
+        for index, item in enumerate(QUESTIONS_GN + QUESTIONS_TRAINING_FULL)
+    ]
+
+    filtered = filter_official_exam_pool(seeded)
+    official_texts = {item["text"] for item in QUESTIONS_GN}
+
+    assert len(seeded) == 200
+    assert len(filtered) == 40
+    assert {item.text for item in filtered} == official_texts
+
+
+def test_future_approved_official_import_remains_eligible():
+    imported = SimpleNamespace(
+        id="official-import-1",
+        text="Question officielle importée après le seed historique",
+    )
+
+    assert filter_official_exam_pool([imported]) == [imported]
+
+
+def test_missing_official_trace_is_never_reconstructed():
+    with pytest.raises(HTTPException) as exc_info:
+        _require_official_trace(None)
+
+    assert exc_info.value.status_code == 409
+    assert exc_info.value.detail["code"] == "OFFICIAL_EXAM_TRACE_MISSING"
