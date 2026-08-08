@@ -26,6 +26,14 @@ class Settings(BaseSettings):
     allowed_hosts: str = "localhost,127.0.0.1,testserver"
     enable_api_docs: bool = True
 
+    # ── Portique centre d'examen ─────────────────────────────────────────
+    # Paramètres OPÉRATIONNELS, configurables sans modification de code.
+    # Ils devront être alignés sur la procédure DNTT formellement validée.
+    exam_checkin_open_minutes_before: int = 60
+    exam_checkin_close_minutes_after: int = 30
+    exam_start_open_minutes_before: int = 10
+    exam_start_close_minutes_after: int = 45
+
     # ── Email (Brevo) ─────────────────────────────────────────────────────
     brevo_api_key: str = ""
     email_from: str = "noreply@coderoute.gov.gn"
@@ -99,18 +107,13 @@ class Settings(BaseSettings):
         if not self.is_production:
             return
 
-        # Sous-chaînes interdites (jamais présentes dans un vrai secret/URL)
         PLACEHOLDER_SUBSTRINGS = ("CHANGE_ME", "change-me-in-production", "changeme")
-
-        # Secrets notoirement faibles : un secret peut ne pas être un
-        # placeholder tout en étant trivialement devinable. Un audit de
-        # sécurité externe (exigé pour un déploiement national) le relèverait.
         WEAK_VALUES = {
             "secret", "password", "passwd", "admin", "test", "dev", "default",
             "secretkey", "secret_key", "mysecret", "coderoute", "guinee",
             "123456", "12345678", "password123", "azerty", "qwerty",
         }
-        MIN_SECRET_LENGTH = 32  # 256 bits en hexadécimal
+        MIN_SECRET_LENGTH = 32
 
         errors: list[str] = []
 
@@ -119,9 +122,8 @@ class Settings(BaseSettings):
                 errors.append(f"{name} est vide ou placeholder — définir dans Render Dashboard")
 
         def _check_strength(v: str, name: str) -> None:
-            """Un secret de production doit être long et non devinable."""
             if not v or not v.strip():
-                return  # déjà signalé par _is_placeholder
+                return
             if len(v) < MIN_SECRET_LENGTH:
                 errors.append(
                     f"{name} est trop court ({len(v)} caractères, minimum "
@@ -139,8 +141,6 @@ class Settings(BaseSettings):
         _check_strength(self.secret_key,  "SECRET_KEY")
         _check_strength(self.csrf_secret, "CSRF_SECRET")
 
-        # SECRET_KEY et CSRF_SECRET doivent être DISTINCTS : réutiliser le même
-        # secret pour deux usages cryptographiques est une faute classique.
         if self.secret_key and self.secret_key == self.csrf_secret:
             errors.append("SECRET_KEY et CSRF_SECRET doivent être différents")
 
@@ -154,8 +154,6 @@ class Settings(BaseSettings):
         if any(h in local_hosts for h in self.allowed_host_list):
             errors.append("ALLOWED_HOSTS ne doit pas contenir localhost/testserver en production")
 
-        # La base de production ne doit pas être un SQLite local (perte de
-        # données garantie sur un hébergement éphémère).
         if self.database_url and self.database_url.strip().startswith("sqlite"):
             errors.append("DATABASE_URL ne doit pas être SQLite en production — utiliser PostgreSQL")
 
