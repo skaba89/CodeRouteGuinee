@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
-from app.deps import get_current_user, require_roles
+from app.deps import require_roles
 from app.exam_engine import (
     EXAM_DURATION_MINUTES,
     build_question_bank_hash,
@@ -53,13 +53,34 @@ class ExamQuestionsRead(_BaseModel):
     duration_seconds: int = 1800   # 30 min par défaut
     threshold: int = 35
 
-router = APIRouter(prefix="/exams", tags=["exams"])
 
+router = APIRouter(prefix="/exams", tags=["exams"])
 
 
 def _is_attempt_expired(attempt: ExamAttempt, now: datetime) -> bool:
     return now - attempt.started_at > timedelta(minutes=EXAM_DURATION_MINUTES)
 
+
+def _assert_attempt_access(db: Session, current_user: User, attempt: ExamAttempt) -> None:
+    """Protège les ressources d'une tentative contre les accès horizontaux.
+
+    Les candidats ne peuvent consulter ou soumettre que leur propre tentative.
+    Les rôles centre/admin/super_admin conservent leurs droits opérationnels ;
+    le cloisonnement des agents de centre par center_id sera traité séparément.
+    """
+    if current_user.role != "candidate":
+        return
+
+    candidate = db.get(Candidate, attempt.candidate_id)
+    owns_attempt = candidate is not None and (
+        candidate.user_id == current_user.id
+        or bool(candidate.email and candidate.email == current_user.email)
+    )
+    if not owns_attempt:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Cette tentative ne vous appartient pas.",
+        )
 
 
 def _create_exam_attempt(db: Session, candidate_id: str, session_id: str) -> ExamAttempt:
@@ -72,10 +93,10 @@ def _create_exam_attempt(db: Session, candidate_id: str, session_id: str) -> Exa
         )
     ).all())
 
-    # Filet de sécurité : si trop peu de questions approuvées existent
-    # (déploiement initial, banque non encore validée), on retombe sur les
-    # questions actives pour ne pas bloquer le service. En régime normal,
-    # la banque approuvée couvre les 40 questions.
+    # Filet de sécurité historique : si trop peu de questions approuvées existent,
+    # l'application retombe encore sur les questions actives. Ce comportement sera
+    # supprimé dans le lot "banque officielle fail-closed" après vérification des
+    # seeds/migrations existants afin d'éviter une régression de déploiement.
     from app.exam_engine import EXAM_QUESTIONS_TOTAL
     if len(approved) >= EXAM_QUESTIONS_TOTAL:
         all_questions = approved
@@ -263,8 +284,7 @@ def start_exam_from_booking(
     # Un candidat ne peut démarrer QUE sa propre réservation
     # (sur les appareils du centre, il se connecte avec SON compte)
     if current_user.role == "candidate":
-        from app.models_candidate import Candidate as _Cand
-        cand = db.get(_Cand, booking.candidate_id)
+        cand = db.get(Candidate, booking.candidate_id)
         owns = cand is not None and (
             cand.user_id == current_user.id
             or (cand.email and cand.email == current_user.email)
@@ -297,11 +317,13 @@ def get_exam_questions(
     """
     Retourne les questions de l'examen pour un attempt donné.
     Les réponses correctes ne sont PAS incluses (sécurité).
-    Accessible au candidat propriétaire ou à un agent de centre.
+    Accessible au candidat propriétaire ou à un agent autorisé.
     """
     attempt = db.scalar(select(ExamAttempt).where(ExamAttempt.id == attempt_id))
     if not attempt:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Attempt not found")
+
+    _assert_attempt_access(db, current_user, attempt)
 
     # Bloquer après soumission — les questions ne sont plus accessibles
     if attempt.status in ("submitted", "passed", "failed", "cancelled"):
@@ -309,12 +331,6 @@ def get_exam_questions(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Exam already {attempt.status} — questions no longer accessible",
         )
-
-    # Vérifier que le candidat peut accéder à SES questions
-    if current_user.role == "candidate":
-        candidate = db.scalar(select(Candidate).where(Candidate.id == attempt.candidate_id))
-        if not candidate or candidate.id != attempt.candidate_id:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
 
     # Récupérer le trace pour connaître les question_ids sélectionnés
     trace = db.scalar(select(ExamQuestionTrace).where(ExamQuestionTrace.attempt_id == attempt_id))
@@ -326,7 +342,7 @@ def get_exam_questions(
         id_order = {qid: i for i, qid in enumerate(trace.question_ids)}
         questions.sort(key=lambda q: id_order.get(q.id, 999))
     else:
-        # Fallback : 40 questions actives aléatoires
+        # Fallback historique : sera supprimé avec le lot fail-closed banque officielle.
         questions = list(db.scalars(
             select(Question).where(Question.is_active.is_(True)).limit(40)
         ).all())
@@ -447,16 +463,7 @@ def submit_exam(
     if not attempt:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Exam attempt not found")
 
-    # Un candidat ne peut soumettre QUE sa propre tentative
-    if current_user.role == "candidate":
-        from app.models_candidate import Candidate as _Cand
-        _c = db.get(_Cand, attempt.candidate_id)
-        _owns = _c is not None and (
-            _c.user_id == current_user.id or (_c.email and _c.email == current_user.email)
-        )
-        if not _owns:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
-                                detail="Cette tentative ne vous appartient pas.")
+    _assert_attempt_access(db, current_user, attempt)
 
     now = datetime.now(UTC).replace(tzinfo=None)
     if attempt.status == "submitted":
@@ -513,8 +520,7 @@ def submit_exam(
     db.add(attempt)
 
     # Incrémenter le compteur de tentatives du candidat
-    from app.models_candidate import Candidate as _Candidate
-    _cand = db.get(_Candidate, attempt.candidate_id)
+    _cand = db.get(Candidate, attempt.candidate_id)
     if _cand and hasattr(_cand, "attempt_count"):
         _cand.attempt_count = (_cand.attempt_count or 0) + 1
         db.add(_cand)
@@ -595,7 +601,7 @@ def submit_exam(
 def get_exam_status(
     attempt_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_roles("candidate", "center", "admin", "super_admin")),
 ) -> dict:
     """
     Statut en temps réel d'un examen en cours.
@@ -604,6 +610,8 @@ def get_exam_status(
     attempt = db.get(ExamAttempt, attempt_id)
     if not attempt:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Exam attempt not found")
+
+    _assert_attempt_access(db, current_user, attempt)
 
     now = datetime.now(UTC).replace(tzinfo=None)
     elapsed_seconds = int((now - attempt.started_at).total_seconds())
@@ -639,15 +647,18 @@ def get_exam_status(
 def get_exam_results(
     attempt_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_roles("candidate", "center", "admin", "super_admin")),
 ) -> dict:
     """
     Résultats détaillés après soumission (avec bonnes réponses et explications).
-    Accessible uniquement après soumission.
+    Accessible uniquement après soumission et au propriétaire/agents autorisés.
     """
     attempt = db.get(ExamAttempt, attempt_id)
     if not attempt:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Exam attempt not found")
+
+    _assert_attempt_access(db, current_user, attempt)
+
     if attempt.status != "submitted":
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -773,7 +784,8 @@ def verify_exam_certificate(attempt_id: str, db: Session = Depends(get_db)) -> E
         status=attempt.status,
         candidate_reference=candidate.reference,
         candidate_name=f"{candidate.first_name} {candidate.last_name}",
-        identity_number=candidate.identity_number,
+        # Le numéro d'identité n'est jamais exposé par l'endpoint public QR.
+        identity_number=None,
         permit_category=candidate.permit_category,
         session_reference=session.reference,
         center_name=center.name,
@@ -788,11 +800,14 @@ def verify_exam_certificate(attempt_id: str, db: Session = Depends(get_db)) -> E
 def get_exam_certificate(
     attempt_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_roles("candidate", "center", "admin", "super_admin")),
 ) -> Response:
     attempt = db.get(ExamAttempt, attempt_id)
     if not attempt:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Exam attempt not found")
+
+    _assert_attempt_access(db, current_user, attempt)
+
     if attempt.status != "submitted":
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Exam attempt not submitted")
 
