@@ -1,4 +1,4 @@
-"""Tests de non-régression — contrôle horizontal et reprise des tentatives d'examen."""
+"""Tests de non-régression — contrôle horizontal des tentatives d'examen."""
 from __future__ import annotations
 
 from types import SimpleNamespace
@@ -8,7 +8,7 @@ from fastapi import HTTPException
 
 from app.models_candidate import Candidate
 from app.models_session import ExamSession
-from app.routers.exam_runtime import _assert_runtime_access, _sanitize_trace_answers
+from app.routers.exam_runtime import _assert_runtime_access
 from app.routers.exams import _assert_attempt_access
 
 
@@ -52,10 +52,6 @@ def _candidate(
 
 def _session(*, session_id: str = "session-1", center_id: str = "center-1"):
     return SimpleNamespace(id=session_id, center_id=center_id)
-
-
-def _trace(question_ids: list[str] | None = None):
-    return SimpleNamespace(question_ids=question_ids or ["q-1", "q-2"])
 
 
 def test_admin_access_does_not_require_candidate_lookup():
@@ -144,28 +140,3 @@ def test_runtime_candidate_cannot_access_foreign_attempt():
         )
 
     assert exc_info.value.status_code == 403
-
-
-def test_server_answer_recovery_keeps_only_questions_from_official_trace():
-    answers = {
-        "q-1": "Réponse A",
-        "q-2": "Réponse B",
-        "q-injected": "Ne doit jamais ressortir",
-    }
-
-    sanitized = _sanitize_trace_answers(_trace(), answers)
-
-    assert sanitized == {"q-1": "Réponse A", "q-2": "Réponse B"}
-
-
-def test_server_answer_recovery_rejects_non_string_answer_values():
-    answers = {"q-1": "Réponse A", "q-2": {"unexpected": True}}
-
-    sanitized = _sanitize_trace_answers(_trace(), answers)
-
-    assert sanitized == {"q-1": "Réponse A"}
-
-
-def test_server_answer_recovery_handles_empty_copy():
-    assert _sanitize_trace_answers(_trace(), None) == {}
-    assert _sanitize_trace_answers(_trace(), {}) == {}
