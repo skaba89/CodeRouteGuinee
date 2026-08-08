@@ -99,6 +99,11 @@ def validate_media_url(value: str, resource_type: str) -> str:
     if parsed.username or parsed.password:
         raise ValueError("Les identifiants intégrés dans une URL média sont interdits.")
 
+    try:
+        port = parsed.port
+    except ValueError as exc:
+        raise ValueError("Le port indiqué dans l'URL média est invalide.") from exc
+
     if scheme != "https":
         if not _development_local_allowed(hostname, scheme):
             raise ValueError("Les médias doivent être servis en HTTPS.")
@@ -110,7 +115,7 @@ def validate_media_url(value: str, resource_type: str) -> str:
             raise ValueError("Une URL média ne peut pas cibler une adresse IP privée ou non publique.")
         if "." not in hostname:
             raise ValueError("Le nom d'hôte du média doit être public et pleinement qualifié.")
-        if parsed.port not in (None, 443):
+        if port not in (None, 443):
             raise ValueError("Un média HTTPS de production doit utiliser le port standard 443.")
 
     # L'API d'upload n'est jamais une URL de livraison à persister dans Question.
