@@ -10,6 +10,11 @@ Flux d'upload signé :
 Avantage : les fichiers ne transitent jamais par Render (pas de charge
 serveur, pas de limite de taille Render), et le secret reste côté serveur.
 
+La réponse inclut également la politique qualité/sécurité à appliquer AVANT
+l'upload (taille, MIME, durée, résolution). Ces champs ne sont pas ajoutés aux
+paramètres signés historiques afin de rester compatibles avec le frontend
+actuel pendant la migration vers la Media Factory.
+
 Docs : https://cloudinary.com/documentation/upload_images#generating_authentication_signatures
 """
 from __future__ import annotations
@@ -18,6 +23,7 @@ import hashlib
 import time
 
 from app.core.config import get_settings
+from app.media_policy import get_media_upload_policy
 
 
 def is_configured() -> bool:
@@ -26,11 +32,15 @@ def is_configured() -> bool:
 
 
 def build_upload_signature(resource_type: str = "image") -> dict:
-    """
-    Retourne les paramètres signés pour un upload direct navigateur.
+    """Retourne les paramètres signés et la politique d'upload navigateur.
 
-    resource_type : 'image' ou 'video'.
+    `resource_type` accepte uniquement `image` ou `video`. Le dictionnaire
+    `policy` est destiné à la validation côté client ; il ne fait pas partie de
+    la signature Cloudinary et n'altère donc pas le flux existant.
     """
+    normalized_type = (resource_type or "").strip().lower()
+    policy = get_media_upload_policy(normalized_type)
+
     s = get_settings()
     timestamp = int(time.time())
     folder = s.cloudinary_upload_folder
@@ -46,7 +56,7 @@ def build_upload_signature(resource_type: str = "image") -> dict:
 
     upload_url = (
         f"https://api.cloudinary.com/v1_1/{s.cloudinary_cloud_name}/"
-        f"{'video' if resource_type == 'video' else 'image'}/upload"
+        f"{normalized_type}/upload"
     )
 
     return {
@@ -55,5 +65,6 @@ def build_upload_signature(resource_type: str = "image") -> dict:
         "timestamp": timestamp,
         "folder": folder,
         "signature": signature,
-        "resource_type": resource_type,
+        "resource_type": normalized_type,
+        "policy": policy,
     }
