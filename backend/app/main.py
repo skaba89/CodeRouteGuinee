@@ -43,6 +43,7 @@ from app.routers import (
     exam_monitoring,
     exam_question_traces,
     exam_reviews,
+    exam_runtime,
     exams,
     health,
     institutional_authorizations,
@@ -166,9 +167,7 @@ if os.environ.get("ENVIRONMENT", "development").lower() == "production":
     app.add_middleware(_CsrfMiddleware)
 
 
-
 # ── Handler d'erreur global 500 ────────────────────────────────────────────
-
 
 def _cors_headers(request: Request) -> dict:
     """Retourne les headers CORS corrects pour une requête donnée."""
@@ -191,8 +190,8 @@ async def global_exception_handler(_req: Request, exc: Exception) -> _JSONRespon
     from app.sentry import capture_exception as _sentry_cap
     _sentry_cap(exc, context={
         "method": _req.method,
-        "url":    str(_req.url),
-        "path":   _req.url.path,
+        "url": str(_req.url),
+        "path": _req.url.path,
     })
     import logging as _log
     _log.getLogger("coderoute.errors").error(
@@ -229,6 +228,7 @@ app.include_router(questions.router, prefix=settings.api_v1_prefix)
 app.include_router(question_governance.router, prefix=settings.api_v1_prefix)
 app.include_router(sessions.router, prefix=settings.api_v1_prefix)
 app.include_router(exams.router, prefix=settings.api_v1_prefix)
+app.include_router(exam_runtime.router, prefix=settings.api_v1_prefix)
 app.include_router(institutional_authorizations.router, prefix=settings.api_v1_prefix)
 app.include_router(bookings.router, prefix=settings.api_v1_prefix)
 app.include_router(documents.router, prefix=settings.api_v1_prefix)
@@ -250,10 +250,10 @@ app.include_router(supervision.router, prefix=settings.api_v1_prefix)
 app.include_router(users.router, prefix=settings.api_v1_prefix)
 
 app.include_router(elearning_public_router, prefix=settings.api_v1_prefix)
-app.include_router(elearning_admin_router,  prefix=settings.api_v1_prefix)
+app.include_router(elearning_admin_router, prefix=settings.api_v1_prefix)
 app.include_router(rgpd_router, prefix=settings.api_v1_prefix)
 app.include_router(tarifs_public_router, prefix=settings.api_v1_prefix)
-app.include_router(tarifs_admin_router,  prefix=settings.api_v1_prefix)
+app.include_router(tarifs_admin_router, prefix=settings.api_v1_prefix)
 
 from app.routers.admin_ops import router as admin_ops_router
 app.include_router(admin_ops_router, prefix=settings.api_v1_prefix)
