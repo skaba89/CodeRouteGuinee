@@ -10,27 +10,34 @@ export default defineConfig({
       includeAssets: ['favicon.ico', 'icons/*.png'],
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        cleanupOutdatedCaches: true,
         navigateFallback: '/offline.html',
-        navigateFallbackDenylist: [/^\/api/, /\/docs/, /\/openapi/],
+        navigateFallbackDenylist: [/\/api\//, /\/docs(?:\/|$)/, /\/openapi(?:\/|$)/],
         runtimeCaching: [
           {
-            // Questions d'entraînement : cache long (CacheFirst) pour un
-            // usage hors-ligne réel — le contenu change rarement.
-            urlPattern: /^\/api\/v1\/(training|questions)/,
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'training-cache',
-              expiration: { maxEntries: 100, maxAgeSeconds: 7 * 24 * 3600 },
-            },
+            // Frontière de sécurité explicite : les API sensibles ne doivent
+            // JAMAIS être persistées par le Service Worker. Cela couvre la
+            // banque admin (avec réponses), les examens officiels et les PII.
+            // La regexp n'est pas ancrée afin de fonctionner aussi lorsque
+            // VITE_API_BASE_URL pointe vers un domaine Render distinct.
+            urlPattern: /\/api\/v1\/(questions|exams|auth|candidates|payments|bookings|entries|center-incidents|supervision|audit)(?:\/|\?|$)/,
+            handler: 'NetworkOnly',
           },
           {
-            // Autres lectures (sessions, centres) : fraîcheur privilégiée
-            // mais disponibles hors-ligne le temps du cache.
-            urlPattern: /^\/api\/v1\/(sessions|centres|centers)/,
+            // Seul le contenu pédagogique d'entraînement est autorisé dans
+            // le cache API. StaleWhileRevalidate offre une reprise hors ligne
+            // tout en rafraîchissant la banque dès que le réseau revient.
+            // Cette regexp matche aussi https://backend.../api/v1/training.
+            urlPattern: /\/api\/v1\/training(?:\/|\?|$)/,
             handler: 'StaleWhileRevalidate',
             options: {
-              cacheName: 'api-cache',
-              expiration: { maxEntries: 50, maxAgeSeconds: 3600 },
+              cacheName: 'training-content-v2',
+              cacheableResponse: { statuses: [0, 200] },
+              expiration: {
+                maxEntries: 120,
+                maxAgeSeconds: 7 * 24 * 3600,
+                purgeOnQuotaError: true,
+              },
             },
           },
         ],

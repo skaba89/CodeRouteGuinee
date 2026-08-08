@@ -18,97 +18,62 @@
       padding: 24px;
       text-align: center;
     }
-    .flag {
-      display: flex;
-      border-radius: 8px;
-      overflow: hidden;
-      margin-bottom: 28px;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-    }
+    .flag { display: flex; border-radius: 8px; overflow: hidden; margin-bottom: 28px; box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
     .flag-stripe { width: 20px; height: 60px; }
-    .red    { background: #CE1126; }
+    .red { background: #CE1126; }
     .yellow { background: #FCD116; }
-    .green  { background: #009460; }
-
+    .green { background: #009460; }
     h1 { font-size: 1.8rem; font-weight: 800; margin-bottom: 8px; }
     .subtitle { font-size: 1rem; opacity: 0.85; margin-bottom: 32px; }
-
-    .card {
-      background: rgba(255,255,255,0.12);
-      border: 1px solid rgba(255,255,255,0.2);
-      border-radius: 16px;
-      padding: 24px 28px;
-      max-width: 380px;
-      width: 100%;
-      margin-bottom: 24px;
-    }
-    .icon { font-size: 3rem; margin-bottom: 12px; }
+    .card { background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.2); border-radius: 16px; padding: 24px 28px; max-width: 400px; width: 100%; margin-bottom: 18px; }
+    .icon { font-size: 2.6rem; margin-bottom: 12px; }
     .card h2 { font-size: 1.1rem; margin-bottom: 8px; }
-    .card p  { font-size: 0.9rem; opacity: 0.8; line-height: 1.5; }
-
+    .card p { font-size: 0.9rem; opacity: 0.86; line-height: 1.55; }
     .tips { list-style: none; text-align: left; margin-top: 12px; }
-    .tips li { font-size: 0.88rem; opacity: 0.85; padding: 4px 0; }
+    .tips li { font-size: 0.88rem; opacity: 0.88; padding: 4px 0; }
     .tips li::before { content: "→ "; opacity: 0.6; }
-
-    .btn {
-      display: inline-block;
-      background: #FCD116;
-      color: #000;
-      font-weight: 700;
-      padding: 12px 28px;
-      border-radius: 12px;
-      text-decoration: none;
-      font-size: 1rem;
-      border: none;
-      cursor: pointer;
-      margin-top: 8px;
-    }
+    .secure { border-color: rgba(252,209,22,.65); }
+    .btn { display: inline-block; background: #FCD116; color: #000; font-weight: 700; padding: 12px 28px; border-radius: 12px; font-size: 1rem; border: none; cursor: pointer; margin-top: 8px; }
     .version { font-size: 0.75rem; opacity: 0.5; margin-top: 24px; }
   </style>
 </head>
 <body>
-  <div class="flag">
-    <div class="flag-stripe red"></div>
-    <div class="flag-stripe yellow"></div>
-    <div class="flag-stripe green"></div>
+  <div class="flag" aria-hidden="true">
+    <div class="flag-stripe red"></div><div class="flag-stripe yellow"></div><div class="flag-stripe green"></div>
   </div>
 
   <h1>CodeRoute Guinée</h1>
-  <p class="subtitle">Examen du Code de la Route — DNTT</p>
+  <p class="subtitle">Code de la Route — République de Guinée</p>
 
   <div class="card">
     <div class="icon">📡</div>
-    <h2>Connexion requise</h2>
-    <p>
-      Certaines fonctionnalités nécessitent une connexion internet.
-      Vérifiez votre réseau et réessayez.
-    </p>
+    <h2>Connexion momentanément indisponible</h2>
+    <p>L'application installée reste accessible, mais les opérations qui exigent le serveur national attendent le retour du réseau.</p>
     <ul class="tips">
-      <li>Activez vos données mobiles (Orange, MTN, Celcom…)</li>
-      <li>Connectez-vous à un réseau WiFi</li>
-      <li>Vérifiez que l'avion n'est pas activé</li>
+      <li>Vérifiez le Wi-Fi ou les données mobiles</li>
+      <li>Ne fermez pas l'application si une opération est en cours</li>
+      <li>La page se rechargera automatiquement au retour du réseau</li>
     </ul>
   </div>
 
   <div class="card">
     <div class="icon">📚</div>
-    <h2>Disponible hors connexion</h2>
-    <p>
-      Les questions de code de la route et les cours déjà consultés
-      sont disponibles sans connexion.
-    </p>
+    <h2>Entraînement hors connexion</h2>
+    <p>Les contenus pédagogiques d'entraînement déjà chargés peuvent être disponibles hors connexion selon le cache du téléphone ou du poste.</p>
   </div>
 
-  <button class="btn" onclick="window.location.reload()">
-    🔄 Réessayer
-  </button>
+  <div class="card secure">
+    <div class="icon">🛡️</div>
+    <h2>Examen officiel protégé</h2>
+    <p>La banque officielle, les réponses correctes, les dossiers candidats et les paiements ne sont jamais conservés dans le cache PWA. La continuité d'un examen officiel est gérée par le serveur et le dispositif sécurisé du centre.</p>
+  </div>
 
-  <p class="version">CodeRoute Guinée · DNTT · Version PWA</p>
+  <button class="btn" onclick="window.location.reload()">Réessayer</button>
+  <p class="version">CodeRoute Guinée · Mode PWA sécurisé</p>
 
   <script>
-    // Détecter le retour en ligne et recharger automatiquement
     window.addEventListener('online', () => {
-      setTimeout(() => window.location.replace('/'), 1000);
+      setTimeout(() => window.location.replace('/'), 800);
     });
   </script>
 </body>
