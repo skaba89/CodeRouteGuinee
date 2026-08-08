@@ -1,12 +1,15 @@
 """
 Moteur d'examen CodeRoute Guinée — Catégorie B.
 
-Règles officielles DNTT / Ministère des Transports :
-  - 40 questions obligatoires tirées aléatoirement par catégorie
+Configuration institutionnelle actuellement utilisée par la plateforme :
+  - 40 questions tirées aléatoirement par catégorie
   - Seuil d'admission : 35 bonnes réponses sur 40 (87,5 %)
   - Durée maximale : 30 minutes
   - 1 seul passage autorisé par session
-  - Résultat infalsifiable : hash SHA-256 de la banque enregistré à la création
+  - Résultat traçable : hash SHA-256 de la banque enregistré à la création
+
+IMPORTANT : ces paramètres restent configurables tant que leur validation
+formelle par l'autorité DNTT n'est pas matérialisée dans le référentiel projet.
 """
 from __future__ import annotations
 
@@ -15,16 +18,17 @@ import random
 from collections import defaultdict
 from typing import TYPE_CHECKING
 
+from app.question_bank_gn import QUESTIONS_TRAINING_FULL
+
 if TYPE_CHECKING:
     from app.models_question import Question
 
-# ── Constantes officielles ─────────────────────────────────────────────────
+# ── Paramètres institutionnels courants ────────────────────────────────────
 
-EXAM_QUESTIONS_TOTAL = 40        # Nombre de questions par examen
-EXAM_PASS_THRESHOLD = 35         # Minimum pour être admis (35/40 = 87,5 %)
-EXAM_DURATION_MINUTES = 30       # Durée maximale
+EXAM_QUESTIONS_TOTAL = 40
+EXAM_PASS_THRESHOLD = 35
+EXAM_DURATION_MINUTES = 30
 
-# Répartition officielle par catégorie (total = 40)
 CATEGORY_DISTRIBUTION: dict[str, int] = {
     "signalisation": 10,
     "priorites": 6,
@@ -41,53 +45,78 @@ assert sum(CATEGORY_DISTRIBUTION.values()) == EXAM_QUESTIONS_TOTAL, (
 )
 
 
+# ── Isolation de la banque d'entraînement historique ──────────────────────
+
+def _question_text_key(value: str) -> str:
+    return " ".join((value or "").strip().casefold().split())
+
+
+# Le seed historique a marqué les 160 questions d'entraînement comme
+# `approved`. Une base déjà créée peut donc encore contenir ce mauvais statut.
+# On exclut explicitement ces entrées connues du pool officiel, sans empêcher
+# de futures questions officiellement importées et approuvées d'être utilisées.
+_LEGACY_TRAINING_TEXT_KEYS = frozenset(
+    _question_text_key(str(item.get("text", "")))
+    for item in QUESTIONS_TRAINING_FULL
+    if item.get("text")
+)
+
+
+def filter_official_exam_pool(questions: list[Question]) -> list[Question]:
+    """Retire du pool les questions du dataset d'entraînement historique.
+
+    Le workflow officiel reste gouverné par `validation_status=approved` dans
+    le routeur. Ce filtre est un garde de compatibilité pour les bases seedées
+    avant la séparation stricte des deux banques.
+    """
+    return [
+        question
+        for question in questions
+        if _question_text_key(getattr(question, "text", "")) not in _LEGACY_TRAINING_TEXT_KEYS
+    ]
+
+
 # ── Sélection aléatoire ────────────────────────────────────────────────────
 
 def select_exam_questions(
     questions: list[Question],
     seed: str | None = None,
 ) -> list[Question]:
+    """Sélectionne les questions selon la répartition configurée.
+
+    Les 160 questions du dataset d'entraînement historique sont toujours
+    exclues avant sélection, même si une ancienne base les a marquées
+    `approved` par erreur.
+
+    Si une catégorie ne contient pas assez de questions, le manque est
+    complété avec les autres catégories. Le routeur officiel contrôle ensuite
+    que le résultat contient exactement `EXAM_QUESTIONS_TOTAL` questions et
+    refuse le démarrage dans le cas contraire.
     """
-    Sélectionne 40 questions selon la répartition officielle par catégorie.
-
-    Si la banque n'a pas assez de questions dans une catégorie, toutes les
-    questions disponibles dans cette catégorie sont utilisées et le reste
-    est complété par les autres catégories pour maintenir le total à 40.
-
-    Args:
-        questions: liste complète des questions actives de la banque
-        seed: graine pour la reproductibilité (None = aléatoire)
-
-    Returns:
-        Liste de 40 questions mélangées dans un ordre aléatoire
-    """
+    questions = filter_official_exam_pool(questions)
     rng = random.Random(seed)
 
-    # Grouper par catégorie
     by_cat: dict[str, list[Question]] = defaultdict(list)
     for q in questions:
         by_cat[q.category].append(q)
 
     selected: list[Question] = []
-    shortfall = 0  # Questions manquantes dans les catégories courtes
+    shortfall = 0
 
-    # Premier passage : sélection selon la distribution officielle
     for cat, count in CATEGORY_DISTRIBUTION.items():
         pool = by_cat.get(cat, [])
         if len(pool) >= count:
             selected.extend(rng.sample(pool, count))
         else:
-            selected.extend(pool)  # Prendre tout si insuffisant
+            selected.extend(pool)
             shortfall += count - len(pool)
 
-    # Deuxième passage : combler le manque avec les questions restantes
     if shortfall > 0:
         already_selected_ids = {q.id for q in selected}
         remaining = [q for q in questions if q.id not in already_selected_ids]
         supplement = rng.sample(remaining, min(shortfall, len(remaining)))
         selected.extend(supplement)
 
-    # Mélanger l'ordre final
     rng.shuffle(selected)
     return selected[:EXAM_QUESTIONS_TOTAL]
 
@@ -95,25 +124,20 @@ def select_exam_questions(
 # ── Hachage de la banque ──────────────────────────────────────────────────
 
 def build_question_bank_hash(questions: list[Question]) -> str:
-    """
-    Hash SHA-256 déterministe de la banque de questions active.
-    Enregistré dans ExamQuestionTrace pour garantir l'intégrité du résultat.
-    """
+    """Hash SHA-256 déterministe du pool officiel réellement éligible."""
+    official_questions = filter_official_exam_pool(questions)
     payload = "|".join(
         f"{q.id}:{q.correct_answer}:{q.is_active}"
-        for q in sorted(questions, key=lambda q: q.id)
+        for q in sorted(official_questions, key=lambda q: q.id)
     )
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
 def build_selected_questions_hash(questions: list[Question]) -> str:
-    """
-    Hash SHA-256 des questions sélectionnées pour cet examen précis.
-    Permet de vérifier a posteriori qu'aucune substitution n'a eu lieu.
-    """
+    """Hash SHA-256 des questions sélectionnées pour cet examen précis."""
     payload = "|".join(
         f"{q.id}:{q.correct_answer}"
-        for q in questions  # Ordre de sélection conservé
+        for q in questions
     )
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
@@ -124,17 +148,7 @@ def score_answers(
     answer_key: dict[str, str],
     submitted_answers: dict[str, str],
 ) -> dict:
-    """
-    Calcule le score d'un examen.
-
-    Args:
-        answer_key: {question_id: correct_answer}
-        submitted_answers: {question_id: submitted_answer}
-
-    Returns:
-        dict avec total_questions, correct_answers, wrong_answers,
-        unanswered, score_percent, passed
-    """
+    """Calcule le score de l'examen à partir de la clé serveur."""
     total = len(answer_key)
     correct = 0
     wrong = 0
@@ -151,11 +165,9 @@ def score_answers(
 
     score_percent = round((correct / total) * 100, 2) if total else 0
 
-    # Règle officielle : 35/40 pour être admis
     if total == EXAM_QUESTIONS_TOTAL:
         passed = correct >= EXAM_PASS_THRESHOLD
     else:
-        # Proportionnel pour les banques non standard (tests)
         passed = score_percent >= (EXAM_PASS_THRESHOLD / EXAM_QUESTIONS_TOTAL * 100)
 
     return {
