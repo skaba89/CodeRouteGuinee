@@ -15,15 +15,18 @@ EDGE_SCOPE_KIND = "center_edge_node"
 EDGE_HEARTBEAT_INTERVAL_SECONDS = 60
 EDGE_HEARTBEAT_MAX_SKEW_SECONDS = 300
 EDGE_ONLINE_GRACE_SECONDS = 180
-EDGE_TARGET_SOFTWARE_VERSION = os.environ.get("CODEROUTE_EDGE_TARGET_VERSION", "edge-agent-0.3.0").strip() or "edge-agent-0.3.0"
+EDGE_TARGET_SOFTWARE_VERSION = os.environ.get("CODEROUTE_EDGE_TARGET_VERSION", "edge-agent-0.4.0").strip() or "edge-agent-0.4.0"
 EDGE_REQUIRED_CAPABILITIES = (
     "answer-journal-v1",
     "exam-lease-v1",
     "fleet-telemetry-v1",
+    "maintenance-updater-v1",
     "media-prefetch-v1",
     "operator-status-v1",
     "release-attestation-v1",
+    "release-key-rotation-v1",
     "release-staging-v1",
+    "supply-chain-evidence-v1",
 )
 
 
