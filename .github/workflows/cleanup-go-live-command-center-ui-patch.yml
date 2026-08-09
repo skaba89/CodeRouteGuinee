@@ -1,0 +1,41 @@
+name: Cleanup Go-Live Command Center UI Patch
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/cleanup-go-live-command-center-ui-patch.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref || github.ref_name }}
+      - name: Refuse cleanup until dashboard integration is present
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          text = Path('frontend/src/components/NationalDashboard.tsx').read_text(encoding='utf-8')
+          assert text.count("import { NationalGoLiveCommandCenter } from './NationalGoLiveCommandCenter';") == 1
+          assert text.count('<NationalGoLiveCommandCenter />') == 1
+          assert '<NationalGoLiveCommandCenter />\n      <NationalGovernancePanel />' in text
+          print('Command Center dashboard integration confirmed.')
+          PY
+      - name: Remove temporary write-capable workflows
+        shell: bash
+        run: |
+          git rm -f \
+            .github/workflows/go-live-command-center-ui-patch.yml \
+            .github/workflows/cleanup-go-live-command-center-ui-patch.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'ci: remove temporary command-center patch workflows'
+          git push origin HEAD:${{ github.event.pull_request.head.ref || github.ref_name }}
