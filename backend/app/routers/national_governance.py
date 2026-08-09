@@ -9,13 +9,11 @@ from app.models_user import User
 from app.national_governance import (
     ApprovalRequest,
     DossierCreate,
-    EvidenceRequest,
     PolicyCreate,
     active_policy,
     activate_policy,
     approve_dossier,
     approve_policy,
-    attach_evidence,
     build_readiness,
     compare_policy_to_runtime,
     create_dossier,
@@ -27,6 +25,11 @@ from app.national_governance import (
     submit_dossier,
     submit_policy,
     technical_contract,
+)
+from app.national_governance_evidence import (
+    EvidenceIntegrityRequest,
+    attach_hashed_evidence,
+    validate_dossier_evidence_integrity,
 )
 from app.national_governance_guard import assert_single_active_policy_code
 
@@ -142,11 +145,11 @@ def homologation_create(
 @router.post("/homologation-dossiers/{reference}/evidence")
 def homologation_evidence(
     reference: str,
-    payload: EvidenceRequest,
+    payload: EvidenceIntegrityRequest,
     db: Session = Depends(get_db),
     user: User = Depends(require_roles("admin", "super_admin")),
 ) -> dict:
-    return attach_evidence(db, user, reference, payload)
+    return attach_hashed_evidence(db, user, reference, payload)
 
 
 @router.post("/homologation-dossiers/{reference}/submit")
@@ -155,6 +158,7 @@ def homologation_submit(
     db: Session = Depends(get_db),
     user: User = Depends(require_roles("admin", "super_admin")),
 ) -> dict:
+    validate_dossier_evidence_integrity(db, reference)
     return submit_dossier(db, user, reference)
 
 
@@ -176,4 +180,6 @@ def homologation_decision(
     db: Session = Depends(get_db),
     user: User = Depends(require_roles("super_admin")),
 ) -> dict:
+    if approve:
+        validate_dossier_evidence_integrity(db, reference)
     return decide_dossier(db, user, reference, approve=approve, note=payload.note)
