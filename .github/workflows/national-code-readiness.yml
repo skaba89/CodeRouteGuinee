@@ -19,6 +19,10 @@ on:
       - '.github/workflows/national-code-readiness.yml'
   workflow_dispatch:
 
+concurrency:
+  group: national-code-readiness-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   frontend-security-and-critical-e2e:
     runs-on: ubuntu-latest
