@@ -471,6 +471,7 @@ def build_readiness(db: Session) -> dict:
     operational_evidence = [
         ("backup_off_region", "reliability.backup_uploaded", timedelta(hours=26)),
         ("restore_drill", "reliability.restore_drill_passed", timedelta(days=35)),
+        ("pitr_provider", "reliability.pitr_drill_passed", timedelta(days=35)),
         ("api_failover", "reliability.ha_failover_probe_passed", timedelta(days=35)),
     ]
     for code, action, max_age in operational_evidence:
