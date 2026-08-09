@@ -27,6 +27,11 @@ class FakeAsyncRedis:
         return True
 
 
+class BrokenSyncRedis:
+    def ping(self):
+        raise ConnectionError("redis unavailable")
+
+
 def test_distributed_rate_limit_accepts_and_rejects_from_shared_backend(monkeypatch):
     fake = FakeAsyncRedis()
     monkeypatch.setattr(distributed, "get_async_redis", lambda: fake)
@@ -51,6 +56,25 @@ def test_distributed_cache_round_trip_is_binary_safe(monkeypatch):
     stored_json = next(iter(fake.values.values()))
     assert "CodeRoute" not in stored_json
     assert json.loads(stored_json)["body_b64"]
+
+
+def test_shared_state_outage_is_degraded_when_reconstructible(monkeypatch):
+    monkeypatch.setattr(distributed, "redis_configured", lambda: True)
+    monkeypatch.setattr(distributed, "redis_is_required", lambda: False)
+    monkeypatch.setattr(distributed, "get_sync_redis", lambda: BrokenSyncRedis())
+    check = distributed.check_shared_state()
+    assert check["status"] == "degraded"
+    assert check["required"] is False
+    assert check["detail"] == "ConnectionError"
+
+
+def test_shared_state_outage_is_blocking_only_in_explicit_strict_mode(monkeypatch):
+    monkeypatch.setattr(distributed, "redis_configured", lambda: True)
+    monkeypatch.setattr(distributed, "redis_is_required", lambda: True)
+    monkeypatch.setattr(distributed, "get_sync_redis", lambda: BrokenSyncRedis())
+    check = distributed.check_shared_state()
+    assert check["status"] == "error"
+    assert check["required"] is True
 
 
 def test_distributed_helpers_fail_closed_when_no_client(monkeypatch):
