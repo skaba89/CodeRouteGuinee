@@ -6,6 +6,7 @@ exporté vers Prometheus.
 """
 from __future__ import annotations
 
+import math
 import os
 import re
 import time
@@ -130,7 +131,7 @@ def _safe_number(value: Any) -> float | None:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         return None
     number = float(value)
-    if number < 0 or number > 100_000:
+    if not math.isfinite(number) or number < 0 or number > 100_000:
         return None
     return number
 
