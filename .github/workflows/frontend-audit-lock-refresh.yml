@@ -7,14 +7,20 @@ on:
       - '.github/workflows/frontend-audit-lock-refresh.yml'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   refresh-lock-preview:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: frontend
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref || github.ref_name }}
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -25,7 +31,18 @@ jobs:
       - name: Apply compatible audit fixes to lockfile only
         run: npm audit fix --package-lock-only
       - name: Show minimal lockfile diff
-        if: always()
         run: git diff -- package-lock.json
       - name: Verify refreshed lock has no high/critical vulnerabilities
         run: npm audit --package-lock-only --audit-level=high
+      - name: Commit refreshed lockfile
+        shell: bash
+        run: |
+          if git diff --quiet -- package-lock.json; then
+            echo 'Lockfile already clean; nothing to commit.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add package-lock.json
+          git commit -m 'security: refresh vulnerable frontend transitive dependencies'
+          git push origin HEAD:${{ github.event.pull_request.head.ref || github.ref_name }}
