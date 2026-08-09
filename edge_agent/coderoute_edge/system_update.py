@@ -126,6 +126,16 @@ def _sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _symlink_target(root: Path, name: str) -> Path | None:
+    link = root / name
+    if not link.is_symlink():
+        return None
+    try:
+        return (link.parent / os.readlink(link)).resolve()
+    except OSError:
+        return None
+
+
 def _copy_into_root_workspace(staged: dict[str, Any], staging_root: Path, release_root: Path) -> dict[str, Any]:
     if staging_root.resolve() == release_root.resolve():
         return staged
@@ -189,6 +199,7 @@ def _prepare_offline_runtime(target_root: Path, runtime_python: str) -> dict[str
             str(pip),
             "install",
             "--disable-pip-version-check",
+            "--no-cache-dir",
             "--no-index",
             "--find-links",
             str(wheelhouse),
@@ -242,21 +253,30 @@ def apply_system_update_transaction(
     if not expected_version:
         raise RuntimeError("Version staged absente")
 
+    current_before = _symlink_target(config.release_dir, "current")
     try:
         _copy_into_root_workspace(staged, staging_root, config.release_dir)
         installed = apply_verified_release(config.release_dir)
         target_root = Path(str(installed.get("current_path") or ""))
         runtime = runtime_prepare(target_root, config.runtime_python)
     except Exception as exc:
+        current_after = _symlink_target(config.release_dir, "current")
+        switched = current_after is not None and current_after != current_before
         rollback_receipt: dict[str, Any] | None = None
-        try:
-            rollback_receipt = rollback_to_previous(config.release_dir)
-        except Exception:
-            rollback_receipt = None
+        rollback_error: Exception | None = None
+        if switched:
+            try:
+                rollback_receipt = rollback_to_previous(config.release_dir)
+            except Exception as rollback_exc:
+                rollback_error = rollback_exc
+
+        error = f"apply/runtime: {exc}"
+        if rollback_error is not None:
+            error += f"; rollback: {rollback_error}"
         failed = _failed_receipt(
             staging_root,
             staged,
-            error=f"apply/runtime: {exc}",
+            error=error,
             rollback=rollback_receipt,
         )
         _handoff_receipt(staging_root, config.release_dir, failed)
@@ -266,6 +286,7 @@ def apply_system_update_transaction(
             "receipt": failed,
             "rollback": rollback_receipt,
             "root_verification": root_verification,
+            "current_switched": switched,
             "quiescent": state.quiescent,
         }
 
