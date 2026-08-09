@@ -25,12 +25,14 @@ EvidenceKind = Literal[
     "backup_uploaded",
     "restore_drill_passed",
     "ha_failover_probe_passed",
+    "pitr_drill_passed",
 ]
 
 _ACTIONS: dict[str, str] = {
     "backup_uploaded": "reliability.backup_uploaded",
     "restore_drill_passed": "reliability.restore_drill_passed",
     "ha_failover_probe_passed": "reliability.ha_failover_probe_passed",
+    "pitr_drill_passed": "reliability.pitr_drill_passed",
 }
 _SHA256 = re.compile(r"^[a-f0-9]{64}$")
 _MAX_CLOCK_SKEW = timedelta(minutes=5)
@@ -80,6 +82,25 @@ def _validate_kind_evidence(payload: ReliabilityEvidenceCreate, settings: Reliab
     elif payload.kind == "ha_failover_probe_passed":
         if payload.availability_percent is None or payload.duration_seconds is None:
             raise HTTPException(status_code=422, detail="preuve failover incomplète")
+
+    elif payload.kind == "pitr_drill_passed":
+        if (
+            not payload.artifact_sha256
+            or not (payload.reference or "").strip()
+            or payload.observed_rpo_minutes is None
+            or payload.observed_rto_minutes is None
+        ):
+            raise HTTPException(status_code=422, detail="preuve PITR incomplète")
+        if payload.observed_rpo_minutes > settings.dr_rpo_minutes:
+            raise HTTPException(
+                status_code=422,
+                detail=f"RPO PITR observé supérieur à la cible de {settings.dr_rpo_minutes} min",
+            )
+        if payload.observed_rto_minutes > settings.dr_rto_minutes:
+            raise HTTPException(
+                status_code=422,
+                detail=f"RTO PITR observé supérieur à la cible de {settings.dr_rto_minutes} min",
+            )
 
 
 def _safe_details(payload: ReliabilityEvidenceCreate, *, occurred_at: datetime) -> dict:
