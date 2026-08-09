@@ -296,7 +296,7 @@ def test_active_exam_blocks_transaction_before_copy_link_switch_or_restart(tmp_p
     config = _config(tmp_path, database)
     _install_previous(config, "edge-agent-0.3.0")
     before = _current_target(config.release_dir)
-    bad = _stage(config.release_staging_dir, "edge-agent-0.4.0")
+    staged = _stage(config.release_staging_dir, "edge-agent-0.4.0")
     restarts: list[str] = []
 
     with pytest.raises(RuntimeError, match="examen"):
@@ -312,4 +312,4 @@ def test_active_exam_blocks_transaction_before_copy_link_switch_or_restart(tmp_p
     assert restarts == []
     assert _current_target(config.release_dir) == before
     assert (config.release_staging_dir / "staged.json").exists()
-    assert not (config.release_dir / f"{bad['release_id']}.tar.gz").exists()
+    assert not (config.release_dir / f"{staged['release_id']}.tar.gz").exists()
