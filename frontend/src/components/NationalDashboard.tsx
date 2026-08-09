@@ -9,6 +9,7 @@ import {
 import { EdgeReleasePanel } from './EdgeReleasePanel';
 import { EdgeSupplyChainPanel } from './EdgeSupplyChainPanel';
 import { NationalGovernancePanel } from './NationalGovernancePanel';
+import { NationalHomologationEvidencePanel } from './NationalHomologationEvidencePanel';
 
 function fmtNumber(value: number): string {
   return value.toLocaleString('fr-FR');
@@ -283,6 +284,7 @@ export function NationalDashboard() {
       </div>
 
       <NationalGovernancePanel />
+      <NationalHomologationEvidencePanel />
       <EdgeSupplyChainPanel />
       <EdgeReleasePanel />
     </div>
