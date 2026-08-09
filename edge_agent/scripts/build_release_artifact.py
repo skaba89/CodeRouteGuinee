@@ -10,8 +10,13 @@ from pathlib import Path
 
 _VERSION_RE = re.compile(r"^edge-agent-[0-9]+\.[0-9]+\.[0-9]+(?:[-._A-Za-z0-9]*)?$")
 _EXCLUDED_PARTS = {"__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache", ".coderoute-edge", "tests"}
-_ALLOWED_ROOT_FILES = {"requirements.txt", "Dockerfile"}
-_ALLOWED_SCRIPT_FILES = {"apply_verified_release.py"}
+_ALLOWED_ROOT_FILES = {
+    "requirements.txt",
+    "requirements.runtime.txt",
+    "requirements.runtime.lock",
+    "Dockerfile",
+}
+_ALLOWED_SCRIPT_FILES = {"apply_verified_release.py", "run_system_update.py"}
 
 
 def _included_files(edge_root: Path) -> list[Path]:
@@ -33,7 +38,23 @@ def _included_files(edge_root: Path) -> list[Path]:
         path = scripts / name
         if path.is_file():
             files.append(path)
+    wheelhouse = edge_root / "wheelhouse"
+    if wheelhouse.is_dir():
+        files.extend(sorted(path for path in wheelhouse.glob("*.whl") if path.is_file()))
     return sorted(set(files), key=lambda item: item.as_posix())
+
+
+def _assert_runtime_bundle(files: list[Path], edge_root: Path) -> None:
+    relative = {path.relative_to(edge_root).as_posix() for path in files}
+    required = {"requirements.runtime.txt", "requirements.runtime.lock"}
+    missing = sorted(required - relative)
+    wheels = [name for name in relative if name.startswith("wheelhouse/") and name.endswith(".whl")]
+    if missing or not wheels:
+        raise RuntimeError(
+            "Artefact P9 incomplet : "
+            + (f"fichiers manquants {', '.join(missing)}; " if missing else "")
+            + ("wheelhouse vide" if not wheels else "")
+        )
 
 
 def build_release_artifact(edge_root: Path, output_dir: Path, version: str) -> dict[str, object]:
@@ -45,6 +66,7 @@ def build_release_artifact(edge_root: Path, output_dir: Path, version: str) -> d
     files = _included_files(edge_root)
     if not files:
         raise RuntimeError("Aucun fichier Edge à empaqueter")
+    _assert_runtime_bundle(files, edge_root)
 
     with output.open("wb") as raw:
         with gzip.GzipFile(filename="", mode="wb", fileobj=raw, mtime=0) as compressed:
@@ -76,6 +98,7 @@ def build_release_artifact(edge_root: Path, output_dir: Path, version: str) -> d
         "artifact_sha256": digest.hexdigest(),
         "artifact_size_bytes": size,
         "file_count": len(files),
+        "runtime_wheels": sum(1 for path in files if path.parent.name == "wheelhouse"),
     }
     (output_dir / f"{version}.manifest-input.json").write_text(
         json.dumps(result, sort_keys=True, indent=2),
@@ -85,8 +108,8 @@ def build_release_artifact(edge_root: Path, output_dir: Path, version: str) -> d
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Construit un artefact Center Edge déterministe pour le manifeste P8.")
-    parser.add_argument("--version", required=True, help="Exemple : edge-agent-0.3.1")
+    parser = argparse.ArgumentParser(description="Construit un artefact Center Edge P9 déterministe et autonome.")
+    parser.add_argument("--version", required=True, help="Exemple : edge-agent-0.4.0")
     parser.add_argument("--edge-root", default="edge_agent")
     parser.add_argument("--output-dir", default="dist/edge-releases")
     args = parser.parse_args()
