@@ -45,23 +45,31 @@ Le Blueprint P10 demande `numInstances: 2` et fixe `WEB_CONCURRENCY=2`, soit un 
 
 ### Readiness
 
-`GET /health/readiness` contrôle la configuration, la connexion PostgreSQL, les tables critiques, Alembic et Redis/Valkey lorsque `HA_MODE` ou `REDIS_REQUIRED` est actif.
+`GET /health/readiness` contrôle la configuration, la connexion PostgreSQL, les tables critiques, Alembic et l'état Redis/Valkey.
 
-Une dépendance obligatoire en erreur retourne HTTP 503 avec `status=not_ready`. Les warnings de développement/test ne bloquent pas la readiness.
+Une dépendance métier obligatoire en erreur retourne HTTP 503 avec `status=not_ready`. Les warnings de développement/test ne bloquent pas la readiness.
+
+Redis/Valkey a deux niveaux de politique :
+
+- `HA_MODE=true` exige qu'un `REDIS_URL` soit configuré pour bénéficier du cache/quota partagé ;
+- `REDIS_REQUIRED=true` transforme explicitement Redis en dépendance runtime bloquante ;
+- avec le mode national recommandé `REDIS_REQUIRED=false`, une panne Redis est affichée `degraded` mais l'API reste prête grâce au fallback local.
+
+Cette séparation évite de transformer un cache reconstructible en single point of failure.
 
 ## 5. État partagé Redis / Valkey
 
-Variables :
+Configuration nationale recommandée :
 
 ```text
-REDIS_URL
-REDIS_REQUIRED=true
+REDIS_URL=<private connection string>
+REDIS_REQUIRED=false
 HA_MODE=true
 EXPECTED_API_INSTANCES=2
 DEPLOYMENT_ID=production
 ```
 
-Le rate limiting repose sur une fenêtre glissante Redis atomique : les requêtes reçues par les différentes instances participent au même quota. Si Redis devient momentanément inaccessible, les requêtes peuvent continuer avec un fallback local, mais la readiness passe à 503 lorsque Redis est obligatoire.
+Le rate limiting repose sur une fenêtre glissante Redis atomique : les requêtes reçues par les différentes instances participent au même quota. Si Redis devient momentanément inaccessible, les requêtes continuent avec un quota local par instance et la supervision signale `degraded`.
 
 Le cache des GET publics utilise également Redis/Valkey. Les réponses authentifiées et les endpoints `/health*` sont exclus du cache.
 
@@ -145,19 +153,22 @@ P10 apporte les outils de dump et restore drill mais **n'implémente pas lui-mê
 
 ```text
 Redis perdu
-  -> cache perdu
+  -> cache partagé perdu
   -> quotas distribués temporairement indisponibles
-  -> fallback local
-  -> readiness 503 en HA
+  -> fallback cache/rate-limit local par instance
+  -> shared_state = degraded
+  -> API reste disponible
   -> aucune réponse examen perdue
   -> aucune correction modifiée
 ```
+
+Si l'exploitation choisit explicitement `REDIS_REQUIRED=true`, le même incident rend alors la readiness 503. Ce mode strict n'est pas le défaut recommandé tant que Redis reste une donnée reconstructible.
 
 Aucune restauration Redis n'est nécessaire pour préserver l'intégrité métier.
 
 ## 14. Perte d'une instance API
 
-Avec deux instances, la perte d'une instance doit laisser l'autre servir le trafic, sous réserve que DB, secrets, cache/rate limit partagé et health/readiness soient corrects.
+Avec deux instances, la perte d'une instance doit laisser l'autre servir le trafic, sous réserve que PostgreSQL et les secrets partagés restent disponibles. Redis peut être temporairement dégradé grâce au fallback local.
 
 ## 15. Perte PostgreSQL
 
@@ -214,8 +225,8 @@ P10 peut quitter Draft lorsque :
 2. frontend non régressé ;
 3. Blueprint validé ;
 4. deux instances réellement observées ;
-5. Redis/Valkey partagé réellement observé ;
-6. `/health/readiness` vert sur chaque instance ;
+5. Redis/Valkey partagé observé et scénario de dégradation testé ;
+6. `/health/readiness` vert sur chaque instance avec PostgreSQL disponible ;
 7. migration pre-deploy testée sur une copie de production ;
 8. un restore drill complet produit un reçu vert ;
 9. PITR fournisseur démontré ;
