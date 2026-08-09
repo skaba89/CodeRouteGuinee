@@ -153,3 +153,7 @@ Le script est couvert par `backend/tests/test_go_live_evidence_pack.py` :
 - impossibilité de déclarer une homologation ;
 - blocage lorsque les endpoints authentifiés ne sont pas collectés ;
 - blocage lorsque les preuves PRA sont trop anciennes.
+
+## Gate CI permanent
+
+Le workflow `.github/workflows/go-live-evidence-pack-pr-ci.yml` exécute la compilation et les tests de sécurité du collecteur sur les pull requests concernées **et sur chaque push correspondant vers `main`**. Le `conftest` backend est isolé avec une base SQLite mémoire et `ENVIRONMENT=test`, afin qu'un échec du gate indique un vrai problème de code/test et non l'absence d'une base de production dans GitHub Actions.
