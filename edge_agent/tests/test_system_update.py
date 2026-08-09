@@ -51,6 +51,12 @@ def _stage(root: Path, version: str) -> dict:
     return state
 
 
+def _install_previous(config: SimpleNamespace, version: str) -> dict:
+    state = _stage(config.release_dir, version)
+    apply_verified_release(config.release_dir)
+    return state
+
+
 def _db(path: Path, statuses: list[str] | None = None) -> None:
     with sqlite3.connect(path) as conn:
         conn.execute("CREATE TABLE leases(attempt_id TEXT PRIMARY KEY,status TEXT NOT NULL)")
@@ -64,7 +70,8 @@ def _config(tmp_path: Path, database: Path) -> SimpleNamespace:
         database_path=database,
         maintenance_windows="sun@01:00-04:00",
         maintenance_timezone="Africa/Conakry",
-        release_dir=tmp_path / "releases",
+        release_dir=tmp_path / "releases-root",
+        release_staging_dir=tmp_path / "release-staging",
         runtime_python="/usr/bin/python3",
         systemd_service_name="coderoute-edge.service",
         public_url="https://edge.example.test:8443",
@@ -97,9 +104,8 @@ def test_system_update_confirms_exact_running_version(tmp_path: Path) -> None:
     database = tmp_path / "edge.db"
     _db(database)
     config = _config(tmp_path, database)
-    _stage(config.release_dir, "edge-agent-0.3.0")
-    apply_verified_release(config.release_dir)
-    _stage(config.release_dir, "edge-agent-0.4.0")
+    _install_previous(config, "edge-agent-0.3.0")
+    _stage(config.release_staging_dir, "edge-agent-0.4.0")
     restarts: list[str] = []
 
     result = apply_system_update_transaction(
@@ -115,7 +121,8 @@ def test_system_update_confirms_exact_running_version(tmp_path: Path) -> None:
     assert result["phase"] == "confirmed"
     assert restarts == ["coderoute-edge.service"]
     assert _current_target(config.release_dir).name == "edge-agent-0.4.0"
-    receipt = json.loads((config.release_dir / "install-receipt.json").read_text())
+    assert not (config.release_staging_dir / "staged.json").exists()
+    receipt = json.loads((config.release_staging_dir / "install-receipt.json").read_text())
     assert receipt["result"] == "installed"
 
 
@@ -123,9 +130,8 @@ def test_health_version_mismatch_rolls_back_and_marks_bad_release_failed(tmp_pat
     database = tmp_path / "edge.db"
     _db(database)
     config = _config(tmp_path, database)
-    previous = _stage(config.release_dir, "edge-agent-0.3.0")
-    apply_verified_release(config.release_dir)
-    bad = _stage(config.release_dir, "edge-agent-0.4.0")
+    previous = _install_previous(config, "edge-agent-0.3.0")
+    bad = _stage(config.release_staging_dir, "edge-agent-0.4.0")
     restarts: list[str] = []
     probes = iter([
         {"status": "ok", "software_version": "edge-agent-0.3.0"},
@@ -145,21 +151,21 @@ def test_health_version_mismatch_rolls_back_and_marks_bad_release_failed(tmp_pat
     assert result["phase"] == "rolled_back"
     assert len(restarts) == 2
     assert _current_target(config.release_dir).name == "edge-agent-0.3.0"
-    receipt = json.loads((config.release_dir / "install-receipt.json").read_text())
+    assert not (config.release_staging_dir / "staged.json").exists()
+    receipt = json.loads((config.release_staging_dir / "install-receipt.json").read_text())
     assert receipt["result"] == "failed"
     assert receipt["release_id"] == bad["release_id"]
     assert receipt["rollback_confirmed"] is True
     assert receipt["rollback_release_id"] == previous["release_id"]
 
 
-def test_active_exam_blocks_transaction_before_link_switch_or_restart(tmp_path: Path) -> None:
+def test_active_exam_blocks_transaction_before_copy_link_switch_or_restart(tmp_path: Path) -> None:
     database = tmp_path / "edge.db"
     _db(database, ["active"])
     config = _config(tmp_path, database)
-    _stage(config.release_dir, "edge-agent-0.3.0")
-    apply_verified_release(config.release_dir)
+    _install_previous(config, "edge-agent-0.3.0")
     before = _current_target(config.release_dir)
-    _stage(config.release_dir, "edge-agent-0.4.0")
+    bad = _stage(config.release_staging_dir, "edge-agent-0.4.0")
     restarts: list[str] = []
 
     with pytest.raises(RuntimeError, match="examen"):
@@ -174,3 +180,5 @@ def test_active_exam_blocks_transaction_before_link_switch_or_restart(tmp_path: 
 
     assert restarts == []
     assert _current_target(config.release_dir) == before
+    assert (config.release_staging_dir / "staged.json").exists()
+    assert not (config.release_dir / f"{bad['release_id']}.tar.gz").exists()
