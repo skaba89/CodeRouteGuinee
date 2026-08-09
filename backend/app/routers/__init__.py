@@ -16,7 +16,14 @@ from app.routers import center_edge as center_edge
 from app.routers import center_edge_release as center_edge_release
 from app.routers import center_edge_release_guard as center_edge_release_guard
 from app.routers import center_edge_station_guard as center_edge_station_guard
+from app.routers import center_edge_supply_chain as center_edge_supply_chain
+from app.routers import center_edge_supply_chain_guard as center_edge_supply_chain_guard
 
 center_edge.router.include_router(center_edge_station_guard.router)
+# P9 doit intercepter le rollout avant le quality gate P8, puis déléguer vers lui.
+center_edge.router.include_router(center_edge_supply_chain_guard.router)
 center_edge.router.include_router(center_edge_release_guard.router)
+# P9 remplace aussi la vue de clé de signature par une réponse compatible P8
+# enrichie d'un trousseau de rotation.
+center_edge.router.include_router(center_edge_supply_chain.router)
 center_edge.router.include_router(center_edge_release.router)
