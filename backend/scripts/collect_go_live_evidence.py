@@ -284,6 +284,13 @@ def evaluate_snapshot(
         )
         add_check("P10_RESTORE_DRILL_FRESH", ok, detail)
         ok, detail = _freshness_check(
+            label="PITR fournisseur",
+            value=last_evidence.get("pitr_drill_passed"),
+            now=now,
+            max_age=timedelta(days=35),
+        )
+        add_check("P10_PITR_FRESH", ok, detail)
+        ok, detail = _freshness_check(
             label="failover API",
             value=last_evidence.get("ha_failover_probe_passed"),
             now=now,
@@ -346,7 +353,7 @@ def evaluate_snapshot(
     )
 
     manual_evidence_required = [
-        "P10.2: preuve fournisseur PITR, fenêtre de rétention et RPO/RTO réellement mesurés",
+        "P10.2: preuve fournisseur PITR source, fenêtre de rétention et rapport du test archivé",
         "P10.2: preuve externe du bucket/objet backup hors région et restore drill archivé",
         "P11: preuve SIEM/OTLP, WAF/DDoS, astreinte, tests staging et sign-off sécurité",
         "P12: règles officielles DNTT, référence juridique, droits contenus/médias et cinq pièces institutionnelles",
