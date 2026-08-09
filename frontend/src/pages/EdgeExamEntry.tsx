@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { claimPendingEdgeSession, hasPendingEdgeBootstrap } from '../edgeExamSession';
-import ExamPage from './exam';
+import { ExamPage } from './exam';
 
 export default function EdgeExamEntry() {
   const [state, setState] = useState<'checking' | 'ready' | 'error'>(

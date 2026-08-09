@@ -88,14 +88,14 @@ test('Edge finalization never exposes a local verdict and redirects to DNTT sync
     sessionStorage.setItem('coderoute:official-exam:active-attempt', id);
   }, { id: attemptId, edgeOrigin: EDGE_ORIGIN });
 
-  const responseStatus = await page.evaluate(async id => {
+  const responseResult = await page.evaluate(async id => {
     const response = await fetch(`/api/v1/exams/${id}/submit`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ answers: { q1: 'A' } }),
     });
-    return response.status;
+    return { status: response.status, body: await response.text() };
   }, attemptId);
 
-  expect(responseStatus).toBe(200);
+  expect(responseResult.status, responseResult.body).toBe(200);
   await expect.poll(() => finalizeCalls).toBe(1);
   expect(localAnswers).toEqual({ q1: 'A' });
   await expect(page).toHaveURL(/#\/edge-pending$/);
