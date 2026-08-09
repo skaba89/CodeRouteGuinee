@@ -20,6 +20,9 @@ jobs:
       - name: Compile backend
         working-directory: backend
         run: python -m compileall -q app
+      - name: Validate operational shell scripts
+        working-directory: backend
+        run: bash -n entrypoint.sh scripts/*.sh
       - name: Run targeted regression tests
         working-directory: backend
         env:
@@ -39,6 +42,10 @@ jobs:
             tests/test_center_edge_release.py
             tests/test_center_edge_supply_chain.py
             tests/test_edge_install_authorization.py
+            tests/test_distributed_ha.py
+            tests/test_middleware_ha.py
+            tests/test_ha_config.py
+            tests/test_pra_scripts.py
             tests/test_media_policy.py
             tests/test_question_media_schema_compat.py
             tests/test_e2e_exam_question_trace.py
@@ -130,8 +137,8 @@ jobs:
             exit 0
           fi
           echo "Installing Chromium for targeted Playwright tests."
-          npx playwright install --with-deps chromium
           printf 'Running targeted frontend tests:\n - %s\n' "${selected[@]}"
+          npx playwright install --with-deps chromium
           npx playwright test "${selected[@]}" --timeout=30000 --retries=1
 
   publish-agent-statuses:
@@ -169,7 +176,7 @@ jobs:
               -f description="$description ($result)"
           }
 
-          publish_status "$BACKEND_RESULT" "agent-ci/backend-targeted" "Targeted backend regression suite"
+          publish_status "$BACKEND_RESULT" "agent-ci/backend-targeted" "Targeted backend + P10 HA/PRA suite"
           publish_status "$EDGE_AGENT_RESULT" "agent-ci/edge-agent" "Center Edge Agent + P9 updater suite"
           publish_status "$FRONTEND_BUILD_RESULT" "agent-ci/frontend-build" "Frontend typecheck and production build"
           publish_status "$FRONTEND_E2E_RESULT" "agent-ci/frontend-e2e" "Targeted Playwright regressions"

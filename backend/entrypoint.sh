@@ -1,28 +1,50 @@
 #!/usr/bin/env bash
 # entrypoint.sh — CodeRoute Guinée
-# Auto-setup au démarrage : migrations + seed admin + Gunicorn
-set -e
+# P10 : migrations pre-deploy et seeds désactivés par défaut en production HA.
+set -euo pipefail
+
+ENVIRONMENT_VALUE="${ENVIRONMENT:-development}"
+RUN_MIGRATIONS_ON_STARTUP_VALUE="${RUN_MIGRATIONS_ON_STARTUP:-}"
+RUN_BOOTSTRAP_SEED_ON_STARTUP_VALUE="${RUN_BOOTSTRAP_SEED_ON_STARTUP:-}"
+
+if [ -z "$RUN_MIGRATIONS_ON_STARTUP_VALUE" ]; then
+    if [ "$ENVIRONMENT_VALUE" = "production" ]; then
+        RUN_MIGRATIONS_ON_STARTUP_VALUE=false
+    else
+        RUN_MIGRATIONS_ON_STARTUP_VALUE=true
+    fi
+fi
+if [ -z "$RUN_BOOTSTRAP_SEED_ON_STARTUP_VALUE" ]; then
+    if [ "$ENVIRONMENT_VALUE" = "production" ]; then
+        RUN_BOOTSTRAP_SEED_ON_STARTUP_VALUE=false
+    else
+        RUN_BOOTSTRAP_SEED_ON_STARTUP_VALUE=true
+    fi
+fi
 
 echo "════════════════════════════════════════════"
 echo "  CodeRoute Guinée — Démarrage"
-echo "  Environnement : ${ENVIRONMENT:-development}"
+echo "  Environnement : ${ENVIRONMENT_VALUE}"
 echo "════════════════════════════════════════════"
 
 # Vérification DATABASE_URL
 if [ -z "${DATABASE_URL:-}" ] || echo "${DATABASE_URL}" | grep -q "CHANGE_ME"; then
-    echo "⚠️  DATABASE_URL non configurée — définir dans Render Dashboard"
+    echo "⚠️  DATABASE_URL non configurée — définir dans le gestionnaire d'environnement"
 fi
 
 # ── 1. Migrations Alembic ─────────────────────────────────────────
-if [ -n "${DATABASE_URL:-}" ] && ! echo "${DATABASE_URL}" | grep -q "CHANGE_ME"; then
-    echo "── Migrations Alembic ──"
-    MIGRATE_URL="${ALEMBIC_DATABASE_URL:-$DATABASE_URL}"
-    DATABASE_URL="$MIGRATE_URL" alembic upgrade head && echo "✅ Migrations OK" || \
-        echo "⚠️  Migrations échouées — le serveur démarre quand même"
+# En production P10, Render exécute ./scripts/predeploy.sh une seule fois
+# avant la mise en service des nouvelles instances.
+if [ "$RUN_MIGRATIONS_ON_STARTUP_VALUE" = "true" ]; then
+    echo "── Migrations Alembic au startup (mode explicite/dev) ──"
+    ./scripts/predeploy.sh
+else
+    echo "✅ Migrations au startup désactivées — pre-deploy fail-closed requis."
 fi
 
-# ── 2. Seed admin (si BOOTSTRAP_ADMIN_PASSWORD défini) ───────────
-if [ -n "${BOOTSTRAP_ADMIN_PASSWORD:-}" ] && [ -n "${DATABASE_URL:-}" ] && \
+# ── 2. Seed admin (mode explicite uniquement en production HA) ────
+if [ "$RUN_BOOTSTRAP_SEED_ON_STARTUP_VALUE" = "true" ] && \
+   [ -n "${BOOTSTRAP_ADMIN_PASSWORD:-}" ] && [ -n "${DATABASE_URL:-}" ] && \
    ! echo "${DATABASE_URL}" | grep -q "CHANGE_ME"; then
     echo "── Bootstrap admin ──"
     python3 - << 'PYEOF'
@@ -44,37 +66,42 @@ try:
         sys.exit(0)
 
     db = SessionLocal()
-    existing = db.execute(select(User).where(User.email == ADMIN_EMAIL)).scalar_one_or_none()
-    if existing:
-        print(f"✅ Admin déjà présent : {ADMIN_EMAIL}")
-    else:
-        admin = User(
-            id=str(uuid.uuid4()),
-            email=ADMIN_EMAIL,
-            full_name=ADMIN_NAME,
-            password_hash=get_password_hash(ADMIN_PASSWORD),
-            role="super_admin",
-            is_active=True,
-        )
-        db.add(admin)
-        db.commit()
-        print(f"✅ Admin créé : {ADMIN_EMAIL}")
-    db.close()
+    try:
+        existing = db.execute(select(User).where(User.email == ADMIN_EMAIL)).scalar_one_or_none()
+        if existing:
+            print(f"✅ Admin déjà présent : {ADMIN_EMAIL}")
+        else:
+            admin = User(
+                id=str(uuid.uuid4()),
+                email=ADMIN_EMAIL,
+                full_name=ADMIN_NAME,
+                password_hash=get_password_hash(ADMIN_PASSWORD),
+                role="super_admin",
+                is_active=True,
+            )
+            db.add(admin)
+            db.commit()
+            print(f"✅ Admin créé : {ADMIN_EMAIL}")
+    finally:
+        db.close()
 except Exception as e:
-    print(f"⚠️  Seed admin ignoré : {e}", file=sys.stderr)
+    print(f"❌ Seed admin échoué : {e.__class__.__name__}", file=sys.stderr)
+    raise
 PYEOF
 fi
 
-# ── 3. Seed questions (si DB disponible) ─────────────────────────
-if [ -n "${DATABASE_URL:-}" ] && ! echo "${DATABASE_URL}" | grep -q "CHANGE_ME"; then
+# ── 3. Seed questions/centres (mode explicite uniquement) ─────────
+if [ "$RUN_BOOTSTRAP_SEED_ON_STARTUP_VALUE" = "true" ] && \
+   [ -n "${DATABASE_URL:-}" ] && ! echo "${DATABASE_URL}" | grep -q "CHANGE_ME"; then
     python3 - << 'PYEOF'
-import sys, logging
+import logging
 logging.basicConfig(level=logging.WARNING)
+from app.db.session import SessionLocal
+from app.models_question import Question
+from app.models_center import Center
+
+db = SessionLocal()
 try:
-    from app.db.session import SessionLocal
-    from app.models_question import Question
-    from app.models_center import Center
-    db = SessionLocal()
     n_q = db.query(Question).count()
     n_c = db.query(Center).count()
     if n_q < 50:
@@ -89,10 +116,11 @@ try:
         print(f"✅ Centres insérés : {len(centers)}")
     else:
         print(f"✅ Centres : {n_c} déjà présents")
+finally:
     db.close()
-except Exception as e:
-    print(f"⚠️  Seed ignoré : {e}", file=sys.stderr)
 PYEOF
+else
+    echo "✅ Seeds au startup désactivés — aucune course entre instances HA."
 fi
 
 # ── 4. Démarrage Gunicorn ─────────────────────────────────────────

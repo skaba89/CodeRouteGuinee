@@ -1,10 +1,20 @@
-# render.yaml — CodeRoute Guinée
+# render.yaml — CodeRoute Guinée P10
 # Les variables marquées sync:false DOIVENT être saisies manuellement dans
 # Render Dashboard → Environment avant le premier déploiement.
 # Les variables generateValue:true sont auto-générées par Render.
 
 services:
-  # ── Backend FastAPI ──────────────────────────────────────────────────────
+  # ── Shared state Redis/Valkey ────────────────────────────────────────────
+  # Cache public + rate limiting uniquement. Aucune donnée d'examen durable.
+  - type: keyvalue
+    name: coderoute-shared-state
+    plan: starter
+    region: frankfurt
+    ipAllowList: []
+    maxmemoryPolicy: allkeys-lru
+    persistenceMode: off
+
+  # ── Backend FastAPI HA ──────────────────────────────────────────────────
   - type: web
     name: coderoute-backend
     runtime: docker
@@ -12,12 +22,17 @@ services:
     dockerfilePath: backend/Dockerfile
     plan: starter
     region: frankfurt
-    healthCheckPath: /health
+    numInstances: 2
+    healthCheckPath: /health/readiness
+    maxShutdownDelaySeconds: 60
+    preDeployCommand: "./scripts/predeploy.sh"
     envVars:
       - key: PYTHONPATH
         value: "/app"
+      - key: WEB_CONCURRENCY
+        value: "2"
 
-      # Sécurité — OBLIGATOIRE : saisir dans Render Dashboard
+      # Sécurité — valeurs partagées entre toutes les instances API.
       - key: SECRET_KEY
         generateValue: true
       - key: CSRF_SECRET
@@ -26,9 +41,11 @@ services:
         generateValue: true
 
       # Signature centrale des leases Center Edge. Toutes les instances API
-      # doivent partager la même valeur afin qu'un lease reste vérifiable
-      # après redéploiement ou changement d'instance.
+      # doivent partager la même valeur afin qu'un lease reste vérifiable.
       - key: EDGE_LEASE_SIGNING_SECRET
+        generateValue: true
+      # Signature P9 des releases Center Edge, également partagée.
+      - key: EDGE_RELEASE_SIGNING_SECRET
         generateValue: true
 
       # Base de données Neon — OBLIGATOIRE : saisir dans Render Dashboard
@@ -37,6 +54,31 @@ services:
         sync: false
       - key: ALEMBIC_DATABASE_URL
         sync: false
+
+      # P10 shared state privé Render.
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: coderoute-shared-state
+          property: connectionString
+      # Redis est requis comme configuration HA mais reste reconstructible :
+      # une panne runtime déclenche le fallback local et un état degraded.
+      - key: REDIS_REQUIRED
+        value: "false"
+      - key: HA_MODE
+        value: "true"
+      - key: EXPECTED_API_INSTANCES
+        value: "2"
+      - key: DEPLOYMENT_ID
+        value: "production"
+
+      # Migrations/seeds : jamais en concurrence au démarrage des instances.
+      - key: RUN_MIGRATIONS_ON_STARTUP
+        value: "false"
+      - key: RUN_BOOTSTRAP_SEED_ON_STARTUP
+        value: "false"
+      - key: AUTO_CREATE_TABLES
+        value: "false"
 
       # Bootstrap admin — saisir dans Render Dashboard
       - key: BOOTSTRAP_ADMIN_EMAIL
@@ -77,8 +119,7 @@ services:
         value: "CodeRoute Guinée — DNTT"
 
       # Media Factory Cloudinary — secrets à saisir dans Render Dashboard.
-      # Les fichiers sont téléversés directement navigateur -> Cloudinary :
-      # le backend ne reçoit jamais le binaire, seulement la demande de signature.
+      # Les fichiers sont téléversés directement navigateur -> Cloudinary.
       - key: CLOUDINARY_CLOUD_NAME
         sync: false
       - key: CLOUDINARY_API_KEY
@@ -92,7 +133,7 @@ services:
       - key: MOBILE_MONEY_MODE
         value: "sandbox"
 
-      # Performance DB
+      # Performance DB : budget par instance, avec 2 instances API.
       - key: DB_POOL_RECYCLE
         value: "60"
       - key: DB_POOL_SIZE

@@ -20,6 +20,16 @@ class Settings(BaseSettings):
     database_url: str = "CHANGE_ME_database_url_must_be_set_in_env"
     auto_create_tables: bool = True   # False en production (Alembic gère le schéma)
 
+    # ── Haute disponibilité / état partagé P10 ────────────────────────────
+    # Redis/Valkey ne stocke jamais les réponses ou résultats d'examen.
+    # Il sert uniquement au cache public et au rate limiting multi-instance.
+    redis_url: str = ""
+    redis_required: bool = False
+    ha_mode: bool = False
+    expected_api_instances: int = 1
+    instance_id: str = ""
+    deployment_id: str = ""
+
     # ── Application ───────────────────────────────────────────────────────
     environment: str = "development"
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
@@ -156,6 +166,14 @@ class Settings(BaseSettings):
 
         if self.database_url and self.database_url.strip().startswith("sqlite"):
             errors.append("DATABASE_URL ne doit pas être SQLite en production — utiliser PostgreSQL")
+
+        redis_url = (self.redis_url or "").strip()
+        if redis_url and not redis_url.startswith(("redis://", "rediss://")):
+            errors.append("REDIS_URL doit utiliser redis:// ou rediss://")
+        if (self.redis_required or self.ha_mode) and not redis_url:
+            errors.append("REDIS_URL est obligatoire lorsque REDIS_REQUIRED ou HA_MODE est activé")
+        if self.ha_mode and self.expected_api_instances < 2:
+            errors.append("EXPECTED_API_INSTANCES doit être >= 2 lorsque HA_MODE=true")
 
         if errors:
             msg = "\n".join(f"  ❌ {e}" for e in errors)
