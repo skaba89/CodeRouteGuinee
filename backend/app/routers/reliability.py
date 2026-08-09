@@ -15,6 +15,7 @@ from app.models_audit import AuditLog
 from app.models_user import User
 from app.reliability_config import ReliabilitySettings, get_reliability_settings
 from app.reliability_metrics import (
+    latest_reliability_evidence,
     latest_reliability_evidence_times,
     record_reliability_evidence_metric,
 )
@@ -126,6 +127,7 @@ def reliability_status(
     _current_user: User = Depends(require_roles("admin", "super_admin")),
 ) -> dict:
     settings = get_reliability_settings()
+    evidence = latest_reliability_evidence(db)
     actual_times = latest_reliability_evidence_times(db)
     return {
         "generated_at": datetime.now(UTC).isoformat(),
@@ -134,6 +136,7 @@ def reliability_status(
             kind: value.isoformat() if value is not None else None
             for kind, value in actual_times.items()
         },
+        "last_evidence_details": evidence,
     }
 
 
