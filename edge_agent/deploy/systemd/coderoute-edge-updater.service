@@ -31,8 +31,8 @@ RestrictSUIDSGID=true
 CapabilityBoundingSet=
 AmbientCapabilities=
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
-ReadOnlyPaths=/etc/coderoute-edge /var/lib/coderoute-edge
-ReadWritePaths=/opt/coderoute-edge/releases
+ReadOnlyPaths=/etc/coderoute-edge /var/lib/coderoute-edge/edge.db /var/lib/coderoute-edge/storage.key
+ReadWritePaths=/opt/coderoute-edge/releases /var/lib/coderoute-edge/release-staging
 
 [Install]
 WantedBy=multi-user.target
