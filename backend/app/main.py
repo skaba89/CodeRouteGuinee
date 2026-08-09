@@ -59,6 +59,7 @@ from app.routers import (
     health,
     institutional_authorizations,
     metrics,
+    national_governance,
     operations,
     payment_reconciliation,
     payments,
@@ -274,6 +275,7 @@ app.include_router(payments.router, prefix=settings.api_v1_prefix)
 app.include_router(payment_reconciliation.router, prefix=settings.api_v1_prefix)
 app.include_router(operations.router, prefix=settings.api_v1_prefix)
 app.include_router(reliability.router, prefix=settings.api_v1_prefix)
+app.include_router(national_governance.router, prefix=settings.api_v1_prefix)
 app.include_router(security_operations.router, prefix=settings.api_v1_prefix)
 app.include_router(entries.router, prefix=settings.api_v1_prefix)
 app.include_router(center_incidents.router, prefix=settings.api_v1_prefix)
