@@ -1,4 +1,13 @@
-"""Middleware FastAPI — CodeRoute Guinée P10."""
+"""
+Middleware FastAPI — CodeRoute Guinée.
+
+Middleware actifs (dans l'ordre d'exécution) :
+  1. RequestID       — injecte X-Request-ID unique dans chaque requête/réponse
+  2. TimingHeader    — ajoute X-Process-Time (ms) dans chaque réponse
+  3. GZipMiddleware  — déjà dans FastAPI mais activé seulement si Nginx est absent
+  4. SecurityHeaders — headers de sécurité HTTP sur toutes les réponses
+  5. ResponseCache   — cache public partagé en HA, fallback LRU local
+"""
 import time
 import uuid
 from collections import OrderedDict, deque
@@ -9,10 +18,18 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 from starlette.types import ASGIApp
 
-from app.distributed import distributed_cache_get, distributed_cache_set, distributed_rate_limit, redis_configured
+from app.distributed import (
+    distributed_cache_get,
+    distributed_cache_set,
+    distributed_rate_limit,
+    redis_configured,
+)
 
+# ── 1. X-Request-ID ──────────────────────────────────────────────────────────
 
 class RequestIDMiddleware(BaseHTTPMiddleware):
+    """Injecte un ID unique dans chaque requête pour le tracing distribué."""
+
     async def dispatch(self, request: Request, call_next: "Callable") -> Response:
         request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
         request.state.request_id = request_id
@@ -21,15 +38,32 @@ class RequestIDMiddleware(BaseHTTPMiddleware):
         return response
 
 
+# ── 2. Timing ─────────────────────────────────────────────────────────────────
+
 class TimingMiddleware(BaseHTTPMiddleware):
+    """Ajoute X-Process-Time dans chaque réponse (utile pour le monitoring)."""
+
     async def dispatch(self, request: Request, call_next: "Callable") -> Response:
         start = time.perf_counter()
         response = await call_next(request)
-        response.headers["X-Process-Time"] = f"{(time.perf_counter() - start) * 1000:.1f}ms"
+        elapsed_ms = (time.perf_counter() - start) * 1000
+        response.headers["X-Process-Time"] = f"{elapsed_ms:.1f}ms"
         return response
 
 
+# ── 3. Cache public partagé + fallback mémoire ────────────────────────────────
+#
+# Stratégie :
+#   - Seulement les GET sans Authorization header
+#   - Redis/Valkey si REDIS_URL est configuré
+#   - Fallback LRU local en cas d'incident shared-state
+#   - Aucun health/readiness dans le cache
+#   - Aucune donnée d'examen authentifiée dans Redis
+
+
 class LRUCache:
+    """Fallback LRU local, utilisé en dev ou si le shared-state est indisponible."""
+
     def __init__(self, maxsize: int = 256) -> None:
         self._cache: OrderedDict[str, tuple[bytes, dict, float]] = OrderedDict()
         self._maxsize = maxsize
@@ -52,34 +86,43 @@ class LRUCache:
             self._cache.popitem(last=False)
 
     def invalidate_prefix(self, prefix: str) -> int:
-        keys = [key for key in self._cache if key.startswith(prefix)]
-        for key in keys:
-            del self._cache[key]
+        keys = [k for k in self._cache if k.startswith(prefix)]
+        for k in keys:
+            del self._cache[k]
         return len(keys)
 
 
 _cache = LRUCache(maxsize=512)
 
-# Health/readiness ne doit jamais être mis en cache.
 _CACHE_RULES: list[tuple[str, float]] = [
-    ("/api/v1/sessions", 30.0),
-    ("/api/v1/centers", 60.0),
-    ("/api/v1/dashboard", 60.0),
-    ("/api/v1/exams/", 5.0),
+    ("/api/v1/sessions",                  30.0),
+    ("/api/v1/centers",                   60.0),
+    ("/api/v1/dashboard",                 60.0),
+    ("/api/v1/exams/",                     5.0),
 ]
 
 
 class ResponseCacheMiddleware(BaseHTTPMiddleware):
+    """Cache des GET publics ; partagé entre instances lorsque Redis/Valkey est disponible."""
+
     def __init__(self, app: ASGIApp, environment: str = "development") -> None:
         super().__init__(app)
         self._enabled = environment == "production"
 
     async def dispatch(self, request: Request, call_next: "Callable") -> Response:
-        if not self._enabled or request.method != "GET" or "authorization" in request.headers:
+        if (
+            not self._enabled
+            or request.method != "GET"
+            or "authorization" in request.headers
+        ):
             return await call_next(request)
 
         path = request.url.path
-        ttl = next((candidate for prefix, candidate in _CACHE_RULES if path.startswith(prefix)), None)
+        ttl: float | None = None
+        for prefix, candidate_ttl in _CACHE_RULES:
+            if path.startswith(prefix):
+                ttl = candidate_ttl
+                break
         if ttl is None:
             return await call_next(request)
 
@@ -90,34 +133,59 @@ class ResponseCacheMiddleware(BaseHTTPMiddleware):
                 hit = await distributed_cache_get(cache_key)
                 if hit is not None:
                     body, headers = hit
-                    return Response(content=body, headers={**headers, "X-Cache": "HIT", "X-Cache-Backend": "shared"})
+                    return Response(
+                        content=body,
+                        media_type=headers.get("content-type", "application/json"),
+                        headers={**headers, "X-Cache": "HIT", "X-Cache-Backend": "shared"},
+                    )
             except Exception:
                 shared_failed = True
 
         if not redis_configured() or shared_failed:
-            local_hit = _cache.get(cache_key)
-            if local_hit is not None:
-                body, headers = local_hit
-                return Response(content=body, headers={**headers, "X-Cache": "HIT", "X-Cache-Backend": "local-fallback"})
+            hit = _cache.get(cache_key)
+            if hit is not None:
+                body, headers = hit
+                return Response(
+                    content=body,
+                    media_type=headers.get("content-type", "application/json"),
+                    headers={**headers, "X-Cache": "HIT", "X-Cache-Backend": "local-fallback"},
+                )
 
         response = await call_next(request)
         if response.status_code != 200:
             return response
 
-        chunks: list[bytes] = []
+        body_chunks: list[bytes] = []
         async for chunk in response.body_iterator:
-            chunks.append(chunk)
-        body = b"".join(chunks)
-        cached_headers = {k: v for k, v in response.headers.items() if k.lower() in {"content-type", "content-encoding"}}
+            body_chunks.append(chunk)
+        body = b"".join(body_chunks)
+        headers_to_cache = {
+            k: v for k, v in response.headers.items()
+            if k.lower() in ("content-type", "content-encoding")
+        }
+
         backend = "local"
         if redis_configured():
             try:
-                await distributed_cache_set(cache_key, body, cached_headers, ttl=ttl)
+                await distributed_cache_set(cache_key, body, headers_to_cache, ttl=ttl)
                 backend = "shared"
             except Exception:
                 backend = "local-fallback"
-        _cache.set(cache_key, body, cached_headers, ttl)
-        return Response(content=body, status_code=200, headers={**dict(response.headers), "X-Cache": "MISS", "X-Cache-Backend": backend})
+        _cache.set(cache_key, body, headers_to_cache, ttl)
+
+        return Response(
+            content=body,
+            status_code=200,
+            headers={**dict(response.headers), "X-Cache": "MISS", "X-Cache-Backend": backend},
+            media_type=response.headers.get("content-type"),
+        )
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# GlobalRateLimitMiddleware — protection anti-abus à l'échelle nationale
+# ══════════════════════════════════════════════════════════════════════════════
+# P10 : sliding window Redis/Valkey atomique en HA ; fallback mémoire local
+# pour préserver la disponibilité. La readiness signale la panne du shared-state.
 
 
 class GlobalRateLimitMiddleware(BaseHTTPMiddleware):
@@ -129,6 +197,7 @@ class GlobalRateLimitMiddleware(BaseHTTPMiddleware):
         self._last_cleanup = time.monotonic()
 
     def _client_ip(self, request: Request) -> str:
+        # Render met l'IP réelle dans X-Forwarded-For (première valeur)
         forwarded = request.headers.get("x-forwarded-for")
         if forwarded:
             return forwarded.split(",")[0].strip()
@@ -139,7 +208,8 @@ class GlobalRateLimitMiddleware(BaseHTTPMiddleware):
             return
         self._last_cleanup = now
         cutoff = now - self.window
-        for ip in [ip for ip, hits in self._hits.items() if not hits or hits[-1] < cutoff]:
+        stale = [ip for ip, hits in self._hits.items() if not hits or hits[-1] < cutoff]
+        for ip in stale:
             del self._hits[ip]
 
     def _local_decision(self, identity: str) -> tuple[bool, int]:
@@ -155,14 +225,19 @@ class GlobalRateLimitMiddleware(BaseHTTPMiddleware):
         return True, 0
 
     async def dispatch(self, request: Request, call_next: "Callable") -> Response:
-        if request.url.path.startswith(("/health", "/static")):
+        path = request.url.path
+        if path.startswith("/health") or path.startswith("/static"):
             return await call_next(request)
 
         identity = self._client_ip(request)
         backend = "local"
         if redis_configured():
             try:
-                allowed, _count, retry_after = await distributed_rate_limit(identity, limit=self.max_requests, window_seconds=self.window)
+                allowed, _count, retry_after = await distributed_rate_limit(
+                    identity,
+                    limit=self.max_requests,
+                    window_seconds=self.window,
+                )
                 backend = "shared"
             except Exception:
                 allowed, retry_after = self._local_decision(identity)
@@ -171,7 +246,12 @@ class GlobalRateLimitMiddleware(BaseHTTPMiddleware):
             allowed, retry_after = self._local_decision(identity)
 
         if not allowed:
-            return JSONResponse(status_code=429, content={"detail": "Trop de requêtes. Réessayez dans quelques instants."}, headers={"Retry-After": str(max(1, retry_after)), "X-RateLimit-Backend": backend})
+            return JSONResponse(
+                status_code=429,
+                content={"detail": "Trop de requêtes. Réessayez dans quelques instants."},
+                headers={"Retry-After": str(max(1, retry_after)), "X-RateLimit-Backend": backend},
+            )
+
         response = await call_next(request)
         response.headers["X-RateLimit-Backend"] = backend
         return response
