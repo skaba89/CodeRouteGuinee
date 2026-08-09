@@ -8,8 +8,9 @@ Type=oneshot
 User=root
 Group=root
 EnvironmentFile=/etc/coderoute-edge/edge.env
+Environment=PYTHONPATH=/opt/coderoute-edge/releases/current/edge_agent
 WorkingDirectory=/opt/coderoute-edge/releases/current/edge_agent
-ExecStart=/usr/bin/python3 /opt/coderoute-edge/releases/current/edge_agent/scripts/run_system_update.py
+ExecStart=/opt/coderoute-edge/releases/current/.venv/bin/python /opt/coderoute-edge/releases/current/edge_agent/scripts/run_system_update.py
 TimeoutStartSec=10min
 UMask=0077
 
