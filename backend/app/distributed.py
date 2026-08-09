@@ -57,8 +57,13 @@ def redis_configured() -> bool:
 
 
 def redis_is_required() -> bool:
-    settings = _settings()
-    return bool(getattr(settings, "redis_required", False) or getattr(settings, "ha_mode", False))
+    """Runtime hard dependency flag.
+
+    HA_MODE exige qu'un shared-state soit *configuré* en production, mais Redis
+    reste reconstructible. Une panne runtime ne doit donc couper toutes les API
+    que si REDIS_REQUIRED=true est explicitement demandé.
+    """
+    return bool(getattr(_settings(), "redis_required", False))
 
 
 def cache_namespace() -> str:
@@ -104,10 +109,11 @@ def get_async_redis():
 
 def check_shared_state() -> dict[str, Any]:
     """Probe synchrone sans exposer l'URL ou les credentials."""
+    required = redis_is_required()
     if not redis_configured():
         return {
-            "status": "error" if redis_is_required() else "disabled",
-            "required": redis_is_required(),
+            "status": "error" if required else "disabled",
+            "required": required,
             "backend": "redis-compatible",
         }
     client = get_sync_redis()
@@ -117,14 +123,14 @@ def check_shared_state() -> dict[str, Any]:
         client.ping()
         return {
             "status": "ok",
-            "required": redis_is_required(),
+            "required": required,
             "backend": "redis-compatible",
             "latency_ms": round((time.perf_counter() - started) * 1000, 1),
         }
     except Exception as exc:
         return {
-            "status": "error",
-            "required": redis_is_required(),
+            "status": "error" if required else "degraded",
+            "required": required,
             "backend": "redis-compatible",
             "detail": exc.__class__.__name__,
         }
