@@ -21,7 +21,7 @@ class EdgeAgentConfig:
     operator_token: str
     allowed_origins: tuple[str, ...]
     release_dir: Path = Path(".coderoute-edge/releases")
-    software_version: str = "edge-agent-0.3.0"
+    software_version: str = "edge-agent-0.4.0"
     max_media_bytes: int = 50 * 1024 * 1024
     max_release_bytes: int = 512 * 1024 * 1024
     bind_host: str = "0.0.0.0"
@@ -30,6 +30,11 @@ class EdgeAgentConfig:
     tls_cert_path: Path | None = None
     tls_key_path: Path | None = None
     allow_insecure_http: bool = False
+    maintenance_windows: str = "sun@01:00-04:00"
+    maintenance_timezone: str = "Africa/Conakry"
+    systemd_service_name: str = "coderoute-edge.service"
+    healthcheck_timeout_seconds: int = 60
+    healthcheck_ca_path: Path | None = None
 
     @classmethod
     def from_env(cls) -> "EdgeAgentConfig":
@@ -50,7 +55,7 @@ class EdgeAgentConfig:
             ).split(",")
             if origin.strip()
         )
-        version = os.environ.get("CODEROUTE_EDGE_SOFTWARE_VERSION", "edge-agent-0.3.0").strip()
+        version = os.environ.get("CODEROUTE_EDGE_SOFTWARE_VERSION", "edge-agent-0.4.0").strip()
         max_media = int(os.environ.get("CODEROUTE_EDGE_MAX_MEDIA_BYTES", str(50 * 1024 * 1024)))
         max_release = int(os.environ.get("CODEROUTE_EDGE_MAX_RELEASE_BYTES", str(512 * 1024 * 1024)))
         bind_host = os.environ.get("CODEROUTE_EDGE_BIND_HOST", "0.0.0.0").strip()
@@ -61,6 +66,12 @@ class EdgeAgentConfig:
         tls_cert = Path(cert_raw) if cert_raw else None
         tls_key = Path(key_raw) if key_raw else None
         insecure = _truthy(os.environ.get("CODEROUTE_EDGE_ALLOW_INSECURE_HTTP"))
+        maintenance_windows = os.environ.get("CODEROUTE_EDGE_MAINTENANCE_WINDOWS", "sun@01:00-04:00").strip()
+        maintenance_timezone = os.environ.get("CODEROUTE_EDGE_MAINTENANCE_TIMEZONE", "Africa/Conakry").strip()
+        systemd_service_name = os.environ.get("CODEROUTE_EDGE_SYSTEMD_SERVICE", "coderoute-edge.service").strip()
+        healthcheck_timeout = int(os.environ.get("CODEROUTE_EDGE_HEALTHCHECK_TIMEOUT_SECONDS", "60"))
+        ca_raw = os.environ.get("CODEROUTE_EDGE_HEALTHCHECK_CA_PATH", "").strip()
+        healthcheck_ca = Path(ca_raw) if ca_raw else None
 
         errors: list[str] = []
         if not central_url.startswith("https://"):
@@ -88,6 +99,14 @@ class EdgeAgentConfig:
                 "TLS LAN obligatoire : définir CODEROUTE_EDGE_TLS_CERT_PATH et CODEROUTE_EDGE_TLS_KEY_PATH "
                 "(ou CODEROUTE_EDGE_ALLOW_INSECURE_HTTP=true uniquement en développement)"
             )
+        if not maintenance_windows:
+            errors.append("CODEROUTE_EDGE_MAINTENANCE_WINDOWS ne peut pas être vide")
+        if not maintenance_timezone:
+            errors.append("CODEROUTE_EDGE_MAINTENANCE_TIMEZONE ne peut pas être vide")
+        if not systemd_service_name or "/" in systemd_service_name:
+            errors.append("CODEROUTE_EDGE_SYSTEMD_SERVICE invalide")
+        if healthcheck_timeout < 10 or healthcheck_timeout > 600:
+            errors.append("CODEROUTE_EDGE_HEALTHCHECK_TIMEOUT_SECONDS doit être compris entre 10 et 600")
         if errors:
             raise RuntimeError("Configuration Edge invalide : " + "; ".join(errors))
 
@@ -111,4 +130,9 @@ class EdgeAgentConfig:
             tls_cert_path=tls_cert,
             tls_key_path=tls_key,
             allow_insecure_http=insecure,
+            maintenance_windows=maintenance_windows,
+            maintenance_timezone=maintenance_timezone,
+            systemd_service_name=systemd_service_name,
+            healthcheck_timeout_seconds=healthcheck_timeout,
+            healthcheck_ca_path=healthcheck_ca,
         )
