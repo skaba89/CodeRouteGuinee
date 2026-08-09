@@ -57,6 +57,12 @@ Un dossier historique contenant des preuves sans SHA est donc bloqué avec :
 
 Il doit repasser en préparation/migration contrôlée avant de pouvoir être utilisé pour une homologation nationale.
 
+### Migration des dossiers historiques
+
+La lecture des anciens dossiers reste compatible : une ancienne référence sans `artifact_sha256` n’est ni supprimée ni interprétée comme une preuve valide. Dans le dashboard, elle apparaît **« À re-hasher »** et n’entre pas dans le compteur `5/5 hashées`.
+
+Tant que le dossier est encore en `draft` ou `evidence_review`, l’opérateur peut sélectionner le même type de preuve et rattacher la pièce GED correspondante avec son SHA-256. L’ancienne référence est conservée dans `evidence_history`. Un dossier déjà avancé dans le workflow doit faire l’objet d’une migration/reprise contrôlée plutôt que d’une modification silencieuse de ses pièces.
+
 ## Décision finale
 
 Lors d’une décision positive, l’intégrité des cinq pièces est revalidée avant la logique P12 existante :
@@ -74,7 +80,7 @@ Une décision de rejet reste possible même si l’intégrité d’une pièce es
 Le dashboard national expose un panneau « Dossier de preuves — homologation DNTT » permettant :
 
 - de sélectionner un dossier ;
-- d’identifier visuellement les pièces manquantes/hashées ;
+- d’identifier visuellement les pièces manquantes, hashées ou héritées sans hash ;
 - de rattacher ou remplacer une pièce avant soumission ;
 - de soumettre les cinq preuves ;
 - de réaliser les deux approbations selon RBAC ;
