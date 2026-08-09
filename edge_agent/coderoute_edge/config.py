@@ -20,7 +20,7 @@ class EdgeAgentConfig:
     media_cache_dir: Path
     operator_token: str
     allowed_origins: tuple[str, ...]
-    software_version: str = "edge-agent-0.1.0"
+    software_version: str = "edge-agent-0.2.0"
     max_media_bytes: int = 50 * 1024 * 1024
     bind_host: str = "0.0.0.0"
     bind_port: int = 8443
@@ -47,7 +47,7 @@ class EdgeAgentConfig:
             ).split(",")
             if origin.strip()
         )
-        version = os.environ.get("CODEROUTE_EDGE_SOFTWARE_VERSION", "edge-agent-0.1.0").strip()
+        version = os.environ.get("CODEROUTE_EDGE_SOFTWARE_VERSION", "edge-agent-0.2.0").strip()
         max_media = int(os.environ.get("CODEROUTE_EDGE_MAX_MEDIA_BYTES", str(50 * 1024 * 1024)))
         bind_host = os.environ.get("CODEROUTE_EDGE_BIND_HOST", "0.0.0.0").strip()
         bind_port = int(os.environ.get("CODEROUTE_EDGE_BIND_PORT", "8443"))
