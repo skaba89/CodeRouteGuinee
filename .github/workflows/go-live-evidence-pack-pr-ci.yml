@@ -5,6 +5,7 @@ on:
     paths:
       - 'backend/scripts/collect_go_live_evidence.py'
       - 'backend/tests/test_go_live_evidence_pack.py'
+      - 'backend/tests/test_go_live_evidence_pitr.py'
       - 'docs/GO_LIVE_EVIDENCE_PACK.md'
       - '.gitignore'
       - '.github/workflows/go-live-evidence-pack-pr-ci.yml'
@@ -14,10 +15,14 @@ on:
     paths:
       - 'backend/scripts/collect_go_live_evidence.py'
       - 'backend/tests/test_go_live_evidence_pack.py'
+      - 'backend/tests/test_go_live_evidence_pitr.py'
       - 'docs/GO_LIVE_EVIDENCE_PACK.md'
       - '.gitignore'
       - '.github/workflows/go-live-evidence-pack-pr-ci.yml'
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   evidence-pack:
@@ -34,7 +39,7 @@ jobs:
       - name: Compile collector
         working-directory: backend
         run: python -m compileall -q scripts/collect_go_live_evidence.py
-      - name: Run evidence-pack safety tests
+      - name: Run evidence-pack safety, deployed-SHA and PITR tests
         working-directory: backend
         env:
           PYTHONPATH: .
@@ -43,4 +48,7 @@ jobs:
           ENVIRONMENT: test
           SOC_ENABLED: 'false'
           AUDIT_CHAIN_ENABLED: 'false'
-        run: pytest -q --tb=short --disable-warnings tests/test_go_live_evidence_pack.py
+        run: |
+          pytest -q --tb=short --disable-warnings \
+            tests/test_go_live_evidence_pack.py \
+            tests/test_go_live_evidence_pitr.py
