@@ -20,8 +20,10 @@ class EdgeAgentConfig:
     media_cache_dir: Path
     operator_token: str
     allowed_origins: tuple[str, ...]
-    software_version: str = "edge-agent-0.2.0"
+    release_dir: Path = Path(".coderoute-edge/releases")
+    software_version: str = "edge-agent-0.3.0"
     max_media_bytes: int = 50 * 1024 * 1024
+    max_release_bytes: int = 512 * 1024 * 1024
     bind_host: str = "0.0.0.0"
     bind_port: int = 8443
     public_url: str = ""
@@ -38,6 +40,7 @@ class EdgeAgentConfig:
         database_path = Path(os.environ.get("CODEROUTE_EDGE_DB_PATH", ".coderoute-edge/edge.db"))
         storage_key_path = Path(os.environ.get("CODEROUTE_EDGE_STORAGE_KEY_PATH", ".coderoute-edge/storage.key"))
         media_cache_dir = Path(os.environ.get("CODEROUTE_EDGE_MEDIA_DIR", ".coderoute-edge/media"))
+        release_dir = Path(os.environ.get("CODEROUTE_EDGE_RELEASE_DIR", ".coderoute-edge/releases"))
         operator_token = os.environ.get("CODEROUTE_EDGE_OPERATOR_TOKEN", "").strip()
         origins = tuple(
             origin.strip()
@@ -47,8 +50,9 @@ class EdgeAgentConfig:
             ).split(",")
             if origin.strip()
         )
-        version = os.environ.get("CODEROUTE_EDGE_SOFTWARE_VERSION", "edge-agent-0.2.0").strip()
+        version = os.environ.get("CODEROUTE_EDGE_SOFTWARE_VERSION", "edge-agent-0.3.0").strip()
         max_media = int(os.environ.get("CODEROUTE_EDGE_MAX_MEDIA_BYTES", str(50 * 1024 * 1024)))
+        max_release = int(os.environ.get("CODEROUTE_EDGE_MAX_RELEASE_BYTES", str(512 * 1024 * 1024)))
         bind_host = os.environ.get("CODEROUTE_EDGE_BIND_HOST", "0.0.0.0").strip()
         bind_port = int(os.environ.get("CODEROUTE_EDGE_BIND_PORT", "8443"))
         public_url = os.environ.get("CODEROUTE_EDGE_PUBLIC_URL", "").strip().rstrip("/")
@@ -71,6 +75,8 @@ class EdgeAgentConfig:
             errors.append("CODEROUTE_EDGE_ALLOWED_ORIGINS doit être une liste explicite sans wildcard")
         if max_media < 1024 * 1024:
             errors.append("CODEROUTE_EDGE_MAX_MEDIA_BYTES est trop faible")
+        if max_release < 1024 * 1024:
+            errors.append("CODEROUTE_EDGE_MAX_RELEASE_BYTES est trop faible")
         if bind_port < 1 or bind_port > 65535:
             errors.append("CODEROUTE_EDGE_BIND_PORT invalide")
         if not public_url:
@@ -95,8 +101,10 @@ class EdgeAgentConfig:
             media_cache_dir=media_cache_dir,
             operator_token=operator_token,
             allowed_origins=origins,
+            release_dir=release_dir,
             software_version=version,
             max_media_bytes=max_media,
+            max_release_bytes=max_release,
             bind_host=bind_host,
             bind_port=bind_port,
             public_url=public_url,
