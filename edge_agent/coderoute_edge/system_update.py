@@ -80,12 +80,7 @@ def _verify_staged_with_local_trust(
     center_id: str,
     current_version: str,
 ) -> dict[str, Any]:
-    trust_store = Path(
-        os.environ.get(
-            "CODEROUTE_EDGE_RELEASE_TRUST_PATH",
-            "/etc/coderoute-edge/release-trust.json",
-        )
-    )
+    trust_store = Path(os.environ.get("CODEROUTE_EDGE_RELEASE_TRUST_PATH", "/etc/coderoute-edge/release-trust.json"))
     return verify_staged_release_for_root(
         staged,
         release_root=staging_root,
@@ -138,11 +133,7 @@ def _symlink_target(root: Path, name: str) -> Path | None:
         return None
 
 
-def _copy_into_root_workspace(
-    staged: dict[str, Any],
-    staging_root: Path,
-    release_root: Path,
-) -> dict[str, Any]:
+def _copy_into_root_workspace(staged: dict[str, Any], staging_root: Path, release_root: Path) -> dict[str, Any]:
     if staging_root.resolve() == release_root.resolve():
         return staged
     release_root.mkdir(parents=True, exist_ok=True)
@@ -164,11 +155,7 @@ def _copy_into_root_workspace(
     return root_state
 
 
-def _handoff_receipt(
-    staging_root: Path,
-    release_root: Path,
-    receipt: dict[str, Any],
-) -> None:
+def _handoff_receipt(staging_root: Path, release_root: Path, receipt: dict[str, Any]) -> None:
     _json_atomic(staging_root / "install-receipt.json", receipt)
     (staging_root / "staged.json").unlink(missing_ok=True)
     (release_root / "staged.json").unlink(missing_ok=True)
@@ -296,11 +283,7 @@ def apply_system_update_transaction(
 
     try:
         restart_service(config.systemd_service_name)
-        health = health_probe(
-            config.public_url,
-            config.healthcheck_timeout_seconds,
-            config.healthcheck_ca_path,
-        )
+        health = health_probe(config.public_url, config.healthcheck_timeout_seconds, config.healthcheck_ca_path)
         running_version = str(health.get("software_version") or "")
         if running_version != expected_version:
             raise RuntimeError(
