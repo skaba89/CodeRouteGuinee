@@ -3,18 +3,23 @@ groups:
     interval: 30s
     rules:
       - alert: CodeRouteSOCAuditChainInvalid
-        expr: coderoute_audit_chain_valid < 1
+        expr: |
+          absent(coderoute_audit_chain_valid)
+          or
+          coderoute_audit_chain_valid < 1
         for: 1m
         labels:
           severity: critical
           service: coderoute
           domain: security
         annotations:
-          summary: "Intégrité du journal d'audit CodeRoute invalide"
+          summary: "Intégrité du journal d'audit CodeRoute absente ou invalide"
           runbook: "docs/P11_SOC_SECURITY_OPERATIONS.md#audit-chain"
 
       - alert: CodeRouteSOCAuditVerificationStale
         expr: |
+          absent(coderoute_audit_chain_last_verify_timestamp_seconds)
+          or
           coderoute_audit_chain_last_verify_timestamp_seconds == 0
           or
           (time() - coderoute_audit_chain_last_verify_timestamp_seconds) > 1800
