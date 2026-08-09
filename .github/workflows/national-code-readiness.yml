@@ -55,6 +55,8 @@ jobs:
           tests/e2e/edge-exam-bridge.spec.ts
           tests/e2e/national-soc-security.spec.ts
           tests/e2e/national-governance.spec.ts
+          tests/e2e/national-go-live-command-center.spec.ts
+          tests/e2e/national-homologation-evidence.spec.ts
           --project=chromium --timeout=30000 --retries=1
 
   p10-p11-reliability-security:
@@ -104,7 +106,11 @@ jobs:
             tests/test_soc_privacy.py \
             tests/test_audit_chain_p11.py \
             tests/test_audit_immutability_p11.py \
-            tests/test_soc_runtime_security.py
+            tests/test_soc_runtime_security.py \
+            tests/test_soc_go_live_readiness.py \
+            tests/test_render_deployment_fingerprint.py \
+            tests/test_go_live_evidence_pack.py \
+            tests/test_go_live_evidence_pitr.py
 
   p12-governance:
     runs-on: ubuntu-latest
@@ -118,7 +124,7 @@ jobs:
         run: pip install -q -r requirements.txt
       - name: Compile governance modules
         working-directory: backend
-        run: python -m compileall -q app/national_governance.py app/national_governance_guard.py app/routers/national_governance.py
+        run: python -m compileall -q app/national_governance.py app/national_governance_evidence.py app/national_governance_guard.py app/routers/national_governance.py
       - name: P12 governance and homologation guards
         working-directory: backend
         env:
@@ -128,10 +134,14 @@ jobs:
           ENVIRONMENT: test
           SOC_ENABLED: 'false'
           AUDIT_CHAIN_ENABLED: 'false'
+          EDGE_LEASE_SIGNING_SECRET: coderoute-readiness-edge-signing-secret-at-least-32-characters
+          EDGE_RELEASE_SIGNING_SECRET: coderoute-readiness-release-signing-secret-at-least-32-characters
         run: |
           pytest -q --tb=short --disable-warnings \
             tests/test_national_governance.py \
-            tests/test_national_homologation.py
+            tests/test_national_homologation.py \
+            tests/test_national_readiness_pitr.py \
+            tests/test_homologation_evidence_integrity.py
 
   deployment-safety-invariants:
     runs-on: ubuntu-latest
@@ -142,7 +152,7 @@ jobs:
           python-version: '3.12'
       - name: Install YAML validator
         run: pip install -q PyYAML
-      - name: Verify HA, backup secret isolation and dormant SOC rollout
+      - name: Verify HA, CI-gated CD, deployment fingerprint and secret isolation
         shell: bash
         run: |
           python - <<'PY'
@@ -153,15 +163,23 @@ jobs:
           services = {item['name']: item for item in render['services']}
           backend = services['coderoute-backend']
           backup = services['coderoute-offsite-backup']
+          frontend = services['coderoute-frontend']
           env = {item['key']: item for item in backend['envVars'] if 'key' in item}
           backup_env = {item['key']: item for item in backup['envVars'] if 'key' in item}
 
           assert backend['numInstances'] == 2
           assert backend['healthCheckPath'] == '/health/readiness'
+          for service in (backend, backup, frontend):
+              assert service['autoDeployTrigger'] == 'checksPass', f"{service['name']} must deploy only after CI checks pass"
+
           assert env['HA_MODE']['value'] == 'true'
           assert env['EXPECTED_API_INSTANCES']['value'] == '2'
+          assert env['DEPLOYMENT_ID']['value'] == 'production'
           assert env['METRICS_ENABLED']['value'] == 'true'
           assert env['RELIABILITY_EVIDENCE_ENABLED']['value'] == 'true'
+          assert 'RENDER_GIT_COMMIT' not in env
+          assert 'RENDER_GIT_BRANCH' not in env
+          assert 'RENDER_GIT_REPO_SLUG' not in env
 
           for forbidden in ('BACKUP_ENCRYPTION_KEY_B64', 'AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY', 'BACKUP_DATABASE_URL'):
               assert forbidden not in env, f'{forbidden} must not be present on the web service'
@@ -175,6 +193,13 @@ jobs:
           assert env['SIEM_REQUIRED']['value'] == 'false'
           assert env['SOC_PSEUDONYM_KEY']['sync'] is False
           assert env['AUDIT_CHAIN_HMAC_KEY']['sync'] is False
+
+          health = Path('backend/app/routers/health.py').read_text(encoding='utf-8')
+          verifier = Path('backend/scripts/verify_render_deployment.py').read_text(encoding='utf-8')
+          for marker in ('RENDER_GIT_COMMIT', 'git_commit', 'git_repo_slug'):
+              assert marker in health, marker
+          for marker in ('DEPLOYED_SHA_MATCH', 'coderoute_render_deployment_receipt_v1', 'expected_commit'):
+              assert marker in verifier, marker
 
           print('National deployment code/IaC invariants: OK')
           PY
