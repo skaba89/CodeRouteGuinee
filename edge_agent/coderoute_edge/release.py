@@ -118,6 +118,9 @@ class EdgeReleaseManager:
         bundle = offer.get("release")
         if not isinstance(bundle, dict) or not self.central.verify_release_bundle(bundle):
             raise RuntimeError("Signature centrale de release Edge invalide")
+        install_authorization = offer.get("install_authorization")
+        if not isinstance(install_authorization, dict):
+            raise RuntimeError("Autorisation d'installation centrale P9 absente")
 
         manifest = bundle.get("manifest")
         if not isinstance(manifest, dict) or manifest.get("kind") != "center_edge_release_manifest_v1":
@@ -167,6 +170,7 @@ class EdgeReleaseManager:
             "manifest_hash": bundle.get("manifest_hash"),
             "manifest_signature_b64": bundle.get("manifest_signature_b64"),
             "signing_key_id": bundle.get("signing_key_id"),
+            "install_authorization": install_authorization,
             "verified": True,
         }
         self._write_json_atomic(self.staged_state_path, state)
