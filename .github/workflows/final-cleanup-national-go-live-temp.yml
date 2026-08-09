@@ -73,3 +73,5 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git commit -m 'ci: remove all temporary national go-live workflows'
           git push origin HEAD:${{ github.event.pull_request.head.ref || github.ref_name }}
+
+# Triggered from a clean branch based on current main after Render fingerprint gates were installed.
