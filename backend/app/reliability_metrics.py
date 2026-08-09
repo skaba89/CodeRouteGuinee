@@ -50,6 +50,7 @@ _EVIDENCE_ACTIONS = {
     "backup_uploaded": "reliability.backup_uploaded",
     "restore_drill_passed": "reliability.restore_drill_passed",
     "ha_failover_probe_passed": "reliability.ha_failover_probe_passed",
+    "pitr_drill_passed": "reliability.pitr_drill_passed",
 }
 _ACTION_TO_KIND = {action: kind for kind, action in _EVIDENCE_ACTIONS.items()}
 
