@@ -28,6 +28,8 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - name: Install dependencies
         run: npm ci
+      - name: Security audit — high/critical gate
+        run: npm run audit:security
       - name: Typecheck
         run: npm run typecheck
       - name: Production build
