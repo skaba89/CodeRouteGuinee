@@ -31,6 +31,7 @@ from app.core.config import get_settings as _get_settings
 from app.db.session import SessionLocal, init_db
 from app.logging_config import setup_logging
 from app.middleware import GlobalRateLimitMiddleware, RequestIDMiddleware, ResponseCacheMiddleware, TimingMiddleware
+from app.monitoring import capture_exception as capture_monitoring_exception
 from app.monitoring import init_sentry
 from app.reliability_metrics import ReliabilityMetricsMiddleware
 from app.soc_logging import install_soc_log_filter
@@ -215,10 +216,9 @@ def _route_template(request: Request) -> str:
 @app.exception_handler(Exception)
 async def global_exception_handler(_req: Request, exc: Exception) -> _JSONResponse:
     """Capture les 500 sans exporter URL/query/identité brute."""
-    from app.sentry import capture_exception as _sentry_cap
     route = _route_template(_req)
     request_id = getattr(_req.state, "request_id", None)
-    _sentry_cap(
+    capture_monitoring_exception(
         exc,
         context={
             "method": _req.method,
