@@ -102,6 +102,8 @@ async function edgeStatusResponse(attemptId: string): Promise<Response> {
   if (localFinalized) {
     markPendingEdgeResult(attemptId);
     queueMicrotask(routeToPendingResult);
+  } else if (state.status !== 'active') {
+    throw new Error(`État Edge non exploitable: ${state.status || 'unknown'}`);
   }
 
   return jsonResponse({
