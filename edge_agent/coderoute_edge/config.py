@@ -32,6 +32,7 @@ class EdgeAgentConfig:
     operator_token: str
     allowed_origins: tuple[str, ...]
     release_dir: Path = Path(".coderoute-edge/releases")
+    release_staging_dir: Path | None = None
     software_version: str = "edge-agent-0.4.0"
     max_media_bytes: int = 50 * 1024 * 1024
     max_release_bytes: int = 512 * 1024 * 1024
@@ -58,6 +59,10 @@ class EdgeAgentConfig:
         storage_key_path = Path(os.environ.get("CODEROUTE_EDGE_STORAGE_KEY_PATH", ".coderoute-edge/storage.key"))
         media_cache_dir = Path(os.environ.get("CODEROUTE_EDGE_MEDIA_DIR", ".coderoute-edge/media"))
         release_dir = Path(os.environ.get("CODEROUTE_EDGE_RELEASE_DIR", ".coderoute-edge/releases"))
+        release_staging_dir = Path(os.environ.get(
+            "CODEROUTE_EDGE_RELEASE_STAGING_DIR",
+            ".coderoute-edge/release-staging",
+        ))
         operator_token = os.environ.get("CODEROUTE_EDGE_OPERATOR_TOKEN", "").strip()
         origins = tuple(
             origin.strip()
@@ -123,6 +128,8 @@ class EdgeAgentConfig:
             errors.append("CODEROUTE_EDGE_HEALTHCHECK_TIMEOUT_SECONDS doit être compris entre 10 et 600")
         if not runtime_python.startswith("/"):
             errors.append("CODEROUTE_EDGE_RUNTIME_PYTHON doit être un chemin absolu")
+        if release_staging_dir.resolve() == release_dir.resolve():
+            errors.append("CODEROUTE_EDGE_RELEASE_STAGING_DIR doit être distinct de CODEROUTE_EDGE_RELEASE_DIR en P9")
         if errors:
             raise RuntimeError("Configuration Edge invalide : " + "; ".join(errors))
 
@@ -137,6 +144,7 @@ class EdgeAgentConfig:
             operator_token=operator_token,
             allowed_origins=origins,
             release_dir=release_dir,
+            release_staging_dir=release_staging_dir,
             software_version=version,
             max_media_bytes=max_media,
             max_release_bytes=max_release,
