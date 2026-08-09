@@ -13,25 +13,37 @@ import httpx
 def _payload(receipt: dict) -> dict:
     kind = receipt.get("kind")
     if kind == "coderoute_offsite_backup_receipt_v2":
+        if receipt.get("off_region_verified") is not True:
+            raise SystemExit("preuve backup refusée: stockage hors région non vérifié")
+        if not receipt.get("bundle_sha256") or not receipt.get("target_region") or not receipt.get("object_key"):
+            raise SystemExit("preuve backup refusée: reçu incomplet")
         return {
             "kind": "backup_uploaded",
             "occurred_at": receipt["uploaded_at"],
             "artifact_sha256": receipt["bundle_sha256"],
-            "region": receipt.get("target_region"),
-            "reference": receipt.get("object_key"),
+            "region": receipt["target_region"],
+            "reference": receipt["object_key"],
         }
     if kind == "coderoute_restore_drill_receipt_v1":
+        if receipt.get("ok") is not True:
+            raise SystemExit("preuve restore refusée: drill non réussi")
+        if not receipt.get("dump_sha256"):
+            raise SystemExit("preuve restore refusée: empreinte absente")
         return {
             "kind": "restore_drill_passed",
             "occurred_at": receipt["verified_at"],
-            "artifact_sha256": receipt.get("dump_sha256"),
+            "artifact_sha256": receipt["dump_sha256"],
         }
     if kind == "coderoute_ha_failover_probe_receipt_v1":
+        if receipt.get("passed") is not True:
+            raise SystemExit("preuve failover refusée: seuils non atteints")
+        if receipt.get("availability_percent") is None or receipt.get("duration_seconds") is None:
+            raise SystemExit("preuve failover refusée: reçu incomplet")
         return {
             "kind": "ha_failover_probe_passed",
             "occurred_at": receipt["finished_at"],
-            "availability_percent": receipt.get("availability_percent"),
-            "duration_seconds": receipt.get("duration_seconds"),
+            "availability_percent": receipt["availability_percent"],
+            "duration_seconds": receipt["duration_seconds"],
         }
     raise SystemExit(f"type de reçu non supporté: {kind!r}")
 
