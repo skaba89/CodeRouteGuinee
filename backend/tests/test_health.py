@@ -28,7 +28,27 @@ def test_readiness_reports_database_schema_migrations_and_shared_state() -> None
     assert body["checks"]["schema"]["status"] == "ok"
     assert "users" in body["checks"]["schema"]["critical_tables"]
     assert body["checks"]["migrations"]["status"] in {"ok", "warning"}
-    assert body["checks"]["shared_state"]["status"] in {"ok", "disabled"}
+    assert body["checks"]["shared_state"]["status"] in {"ok", "disabled", "degraded"}
+
+
+def test_readiness_stays_200_when_reconstructible_shared_state_is_degraded(monkeypatch) -> None:
+    monkeypatch.setattr(
+        health_router,
+        "check_shared_state",
+        lambda: {
+            "status": "degraded",
+            "required": False,
+            "backend": "redis-compatible",
+            "detail": "ConnectionError",
+        },
+    )
+    client = TestClient(app)
+    response = client.get("/health/readiness")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "ready"
+    assert "shared_state" not in body["blocking_checks"]
+    assert body["checks"]["shared_state"]["status"] == "degraded"
 
 
 def test_readiness_returns_503_when_required_shared_state_is_unavailable(monkeypatch) -> None:
@@ -94,7 +114,7 @@ def test_production_configuration_check_accepts_hardened_ha_settings() -> None:
         admin_registration_token="private-admin-bootstrap-token",
         bootstrap_admin_email="admin@coderoute.gov.gn",
         redis_url="redis://coderoute-keyvalue:6379",
-        redis_required=True,
+        redis_required=False,
         ha_mode=True,
         expected_api_instances=2,
     )
