@@ -2,6 +2,8 @@ from datetime import UTC, datetime
 
 from scripts.collect_go_live_evidence import evaluate_snapshot
 
+EXPECTED_SHA = "0123456789abcdef0123456789abcdef01234567"
+
 
 def _obs(body=None, *, ok=True):
     return {
@@ -17,7 +19,16 @@ def _observations(*, pitr_time):
     now = datetime(2026, 8, 9, 18, 30, tzinfo=UTC)
     evidence_time = now.isoformat()
     return now, {
-        "health_live": _obs({"status": "ok"}),
+        "health_live": _obs(
+            {
+                "status": "ok",
+                "runtime": {
+                    "git_commit": EXPECTED_SHA,
+                    "git_branch": "main",
+                    "git_repo_slug": "skaba89/CodeRouteGuinee",
+                },
+            }
+        ),
         "health_readiness": _obs({"status": "ready"}),
         "reliability": _obs(
             {
@@ -44,16 +55,18 @@ def _observations(*, pitr_time):
 
 def test_fresh_pitr_evidence_allows_automated_pack_to_pass():
     now, observations = _observations(pitr_time="2026-08-09T18:30:00+00:00")
-    result = evaluate_snapshot(observations, now=now)
+    result = evaluate_snapshot(observations, now=now, expected_git_commit=EXPECTED_SHA)
     assert result["status"] == "automated_checks_passed"
     pitr = next(item for item in result["checks"] if item["code"] == "P10_PITR_FRESH")
     assert pitr["passed"] is True
+    deployed = next(item for item in result["checks"] if item["code"] == "P10_DEPLOYED_SHA_MATCH")
+    assert deployed["passed"] is True
     assert result["institutional_homologation_claimed"] is False
 
 
 def test_missing_pitr_evidence_is_explicit_blocker():
     now, observations = _observations(pitr_time=None)
-    result = evaluate_snapshot(observations, now=now)
+    result = evaluate_snapshot(observations, now=now, expected_git_commit=EXPECTED_SHA)
     assert result["status"] == "blocked"
     pitr = next(item for item in result["checks"] if item["code"] == "P10_PITR_FRESH")
     assert pitr["passed"] is False
@@ -62,7 +75,7 @@ def test_missing_pitr_evidence_is_explicit_blocker():
 
 def test_stale_pitr_evidence_is_explicit_blocker():
     now, observations = _observations(pitr_time="2026-01-01T00:00:00+00:00")
-    result = evaluate_snapshot(observations, now=now)
+    result = evaluate_snapshot(observations, now=now, expected_git_commit=EXPECTED_SHA)
     assert result["status"] == "blocked"
     pitr = next(item for item in result["checks"] if item["code"] == "P10_PITR_FRESH")
     assert pitr["passed"] is False
