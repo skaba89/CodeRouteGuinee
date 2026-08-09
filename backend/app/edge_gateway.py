@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import os
 from datetime import UTC, datetime
 from typing import Any
 
@@ -14,6 +15,14 @@ EDGE_SCOPE_KIND = "center_edge_node"
 EDGE_HEARTBEAT_INTERVAL_SECONDS = 60
 EDGE_HEARTBEAT_MAX_SKEW_SECONDS = 300
 EDGE_ONLINE_GRACE_SECONDS = 180
+EDGE_TARGET_SOFTWARE_VERSION = os.environ.get("CODEROUTE_EDGE_TARGET_VERSION", "edge-agent-0.2.0").strip() or "edge-agent-0.2.0"
+EDGE_REQUIRED_CAPABILITIES = (
+    "answer-journal-v1",
+    "exam-lease-v1",
+    "fleet-telemetry-v1",
+    "media-prefetch-v1",
+    "operator-status-v1",
+)
 
 
 def _decode_urlsafe_b64(value: str) -> bytes:
@@ -57,6 +66,34 @@ def normalize_capabilities(capabilities: list[str] | None) -> list[str]:
     return sorted(clean)[:32]
 
 
+def _safe_non_negative_int(value: Any, *, maximum: int) -> int:
+    try:
+        parsed = int(value or 0)
+    except (TypeError, ValueError):
+        parsed = 0
+    return min(max(parsed, 0), maximum)
+
+
+def normalize_heartbeat_telemetry(telemetry: dict[str, Any] | None) -> dict[str, int] | None:
+    """Normalise uniquement la télémétrie d'exploitation autorisée.
+
+    Le heartbeat national ne doit jamais transporter de question, réponse,
+    identité candidat, token ou contenu de journal.
+    """
+    if telemetry is None:
+        return None
+    return {
+        "active_leases": _safe_non_negative_int(telemetry.get("active_leases"), maximum=100_000),
+        "finalized_leases": _safe_non_negative_int(telemetry.get("finalized_leases"), maximum=100_000),
+        "synced_leases": _safe_non_negative_int(telemetry.get("synced_leases"), maximum=10_000_000),
+        "sync_pending": _safe_non_negative_int(telemetry.get("sync_pending"), maximum=100_000),
+        "revalidation_required": _safe_non_negative_int(telemetry.get("revalidation_required"), maximum=100_000),
+        "corrupt_leases": _safe_non_negative_int(telemetry.get("corrupt_leases"), maximum=100_000),
+        "media_files": _safe_non_negative_int(telemetry.get("media_files"), maximum=1_000_000),
+        "media_bytes": _safe_non_negative_int(telemetry.get("media_bytes"), maximum=10_000_000_000_000),
+    }
+
+
 def normalize_utc(value: datetime) -> datetime:
     if value.tzinfo is None:
         return value.replace(tzinfo=UTC)
@@ -85,8 +122,9 @@ def heartbeat_signing_payload(
     sent_at: datetime,
     software_version: str,
     capabilities: list[str] | None,
+    telemetry: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    return {
+    payload: dict[str, Any] = {
         "capabilities": normalize_capabilities(capabilities),
         "center_id": center_id,
         "node_id": node_id,
@@ -94,6 +132,10 @@ def heartbeat_signing_payload(
         "sequence": int(sequence),
         "software_version": (software_version or "unknown").strip()[:80],
     }
+    normalized_telemetry = normalize_heartbeat_telemetry(telemetry)
+    if normalized_telemetry is not None:
+        payload["telemetry"] = normalized_telemetry
+    return payload
 
 
 def verify_edge_signature(
@@ -155,6 +197,8 @@ def build_edge_scope(
         "last_seen_at": None,
         "last_software_version": None,
         "last_clock_skew_seconds": None,
+        "last_telemetry": None,
+        "last_telemetry_at": None,
     }
 
 
