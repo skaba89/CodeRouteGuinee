@@ -55,6 +55,8 @@ jobs:
           tests/e2e/edge-exam-bridge.spec.ts
           tests/e2e/national-soc-security.spec.ts
           tests/e2e/national-governance.spec.ts
+          tests/e2e/national-go-live-command-center.spec.ts
+          tests/e2e/national-homologation-evidence.spec.ts
           --project=chromium --timeout=30000 --retries=1
 
   p10-p11-reliability-security:
@@ -105,8 +107,10 @@ jobs:
             tests/test_audit_chain_p11.py \
             tests/test_audit_immutability_p11.py \
             tests/test_soc_runtime_security.py \
+            tests/test_soc_go_live_readiness.py \
             tests/test_render_deployment_fingerprint.py \
-            tests/test_go_live_evidence_pack.py
+            tests/test_go_live_evidence_pack.py \
+            tests/test_go_live_evidence_pitr.py
 
   p12-governance:
     runs-on: ubuntu-latest
@@ -120,7 +124,7 @@ jobs:
         run: pip install -q -r requirements.txt
       - name: Compile governance modules
         working-directory: backend
-        run: python -m compileall -q app/national_governance.py app/national_governance_guard.py app/routers/national_governance.py
+        run: python -m compileall -q app/national_governance.py app/national_governance_evidence.py app/national_governance_guard.py app/routers/national_governance.py
       - name: P12 governance and homologation guards
         working-directory: backend
         env:
@@ -130,10 +134,14 @@ jobs:
           ENVIRONMENT: test
           SOC_ENABLED: 'false'
           AUDIT_CHAIN_ENABLED: 'false'
+          EDGE_LEASE_SIGNING_SECRET: coderoute-readiness-edge-signing-secret-at-least-32-characters
+          EDGE_RELEASE_SIGNING_SECRET: coderoute-readiness-release-signing-secret-at-least-32-characters
         run: |
           pytest -q --tb=short --disable-warnings \
             tests/test_national_governance.py \
-            tests/test_national_homologation.py
+            tests/test_national_homologation.py \
+            tests/test_national_readiness_pitr.py \
+            tests/test_homologation_evidence_integrity.py
 
   deployment-safety-invariants:
     runs-on: ubuntu-latest
