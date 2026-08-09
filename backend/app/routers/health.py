@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+import os
+
 from fastapi import APIRouter, Depends, Response, status
 from sqlalchemy import inspect, text
 from sqlalchemy.orm import Session
@@ -100,9 +104,24 @@ def _build_configuration_check(current_settings) -> dict:
 
 
 def _runtime_metadata() -> dict:
+    """Return privacy-safe runtime identity, including Render's immutable Git SHA.
+
+    Render documents RENDER_GIT_COMMIT, RENDER_GIT_BRANCH and RENDER_GIT_REPO_SLUG
+    as default runtime variables. None of these values are credentials.
+    """
+
+    def env(name: str) -> str | None:
+        value = (os.getenv(name) or "").strip()
+        return value or None
+
     return {
         "instance_id": instance_id(),
         "deployment_id": str(getattr(settings, "deployment_id", "") or "") or None,
+        "git_commit": env("RENDER_GIT_COMMIT"),
+        "git_branch": env("RENDER_GIT_BRANCH"),
+        "git_repo_slug": env("RENDER_GIT_REPO_SLUG"),
+        "render_service_name": env("RENDER_SERVICE_NAME"),
+        "render_instance_id": env("RENDER_INSTANCE_ID"),
         "ha_mode": bool(getattr(settings, "ha_mode", False)),
         "expected_api_instances": int(getattr(settings, "expected_api_instances", 1) or 1),
     }
