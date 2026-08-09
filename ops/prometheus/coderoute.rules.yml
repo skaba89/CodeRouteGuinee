@@ -1,0 +1,114 @@
+groups:
+  - name: coderoute-slo-recording
+    interval: 30s
+    rules:
+      - record: coderoute:http_availability:ratio5m
+        expr: |
+          1 - (
+            sum(rate(coderoute_http_requests_total{status_class="5xx"}[5m]))
+            /
+            clamp_min(sum(rate(coderoute_http_requests_total[5m])), 0.000001)
+          )
+      - record: coderoute:http_5xx:ratio5m
+        expr: |
+          sum(rate(coderoute_http_requests_total{status_class="5xx"}[5m]))
+          /
+          clamp_min(sum(rate(coderoute_http_requests_total[5m])), 0.000001)
+      - record: coderoute:http_p95_seconds:5m
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (le) (rate(coderoute_http_request_duration_seconds_bucket[5m]))
+          )
+
+  - name: coderoute-national-alerts
+    interval: 30s
+    rules:
+      - alert: CodeRouteApiAvailabilityBelowSLO
+        expr: coderoute:http_availability:ratio5m < 0.999
+        for: 10m
+        labels:
+          severity: critical
+          service: coderoute
+        annotations:
+          summary: "Disponibilité API CodeRoute sous le SLO 99,9%"
+          runbook: "docs/P10_2_DR_OBSERVABILITY.md#alertes"
+
+      - alert: CodeRouteApiHigh5xxRate
+        expr: coderoute:http_5xx:ratio5m > 0.01
+        for: 5m
+        labels:
+          severity: critical
+          service: coderoute
+        annotations:
+          summary: "Taux HTTP 5xx supérieur à 1%"
+          runbook: "docs/P10_2_DR_OBSERVABILITY.md#alertes"
+
+      - alert: CodeRouteApiP95LatencyHigh
+        expr: coderoute:http_p95_seconds:5m > 1
+        for: 10m
+        labels:
+          severity: warning
+          service: coderoute
+        annotations:
+          summary: "Latence p95 API supérieure à 1 seconde"
+          runbook: "docs/P10_2_DR_OBSERVABILITY.md#alertes"
+
+      - alert: CodeRouteCriticalReadinessFailure
+        expr: coderoute_readiness_component_state{component=~"configuration|database|schema|migrations"} < 1
+        for: 2m
+        labels:
+          severity: critical
+          service: coderoute
+        annotations:
+          summary: "Un composant critique de readiness n'est pas sain"
+          runbook: "docs/P10_2_DR_OBSERVABILITY.md#readiness"
+
+      - alert: CodeRouteSharedStateDegraded
+        expr: coderoute_readiness_component_state{component="shared_state"} < 1
+        for: 10m
+        labels:
+          severity: warning
+          service: coderoute
+        annotations:
+          summary: "Redis/Valkey est dégradé; fallback local actif"
+          runbook: "docs/P10_2_DR_OBSERVABILITY.md#redisvalkey"
+
+      - alert: CodeRouteBackupEvidenceMissingOrStale
+        expr: |
+          coderoute_reliability_evidence_last_success_timestamp_seconds{kind="backup_uploaded"} == 0
+          or
+          (time() - coderoute_reliability_evidence_last_success_timestamp_seconds{kind="backup_uploaded"}) > 93600
+        for: 15m
+        labels:
+          severity: critical
+          service: coderoute
+        annotations:
+          summary: "Aucune preuve de backup hors région depuis plus de 26h"
+          runbook: "docs/P10_2_DR_OBSERVABILITY.md#backup-hors-région"
+
+      - alert: CodeRouteRestoreDrillStale
+        expr: |
+          coderoute_reliability_evidence_last_success_timestamp_seconds{kind="restore_drill_passed"} == 0
+          or
+          (time() - coderoute_reliability_evidence_last_success_timestamp_seconds{kind="restore_drill_passed"}) > 3024000
+        for: 30m
+        labels:
+          severity: critical
+          service: coderoute
+        annotations:
+          summary: "Restore drill absent ou vieux de plus de 35 jours"
+          runbook: "docs/P10_2_DR_OBSERVABILITY.md#restore-drill"
+
+      - alert: CodeRouteFailoverEvidenceStale
+        expr: |
+          coderoute_reliability_evidence_last_success_timestamp_seconds{kind="ha_failover_probe_passed"} == 0
+          or
+          (time() - coderoute_reliability_evidence_last_success_timestamp_seconds{kind="ha_failover_probe_passed"}) > 3024000
+        for: 30m
+        labels:
+          severity: warning
+          service: coderoute
+        annotations:
+          summary: "Test de perte d'instance absent ou vieux de plus de 35 jours"
+          runbook: "docs/P10_2_DR_OBSERVABILITY.md#test-de-failover"
