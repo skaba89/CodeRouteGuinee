@@ -45,6 +45,26 @@ def _payload(receipt: dict) -> dict:
             "availability_percent": receipt["availability_percent"],
             "duration_seconds": receipt["duration_seconds"],
         }
+    if kind == "coderoute_pitr_drill_receipt_v1":
+        if receipt.get("passed") is not True:
+            raise SystemExit("preuve PITR refusée: drill non réussi")
+        required = (
+            "finished_at",
+            "evidence_sha256",
+            "reference",
+            "observed_rpo_minutes",
+            "observed_rto_minutes",
+        )
+        if any(receipt.get(field) is None or receipt.get(field) == "" for field in required):
+            raise SystemExit("preuve PITR refusée: reçu incomplet")
+        return {
+            "kind": "pitr_drill_passed",
+            "occurred_at": receipt["finished_at"],
+            "artifact_sha256": receipt["evidence_sha256"],
+            "reference": receipt["reference"],
+            "observed_rpo_minutes": receipt["observed_rpo_minutes"],
+            "observed_rto_minutes": receipt["observed_rto_minutes"],
+        }
     raise SystemExit(f"type de reçu non supporté: {kind!r}")
 
 

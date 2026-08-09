@@ -39,6 +39,21 @@ def test_failover_receipt_must_have_passed_thresholds() -> None:
         _payload(failed)
 
 
+def test_pitr_receipt_requires_success_and_archived_report_metadata() -> None:
+    with pytest.raises(SystemExit, match="non réussi"):
+        _payload({
+            "kind": "coderoute_pitr_drill_receipt_v1",
+            "passed": False,
+        })
+
+    with pytest.raises(SystemExit, match="incomplet"):
+        _payload({
+            "kind": "coderoute_pitr_drill_receipt_v1",
+            "passed": True,
+            "finished_at": "2026-08-09T10:30:00+00:00",
+        })
+
+
 def test_successful_receipts_map_to_machine_evidence() -> None:
     backup = _payload({
         "kind": "coderoute_offsite_backup_receipt_v2",
@@ -61,6 +76,23 @@ def test_successful_receipts_map_to_machine_evidence() -> None:
         "duration_seconds": 120,
         "passed": True,
     })
+    pitr = _payload({
+        "kind": "coderoute_pitr_drill_receipt_v1",
+        "finished_at": "2026-08-09T10:30:00+00:00",
+        "evidence_sha256": "e" * 64,
+        "reference": "PITR-DRILL-2026-08-09",
+        "observed_rpo_minutes": 3.2,
+        "observed_rto_minutes": 17.0,
+        "passed": True,
+    })
     assert backup["kind"] == "backup_uploaded"
     assert restore["kind"] == "restore_drill_passed"
     assert failover["kind"] == "ha_failover_probe_passed"
+    assert pitr == {
+        "kind": "pitr_drill_passed",
+        "occurred_at": "2026-08-09T10:30:00+00:00",
+        "artifact_sha256": "e" * 64,
+        "reference": "PITR-DRILL-2026-08-09",
+        "observed_rpo_minutes": 3.2,
+        "observed_rto_minutes": 17.0,
+    }
