@@ -17,6 +17,7 @@ from .updater import apply_verified_release, rollback_to_previous
 
 RestartService = Callable[[str], None]
 HealthProbe = Callable[[str, int, Path | None], dict[str, Any]]
+RuntimePrepare = Callable[[Path, str], dict[str, Any]]
 
 
 def _json_atomic(path: Path, payload: dict[str, Any]) -> None:
@@ -52,7 +53,7 @@ def _probe_health(public_url: str, timeout_seconds: int, ca_path: Path | None) -
                 last_error = "payload /health invalide"
             else:
                 last_error = f"HTTP {response.status_code}"
-        except Exception as exc:  # le service peut être en plein restart
+        except Exception as exc:
             last_error = str(exc)
         time.sleep(2)
     raise RuntimeError(f"Health-check Edge expiré : {last_error}")
@@ -166,6 +167,7 @@ def apply_system_update_transaction(
     emergency_window_bypass: bool = False,
     restart_service: RestartService = _restart_systemd,
     health_probe: HealthProbe = _probe_health,
+    runtime_prepare: RuntimePrepare = _prepare_offline_runtime,
 ) -> dict[str, Any]:
     """Applique une release vérifiée comme transaction système locale.
 
@@ -188,11 +190,10 @@ def apply_system_update_transaction(
     try:
         installed = apply_verified_release(config.release_dir)
         target_root = Path(str(installed.get("current_path") or ""))
-        runtime = _prepare_offline_runtime(target_root, config.runtime_python)
+        runtime = runtime_prepare(target_root, config.runtime_python)
     except Exception as exc:
         rollback_receipt: dict[str, Any] | None = None
         try:
-            # apply_verified_release peut avoir déjà déplacé `current`.
             rollback_receipt = rollback_to_previous(config.release_dir)
         except Exception:
             rollback_receipt = None
@@ -227,7 +228,7 @@ def apply_system_update_transaction(
             "quiescent": state.quiescent,
         }
     except Exception as primary_exc:
-        rollback_receipt = None
+        rollback_receipt: dict[str, Any] | None = None
         rollback_error: Exception | None = None
         try:
             rollback_receipt = rollback_to_previous(config.release_dir)
