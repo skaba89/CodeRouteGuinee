@@ -1,5 +1,3 @@
-import base64
-
 import pytest
 
 from app.reliability_config import ReliabilitySettings
@@ -19,11 +17,9 @@ def _settings(**overrides) -> ReliabilitySettings:
         "backup_required": True,
         "backup_s3_bucket": "coderoute-backups",
         "backup_s3_prefix": "coderoute/production",
-        "backup_s3_endpoint_url": "https://objects.example.test",
         "backup_primary_region": "frankfurt",
         "backup_target_region": "paris",
         "backup_require_off_region": True,
-        "backup_encryption_key_b64": base64.b64encode(b"k" * 32).decode(),
         "backup_encryption_key_id": "backup-key-2026-08",
     }
     values.update(overrides)
@@ -37,8 +33,11 @@ def test_hardened_production_reliability_config_is_accepted() -> None:
     assert safe["slo"]["availability_percent"] == 99.9
     assert safe["dr"]["off_region_required"] is True
     assert safe["dr"]["encryption_key_id"] == "backup-key-2026-08"
-    assert "metrics_token" not in str(safe)
-    assert "BACKUP_ENCRYPTION_KEY_B64" not in str(safe)
+    rendered = str(safe)
+    assert "metrics_token" not in rendered
+    assert "evidence_token" not in rendered
+    assert "AWS_SECRET_ACCESS_KEY" not in rendered
+    assert "BACKUP_ENCRYPTION_KEY_B64" not in rendered
 
 
 def test_short_machine_tokens_are_rejected_in_production() -> None:
@@ -51,12 +50,6 @@ def test_short_machine_tokens_are_rejected_in_production() -> None:
 def test_backup_same_region_is_rejected() -> None:
     with pytest.raises(RuntimeError, match="différente"):
         _settings(backup_target_region="FRANKFURT").validate(production=True)
-
-
-def test_backup_key_must_be_exactly_aes256() -> None:
-    bad = base64.b64encode(b"short-key").decode()
-    with pytest.raises(RuntimeError, match="AES-256"):
-        _settings(backup_encryption_key_b64=bad).validate(production=True)
 
 
 def test_backup_required_needs_bucket_region_and_key_id() -> None:
