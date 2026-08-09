@@ -1,0 +1,77 @@
+name: Fix National Readiness Shell Continuations v2
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/fix-national-readiness-shell-continuations-v2.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref || github.ref_name }}
+      - name: Fix pytest continuation boundaries
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('.github/workflows/national-code-readiness.yml')
+          text = path.read_text(encoding='utf-8')
+          slash = chr(92)
+
+          pairs = (
+              (
+                  '            tests/test_soc_runtime_security.py\n            tests/test_soc_go_live_readiness.py ' + slash + '\n',
+                  '            tests/test_soc_runtime_security.py ' + slash + '\n            tests/test_soc_go_live_readiness.py ' + slash + '\n',
+              ),
+              (
+                  '            tests/test_national_homologation.py\n            tests/test_homologation_evidence_integrity.py\n',
+                  '            tests/test_national_homologation.py ' + slash + '\n            tests/test_homologation_evidence_integrity.py\n',
+              ),
+          )
+          for before, after in pairs:
+              if before in text:
+                  text = text.replace(before, after, 1)
+              elif after not in text:
+                  raise SystemExit(f'expected pytest boundary not found: {before!r}')
+
+          path.write_text(text, encoding='utf-8')
+          PY
+      - name: Validate continuation structure
+        shell: bash
+        run: |
+          git diff -- .github/workflows/national-code-readiness.yml
+          python - <<'PY'
+          from pathlib import Path
+          text = Path('.github/workflows/national-code-readiness.yml').read_text(encoding='utf-8')
+          slash = chr(92)
+          required = (
+              'tests/test_soc_runtime_security.py ' + slash + '\n            tests/test_soc_go_live_readiness.py ' + slash,
+              'tests/test_soc_go_live_readiness.py ' + slash + '\n            tests/test_go_live_evidence_pack.py ' + slash,
+              'tests/test_go_live_evidence_pack.py ' + slash + '\n            tests/test_go_live_evidence_pitr.py ' + slash,
+              'tests/test_national_homologation.py ' + slash + '\n            tests/test_homologation_evidence_integrity.py',
+          )
+          for marker in required:
+              assert marker in text, marker
+          assert text.count('tests/e2e/national-go-live-command-center.spec.ts') == 1
+          print('National readiness pytest continuation structure: OK')
+          PY
+      - name: Commit continuation fix
+        shell: bash
+        run: |
+          if git diff --quiet -- .github/workflows/national-code-readiness.yml; then
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add .github/workflows/national-code-readiness.yml
+          git commit -m 'ci: fix national readiness pytest continuations'
+          git push origin HEAD:${{ github.event.pull_request.head.ref || github.ref_name }}
