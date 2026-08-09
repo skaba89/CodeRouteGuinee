@@ -1,0 +1,78 @@
+name: Mark Command Center PR Ready After Verification
+
+on:
+  push:
+    branches:
+      - work/national-go-live-command-center
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  ready:
+    if: github.repository == 'skaba89/CodeRouteGuinee'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: work/national-go-live-command-center
+          fetch-depth: 1
+      - name: Require successful verification receipt and clean branch
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          receipt_path = Path('docs/verification/NATIONAL_GO_LIVE_COMMAND_CENTER.md')
+          assert receipt_path.exists(), 'verification receipt not generated yet'
+          receipt = receipt_path.read_text(encoding='utf-8')
+          for marker in (
+              'npm high/critical audit gate: PASS',
+              'TypeScript typecheck: PASS',
+              'production build: PASS',
+              'Edge exam bridge E2E: PASS',
+              'national SOC E2E: PASS',
+              'P12 governance E2E: PASS',
+              'hashed homologation evidence E2E: PASS',
+              'national go-live command center E2E: PASS',
+              'not** proof of PITR/WAF/SIEM operation',
+          ):
+              assert marker in receipt, marker
+
+          permanent = Path('.github/workflows/national-go-live-command-center-contract.yml')
+          assert permanent.exists()
+
+          forbidden = {
+              'go-live-command-center-ui-patch.yml',
+              'cleanup-go-live-command-center-ui-patch.yml',
+              'national-readiness-command-center-patch.yml',
+              'national-readiness-command-center-patch-v2.yml',
+              'cleanup-national-go-live-command-center.yml',
+              'command-center-resilience-patch.yml',
+              'final-cleanup-national-go-live-temp.yml',
+              'absolute-final-cleanup-go-live.yml',
+              'fix-national-readiness-shell-continuations.yml',
+              'fix-national-readiness-shell-continuations-v2.yml',
+              'definitive-cleanup-national-go-live.yml',
+              'verify-and-clean-national-go-live-command-center.yml',
+          }
+          present = {item.name for item in Path('.github/workflows').glob('*.yml')}
+          leaked = sorted(forbidden & present)
+          assert not leaked, f'temporary workflow(s) remain: {leaked}'
+          print('Verification receipt and branch hygiene confirmed.')
+          PY
+      - name: Remove this final temporary workflow
+        shell: bash
+        run: |
+          git rm -f .github/workflows/mark-ready-after-command-center-verification.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'ci: finish verified command-center delivery'
+          git push origin HEAD:work/national-go-live-command-center
+      - name: Mark PR 162 ready for review
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh pr ready 162 --repo "${{ github.repository }}"
