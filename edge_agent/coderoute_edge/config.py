@@ -35,6 +35,7 @@ class EdgeAgentConfig:
     systemd_service_name: str = "coderoute-edge.service"
     healthcheck_timeout_seconds: int = 60
     healthcheck_ca_path: Path | None = None
+    runtime_python: str = "/usr/bin/python3"
 
     @classmethod
     def from_env(cls) -> "EdgeAgentConfig":
@@ -72,6 +73,7 @@ class EdgeAgentConfig:
         healthcheck_timeout = int(os.environ.get("CODEROUTE_EDGE_HEALTHCHECK_TIMEOUT_SECONDS", "60"))
         ca_raw = os.environ.get("CODEROUTE_EDGE_HEALTHCHECK_CA_PATH", "").strip()
         healthcheck_ca = Path(ca_raw) if ca_raw else None
+        runtime_python = os.environ.get("CODEROUTE_EDGE_RUNTIME_PYTHON", "/usr/bin/python3").strip()
 
         errors: list[str] = []
         if not central_url.startswith("https://"):
@@ -107,6 +109,8 @@ class EdgeAgentConfig:
             errors.append("CODEROUTE_EDGE_SYSTEMD_SERVICE invalide")
         if healthcheck_timeout < 10 or healthcheck_timeout > 600:
             errors.append("CODEROUTE_EDGE_HEALTHCHECK_TIMEOUT_SECONDS doit être compris entre 10 et 600")
+        if not runtime_python.startswith("/"):
+            errors.append("CODEROUTE_EDGE_RUNTIME_PYTHON doit être un chemin absolu")
         if errors:
             raise RuntimeError("Configuration Edge invalide : " + "; ".join(errors))
 
@@ -135,4 +139,5 @@ class EdgeAgentConfig:
             systemd_service_name=systemd_service_name,
             healthcheck_timeout_seconds=healthcheck_timeout,
             healthcheck_ca_path=healthcheck_ca,
+            runtime_python=runtime_python,
         )
