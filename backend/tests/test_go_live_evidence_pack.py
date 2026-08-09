@@ -9,6 +9,9 @@ from scripts.collect_go_live_evidence import (
     render_markdown,
 )
 
+EXPECTED_SHA = "0123456789abcdef0123456789abcdef01234567"
+EXPECTED_REPO = "skaba89/CodeRouteGuinee"
+
 
 def _obs(body=None, *, ok=True, skipped=False):
     return {
@@ -17,6 +20,18 @@ def _obs(body=None, *, ok=True, skipped=False):
         "status_code": 200 if ok else None,
         "error": None if ok else "test",
         "body": body,
+    }
+
+
+def _live_runtime(*, git_commit=EXPECTED_SHA, repo=EXPECTED_REPO):
+    return {
+        "status": "ok",
+        "runtime": {
+            "deployment_id": "production",
+            "git_commit": git_commit,
+            "git_branch": "main",
+            "git_repo_slug": repo,
+        },
     }
 
 
@@ -58,7 +73,7 @@ def test_evaluate_snapshot_passes_only_automatable_checks_and_never_claims_homol
     now = datetime(2026, 8, 9, 18, 30, tzinfo=UTC)
     evidence_time = now.isoformat()
     observations = {
-        "health_live": _obs({"status": "ok", "runtime": {"deployment_id": "production"}}),
+        "health_live": _obs(_live_runtime()),
         "health_readiness": _obs({"status": "ready", "blocking_checks": []}),
         "reliability": _obs(
             {
@@ -88,12 +103,20 @@ def test_evaluate_snapshot_passes_only_automatable_checks_and_never_claims_homol
         observations,
         now=now,
         expected_deployment_id="production",
+        expected_git_commit=EXPECTED_SHA,
+        expected_repo_slug=EXPECTED_REPO,
     )
     assert result["status"] == "automated_checks_passed"
     assert result["automated_checks_passed"] is True
     assert result["blockers"] == []
     assert result["institutional_homologation_claimed"] is False
     assert result["manual_evidence_required"]
+
+    checks = {item["code"]: item for item in result["checks"]}
+    assert checks["P10_EXPECTED_GIT_SHA"]["passed"] is True
+    assert checks["P10_RENDER_GIT_SHA_PRESENT"]["passed"] is True
+    assert checks["P10_DEPLOYED_SHA_MATCH"]["passed"] is True
+    assert checks["P10_DEPLOYED_REPO_MATCH"]["passed"] is True
 
     markdown = render_markdown(
         {
@@ -107,11 +130,48 @@ def test_evaluate_snapshot_passes_only_automatable_checks_and_never_claims_homol
     assert "Preuves humaines / externes toujours requises" in markdown
 
 
+def test_missing_expected_git_sha_is_explicit_blocker_even_when_runtime_is_green():
+    now = datetime(2026, 8, 9, 18, 30, tzinfo=UTC)
+    observations = {
+        "health_live": _obs(_live_runtime()),
+        "health_readiness": _obs({"status": "ready"}),
+        "reliability": _obs({"last_evidence": {}}),
+        "security": _obs({"status": "ok", "soc_policy": {"enabled": True, "audit_chain_enabled": True}, "audit_chain": {"valid": True}}),
+        "governance_contract": _obs({"alignment": {"aligned": True}}),
+        "governance_readiness": _obs({"go_live_allowed": True}),
+        "homologation_dossiers": _obs([]),
+    }
+    result = evaluate_snapshot(observations, now=now, expected_git_commit=None)
+    checks = {item["code"]: item for item in result["checks"]}
+    assert result["status"] == "blocked"
+    assert checks["P10_EXPECTED_GIT_SHA"]["passed"] is False
+    assert checks["P10_DEPLOYED_SHA_MATCH"]["passed"] is False
+
+
+def test_deployed_git_sha_mismatch_is_explicit_blocker():
+    now = datetime(2026, 8, 9, 18, 30, tzinfo=UTC)
+    observations = {
+        "health_live": _obs(_live_runtime(git_commit="f" * 40)),
+        "health_readiness": _obs({"status": "ready"}),
+        "reliability": _obs({"last_evidence": {}}),
+        "security": _obs({"status": "ok", "soc_policy": {"enabled": True, "audit_chain_enabled": True}, "audit_chain": {"valid": True}}),
+        "governance_contract": _obs({"alignment": {"aligned": True}}),
+        "governance_readiness": _obs({"go_live_allowed": True}),
+        "homologation_dossiers": _obs([]),
+    }
+    result = evaluate_snapshot(observations, now=now, expected_git_commit=EXPECTED_SHA)
+    checks = {item["code"]: item for item in result["checks"]}
+    assert result["status"] == "blocked"
+    assert checks["P10_RENDER_GIT_SHA_PRESENT"]["passed"] is True
+    assert checks["P10_DEPLOYED_SHA_MATCH"]["passed"] is False
+    assert EXPECTED_SHA in checks["P10_DEPLOYED_SHA_MATCH"]["detail"]
+
+
 def test_missing_authenticated_access_remains_a_blocker():
     now = datetime(2026, 8, 9, 18, 30, tzinfo=UTC)
     skipped = _obs(None, ok=False, skipped=True)
     observations = {
-        "health_live": _obs({"status": "ok", "runtime": {"deployment_id": "production"}}),
+        "health_live": _obs(_live_runtime()),
         "health_readiness": _obs({"status": "ready"}),
         "reliability": skipped,
         "security": skipped,
@@ -119,7 +179,7 @@ def test_missing_authenticated_access_remains_a_blocker():
         "governance_readiness": skipped,
         "homologation_dossiers": skipped,
     }
-    result = evaluate_snapshot(observations, now=now)
+    result = evaluate_snapshot(observations, now=now, expected_git_commit=EXPECTED_SHA)
     assert result["status"] == "blocked"
     assert result["institutional_homologation_claimed"] is False
     assert any("AUTHENTICATED_EVIDENCE_MISSING" in item for item in result["blockers"])
@@ -128,7 +188,7 @@ def test_missing_authenticated_access_remains_a_blocker():
 def test_stale_reliability_evidence_blocks_readiness():
     now = datetime(2026, 8, 9, 18, 30, tzinfo=UTC)
     observations = {
-        "health_live": _obs({"status": "ok"}),
+        "health_live": _obs(_live_runtime()),
         "health_readiness": _obs({"status": "ready"}),
         "reliability": _obs(
             {
@@ -152,7 +212,7 @@ def test_stale_reliability_evidence_blocks_readiness():
         "governance_readiness": _obs({"go_live_allowed": True}),
         "homologation_dossiers": _obs([]),
     }
-    result = evaluate_snapshot(observations, now=now)
+    result = evaluate_snapshot(observations, now=now, expected_git_commit=EXPECTED_SHA)
     assert result["status"] == "blocked"
     codes = {item["code"] for item in result["checks"] if not item["passed"]}
     assert "P10_BACKUP_FRESH" in codes
