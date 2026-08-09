@@ -1,14 +1,8 @@
 """Chaîne HMAC tamper-evident du journal d'audit CodeRoute.
 
-P11 renforce l'ancien SHA-256 simple :
-- HMAC-SHA256 avec clé institutionnelle séparée ;
-- advisory transaction lock PostgreSQL pour plusieurs instances API ;
-- chaînage automatique de toute nouvelle ligne AuditLog via SQLAlchemy ;
-- ancre cryptographique des lignes historiques non chaînées ;
-- vérification de la chaîne et de l'ancre legacy.
-
-Le journal reste une preuve applicative. La clé HMAC doit être conservée dans le
-coffre de secrets et sa rotation doit suivre une procédure institutionnelle.
+Compatibilité P11 : tout historique préexistant (lignes non chaînées ou ancienne
+chaîne SHA-256) est figé dans une ancre P11. La chaîne HMAC commence à cette
+ancre sans réécrire l'historique, ce qui évite de casser une base déjà en usage.
 """
 from __future__ import annotations
 
@@ -25,6 +19,7 @@ from app.models_audit import AuditLog, new_id
 from app.soc_config import get_soc_settings
 
 GENESIS_HASH = "0" * 64
+_ANCHOR_KIND = "coderoute_audit_legacy_anchor_v2"
 _ADVISORY_LOCK_ID = 1129268293
 
 
@@ -48,13 +43,7 @@ def _canonical_payload(entry: AuditLog, *, seq: int, prev_hash: str) -> bytes:
         "details": entry.details,
         "created_at": _dt(entry.created_at),
     }
-    return json.dumps(
-        payload,
-        sort_keys=True,
-        ensure_ascii=False,
-        separators=(",", ":"),
-        default=str,
-    ).encode("utf-8")
+    return json.dumps(payload, sort_keys=True, ensure_ascii=False, separators=(",", ":"), default=str).encode("utf-8")
 
 
 def _compute_hmac(entry: AuditLog, *, seq: int, prev_hash: str, key: str) -> str:
@@ -66,6 +55,7 @@ def _compute_hmac(entry: AuditLog, *, seq: int, prev_hash: str, key: str) -> str
 
 
 def _legacy_digest(entries: list[AuditLog]) -> str:
+    """Empreinte exacte de tout l'historique pré-P11, y compris ancien chaînage."""
     digest = hashlib.sha256()
     ordered = sorted(entries, key=lambda item: (_dt(item.created_at) or "", item.id or ""))
     for item in ordered:
@@ -77,16 +67,11 @@ def _legacy_digest(entries: list[AuditLog]) -> str:
             "entity_id": item.entity_id,
             "details": item.details,
             "created_at": _dt(item.created_at),
+            "seq": item.seq,
+            "prev_hash": item.prev_hash,
+            "entry_hash": item.entry_hash,
         }
-        digest.update(
-            json.dumps(
-                payload,
-                sort_keys=True,
-                ensure_ascii=False,
-                separators=(",", ":"),
-                default=str,
-            ).encode("utf-8")
-        )
+        digest.update(json.dumps(payload, sort_keys=True, ensure_ascii=False, separators=(",", ":"), default=str).encode("utf-8"))
         digest.update(b"\n")
     return digest.hexdigest()
 
@@ -94,10 +79,7 @@ def _legacy_digest(entries: list[AuditLog]) -> str:
 def _lock_chain(db: Session) -> None:
     connection = db.connection()
     if connection.dialect.name == "postgresql":
-        connection.execute(
-            text("SELECT pg_advisory_xact_lock(:lock_id)"),
-            {"lock_id": _ADVISORY_LOCK_ID},
-        )
+        connection.execute(text("SELECT pg_advisory_xact_lock(:lock_id)"), {"lock_id": _ADVISORY_LOCK_ID})
 
 
 def _chain_head(db: Session) -> tuple[int, str]:
@@ -112,9 +94,16 @@ def _chain_head(db: Session) -> tuple[int, str]:
     return int(row.seq) + 1, str(row.entry_hash)
 
 
+def _p11_anchor(db: Session) -> AuditLog | None:
+    rows = list(db.scalars(select(AuditLog).where(AuditLog.action == "audit.chain_anchor")).all())
+    for item in rows:
+        if isinstance(item.details, dict) and item.details.get("kind") == _ANCHOR_KIND:
+            return item
+    return None
+
+
 @event.listens_for(Session, "before_flush")
 def _chain_new_audit_rows(db: Session, _flush_context, _instances) -> None:
-    """Chaîne automatiquement tout AuditLog ORM non encore signé."""
     settings = get_soc_settings()
     if not settings.audit_chain_enabled:
         return
@@ -153,39 +142,43 @@ def append_audit(
     entity_id: str | None = None,
     details: dict | None = None,
 ) -> AuditLog:
-    """Compatibilité : crée un AuditLog ; le hook before_flush signe la ligne."""
-    entry = AuditLog(
-        actor_id=actor_id,
-        action=action,
-        entity=entity,
-        entity_id=entity_id,
-        details=details,
-    )
+    entry = AuditLog(actor_id=actor_id, action=action, entity=entity, entity_id=entity_id, details=details)
     db.add(entry)
     db.flush()
     return entry
 
 
 def ensure_audit_chain_anchor(db: Session) -> dict:
-    """Fige une empreinte des anciennes lignes non chaînées avant trafic P11."""
+    """Crée l'ancre P11 même si une ancienne chaîne SHA existe déjà."""
     settings = get_soc_settings()
     if not settings.audit_chain_enabled:
         return {"enabled": False, "created": False}
 
-    existing = db.scalar(select(AuditLog.id).where(AuditLog.seq.is_not(None)).limit(1))
-    if existing:
-        return {"enabled": True, "created": False}
+    existing_anchor = _p11_anchor(db)
+    if existing_anchor:
+        return {"enabled": True, "created": False, "anchor_id": existing_anchor.id}
 
-    legacy = list(db.scalars(select(AuditLog).where(AuditLog.seq.is_(None))).all())
+    legacy = list(db.scalars(select(AuditLog)).all())
+    legacy_max_seq = max((int(item.seq or 0) for item in legacy), default=0)
+    legacy_head = next(
+        (
+            item.entry_hash
+            for item in sorted(legacy, key=lambda row: int(row.seq or 0), reverse=True)
+            if item.seq is not None and item.entry_hash
+        ),
+        GENESIS_HASH,
+    )
     anchor = AuditLog(
         actor_id=None,
         action="audit.chain_anchor",
         entity="audit",
         entity_id=None,
         details={
-            "kind": "coderoute_audit_legacy_anchor_v1",
+            "kind": _ANCHOR_KIND,
             "legacy_count": len(legacy),
             "legacy_sha256": _legacy_digest(legacy),
+            "legacy_max_seq": legacy_max_seq,
+            "legacy_head_hash": legacy_head,
             "activated_at": datetime.now(UTC).isoformat(),
         },
     )
@@ -196,6 +189,7 @@ def ensure_audit_chain_anchor(db: Session) -> dict:
         "created": True,
         "legacy_count": len(legacy),
         "anchor_id": anchor.id,
+        "anchor_seq": anchor.seq,
     }
 
 
@@ -207,25 +201,39 @@ def verify_audit_chain(db: Session) -> dict:
     if not key:
         return {"enabled": True, "valid": False, "reason": "missing_key"}
 
-    entries = list(
+    anchor = _p11_anchor(db)
+    if not anchor or anchor.seq is None or not isinstance(anchor.details, dict):
+        return {"enabled": True, "valid": False, "reason": "missing_p11_anchor"}
+
+    anchor_seq = int(anchor.seq)
+    legacy = list(
         db.scalars(
-            select(AuditLog)
-            .where(AuditLog.seq.is_not(None))
-            .order_by(AuditLog.seq.asc())
+            select(AuditLog).where(
+                (AuditLog.seq.is_(None)) | (AuditLog.seq < anchor_seq)
+            )
         ).all()
     )
-    if not entries:
+    expected_count = int(anchor.details.get("legacy_count", -1))
+    expected_digest = str(anchor.details.get("legacy_sha256", ""))
+    if expected_count != len(legacy) or not expected_digest or not hmac.compare_digest(expected_digest, _legacy_digest(legacy)):
         return {
             "enabled": True,
             "valid": False,
-            "total_entries": 0,
+            "reason": "legacy_anchor_mismatch",
+            "legacy_entries": len(legacy),
             "broken_at_seq": None,
-            "reason": "missing_anchor",
         }
 
-    expected_seq = 1
-    expected_prev = GENESIS_HASH
-    for item in entries:
+    entries = list(
+        db.scalars(
+            select(AuditLog)
+            .where(AuditLog.seq >= anchor_seq)
+            .order_by(AuditLog.seq.asc())
+        ).all()
+    )
+    expected_seq = anchor_seq
+    expected_prev = anchor.prev_hash or GENESIS_HASH
+    for index, item in enumerate(entries):
         seq = int(item.seq or 0)
         if seq != expected_seq:
             return {
@@ -243,12 +251,7 @@ def verify_audit_chain(db: Session) -> dict:
                 "broken_at_seq": seq,
                 "reason": "prev_hash_mismatch",
             }
-        recomputed = _compute_hmac(
-            item,
-            seq=seq,
-            prev_hash=item.prev_hash or GENESIS_HASH,
-            key=key,
-        )
+        recomputed = _compute_hmac(item, seq=seq, prev_hash=item.prev_hash or GENESIS_HASH, key=key)
         if not item.entry_hash or not hmac.compare_digest(item.entry_hash, recomputed):
             return {
                 "enabled": True,
@@ -260,34 +263,12 @@ def verify_audit_chain(db: Session) -> dict:
         expected_prev = item.entry_hash
         expected_seq += 1
 
-    anchor = next((item for item in entries if item.action == "audit.chain_anchor"), None)
-    legacy = list(db.scalars(select(AuditLog).where(AuditLog.seq.is_(None))).all())
-    if not anchor or not isinstance(anchor.details, dict):
-        return {
-            "enabled": True,
-            "valid": False,
-            "total_entries": len(entries),
-            "broken_at_seq": None,
-            "reason": "legacy_anchor_missing",
-        }
-    expected_count = int(anchor.details.get("legacy_count", -1))
-    expected_digest = str(anchor.details.get("legacy_sha256", ""))
-    actual_digest = _legacy_digest(legacy)
-    if expected_count != len(legacy) or not expected_digest or not hmac.compare_digest(expected_digest, actual_digest):
-        return {
-            "enabled": True,
-            "valid": False,
-            "total_entries": len(entries),
-            "legacy_entries": len(legacy),
-            "broken_at_seq": None,
-            "reason": "legacy_anchor_mismatch",
-        }
-
     return {
         "enabled": True,
         "valid": True,
         "total_entries": len(entries),
         "legacy_entries": len(legacy),
+        "anchor_seq": anchor_seq,
         "head_seq": int(entries[-1].seq or 0),
         "head_hash": entries[-1].entry_hash,
         "broken_at_seq": None,
