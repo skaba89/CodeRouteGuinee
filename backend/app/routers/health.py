@@ -9,7 +9,15 @@ from app.distributed import check_shared_state, instance_id
 router = APIRouter(tags=["health"])
 settings = get_settings()
 
-CRITICAL_TABLES = {"users", "candidates", "centers", "exam_sessions", "bookings", "payments", "audit_logs"}
+CRITICAL_TABLES = {
+    "users",
+    "candidates",
+    "centers",
+    "exam_sessions",
+    "bookings",
+    "payments",
+    "audit_logs",
+}
 
 
 def _build_configuration_check(current_settings) -> dict:
@@ -17,20 +25,26 @@ def _build_configuration_check(current_settings) -> dict:
     is_production = environment == "production"
     errors: list[str] = []
     warnings: list[str] = []
-    placeholders = {
+
+    # Placeholders à rejeter en production ; en test/dev ils restent des warnings.
+    _PLACEHOLDERS = {
         "change-me-in-production", "replace-with-a-long-random-production-secret",
-        "CHANGE_ME_secret_key_must_be_set_in_env", "CHANGE_ME_database_url_must_be_set_in_env",
+        "CHANGE_ME_secret_key_must_be_set_in_env",
+        "CHANGE_ME_database_url_must_be_set_in_env",
         "", "changeme", "your-secret",
     }
 
-    if current_settings.secret_key in placeholders or current_settings.secret_key.startswith("CHANGE_ME"):
+    if current_settings.secret_key in _PLACEHOLDERS or current_settings.secret_key.startswith("CHANGE_ME"):
         (errors if is_production else warnings).append("SECRET_KEY must be replaced (placeholder detected)")
     elif len(current_settings.secret_key) < 32:
         warnings.append("SECRET_KEY should contain at least 32 characters")
-    if current_settings.database_url in placeholders or current_settings.database_url.startswith("CHANGE_ME"):
+
+    if current_settings.database_url in _PLACEHOLDERS or current_settings.database_url.startswith("CHANGE_ME"):
         (errors if is_production else warnings).append("DATABASE_URL must be set")
+
     if current_settings.database_url.startswith("sqlite"):
         (errors if is_production else warnings).append("DATABASE_URL should use PostgreSQL outside local development")
+
     if current_settings.auto_create_tables:
         (errors if is_production else warnings).append("AUTO_CREATE_TABLES must be false outside local development")
 
@@ -52,8 +66,12 @@ def _build_configuration_check(current_settings) -> dict:
 
     if is_production and current_settings.enable_api_docs:
         errors.append("ENABLE_API_DOCS must be false in production")
+
     if is_production and not current_settings.admin_registration_token:
         errors.append("ADMIN_REGISTRATION_TOKEN is required in production")
+
+    if is_production and not current_settings.bootstrap_admin_email:
+        warnings.append("BOOTSTRAP_ADMIN_EMAIL is recommended for controlled first admin creation")
 
     ha_mode = bool(getattr(current_settings, "ha_mode", False))
     redis_required = bool(getattr(current_settings, "redis_required", False))
@@ -66,8 +84,9 @@ def _build_configuration_check(current_settings) -> dict:
     if ha_mode and expected_instances < 2:
         errors.append("EXPECTED_API_INSTANCES must be >= 2 when HA_MODE is enabled")
 
+    check_status = "error" if errors else "warning" if warnings else "ok"
     return {
-        "status": "error" if errors else "warning" if warnings else "ok",
+        "status": check_status,
         "environment": environment,
         "errors": errors,
         "warnings": warnings,
@@ -91,8 +110,15 @@ def _runtime_metadata() -> dict:
 @router.get("/health")
 @router.get("/health/live")
 def health() -> dict:
+    """Liveness pure : ne dépend pas de PostgreSQL ni Redis/Valkey."""
     from app.api import API_VERSION
-    return {"status": "ok", "service": settings.project_name, "version": API_VERSION, "environment": settings.environment, "runtime": _runtime_metadata()}
+    return {
+        "status": "ok",
+        "service": settings.project_name,
+        "version": API_VERSION,
+        "environment": settings.environment,
+        "runtime": _runtime_metadata(),
+    }
 
 
 @router.get("/health/readiness")
@@ -104,6 +130,7 @@ def readiness(response: Response, db: Session = Depends(get_db)) -> dict:
         "migrations": {"status": "unknown"},
         "shared_state": check_shared_state(),
     }
+
     try:
         db.execute(text("SELECT 1"))
         checks["database"] = {"status": "ok"}
@@ -114,12 +141,20 @@ def readiness(response: Response, db: Session = Depends(get_db)) -> dict:
         inspector = inspect(db.bind)
         tables = set(inspector.get_table_names())
         missing_tables = sorted(CRITICAL_TABLES - tables)
-        checks["schema"] = {"status": "ok" if not missing_tables else "error", "critical_tables": sorted(CRITICAL_TABLES), "missing_tables": missing_tables}
+        checks["schema"] = {
+            "status": "ok" if not missing_tables else "error",
+            "critical_tables": sorted(CRITICAL_TABLES),
+            "missing_tables": missing_tables,
+        }
         if "alembic_version" in tables:
             version = db.execute(text("SELECT version_num FROM alembic_version")).scalar_one_or_none()
             checks["migrations"] = {"status": "ok" if version else "warning", "version": version}
         else:
-            checks["migrations"] = {"status": "warning" if settings.auto_create_tables else "error", "version": None, "detail": "alembic_version table not found"}
+            checks["migrations"] = {
+                "status": "warning" if settings.auto_create_tables else "error",
+                "version": None,
+                "detail": "alembic_version table not found",
+            }
     except Exception as exc:
         checks["schema"] = {"status": "error", "detail": exc.__class__.__name__}
         checks["migrations"] = {"status": "error", "detail": exc.__class__.__name__}
@@ -128,4 +163,11 @@ def readiness(response: Response, db: Session = Depends(get_db)) -> dict:
     overall = "not_ready" if blocking_checks else "ready"
     if blocking_checks:
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
-    return {"status": overall, "service": settings.project_name, "runtime": _runtime_metadata(), "blocking_checks": blocking_checks, "checks": checks}
+
+    return {
+        "status": overall,
+        "service": settings.project_name,
+        "runtime": _runtime_metadata(),
+        "blocking_checks": blocking_checks,
+        "checks": checks,
+    }
