@@ -33,8 +33,6 @@ if [ -z "${DATABASE_URL:-}" ] || echo "${DATABASE_URL}" | grep -q "CHANGE_ME"; t
 fi
 
 # ── 1. Migrations Alembic ─────────────────────────────────────────
-# En production P10, Render exécute ./scripts/predeploy.sh une seule fois
-# avant la mise en service des nouvelles instances.
 if [ "$RUN_MIGRATIONS_ON_STARTUP_VALUE" = "true" ]; then
     echo "── Migrations Alembic au startup (mode explicite/dev) ──"
     ./scripts/predeploy.sh
@@ -123,6 +121,18 @@ else
     echo "✅ Seeds au startup désactivés — aucune course entre instances HA."
 fi
 
-# ── 4. Démarrage Gunicorn ─────────────────────────────────────────
+# ── 4. Prometheus multiprocess ─────────────────────────────────────
+# Le chemin est volontairement borné/hardcodé pour éviter tout rm -rf sur
+# une valeur d'environnement mal configurée. Il est local à chaque instance.
+if [ "${METRICS_ENABLED:-false}" = "true" ]; then
+    export PROMETHEUS_MULTIPROC_DIR="/tmp/coderoute-prometheus"
+    rm -rf -- "$PROMETHEUS_MULTIPROC_DIR"
+    mkdir -p "$PROMETHEUS_MULTIPROC_DIR"
+    chmod 0700 "$PROMETHEUS_MULTIPROC_DIR"
+else
+    unset PROMETHEUS_MULTIPROC_DIR || true
+fi
+
+# ── 5. Démarrage Gunicorn ─────────────────────────────────────────
 echo "── Démarrage Gunicorn ──"
 exec gunicorn app.main:app -c gunicorn.conf.py
