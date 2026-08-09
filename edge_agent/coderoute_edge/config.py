@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 from dataclasses import dataclass
 from pathlib import Path
@@ -7,6 +8,16 @@ from pathlib import Path
 
 def _truthy(value: str | None) -> bool:
     return (value or "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _installed_version(release_dir: Path) -> str | None:
+    state = release_dir / "current" / ".release-state.json"
+    try:
+        data = json.loads(state.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    value = str(data.get("software_version") or "").strip() if isinstance(data, dict) else ""
+    return value or None
 
 
 @dataclass(frozen=True)
@@ -56,7 +67,8 @@ class EdgeAgentConfig:
             ).split(",")
             if origin.strip()
         )
-        version = os.environ.get("CODEROUTE_EDGE_SOFTWARE_VERSION", "edge-agent-0.4.0").strip()
+        explicit_version = os.environ.get("CODEROUTE_EDGE_SOFTWARE_VERSION", "").strip()
+        version = explicit_version or _installed_version(release_dir) or "edge-agent-0.4.0"
         max_media = int(os.environ.get("CODEROUTE_EDGE_MAX_MEDIA_BYTES", str(50 * 1024 * 1024)))
         max_release = int(os.environ.get("CODEROUTE_EDGE_MAX_RELEASE_BYTES", str(512 * 1024 * 1024)))
         bind_host = os.environ.get("CODEROUTE_EDGE_BIND_HOST", "0.0.0.0").strip()
