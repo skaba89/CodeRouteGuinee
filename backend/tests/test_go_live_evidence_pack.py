@@ -65,6 +65,7 @@ def test_evaluate_snapshot_passes_only_automatable_checks_and_never_claims_homol
                 "last_evidence": {
                     "backup_uploaded": evidence_time,
                     "restore_drill_passed": evidence_time,
+                    "pitr_drill_passed": evidence_time,
                     "ha_failover_probe_passed": evidence_time,
                 }
             }
@@ -133,6 +134,7 @@ def test_stale_reliability_evidence_blocks_readiness():
                 "last_evidence": {
                     "backup_uploaded": "2026-08-01T00:00:00+00:00",
                     "restore_drill_passed": "2026-01-01T00:00:00+00:00",
+                    "pitr_drill_passed": "2026-01-01T00:00:00+00:00",
                     "ha_failover_probe_passed": "2026-01-01T00:00:00+00:00",
                 }
             }
@@ -153,4 +155,5 @@ def test_stale_reliability_evidence_blocks_readiness():
     codes = {item["code"] for item in result["checks"] if not item["passed"]}
     assert "P10_BACKUP_FRESH" in codes
     assert "P10_RESTORE_DRILL_FRESH" in codes
+    assert "P10_PITR_FRESH" in codes
     assert "P10_FAILOVER_FRESH" in codes
