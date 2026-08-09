@@ -139,9 +139,10 @@ def _copy_into_root_workspace(staged: dict[str, Any], staging_root: Path, releas
     return root_state
 
 
-def _handoff_receipt(staging_root: Path, receipt: dict[str, Any]) -> None:
+def _handoff_receipt(staging_root: Path, release_root: Path, receipt: dict[str, Any]) -> None:
     _json_atomic(staging_root / "install-receipt.json", receipt)
     (staging_root / "staged.json").unlink(missing_ok=True)
+    (release_root / "staged.json").unlink(missing_ok=True)
 
 
 def _prepare_offline_runtime(target_root: Path, runtime_python: str) -> dict[str, Any]:
@@ -243,7 +244,7 @@ def apply_system_update_transaction(
             error=f"apply/runtime: {exc}",
             rollback=rollback_receipt,
         )
-        _handoff_receipt(staging_root, failed)
+        _handoff_receipt(staging_root, config.release_dir, failed)
         return {
             "ok": False,
             "phase": "runtime" if rollback_receipt else "critical",
@@ -261,7 +262,7 @@ def apply_system_update_transaction(
             raise RuntimeError(
                 f"Version démarrée {running_version or 'inconnue'} différente de la version attendue {expected_version}"
             )
-        _handoff_receipt(staging_root, installed)
+        _handoff_receipt(staging_root, config.release_dir, installed)
         return {
             "ok": True,
             "phase": "confirmed",
@@ -292,7 +293,7 @@ def apply_system_update_transaction(
             error += f"; rollback: {rollback_error}"
             rollback_receipt = None
         failed = _failed_receipt(staging_root, staged, error=error, rollback=rollback_receipt)
-        _handoff_receipt(staging_root, failed)
+        _handoff_receipt(staging_root, config.release_dir, failed)
         return {
             "ok": False,
             "phase": "rolled_back" if rollback_receipt else "critical",
