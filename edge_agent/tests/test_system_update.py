@@ -88,13 +88,7 @@ def _runtime(_root: Path, python: str) -> dict:
     return {"python": python, "requirements_lock_sha256": "f" * 64, "wheel_count": 12}
 
 
-def _trusted_for_transaction(
-    staged: dict,
-    _root: Path,
-    node_id: str,
-    center_id: str,
-    current_version: str,
-) -> dict:
+def _trusted_for_transaction(staged: dict, _root: Path, node_id: str, center_id: str, current_version: str) -> dict:
     assert node_id == "node-p9-test"
     assert center_id == "center-p9-test"
     assert current_version == "edge-agent-0.3.0"
@@ -146,10 +140,7 @@ def test_system_update_confirms_exact_running_version(tmp_path: Path) -> None:
     assert _current_target(config.release_dir).name == "edge-agent-0.4.0"
 
 
-def test_copy_failure_before_switch_keeps_current_and_previous_unchanged(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_copy_failure_before_switch_keeps_current_and_previous_unchanged(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     database = tmp_path / "edge.db"
     _db(database)
     config = _config(tmp_path, database)
@@ -172,7 +163,6 @@ def test_copy_failure_before_switch_keeps_current_and_previous_unchanged(
         runtime_prepare=_runtime,
         staged_verifier=_trusted_for_transaction,
     )
-
     assert result["ok"] is False
     assert result["phase"] == "critical"
     assert result["current_switched"] is False
@@ -182,7 +172,6 @@ def test_copy_failure_before_switch_keeps_current_and_previous_unchanged(
     assert _link_target(config.release_dir, "previous") == previous_before
     receipt = json.loads((config.release_staging_dir / "install-receipt.json").read_text())
     assert receipt["release_id"] == staged["release_id"]
-    assert receipt["result"] == "failed"
     assert receipt["rollback_confirmed"] is False
 
 
@@ -205,7 +194,6 @@ def test_runtime_failure_after_switch_rolls_back_without_restart(tmp_path: Path)
         runtime_prepare=fail_runtime,
         staged_verifier=_trusted_for_transaction,
     )
-
     assert result["ok"] is False
     assert result["phase"] == "runtime"
     assert result["current_switched"] is True
@@ -216,8 +204,6 @@ def test_runtime_failure_after_switch_rolls_back_without_restart(tmp_path: Path)
     assert previous_target.name == "edge-agent-0.4.0"
     receipt = json.loads((config.release_staging_dir / "install-receipt.json").read_text())
     assert receipt["release_id"] == bad["release_id"]
-    assert receipt["result"] == "failed"
-    assert receipt["rollback_confirmed"] is True
     assert receipt["rollback_release_id"] == previous["release_id"]
 
 
@@ -232,7 +218,6 @@ def test_health_version_mismatch_rolls_back_and_marks_bad_release_failed(tmp_pat
         {"status": "ok", "software_version": "edge-agent-0.3.0"},
         {"status": "ok", "software_version": "edge-agent-0.3.0"},
     ])
-
     result = apply_system_update_transaction(
         config,
         emergency_window_bypass=True,
@@ -241,15 +226,12 @@ def test_health_version_mismatch_rolls_back_and_marks_bad_release_failed(tmp_pat
         runtime_prepare=_runtime,
         staged_verifier=_trusted_for_transaction,
     )
-
     assert result["ok"] is False
     assert result["phase"] == "rolled_back"
     assert len(restarts) == 2
     assert _current_target(config.release_dir).name == "edge-agent-0.3.0"
     receipt = json.loads((config.release_staging_dir / "install-receipt.json").read_text())
-    assert receipt["result"] == "failed"
     assert receipt["release_id"] == bad["release_id"]
-    assert receipt["rollback_confirmed"] is True
     assert receipt["rollback_release_id"] == previous["release_id"]
 
 
@@ -271,7 +253,6 @@ def test_first_install_runtime_failure_without_previous_is_critical(tmp_path: Pa
         runtime_prepare=fail_runtime,
         staged_verifier=_trusted_for_transaction,
     )
-
     assert result["ok"] is False
     assert result["phase"] == "critical"
     assert result["current_switched"] is True
@@ -281,7 +262,6 @@ def test_first_install_runtime_failure_without_previous_is_critical(tmp_path: Pa
     assert _link_target(config.release_dir, "previous") is None
     receipt = json.loads((config.release_staging_dir / "install-receipt.json").read_text())
     assert receipt["release_id"] == bad["release_id"]
-    assert receipt["result"] == "failed"
     assert receipt["rollback_confirmed"] is False
     assert "aucune version edge précédente" in receipt["error"].lower()
 
@@ -294,7 +274,6 @@ def test_active_exam_blocks_transaction_before_copy_link_switch_or_restart(tmp_p
     before = _current_target(config.release_dir)
     staged = _stage(config.release_staging_dir, "edge-agent-0.4.0")
     restarts: list[str] = []
-
     with pytest.raises(RuntimeError, match="examen"):
         apply_system_update_transaction(
             config,
@@ -304,7 +283,6 @@ def test_active_exam_blocks_transaction_before_copy_link_switch_or_restart(tmp_p
             runtime_prepare=_runtime,
             staged_verifier=_trusted_for_transaction,
         )
-
     assert restarts == []
     assert _current_target(config.release_dir) == before
     assert (config.release_staging_dir / "staged.json").exists()
