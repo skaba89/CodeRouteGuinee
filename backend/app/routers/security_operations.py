@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from fastapi import APIRouter, Depends
 from sqlalchemy import func, select
@@ -13,7 +14,7 @@ from app.models_audit import AuditLog
 from app.models_center_incident import CenterIncident
 from app.models_device_session import DeviceSession
 from app.models_user import User
-from app.soc_config import get_soc_settings
+from app.soc_config import SOCSettings, get_soc_settings
 from app.soc_metrics import record_audit_chain_check
 
 router = APIRouter(prefix="/operations/security", tags=["security-operations"])
@@ -29,6 +30,70 @@ def _count_action(db: Session, action: str, since: datetime) -> int:
         )
         or 0
     )
+
+
+def build_security_go_live_controls(
+    soc: SOCSettings,
+    audit: dict[str, Any],
+    alerts: list[dict],
+) -> dict:
+    """Return fail-closed P11 go-live controls without mutating infrastructure.
+
+    These checks intentionally require the operational flags to be enabled only
+    after the external WAF/SIEM/OTLP components have been proven by operators.
+    A green result is therefore a runtime configuration gate, not proof that the
+    external providers actually delivered the expected service.
+    """
+    controls = [
+        {
+            "code": "soc_enabled",
+            "passed": soc.enabled,
+            "detail": "SOC_ENABLED=true" if soc.enabled else "SOC encore dormant",
+        },
+        {
+            "code": "audit_hmac_enabled",
+            "passed": soc.audit_chain_enabled,
+            "detail": "chaîne HMAC active" if soc.audit_chain_enabled else "AUDIT_CHAIN_ENABLED=false",
+        },
+        {
+            "code": "audit_chain_valid",
+            "passed": bool(soc.audit_chain_enabled and audit.get("valid") is True),
+            "detail": "chaîne audit valide" if audit.get("valid") is True else "chaîne audit non validée",
+        },
+        {
+            "code": "otel_enabled",
+            "passed": bool(soc.otel_traces_enabled and soc.otel_endpoint),
+            "detail": "OTLP actif avec endpoint configuré" if soc.otel_traces_enabled and soc.otel_endpoint else "OTLP non activé/configuré",
+        },
+        {
+            "code": "waf_enforced",
+            "passed": bool(soc.waf_required and soc.waf_provider),
+            "detail": f"WAF requis via {soc.waf_provider}" if soc.waf_required and soc.waf_provider else "WAF_REQUIRED/provider non finalisé",
+        },
+        {
+            "code": "siem_enforced",
+            "passed": bool(soc.siem_required),
+            "detail": "SIEM_REQUIRED=true" if soc.siem_required else "SIEM_REQUIRED=false",
+        },
+        {
+            "code": "no_active_security_alert",
+            "passed": not alerts,
+            "detail": "aucun signal sécurité actif" if not alerts else f"{len(alerts)} signal(aux) sécurité actif(s)",
+        },
+    ]
+    blockers = [item["code"] for item in controls if not item["passed"]]
+    return {
+        "ready": not blockers,
+        "controls": controls,
+        "blockers": blockers,
+        "external_evidence_still_required": [
+            "preuve d'ingestion SIEM/log drain et rétention/RBAC",
+            "preuve collector OTLP privé et absence de PII dans les traces",
+            "preuve WAF/DDoS et origine non contournable",
+            "tests staging confidentialité/alerting/charge/chaos",
+            "sign-off technique, exploitation, sécurité et autorité métier",
+        ],
+    }
 
 
 @router.get("/status")
@@ -77,12 +142,14 @@ def security_status(
     critical = any(item["severity"] == "critical" for item in alerts)
     warning = any(item["severity"] == "warning" for item in alerts)
     status_value = "disabled" if not soc.enabled else "critical" if critical else "warning" if warning else "ok"
+    go_live = build_security_go_live_controls(soc, audit, alerts)
 
     return {
         "status": status_value,
         "generated_at": now.isoformat(),
         "soc_policy": soc.safe_policy(),
         "audit_chain": audit,
+        "go_live": go_live,
         "signals": {
             "login_failed_15m": login_failed_15m,
             "login_blocked_15m": login_blocked_15m,
