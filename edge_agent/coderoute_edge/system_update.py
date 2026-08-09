@@ -13,11 +13,13 @@ import httpx
 
 from .config import EdgeAgentConfig
 from .maintenance import assert_safe_maintenance
+from .release_trust import verify_staged_release_for_root
 from .updater import apply_verified_release, rollback_to_previous
 
 RestartService = Callable[[str], None]
 HealthProbe = Callable[[str, int, Path | None], dict[str, Any]]
 RuntimePrepare = Callable[[Path, str], dict[str, Any]]
+StagedVerifier = Callable[[dict[str, Any], Path], dict[str, Any]]
 
 
 def _json_atomic(path: Path, payload: dict[str, Any]) -> None:
@@ -68,6 +70,18 @@ def _read_staged(release_root: Path) -> dict[str, Any]:
     if not isinstance(data, dict) or data.get("verified") is not True:
         raise RuntimeError("État de staging Edge invalide")
     return data
+
+
+def _verify_staged_with_local_trust(staged: dict[str, Any], release_root: Path) -> dict[str, Any]:
+    trust_store = Path(os.environ.get(
+        "CODEROUTE_EDGE_RELEASE_TRUST_PATH",
+        "/etc/coderoute-edge/release-trust.json",
+    ))
+    return verify_staged_release_for_root(
+        staged,
+        release_root=release_root,
+        trust_store_path=trust_store,
+    )
 
 
 def _failed_receipt(
@@ -168,13 +182,13 @@ def apply_system_update_transaction(
     restart_service: RestartService = _restart_systemd,
     health_probe: HealthProbe = _probe_health,
     runtime_prepare: RuntimePrepare = _prepare_offline_runtime,
+    staged_verifier: StagedVerifier = _verify_staged_with_local_trust,
 ) -> dict[str, Any]:
     """Applique une release vérifiée comme transaction système locale.
 
-    Ordre P9 : fenêtre -> quiescence -> re-hash/extract P8 -> runtime offline
-    hash-locké -> restart -> health/version. Un échec après bascule déclenche un
-    rollback local puis un second health-check. Le reçu final reste `failed`
-    pour la release fautive afin que la DNTT auto-pause le rollout.
+    Ordre P9 : fenêtre -> quiescence -> signature root-owned -> re-hash/extract
+    P8 -> runtime offline hash-locké -> restart -> health/version. Un échec
+    après bascule déclenche un rollback local puis un second health-check.
     """
     state = assert_safe_maintenance(
         config.database_path,
@@ -183,7 +197,8 @@ def apply_system_update_transaction(
         bypass_window=emergency_window_bypass,
     )
     staged = _read_staged(config.release_dir)
-    expected_version = str(staged.get("software_version") or "")
+    root_verification = staged_verifier(staged, config.release_dir)
+    expected_version = str(root_verification.get("software_version") or staged.get("software_version") or "")
     if not expected_version:
         raise RuntimeError("Version staged absente")
 
@@ -208,6 +223,7 @@ def apply_system_update_transaction(
             "phase": "runtime" if rollback_receipt else "critical",
             "receipt": failed,
             "rollback": rollback_receipt,
+            "root_verification": root_verification,
             "quiescent": state.quiescent,
         }
 
@@ -223,6 +239,7 @@ def apply_system_update_transaction(
             "ok": True,
             "phase": "confirmed",
             "receipt": installed,
+            "root_verification": root_verification,
             "runtime": runtime,
             "health": health,
             "quiescent": state.quiescent,
@@ -253,5 +270,6 @@ def apply_system_update_transaction(
             "phase": "rolled_back" if rollback_receipt else "critical",
             "receipt": failed,
             "rollback": rollback_receipt,
+            "root_verification": root_verification,
             "quiescent": state.quiescent,
         }
