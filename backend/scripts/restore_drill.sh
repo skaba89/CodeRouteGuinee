@@ -22,10 +22,29 @@ normalize_url() {
   local value="$1"
   echo "${value/postgresql+psycopg:/postgresql:}"
 }
+
+db_identity() {
+  python3 - "$1" <<'PY'
+import sys
+from urllib.parse import unquote, urlsplit
+raw = sys.argv[1].replace('postgresql+psycopg://', 'postgresql://', 1)
+parsed = urlsplit(raw)
+if parsed.scheme != 'postgresql' or not parsed.hostname:
+    raise SystemExit('URL PostgreSQL invalide')
+host = parsed.hostname.lower().rstrip('.')
+port = parsed.port or 5432
+database = unquote(parsed.path.lstrip('/'))
+if not database:
+    raise SystemExit('nom de base PostgreSQL absent')
+print(f'{host}:{port}/{database}')
+PY
+}
+
 RESTORE_PG_URL="$(normalize_url "$RESTORE_URL")"
+RESTORE_ID="$(db_identity "$RESTORE_URL")"
 
 for protected in "${DATABASE_URL:-}" "${ALEMBIC_DATABASE_URL:-}" "${BACKUP_DATABASE_URL:-}"; do
-  if [ -n "$protected" ] && [ "$(normalize_url "$protected")" = "$RESTORE_PG_URL" ]; then
+  if [ -n "$protected" ] && [ "$(db_identity "$protected")" = "$RESTORE_ID" ]; then
     echo "ERROR: refus de restaurer dans une base source/production protégée." >&2
     exit 4
   fi
