@@ -8,11 +8,11 @@ from __future__ import annotations
 import logging
 import os
 import time
-from urllib.parse import urlparse
 
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.soc_config import get_soc_settings
+from app.soc_metrics import record_security_event
 from app.soc_privacy import pseudonymize_ip
 
 log = logging.getLogger("coderoute.soc")
@@ -50,7 +50,7 @@ def _trace_endpoint(base: str) -> str:
 
 
 def init_soc_telemetry() -> bool:
-    """Initialise un tracer OTLP. Retourne False si désactivé/indisponible."""
+    """Initialise un tracer OTLP. Une panne exporter ne bloque jamais l'API."""
     global _TRACER
     settings = get_soc_settings()
     if not settings.enabled or not settings.otel_traces_enabled:
@@ -79,12 +79,14 @@ def init_soc_telemetry() -> bool:
             headers=_parse_headers(settings.otel_headers),
             timeout=5.0,
         )
-        provider.add_span_processor(BatchSpanProcessor(exporter, max_queue_size=2048, max_export_batch_size=256))
+        provider.add_span_processor(
+            BatchSpanProcessor(exporter, max_queue_size=2048, max_export_batch_size=256)
+        )
         trace.set_tracer_provider(provider)
         _TRACER = trace.get_tracer("coderoute.soc", "1.0")
         log.info("soc_otel_enabled", extra={"otel_service": settings.otel_service_name})
         return True
-    except Exception as exc:  # exporter never blocks startup
+    except Exception as exc:
         _TRACER = None
         log.warning("soc_otel_init_failed", extra={"error_type": exc.__class__.__name__})
         return False
@@ -118,21 +120,20 @@ class SOCRequestMiddleware(BaseHTTPMiddleware):
         started = time.perf_counter()
         status_code = 500
         tracer = _current_tracer()
-
-        if tracer is None:
-            span_cm = None
-        else:
-            span_cm = tracer.start_as_current_span(f"HTTP {method}")
+        span_cm = tracer.start_as_current_span(f"HTTP {method}") if tracer is not None else None
 
         def _finish_log(route: str, elapsed_ms: float) -> None:
             event = "http.request"
+            metric_kind: str | None = None
             level = logging.INFO
             if status_code in {401, 403}:
-                event, level = "security.access_denied", logging.WARNING
+                event, metric_kind, level = "security.access_denied", "access_denied", logging.WARNING
             elif status_code == 429:
-                event, level = "security.rate_limited", logging.WARNING
+                event, metric_kind, level = "security.rate_limited", "rate_limited", logging.WARNING
             elif status_code >= 500:
-                event, level = "security.server_error", logging.ERROR
+                event, metric_kind, level = "security.server_error", "server_error", logging.ERROR
+            if metric_kind:
+                record_security_event(metric_kind)
             log.log(
                 level,
                 event,
@@ -143,7 +144,7 @@ class SOCRequestMiddleware(BaseHTTPMiddleware):
                     "status": status_code,
                     "duration_ms": round(elapsed_ms, 1),
                     "client_ref": client_ref,
-                    "security_event": event.startswith("security."),
+                    "security_event": metric_kind is not None,
                 },
             )
 
