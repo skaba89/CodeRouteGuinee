@@ -16,6 +16,7 @@ services:
   - type: web
     name: coderoute-backend
     runtime: docker
+    autoDeployTrigger: checksPass
     dockerContext: backend
     dockerfilePath: backend/Dockerfile
     plan: starter
@@ -207,6 +208,7 @@ services:
   - type: cron
     name: coderoute-offsite-backup
     runtime: docker
+    autoDeployTrigger: checksPass
     dockerContext: backend
     dockerfilePath: backend/Dockerfile
     dockerCommand: "./scripts/run_offsite_backup.sh"
@@ -256,6 +258,7 @@ services:
   - type: web
     name: coderoute-frontend
     runtime: static
+    autoDeployTrigger: checksPass
     buildCommand: "cd frontend && npm ci && npm run build"
     staticPublishPath: frontend/dist
     pullRequestPreviewsEnabled: false
