@@ -155,6 +155,9 @@ class EdgeReleaseManager:
             tmp_path.unlink(missing_ok=True)
             raise
 
+        # P9 conserve la preuve signée complète pour que l'updater root puisse
+        # refaire sa propre vérification depuis un trust store qu'un daemon
+        # compromis ne peut pas modifier.
         state = {
             "release_id": release_id,
             "action": str(offer.get("action") or "install"),
@@ -163,7 +166,9 @@ class EdgeReleaseManager:
             "artifact_sha256": expected_sha,
             "artifact_size_bytes": expected_size,
             "artifact_path": str(final_path.resolve()),
+            "manifest": manifest,
             "manifest_hash": bundle.get("manifest_hash"),
+            "manifest_signature_b64": bundle.get("manifest_signature_b64"),
             "signing_key_id": bundle.get("signing_key_id"),
             "verified": True,
         }
