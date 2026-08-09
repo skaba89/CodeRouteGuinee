@@ -214,8 +214,9 @@ def test_runtime_failure_after_switch_rolls_back_without_restart(tmp_path: Path)
     assert result["current_switched"] is True
     assert restarts == []
     assert _current_target(config.release_dir).name == "edge-agent-0.3.0"
-    assert _link_target(config.release_dir, "previous") is not None
-    assert _link_target(config.release_dir, "previous").name == "edge-agent-0.4.0"  # type: ignore[union-attr]
+    previous_target = _link_target(config.release_dir, "previous")
+    assert previous_target is not None
+    assert previous_target.name == "edge-agent-0.4.0"
     receipt = json.loads((config.release_staging_dir / "install-receipt.json").read_text())
     assert receipt["release_id"] == bad["release_id"]
     assert receipt["result"] == "failed"
@@ -286,7 +287,7 @@ def test_first_install_runtime_failure_without_previous_is_critical(tmp_path: Pa
     assert receipt["release_id"] == bad["release_id"]
     assert receipt["result"] == "failed"
     assert receipt["rollback_confirmed"] is False
-    assert "rollback" in receipt["error"].lower()
+    assert "aucune version edge précédente" in receipt["error"].lower()
 
 
 def test_active_exam_blocks_transaction_before_copy_link_switch_or_restart(tmp_path: Path) -> None:
