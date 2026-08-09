@@ -14,7 +14,7 @@ export type ExamPolicyParameters = {
   duration_minutes: number;
   category_distribution: Record<string, number>;
   one_attempt_per_session: boolean;
-  retake_cooldown_hours: number;
+  retake_cooldown_hours?: number;
 };
 
 export type LegalReference = {
