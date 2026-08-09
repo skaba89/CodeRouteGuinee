@@ -46,7 +46,15 @@ async function bootstrapAdmin(page: Page) {
   });
 }
 
-test('DNTT admin sees P11 dormant SOC state without citizen identity', async ({ page }) => {
+const externalEvidence = [
+  'preuve SIEM',
+  'preuve OTLP',
+  'preuve WAF',
+  'tests staging',
+  'sign-off',
+];
+
+test('DNTT admin sees P11 dormant SOC and blocked national go-live without citizen identity', async ({ page }) => {
   await bootstrapAdmin(page);
   await page.route('**/api/v1/operations/security/status', async route => {
     await route.fulfill({
@@ -64,6 +72,20 @@ test('DNTT admin sees P11 dormant SOC state without citizen identity', async ({ 
           siem: { required: false },
         },
         audit_chain: { enabled: false, valid: false, reason: 'disabled' },
+        go_live: {
+          ready: false,
+          controls: [
+            { code: 'soc_enabled', passed: false, detail: 'SOC encore dormant' },
+            { code: 'audit_hmac_enabled', passed: false, detail: 'AUDIT_CHAIN_ENABLED=false' },
+            { code: 'audit_chain_valid', passed: false, detail: 'chaîne audit non validée' },
+            { code: 'otel_enabled', passed: false, detail: 'OTLP non activé/configuré' },
+            { code: 'waf_enforced', passed: false, detail: 'WAF_REQUIRED/provider non finalisé' },
+            { code: 'siem_enforced', passed: false, detail: 'SIEM_REQUIRED=false' },
+            { code: 'no_active_security_alert', passed: true, detail: 'aucun signal sécurité actif' },
+          ],
+          blockers: ['soc_enabled', 'audit_hmac_enabled', 'audit_chain_valid', 'otel_enabled', 'waf_enforced', 'siem_enforced'],
+          external_evidence_still_required: externalEvidence,
+        },
         signals: { login_failed_15m: 0, login_blocked_15m: 0, login_failed_24h: 2, suspicious_devices: 0, critical_center_incidents: 0 },
         alerts: [],
       }),
@@ -77,11 +99,16 @@ test('DNTT admin sees P11 dormant SOC state without citizen identity', async ({ 
   await expect(panel.getByText('Non activé')).toBeVisible();
   await expect(panel.getByText('P11 est livré mais volontairement dormant.', { exact: false })).toBeVisible();
   await expect(panel.getByText('OFF', { exact: true })).toBeVisible();
+  const gate = page.getByTestId('security-go-live-gate');
+  await expect(gate.getByText('Go-live sécurité nationale')).toBeVisible();
+  await expect(gate.getByText('Go-live bloqué')).toBeVisible();
+  await expect(gate.getByText('soc_enabled', { exact: false })).toBeVisible();
+  await expect(gate.getByText('siem_enforced', { exact: false })).toBeVisible();
   await expect(page.getByText('citoyen@example.gn')).toHaveCount(0);
   await expect(page.getByText('98f3be30-a5bf-4a2d-a093-e4a8b7651e4a')).toHaveCount(0);
 });
 
-test('DNTT admin sees audit integrity incident without raw actor details', async ({ page }) => {
+test('DNTT admin sees audit integrity incident and security gate blocked without raw actor details', async ({ page }) => {
   await bootstrapAdmin(page);
   await page.route('**/api/v1/operations/security/status', async route => {
     await route.fulfill({
@@ -99,6 +126,20 @@ test('DNTT admin sees audit integrity incident without raw actor details', async
           siem: { required: true },
         },
         audit_chain: { enabled: true, valid: false, reason: 'entry_hmac_mismatch', head_seq: 128 },
+        go_live: {
+          ready: false,
+          controls: [
+            { code: 'soc_enabled', passed: true, detail: 'SOC_ENABLED=true' },
+            { code: 'audit_hmac_enabled', passed: true, detail: 'chaîne HMAC active' },
+            { code: 'audit_chain_valid', passed: false, detail: 'chaîne audit non validée' },
+            { code: 'otel_enabled', passed: true, detail: 'OTLP actif avec endpoint configuré' },
+            { code: 'waf_enforced', passed: true, detail: 'WAF requis via institutional-edge' },
+            { code: 'siem_enforced', passed: true, detail: 'SIEM_REQUIRED=true' },
+            { code: 'no_active_security_alert', passed: false, detail: '2 signal(aux) sécurité actif(s)' },
+          ],
+          blockers: ['audit_chain_valid', 'no_active_security_alert'],
+          external_evidence_still_required: externalEvidence,
+        },
         signals: { login_failed_15m: 12, login_blocked_15m: 1, login_failed_24h: 19, suspicious_devices: 1, critical_center_incidents: 1 },
         alerts: [
           { code: 'AUDIT_CHAIN_INVALID', severity: 'critical' },
@@ -115,4 +156,53 @@ test('DNTT admin sees audit integrity incident without raw actor details', async
   await expect(panel.getByText('AUTH_BRUTE_FORCE_SIGNAL')).toBeVisible();
   await expect(panel.getByText('OTLP actif')).toBeVisible();
   await expect(panel.getByText('WAF institutional-edge')).toBeVisible();
+  const gate = page.getByTestId('security-go-live-gate');
+  await expect(gate.getByText('Go-live bloqué')).toBeVisible();
+  await expect(gate.getByText('audit_chain_valid', { exact: false })).toBeVisible();
+  await expect(gate.getByText('no_active_security_alert', { exact: false })).toBeVisible();
+});
+
+test('DNTT admin sees runtime security gate ready only after all P11 controls pass', async ({ page }) => {
+  await bootstrapAdmin(page);
+  await page.route('**/api/v1/operations/security/status', async route => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        status: 'ok',
+        generated_at: new Date().toISOString(),
+        soc_policy: {
+          enabled: true,
+          audit_chain_enabled: true,
+          audit_verify_interval_seconds: 900,
+          otel: { traces_enabled: true, endpoint_configured: true, service_name: 'coderoute-api', sample_ratio: 0.05 },
+          waf: { required: true, provider: 'institutional-edge' },
+          siem: { required: true },
+        },
+        audit_chain: { enabled: true, valid: true, reason: null, head_seq: 150 },
+        go_live: {
+          ready: true,
+          controls: [
+            { code: 'soc_enabled', passed: true, detail: 'SOC_ENABLED=true' },
+            { code: 'audit_hmac_enabled', passed: true, detail: 'chaîne HMAC active' },
+            { code: 'audit_chain_valid', passed: true, detail: 'chaîne audit valide' },
+            { code: 'otel_enabled', passed: true, detail: 'OTLP actif avec endpoint configuré' },
+            { code: 'waf_enforced', passed: true, detail: 'WAF requis via institutional-edge' },
+            { code: 'siem_enforced', passed: true, detail: 'SIEM_REQUIRED=true' },
+            { code: 'no_active_security_alert', passed: true, detail: 'aucun signal sécurité actif' },
+          ],
+          blockers: [],
+          external_evidence_still_required: externalEvidence,
+        },
+        signals: { login_failed_15m: 0, login_blocked_15m: 0, login_failed_24h: 1, suspicious_devices: 0, critical_center_incidents: 0 },
+        alerts: [],
+      }),
+    });
+  });
+
+  await page.goto('/#/admin');
+  const gate = page.getByTestId('security-go-live-gate');
+  await expect(gate.getByText('Gate runtime prêt')).toBeVisible();
+  await expect(gate.getByText('5 preuve(s) externe(s) restent à archiver', { exact: false })).toBeVisible();
+  await expect(gate.getByText('Go-live bloqué')).toHaveCount(0);
 });
