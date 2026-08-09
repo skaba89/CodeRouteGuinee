@@ -116,6 +116,7 @@ jobs:
             tests/e2e/national-edge-fleet.spec.ts
             tests/e2e/edge-release-rollout.spec.ts
             tests/e2e/center-edge-release-local.spec.ts
+            tests/e2e/edge-supply-chain.spec.ts
           )
           selected=()
           for file in "${candidates[@]}"; do
