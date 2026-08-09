@@ -10,6 +10,10 @@ on:
       - 'backend/tests/test_audit_chain_p11.py'
       - 'backend/tests/test_audit_immutability_p11.py'
       - 'backend/tests/test_soc_runtime_security.py'
+      - 'frontend/src/securityOperationsClient.ts'
+      - 'frontend/src/components/NationalSecurityOperationsPanel.tsx'
+      - 'frontend/tests/e2e/national-soc-security.spec.ts'
+      - 'frontend/package-lock.json'
       - 'docs/P11_GO_LIVE_GATE.md'
       - '.github/workflows/p11-go-live-gate-ci.yml'
   push:
@@ -23,6 +27,10 @@ on:
       - 'backend/tests/test_audit_chain_p11.py'
       - 'backend/tests/test_audit_immutability_p11.py'
       - 'backend/tests/test_soc_runtime_security.py'
+      - 'frontend/src/securityOperationsClient.ts'
+      - 'frontend/src/components/NationalSecurityOperationsPanel.tsx'
+      - 'frontend/tests/e2e/national-soc-security.spec.ts'
+      - 'frontend/package-lock.json'
       - 'docs/P11_GO_LIVE_GATE.md'
       - '.github/workflows/p11-go-live-gate-ci.yml'
   workflow_dispatch:
@@ -62,6 +70,35 @@ jobs:
             tests/test_audit_immutability_p11.py \
             tests/test_soc_runtime_security.py
 
+  p11-frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install locked frontend dependencies
+        run: npm ci
+      - name: Reject high and critical npm vulnerabilities
+        run: npm run audit:security
+      - name: Typecheck security dashboard
+        run: npm run typecheck
+      - name: Build production frontend
+        run: npm run build
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Run P11 SOC and go-live E2E
+        env:
+          CI: 'true'
+          VITE_API_BASE_URL: http://localhost:8000
+        run: npx playwright test tests/e2e/national-soc-security.spec.ts --project=chromium --timeout=30000 --retries=1
+
   p11-gate-contract:
     runs-on: ubuntu-latest
     steps:
@@ -71,7 +108,7 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path
-          text = Path('backend/app/routers/security_operations.py').read_text(encoding='utf-8')
+          backend = Path('backend/app/routers/security_operations.py').read_text(encoding='utf-8')
           for marker in (
               'soc_enabled',
               'audit_hmac_enabled',
@@ -82,7 +119,17 @@ jobs:
               'no_active_security_alert',
               'external_evidence_still_required',
           ):
-              assert marker in text, marker
-          assert '"go_live": go_live' in text
-          print('P11 go-live contract: OK')
+              assert marker in backend, marker
+          assert '"go_live": go_live' in backend
+
+          client = Path('frontend/src/securityOperationsClient.ts').read_text(encoding='utf-8')
+          assert 'SecurityGoLiveControl' in client
+          assert 'go_live?:' in client
+
+          panel = Path('frontend/src/components/NationalSecurityOperationsPanel.tsx').read_text(encoding='utf-8')
+          assert 'security-go-live-gate' in panel
+          assert 'Go-live sécurité nationale' in panel
+          assert 'Gate runtime prêt' in panel
+          assert 'Go-live bloqué' in panel
+          print('P11 go-live backend/frontend contract: OK')
           PY
