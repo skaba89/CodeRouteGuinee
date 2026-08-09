@@ -8,6 +8,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import ipaddress
+import logging
 import re
 
 from app.soc_config import get_soc_settings
@@ -74,6 +75,50 @@ def sanitize_free_text(text: str) -> str:
 
     text = _UUID_RE.sub(_uuid, text)
     return _IPV4_RE.sub(_ip, text)
+
+
+def _sanitize_nested(key: str, value: object) -> object:
+    direct = sanitize_identifier_field(key, value)
+    if direct is not value:
+        return direct
+    if isinstance(value, str):
+        return sanitize_free_text(value)
+    if isinstance(value, dict):
+        return {str(k): _sanitize_nested(str(k), v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_sanitize_nested(key, item) for item in value]
+    return value
+
+
+def _inject_trace_context(record: logging.LogRecord) -> None:
+    try:
+        from opentelemetry import trace
+        context = trace.get_current_span().get_span_context()
+        if context and context.is_valid:
+            record.trace_id = f"{context.trace_id:032x}"
+            record.span_id = f"{context.span_id:016x}"
+    except Exception:
+        return
+
+
+class SOCPrivacyFilter(logging.Filter):
+    """Dernière barrière avant stdout/SIEM : pseudonymise IDs et IP partout."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        try:
+            record.msg = sanitize_free_text(record.getMessage())
+            record.args = ()
+        except Exception:
+            pass
+        for key, value in list(record.__dict__.items()):
+            if key.startswith("_") or key in {"msg", "args"}:
+                continue
+            try:
+                record.__dict__[key] = _sanitize_nested(key, value)
+            except Exception:
+                pass
+        _inject_trace_context(record)
+        return True
 
 
 def safe_actor_ref(actor_id: object) -> str | None:
