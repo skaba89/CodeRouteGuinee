@@ -1,4 +1,7 @@
-from app.routers.security_operations import build_security_go_live_controls
+from app.routers.security_operations import (
+    build_security_go_live_controls,
+    security_configuration_alerts,
+)
 from app.soc_config import SOCSettings
 
 
@@ -69,3 +72,40 @@ def test_invalid_audit_or_active_security_signal_blocks_go_live():
     )
     assert alert["ready"] is False
     assert _by_code(alert, "no_active_security_alert")["passed"] is False
+
+
+def test_dormant_soc_does_not_emit_false_infrastructure_warnings():
+    alerts = security_configuration_alerts(
+        _soc(
+            enabled=False,
+            otel_traces_enabled=False,
+            otel_endpoint="",
+            waf_required=False,
+            waf_provider="",
+            siem_required=False,
+        )
+    )
+    assert alerts == []
+
+
+def test_active_soc_emits_warnings_until_otel_waf_and_siem_are_finalized():
+    alerts = security_configuration_alerts(
+        _soc(
+            enabled=True,
+            otel_traces_enabled=False,
+            otel_endpoint="",
+            waf_required=False,
+            waf_provider="",
+            siem_required=False,
+        )
+    )
+    assert {item["code"] for item in alerts} == {
+        "OTLP_NOT_READY",
+        "WAF_NOT_READY",
+        "SIEM_NOT_READY",
+    }
+    assert all(item["severity"] == "warning" for item in alerts)
+
+
+def test_fully_configured_p11_infrastructure_emits_no_configuration_warning():
+    assert security_configuration_alerts(_soc()) == []
