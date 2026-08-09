@@ -75,6 +75,7 @@ def test_evaluate_snapshot_passes_only_automatable_checks_and_never_claims_homol
                 "status": "ok",
                 "soc_policy": {"enabled": True, "audit_chain_enabled": True},
                 "audit_chain": {"valid": True},
+                "go_live": {"ready": True, "blockers": []},
                 "alerts": [],
             }
         ),
@@ -144,6 +145,7 @@ def test_stale_reliability_evidence_blocks_readiness():
                 "status": "ok",
                 "soc_policy": {"enabled": True, "audit_chain_enabled": True},
                 "audit_chain": {"valid": True},
+                "go_live": {"ready": True, "blockers": []},
             }
         ),
         "governance_contract": _obs({"alignment": {"aligned": True}}),
