@@ -1,0 +1,37 @@
+[Unit]
+Description=CodeRoute Guinea Center Edge Transactional Updater
+After=network-online.target coderoute-edge.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+EnvironmentFile=/etc/coderoute-edge/edge.env
+WorkingDirectory=/opt/coderoute-edge/releases/current/edge_agent
+ExecStart=/usr/bin/python3 /opt/coderoute-edge/releases/current/edge_agent/scripts/run_system_update.py
+TimeoutStartSec=10min
+UMask=0077
+
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=false
+ProtectClock=true
+ProtectHostname=true
+LockPersonality=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+ReadOnlyPaths=/etc/coderoute-edge /var/lib/coderoute-edge
+ReadWritePaths=/opt/coderoute-edge/releases
+
+[Install]
+WantedBy=multi-user.target
