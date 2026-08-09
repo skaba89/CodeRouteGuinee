@@ -7,6 +7,7 @@ on:
       - 'render.yaml'
       - 'docs/HA_PRA_P10.md'
       - '.github/workflows/p10-ha-pr-ci.yml'
+  workflow_dispatch:
 
 jobs:
   p10-backend-ha:
@@ -47,8 +48,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Verify HA Blueprint invariants
-        shell: python
+        shell: bash
         run: |
+          python - <<'PY'
           from pathlib import Path
           text = Path('render.yaml').read_text(encoding='utf-8')
           required = [
@@ -67,3 +69,4 @@ jobs:
           if missing:
               raise SystemExit(f'Missing P10 Blueprint invariants: {missing}')
           print('P10 Render Blueprint static invariants: OK')
+          PY
