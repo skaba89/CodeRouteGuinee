@@ -110,3 +110,20 @@ test('all automated gates can be green while institutional sign-off remains mand
   await expect(page.getByTestId('institutional-signoff-required')).toBeVisible();
   await expect(command.getByText('Homologation accordée')).toHaveCount(0);
 });
+
+test('fails closed when one readiness source is unavailable', async ({ page }) => {
+  await bootstrap(page);
+  await page.route('**/api/v1/operations/reliability', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(reliability(true)) }));
+  await page.route('**/api/v1/operations/security/status', route => route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ detail: 'SOC temporarily unavailable' }) }));
+  await page.route('**/api/v1/national-governance/readiness', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(governance(true)) }));
+
+  await page.goto('/#/admin');
+
+  await expect(page.getByTestId('national-automated-readiness')).toHaveText('Readiness incomplète');
+  await expect(page.getByText(/Readiness incomplète : P11\/SOC/)).toBeVisible();
+  await expect(page.getByTestId('go-live-p10').getByText('PASS')).toBeVisible();
+  await expect(page.getByTestId('go-live-p11').getByText('INCONNU')).toBeVisible();
+  await expect(page.getByTestId('go-live-p12').getByText('PASS')).toBeVisible();
+  await expect(page.getByTestId('national-go-live-command-center').getByText('Gates automatisables prêts')).toHaveCount(0);
+  await expect(page.getByTestId('institutional-signoff-required')).toContainText('Décision institutionnelle toujours requise');
+});
