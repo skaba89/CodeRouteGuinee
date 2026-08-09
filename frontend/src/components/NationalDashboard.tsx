@@ -7,6 +7,7 @@ import {
   type EdgeFleetNode,
 } from '../edgeFleetClient';
 import { EdgeReleasePanel } from './EdgeReleasePanel';
+import { EdgeSupplyChainPanel } from './EdgeSupplyChainPanel';
 
 function fmtNumber(value: number): string {
   return value.toLocaleString('fr-FR');
@@ -107,6 +108,7 @@ function EdgeNodeCard({ node, targetVersion }: { node: EdgeFleetNode; targetVers
  * Tableau de bord de supervision nationale (DNTT).
  * P7 combine l'activité métier des centres et la santé de la flotte Edge.
  * P8 ajoute la gouvernance des releases signées et leur rollout progressif.
+ * P9 ajoute la preuve de supply chain obligatoire avant canary.
  */
 export function NationalDashboard() {
   const [data, setData] = useState<NationalDashboard | null>(null);
@@ -278,6 +280,7 @@ export function NationalDashboard() {
         )}
       </div>
 
+      <EdgeSupplyChainPanel />
       <EdgeReleasePanel />
     </div>
   );
