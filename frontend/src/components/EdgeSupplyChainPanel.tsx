@@ -6,6 +6,7 @@ import {
   type EdgeRelease,
   type EdgeSupplyChainEvidence,
 } from '../edgeReleaseClient';
+import { NationalSecurityOperationsPanel } from './NationalSecurityOperationsPanel';
 
 function evidenceReady(release: EdgeRelease): boolean {
   const evidence = release.manifest.supply_chain;
@@ -95,83 +96,86 @@ export function EdgeSupplyChainPanel() {
   }
 
   return (
-    <div className="card" data-testid="edge-supply-chain-panel" style={{ marginTop: 20 }}>
-      <div className="card-header" style={{ alignItems: 'flex-start' }}>
-        <div>
-          <span className="card-title">Supply chain Edge — preuve avant canary</span>
-          <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>
-            Import du control-plane-evidence.json généré par la CI attestée
-          </div>
-        </div>
-        <span className={`badge ${canManage ? 'bg' : 'bgr'}`}>{canManage ? 'Super-admin' : 'Lecture seule'}</span>
-      </div>
-
-      {message && <div className="alert aw" style={{ marginBottom: 14 }}>{message}</div>}
-
-      <div style={{ display: 'grid', gap: 10 }}>
-        {releases.map(release => {
-          const evidence = release.manifest.supply_chain;
-          const ready = evidenceReady(release);
-          return (
-            <div key={release.release_id} style={{ border: '1px solid var(--border)', borderRadius: 10, padding: 12 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-                <div>
-                  <strong>{release.manifest.software_version}</strong>
-                  <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
-                    {release.status} · SHA {release.manifest.artifact.sha256.slice(0, 16)}…
-                  </div>
-                </div>
-                <span className={`badge ${ready ? 'bg' : evidence ? 'br' : 'bgo'}`}>
-                  {ready ? 'Preuve CI valide' : evidence ? 'Scan en échec' : 'Preuve manquante'}
-                </span>
-              </div>
-              {evidence && (
-                <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 8 }}>
-                  Commit {evidence.source_commit_sha.slice(0, 12)}… · SBOM {evidence.sbom_sha256.slice(0, 12)}… · {evidence.builder}
-                </div>
-              )}
+    <>
+      <NationalSecurityOperationsPanel />
+      <div className="card" data-testid="edge-supply-chain-panel" style={{ marginTop: 20 }}>
+        <div className="card-header" style={{ alignItems: 'flex-start' }}>
+          <div>
+            <span className="card-title">Supply chain Edge — preuve avant canary</span>
+            <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>
+              Import du control-plane-evidence.json généré par la CI attestée
             </div>
-          );
-        })}
-      </div>
-
-      {canManage && (
-        <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
-          <div className="g2">
-            <label>Draft / release en pause
-              <select value={selectedId} onChange={event => setSelectedId(event.target.value)}>
-                <option value="">Sélectionner…</option>
-                {releases.filter(item => ['draft', 'paused'].includes(item.status)).map(item => (
-                  <option key={item.release_id} value={item.release_id}>{item.manifest.software_version} · {item.status}</option>
-                ))}
-              </select>
-            </label>
-            <label>Bundle de preuve CI
-              <input type="file" accept="application/json,.json" onChange={event => void importFile(event)} />
-            </label>
           </div>
-          <textarea
-            value={evidenceText}
-            onChange={event => setEvidenceText(event.target.value)}
-            rows={8}
-            placeholder='{"builder":"github-actions", ...}'
-            style={{ width: '100%', marginTop: 10, fontFamily: 'monospace', fontSize: 11.5 }}
-          />
-          <div className="actions" style={{ marginTop: 10 }}>
-            <button
-              type="button"
-              className="btn-primary btn-sm"
-              disabled={busy || !selected || !evidenceText.trim()}
-              onClick={() => void attachEvidence()}
-            >
-              {busy ? 'Vérification / signature…' : 'Rattacher la preuve et re-signer'}
-            </button>
-          </div>
-          <p style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 8 }}>
-            Le backend recalcule les invariants : le digest sujet doit égaler l’artefact, le scan doit être « passed » pour autoriser le rollout, et les URLs de provenance doivent être HTTPS publiques.
-          </p>
+          <span className={`badge ${canManage ? 'bg' : 'bgr'}`}>{canManage ? 'Super-admin' : 'Lecture seule'}</span>
         </div>
-      )}
-    </div>
+
+        {message && <div className="alert aw" style={{ marginBottom: 14 }}>{message}</div>}
+
+        <div style={{ display: 'grid', gap: 10 }}>
+          {releases.map(release => {
+            const evidence = release.manifest.supply_chain;
+            const ready = evidenceReady(release);
+            return (
+              <div key={release.release_id} style={{ border: '1px solid var(--border)', borderRadius: 10, padding: 12 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <div>
+                    <strong>{release.manifest.software_version}</strong>
+                    <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
+                      {release.status} · SHA {release.manifest.artifact.sha256.slice(0, 16)}…
+                    </div>
+                  </div>
+                  <span className={`badge ${ready ? 'bg' : evidence ? 'br' : 'bgo'}`}>
+                    {ready ? 'Preuve CI valide' : evidence ? 'Scan en échec' : 'Preuve manquante'}
+                  </span>
+                </div>
+                {evidence && (
+                  <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 8 }}>
+                    Commit {evidence.source_commit_sha.slice(0, 12)}… · SBOM {evidence.sbom_sha256.slice(0, 12)}… · {evidence.builder}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {canManage && (
+          <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
+            <div className="g2">
+              <label>Draft / release en pause
+                <select value={selectedId} onChange={event => setSelectedId(event.target.value)}>
+                  <option value="">Sélectionner…</option>
+                  {releases.filter(item => ['draft', 'paused'].includes(item.status)).map(item => (
+                    <option key={item.release_id} value={item.release_id}>{item.manifest.software_version} · {item.status}</option>
+                  ))}
+                </select>
+              </label>
+              <label>Bundle de preuve CI
+                <input type="file" accept="application/json,.json" onChange={event => void importFile(event)} />
+              </label>
+            </div>
+            <textarea
+              value={evidenceText}
+              onChange={event => setEvidenceText(event.target.value)}
+              rows={8}
+              placeholder='{"builder":"github-actions", ...}'
+              style={{ width: '100%', marginTop: 10, fontFamily: 'monospace', fontSize: 11.5 }}
+            />
+            <div className="actions" style={{ marginTop: 10 }}>
+              <button
+                type="button"
+                className="btn-primary btn-sm"
+                disabled={busy || !selected || !evidenceText.trim()}
+                onClick={() => void attachEvidence()}
+              >
+                {busy ? 'Vérification / signature…' : 'Rattacher la preuve et re-signer'}
+              </button>
+            </div>
+            <p style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 8 }}>
+              Le backend recalcule les invariants : le digest sujet doit égaler l’artefact, le scan doit être « passed » pour autoriser le rollout, et les URLs de provenance doivent être HTTPS publiques.
+            </p>
+          </div>
+        )}
+      </div>
+    </>
   );
 }

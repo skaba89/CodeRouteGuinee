@@ -1,0 +1,135 @@
+name: P11 SOC PR CI
+
+on:
+  pull_request:
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - 'ops/**'
+      - 'render.yaml'
+      - 'docs/P11_SOC_SECURITY_OPERATIONS.md'
+      - '.github/workflows/p11-soc-pr-ci.yml'
+  workflow_dispatch:
+
+jobs:
+  p11-backend-security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install backend dependencies
+        working-directory: backend
+        run: pip install -q -r requirements.txt
+      - name: Compile backend and operational probes
+        working-directory: backend
+        run: python -m compileall -q app scripts
+      - name: Validate shell scripts
+        working-directory: backend
+        run: bash -n entrypoint.sh scripts/*.sh
+      - name: Run P10/P10.2/P11 security regressions
+        working-directory: backend
+        env:
+          PYTHONPATH: .
+          DATABASE_URL: sqlite+pysqlite:///:memory:
+          AUTO_CREATE_TABLES: 'true'
+          ENVIRONMENT: test
+          EDGE_LEASE_SIGNING_SECRET: coderoute-p11-ci-edge-signing-secret-at-least-32-characters
+          EDGE_RELEASE_SIGNING_SECRET: coderoute-p11-ci-release-signing-secret-at-least-32-characters
+        run: |
+          pytest -q --tb=short --disable-warnings \
+            tests/test_distributed_ha.py \
+            tests/test_middleware_ha.py \
+            tests/test_ha_config.py \
+            tests/test_health.py \
+            tests/test_pra_scripts.py \
+            tests/test_reliability_config.py \
+            tests/test_reliability_api.py \
+            tests/test_reliability_security.py \
+            tests/test_metrics_endpoint.py \
+            tests/test_secure_backup_bundle.py \
+            tests/test_offsite_backup.py \
+            tests/test_ha_failover_probe.py \
+            tests/test_soc_config.py \
+            tests/test_soc_privacy.py \
+            tests/test_audit_chain_p11.py \
+            tests/test_audit_immutability_p11.py \
+            tests/test_soc_runtime_security.py
+
+  p11-security-iac:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install YAML validator
+        run: pip install -q PyYAML
+      - name: Validate dormant SOC rollout and security rules
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import yaml
+
+          render = yaml.safe_load(Path('render.yaml').read_text(encoding='utf-8'))
+          services = {item['name']: item for item in render['services']}
+          backend = services['coderoute-backend']
+          env = {item['key']: item for item in backend['envVars'] if 'key' in item}
+
+          assert env['SOC_ENABLED']['value'] == 'false'
+          assert env['AUDIT_CHAIN_ENABLED']['value'] == 'false'
+          assert env['OTEL_TRACES_ENABLED']['value'] == 'false'
+          assert env['WAF_REQUIRED']['value'] == 'false'
+          assert env['SIEM_REQUIRED']['value'] == 'false'
+          assert env['SOC_PSEUDONYM_KEY']['sync'] is False
+          assert env['AUDIT_CHAIN_HMAC_KEY']['sync'] is False
+          assert env['OTEL_EXPORTER_OTLP_HEADERS']['sync'] is False
+
+          rules = yaml.safe_load(Path('ops/prometheus/security.rules.yml').read_text(encoding='utf-8'))
+          expressions = '\n'.join(
+              str(rule.get('expr', ''))
+              for group in rules['groups']
+              for rule in group['rules']
+          )
+          assert 'coderoute_soc_audit_expected == 1' in expressions
+          assert 'coderoute_soc_audit_expected == 0' in expressions
+          assert 'absent(coderoute_audit_chain_valid)' in expressions
+          assert 'absent(coderoute_audit_chain_last_verify_timestamp_seconds)' in expressions
+
+          collector = Path('ops/otel/collector.example.yaml').read_text(encoding='utf-8')
+          assert '${env:OTEL_UPSTREAM_ENDPOINT}' in collector
+          assert '${env:OTEL_UPSTREAM_AUTHORIZATION}' in collector
+          assert 'Bearer ' not in collector
+
+          load = Path('ops/load/k6-national-smoke.js').read_text(encoding='utf-8')
+          assert 'ALLOW_PRODUCTION_LOAD_TEST' in load
+          print('P11 SOC/IaC invariants: OK')
+          PY
+
+  p11-frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+      - name: Typecheck SOC dashboard
+        working-directory: frontend
+        run: npm run typecheck
+      - name: Build production frontend
+        working-directory: frontend
+        run: npm run build
+      - name: Install Chromium
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+      - name: Run national SOC E2E
+        working-directory: frontend
+        env:
+          VITE_API_BASE_URL: http://localhost:8000
+          CI: 'true'
+        run: npx playwright test tests/e2e/national-soc-security.spec.ts --timeout=30000 --retries=1

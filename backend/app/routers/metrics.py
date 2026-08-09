@@ -11,7 +11,7 @@ from app.db.session import SessionLocal
 from app.reliability_config import get_reliability_settings
 from app.reliability_metrics import prometheus_payload, refresh_reliability_evidence_metrics
 from app.soc_config import get_soc_settings
-from app.soc_metrics import record_audit_chain_check
+from app.soc_metrics import record_audit_chain_check, record_soc_policy_state
 
 router = APIRouter(tags=["metrics"])
 _AUDIT_VERIFY_LAST_MONOTONIC = 0.0
@@ -46,6 +46,9 @@ def metrics(request: Request) -> Response:
     supplied = _provided_token(request)
     if not supplied or not settings.metrics_token or not secrets.compare_digest(supplied, settings.metrics_token):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Metrics authentication required")
+
+    soc = get_soc_settings()
+    record_soc_policy_state(enabled=soc.enabled, audit_chain_enabled=soc.audit_chain_enabled)
 
     try:
         db = SessionLocal()

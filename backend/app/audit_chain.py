@@ -109,6 +109,15 @@ def _chain_new_audit_rows(db: Session, _flush_context, _instances) -> None:
     if not settings.audit_chain_hmac_key:
         raise RuntimeError("AUDIT_CHAIN_HMAC_KEY absent alors que AUDIT_CHAIN_ENABLED=true")
 
+    # Append-only au niveau ORM. Une altération SQL hors ORM reste détectée par HMAC.
+    deleted = [item for item in db.deleted if isinstance(item, AuditLog)]
+    modified = [
+        item for item in db.dirty
+        if isinstance(item, AuditLog) and db.is_modified(item, include_collections=True)
+    ]
+    if deleted or modified:
+        raise RuntimeError("AuditLog est append-only lorsque la chaîne HMAC P11 est active")
+
     pending = [item for item in db.new if isinstance(item, AuditLog) and not item.entry_hash]
     if not pending:
         return

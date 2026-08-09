@@ -37,6 +37,7 @@ def security_status(
     _current_user: User = Depends(require_roles("admin", "super_admin")),
 ) -> dict:
     now = datetime.now(UTC)
+    soc = get_soc_settings()
     since_15m = now - timedelta(minutes=15)
     since_24h = now - timedelta(hours=24)
 
@@ -58,10 +59,13 @@ def security_status(
     )
 
     audit = verify_audit_chain(db)
-    record_audit_chain_check(bool(audit.get("valid", False)), now)
+    if soc.enabled and soc.audit_chain_enabled:
+        record_audit_chain_check(bool(audit.get("valid", False)), now)
 
     alerts: list[dict] = []
-    if not audit.get("valid", False):
+    if soc.enabled and not soc.audit_chain_enabled:
+        alerts.append({"code": "AUDIT_CHAIN_DISABLED", "severity": "critical"})
+    elif soc.enabled and soc.audit_chain_enabled and not audit.get("valid", False):
         alerts.append({"code": "AUDIT_CHAIN_INVALID", "severity": "critical"})
     if login_blocked_15m > 0 or login_failed_15m >= 10:
         alerts.append({"code": "AUTH_BRUTE_FORCE_SIGNAL", "severity": "warning"})
@@ -72,12 +76,12 @@ def security_status(
 
     critical = any(item["severity"] == "critical" for item in alerts)
     warning = any(item["severity"] == "warning" for item in alerts)
-    status = "critical" if critical else "warning" if warning else "ok"
+    status_value = "disabled" if not soc.enabled else "critical" if critical else "warning" if warning else "ok"
 
     return {
-        "status": status,
+        "status": status_value,
         "generated_at": now.isoformat(),
-        "soc_policy": get_soc_settings().safe_policy(),
+        "soc_policy": soc.safe_policy(),
         "audit_chain": audit,
         "signals": {
             "login_failed_15m": login_failed_15m,
