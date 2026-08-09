@@ -6,10 +6,11 @@ exporté vers Prometheus.
 """
 from __future__ import annotations
 
+import os
 import time
 from datetime import UTC, datetime
 
-from prometheus_client import Counter, Gauge, Histogram, generate_latest
+from prometheus_client import CollectorRegistry, Counter, Gauge, Histogram, generate_latest, multiprocess
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -30,16 +31,19 @@ HTTP_DURATION = Histogram(
 HTTP_INFLIGHT = Gauge(
     "coderoute_http_inflight_requests",
     "Nombre de requêtes HTTP actuellement en cours.",
+    multiprocess_mode="livesum",
 )
 READINESS_COMPONENT = Gauge(
     "coderoute_readiness_component_state",
     "État d'un composant de readiness: 1=ok/disabled, 0.5=warning/degraded, 0=error.",
     ("component",),
+    multiprocess_mode="livemin",
 )
 RELIABILITY_EVIDENCE_LAST_SUCCESS = Gauge(
     "coderoute_reliability_evidence_last_success_timestamp_seconds",
     "Dernier événement d'exploitation réussi par type.",
     ("kind",),
+    multiprocess_mode="livemax",
 )
 
 _EVIDENCE_ACTIONS = {
@@ -54,7 +58,6 @@ def _route_template(request) -> str:
     template = getattr(route, "path", None)
     if not template or not isinstance(template, str):
         return "unmatched"
-    # Défense contre une route/plugin malformé : borne de cardinalité/longueur.
     return template[:160]
 
 
@@ -116,4 +119,8 @@ def record_reliability_evidence_metric(kind: str, occurred_at: datetime) -> None
 
 
 def prometheus_payload() -> bytes:
+    if os.getenv("PROMETHEUS_MULTIPROC_DIR"):
+        registry = CollectorRegistry(support_collectors_without_names=True)
+        multiprocess.MultiProcessCollector(registry)
+        return generate_latest(registry)
     return generate_latest()
