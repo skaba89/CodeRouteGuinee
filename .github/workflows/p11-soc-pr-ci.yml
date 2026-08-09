@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'backend/**'
+      - 'frontend/**'
       - 'ops/**'
       - 'render.yaml'
       - 'docs/P11_SOC_SECURITY_OPERATIONS.md'
@@ -76,7 +77,6 @@ jobs:
           backend = services['coderoute-backend']
           env = {item['key']: item for item in backend['envVars'] if 'key' in item}
 
-          # P11 code may merge before infrastructure, but must not auto-activate.
           assert env['SOC_ENABLED']['value'] == 'false'
           assert env['AUDIT_CHAIN_ENABLED']['value'] == 'false'
           assert env['OTEL_TRACES_ENABLED']['value'] == 'false'
@@ -104,3 +104,29 @@ jobs:
           assert 'ALLOW_PRODUCTION_LOAD_TEST' in load
           print('P11 SOC/IaC invariants: OK')
           PY
+
+  p11-frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+      - name: Typecheck SOC dashboard
+        working-directory: frontend
+        run: npm run typecheck
+      - name: Build production frontend
+        working-directory: frontend
+        run: npm run build
+      - name: Install Chromium
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+      - name: Run national SOC E2E
+        working-directory: frontend
+        env:
+          VITE_API_BASE_URL: http://localhost:8000
+          CI: 'true'
+        run: npx playwright test tests/e2e/national-soc-security.spec.ts --timeout=30000 --retries=1
