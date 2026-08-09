@@ -1,0 +1,117 @@
+name: P10.2 Reliability PR CI
+
+on:
+  pull_request:
+    paths:
+      - 'backend/**'
+      - 'ops/prometheus/**'
+      - 'render.yaml'
+      - 'docs/P10_2_DR_OBSERVABILITY.md'
+      - '.github/workflows/p10-2-reliability-pr-ci.yml'
+  workflow_dispatch:
+
+jobs:
+  reliability-backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install backend dependencies
+        working-directory: backend
+        run: pip install -q -r requirements.txt
+      - name: Compile application and operational scripts
+        working-directory: backend
+        run: python -m compileall -q app scripts
+      - name: Validate shell scripts
+        working-directory: backend
+        run: bash -n entrypoint.sh scripts/*.sh
+      - name: Run P10 and P10.2 reliability regressions
+        working-directory: backend
+        env:
+          PYTHONPATH: .
+          DATABASE_URL: sqlite+pysqlite:///:memory:
+          AUTO_CREATE_TABLES: 'true'
+          ENVIRONMENT: test
+          EDGE_LEASE_SIGNING_SECRET: coderoute-reliability-ci-edge-signing-secret-at-least-32-characters
+          EDGE_RELEASE_SIGNING_SECRET: coderoute-reliability-ci-release-signing-secret-at-least-32-characters
+        run: |
+          pytest -q --tb=short --disable-warnings \
+            tests/test_distributed_ha.py \
+            tests/test_middleware_ha.py \
+            tests/test_ha_config.py \
+            tests/test_health.py \
+            tests/test_pra_scripts.py \
+            tests/test_reliability_config.py \
+            tests/test_reliability_api.py \
+            tests/test_reliability_security.py \
+            tests/test_metrics_endpoint.py \
+            tests/test_secure_backup_bundle.py \
+            tests/test_offsite_backup.py \
+            tests/test_ha_failover_probe.py
+
+  reliability-iac:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install YAML validator
+        run: pip install -q PyYAML
+      - name: Validate Render and Prometheus configuration
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import yaml
+
+          render = yaml.safe_load(Path('render.yaml').read_text(encoding='utf-8'))
+          services = {item['name']: item for item in render['services']}
+          backend = services['coderoute-backend']
+          backup = services['coderoute-offsite-backup']
+
+          assert backend['numInstances'] == 2
+          assert backend['healthCheckPath'] == '/health/readiness'
+          backend_env = {item['key']: item for item in backend['envVars'] if 'key' in item}
+          assert backend_env['METRICS_ENABLED']['value'] == 'true'
+          assert backend_env['RELIABILITY_EVIDENCE_ENABLED']['value'] == 'true'
+          assert backend_env['BACKUP_REQUIRED']['value'] == 'true'
+          assert 'BACKUP_ENCRYPTION_KEY_B64' not in backend_env
+          assert 'AWS_ACCESS_KEY_ID' not in backend_env
+          assert 'AWS_SECRET_ACCESS_KEY' not in backend_env
+
+          assert backup['type'] == 'cron'
+          assert backup['runtime'] == 'docker'
+          assert backup['dockerCommand'] == './scripts/run_offsite_backup.sh'
+          assert backup['schedule'] == '30 1 * * *'
+          backup_env = {item['key']: item for item in backup['envVars'] if 'key' in item}
+          for required in (
+              'BACKUP_DATABASE_URL', 'BACKUP_TARGET_REGION', 'BACKUP_S3_BUCKET',
+              'BACKUP_ENCRYPTION_KEY_B64', 'BACKUP_ENCRYPTION_KEY_ID',
+              'AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY', 'RELIABILITY_EVIDENCE_TOKEN',
+          ):
+              assert required in backup_env, required
+          evidence_source = backup_env['RELIABILITY_EVIDENCE_TOKEN']['fromService']
+          assert evidence_source['name'] == 'coderoute-backend'
+          assert evidence_source['envVarKey'] == 'RELIABILITY_EVIDENCE_TOKEN'
+
+          rules = yaml.safe_load(Path('ops/prometheus/coderoute.rules.yml').read_text(encoding='utf-8'))
+          alerts = {
+              rule['alert']
+              for group in rules['groups']
+              for rule in group['rules']
+              if 'alert' in rule
+          }
+          required_alerts = {
+              'CodeRouteApiAvailabilityBelowSLO',
+              'CodeRouteApiHigh5xxRate',
+              'CodeRouteApiP95LatencyHigh',
+              'CodeRouteBackupEvidenceMissingOrStale',
+              'CodeRouteRestoreDrillStale',
+              'CodeRouteFailoverEvidenceStale',
+          }
+          assert required_alerts <= alerts
+          print('P10.2 IaC and alert invariants: OK')
+          PY
