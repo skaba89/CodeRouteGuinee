@@ -7,6 +7,7 @@ from urllib.parse import urlsplit, urlunsplit
 
 from .central import CentralClient
 from .media import MediaCache
+from .operator_view import build_operator_status
 from .store import EdgeStore
 from .tickets import media_ticket
 
@@ -109,4 +110,9 @@ class EdgeAgentService:
         return self.central.heartbeat()
 
     def status(self) -> dict[str, Any]:
+        """Statut public minimal utilisé par /health."""
         return {"lease_counts": self.store.counts()}
+
+    def operator_status(self) -> dict[str, Any]:
+        """Vue détaillée réservée à l'opérateur authentifié du centre."""
+        return build_operator_status(self.store, self.media)
