@@ -29,13 +29,17 @@ jobs:
               ("backup_off_region", "reliability.backup_uploaded", timedelta(hours=26)),
               ("restore_drill", "reliability.restore_drill_passed", timedelta(days=35)),
               ("api_failover", "reliability.ha_failover_probe_passed", timedelta(days=35)),
-          ]'''.replace('          ', '    ')
+          ]'''
           after = '''    operational_evidence = [
               ("backup_off_region", "reliability.backup_uploaded", timedelta(hours=26)),
               ("restore_drill", "reliability.restore_drill_passed", timedelta(days=35)),
               ("pitr_provider", "reliability.pitr_drill_passed", timedelta(days=35)),
               ("api_failover", "reliability.ha_failover_probe_passed", timedelta(days=35)),
-          ]'''.replace('          ', '    ')
+          ]'''
+          # YAML block indentation adds ten spaces to the Python source embedded above;
+          # normalize only those leading ten spaces from each literal line.
+          before = '\n'.join(line[10:] if line.startswith('          ') else line for line in before.splitlines())
+          after = '\n'.join(line[10:] if line.startswith('          ') else line for line in after.splitlines())
           if 'reliability.pitr_drill_passed' in text:
               print('PITR readiness already present')
           elif before not in text:
