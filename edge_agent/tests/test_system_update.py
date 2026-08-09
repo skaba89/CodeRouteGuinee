@@ -12,6 +12,7 @@ from uuid import uuid4
 
 import pytest
 
+import coderoute_edge.system_update as system_update_module
 from coderoute_edge.system_update import apply_system_update_transaction
 from coderoute_edge.updater import apply_verified_release
 
@@ -109,9 +110,17 @@ def _trusted_for_transaction(
     }
 
 
-def _current_target(root: Path) -> Path:
-    link = root / "current"
+def _link_target(root: Path, name: str) -> Path | None:
+    link = root / name
+    if not link.is_symlink():
+        return None
     return (link.parent / os.readlink(link)).resolve()
+
+
+def _current_target(root: Path) -> Path:
+    target = _link_target(root, "current")
+    assert target is not None
+    return target
 
 
 def test_system_update_confirms_exact_running_version(tmp_path: Path) -> None:
@@ -138,6 +147,80 @@ def test_system_update_confirms_exact_running_version(tmp_path: Path) -> None:
     assert not (config.release_staging_dir / "staged.json").exists()
     receipt = json.loads((config.release_staging_dir / "install-receipt.json").read_text())
     assert receipt["result"] == "installed"
+
+
+def test_copy_failure_before_switch_keeps_current_and_previous_unchanged(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    database = tmp_path / "edge.db"
+    _db(database)
+    config = _config(tmp_path, database)
+    _install_previous(config, "edge-agent-0.2.9")
+    _install_previous(config, "edge-agent-0.3.0")
+    current_before = _link_target(config.release_dir, "current")
+    previous_before = _link_target(config.release_dir, "previous")
+    staged = _stage(config.release_staging_dir, "edge-agent-0.4.0")
+    restarts: list[str] = []
+
+    def fail_before_switch(*_args, **_kwargs):
+        raise OSError("simulated disk failure before current switch")
+
+    monkeypatch.setattr(system_update_module, "_copy_into_root_workspace", fail_before_switch)
+    result = apply_system_update_transaction(
+        config,
+        emergency_window_bypass=True,
+        restart_service=lambda service: restarts.append(service),
+        health_probe=lambda *_args: {"status": "ok", "software_version": "edge-agent-0.4.0"},
+        runtime_prepare=_runtime,
+        staged_verifier=_trusted_for_transaction,
+    )
+
+    assert result["ok"] is False
+    assert result["phase"] == "critical"
+    assert result["current_switched"] is False
+    assert result["rollback"] is None
+    assert restarts == []
+    assert _link_target(config.release_dir, "current") == current_before
+    assert _link_target(config.release_dir, "previous") == previous_before
+    receipt = json.loads((config.release_staging_dir / "install-receipt.json").read_text())
+    assert receipt["release_id"] == staged["release_id"]
+    assert receipt["result"] == "failed"
+    assert receipt["rollback_confirmed"] is False
+
+
+def test_runtime_failure_after_switch_rolls_back_without_restart(tmp_path: Path) -> None:
+    database = tmp_path / "edge.db"
+    _db(database)
+    config = _config(tmp_path, database)
+    previous = _install_previous(config, "edge-agent-0.3.0")
+    bad = _stage(config.release_staging_dir, "edge-agent-0.4.0")
+    restarts: list[str] = []
+
+    def fail_runtime(_root: Path, _python: str) -> dict:
+        raise RuntimeError("simulated offline runtime failure")
+
+    result = apply_system_update_transaction(
+        config,
+        emergency_window_bypass=True,
+        restart_service=lambda service: restarts.append(service),
+        health_probe=lambda *_args: {"status": "ok", "software_version": "edge-agent-0.4.0"},
+        runtime_prepare=fail_runtime,
+        staged_verifier=_trusted_for_transaction,
+    )
+
+    assert result["ok"] is False
+    assert result["phase"] == "runtime"
+    assert result["current_switched"] is True
+    assert restarts == []
+    assert _current_target(config.release_dir).name == "edge-agent-0.3.0"
+    assert _link_target(config.release_dir, "previous") is not None
+    assert _link_target(config.release_dir, "previous").name == "edge-agent-0.4.0"  # type: ignore[union-attr]
+    receipt = json.loads((config.release_staging_dir / "install-receipt.json").read_text())
+    assert receipt["release_id"] == bad["release_id"]
+    assert receipt["result"] == "failed"
+    assert receipt["rollback_confirmed"] is True
+    assert receipt["rollback_release_id"] == previous["release_id"]
 
 
 def test_health_version_mismatch_rolls_back_and_marks_bad_release_failed(tmp_path: Path) -> None:
@@ -171,6 +254,39 @@ def test_health_version_mismatch_rolls_back_and_marks_bad_release_failed(tmp_pat
     assert receipt["release_id"] == bad["release_id"]
     assert receipt["rollback_confirmed"] is True
     assert receipt["rollback_release_id"] == previous["release_id"]
+
+
+def test_first_install_runtime_failure_without_previous_is_critical(tmp_path: Path) -> None:
+    database = tmp_path / "edge.db"
+    _db(database)
+    config = _config(tmp_path, database)
+    bad = _stage(config.release_staging_dir, "edge-agent-0.4.0")
+    restarts: list[str] = []
+
+    def fail_runtime(_root: Path, _python: str) -> dict:
+        raise RuntimeError("simulated first-install runtime failure")
+
+    result = apply_system_update_transaction(
+        config,
+        emergency_window_bypass=True,
+        restart_service=lambda service: restarts.append(service),
+        health_probe=lambda *_args: {"status": "ok", "software_version": "edge-agent-0.4.0"},
+        runtime_prepare=fail_runtime,
+        staged_verifier=_trusted_for_transaction,
+    )
+
+    assert result["ok"] is False
+    assert result["phase"] == "critical"
+    assert result["current_switched"] is True
+    assert result["rollback"] is None
+    assert restarts == []
+    assert _current_target(config.release_dir).name == "edge-agent-0.4.0"
+    assert _link_target(config.release_dir, "previous") is None
+    receipt = json.loads((config.release_staging_dir / "install-receipt.json").read_text())
+    assert receipt["release_id"] == bad["release_id"]
+    assert receipt["result"] == "failed"
+    assert receipt["rollback_confirmed"] is False
+    assert "rollback" in receipt["error"].lower()
 
 
 def test_active_exam_blocks_transaction_before_copy_link_switch_or_restart(tmp_path: Path) -> None:
