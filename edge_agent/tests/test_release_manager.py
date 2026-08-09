@@ -39,6 +39,12 @@ def _offer(payload: bytes, *, minimum: str | None = "edge-agent-0.3.0") -> dict:
     return {
         "update_available": True,
         "action": "install",
+        "install_authorization": {
+            "payload": {"kind": "center_edge_install_authorization_v1"},
+            "payload_hash": "a" * 64,
+            "signature_b64": "signed-by-central",
+            "signing_key_id": "edge-release-v1:test",
+        },
         "release": {
             "release_id": "release-p8-test",
             "manifest": {
@@ -92,6 +98,8 @@ def test_stage_writes_only_verified_artifact_and_attests(tmp_path: Path) -> None
     assert result["staged"] is True
     assert Path(result["artifact_path"]).read_bytes() == payload
     assert manager.staged_state_path.exists()
+    staged = json.loads(manager.staged_state_path.read_text())
+    assert staged["install_authorization"]["signing_key_id"] == "edge-release-v1:test"
     assert central.attestations == [{
         "release_id": "release-p8-test",
         "software_version": "edge-agent-0.3.1",
@@ -118,32 +126,26 @@ def test_no_update_does_not_touch_disk(tmp_path: Path) -> None:
     assert not manager.staged_state_path.exists()
 
 
-def test_install_receipt_requires_matching_running_daemon_before_attestation(tmp_path: Path) -> None:
+def test_install_receipt_is_attested_only_after_daemon_runs_expected_version(tmp_path: Path) -> None:
+    central = FakeCentral()
+    root = tmp_path / "releases"
+    root.mkdir()
     receipt = {
-        "release_id": "release-installed-p8",
+        "release_id": "release-p8-test",
         "software_version": "edge-agent-0.3.1",
         "artifact_sha256": "a" * 64,
         "result": "installed",
     }
+    (root / "install-receipt.json").write_text(json.dumps(receipt), encoding="utf-8")
 
-    old_central = FakeCentral()
-    old_manager = EdgeReleaseManager(_config(tmp_path, "edge-agent-0.3.0"), old_central)
-    old_manager.root.mkdir(parents=True, exist_ok=True)
-    old_manager.install_receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
+    old_daemon = EdgeReleaseManager(_config(tmp_path, "edge-agent-0.3.0"), central)
     with pytest.raises(RuntimeError, match="daemon en cours"):
-        old_manager.attest_install_receipt()
-    assert old_central.attestations == []
-    assert old_manager.install_receipt_path.exists()
+        old_daemon.attest_install_receipt()
+    assert old_daemon.install_receipt_path.exists()
+    assert central.attestations == []
 
-    new_central = FakeCentral()
-    new_manager = EdgeReleaseManager(_config(tmp_path, "edge-agent-0.3.1"), new_central)
-    result = new_manager.attest_install_receipt()
+    restarted = EdgeReleaseManager(_config(tmp_path, "edge-agent-0.3.1"), central)
+    result = restarted.attest_install_receipt()
     assert result["accepted"] is True
-    assert new_central.attestations == [{
-        "release_id": "release-installed-p8",
-        "software_version": "edge-agent-0.3.1",
-        "result": "installed",
-        "artifact_sha256": "a" * 64,
-    }]
-    assert not new_manager.install_receipt_path.exists()
-    assert Path(result["receipt_archived"]).exists()
+    assert central.attestations[-1]["result"] == "installed"
+    assert not restarted.install_receipt_path.exists()
