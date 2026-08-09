@@ -8,6 +8,7 @@ function fakeJwt(): string {
 
 const releaseId = 'release-p8-ui-001';
 const nodeId = 'node-canary-ratoma';
+const artifactSha = 'a'.repeat(64);
 
 const release = {
   release_id: releaseId,
@@ -20,18 +21,28 @@ const release = {
   rollback_release_id: null,
   manifest: {
     kind: 'center_edge_release_manifest_v1',
-    version: 1,
+    version: 2,
     release_id: releaseId,
     software_version: 'edge-agent-0.3.1',
     artifact: {
       format: 'tar.gz',
       url: 'https://releases.coderoute.gov.gn/edge-agent-0.3.1.tar.gz',
-      sha256: 'a'.repeat(64),
+      sha256: artifactSha,
       size_bytes: 8_388_608,
     },
     created_at: '2026-08-09T00:00:00Z',
     min_current_version: 'edge-agent-0.3.0',
     release_notes: 'Canary P8 DNTT',
+    supply_chain: {
+      builder: 'github-actions',
+      source_commit_sha: '1'.repeat(40),
+      workflow_ref: 'Edge Release Supply Chain@refs/tags/edge-agent-0.3.1',
+      provenance_url: 'https://github.com/skaba89/CodeRouteGuinee/attestations/1',
+      sbom_sha256: 'c'.repeat(64),
+      sbom_attestation_url: 'https://github.com/skaba89/CodeRouteGuinee/attestations/2',
+      subject_sha256: artifactSha,
+      vulnerability_scan_status: 'passed',
+    },
   },
   manifest_hash: 'b'.repeat(64),
   manifest_signature_b64: 'signature',
@@ -54,25 +65,25 @@ async function mockNationalData(page: Page) {
     status: 200,
     contentType: 'application/json',
     body: JSON.stringify({
-      generated_at: new Date().toISOString(), status: 'healthy', target_software_version: 'edge-agent-0.3.0',
-      required_capabilities: ['release-staging-v1', 'release-attestation-v1'],
+      generated_at: new Date().toISOString(), status: 'healthy', target_software_version: 'edge-agent-0.4.0',
+      required_capabilities: ['release-staging-v1', 'release-attestation-v1', 'supply-chain-evidence-v1'],
       summary: {
         centers_total: 1, centers_healthy: 1, centers_degraded: 0, centers_critical: 0, centers_without_gateway: 0,
         nodes_total: 1, nodes_active: 1, nodes_online: 1, sync_pending: 0, revalidation_required: 0, corrupt_leases: 0,
-        version_drift_nodes: 0, capability_drift_nodes: 0,
+        version_drift_nodes: 1, capability_drift_nodes: 1,
       },
-      rollout: { target_version: 'edge-agent-0.3.0', compliant_nodes: 1, upgrade_required_nodes: 0, blocked_nodes: 0 },
+      rollout: { target_version: 'edge-agent-0.4.0', compliant_nodes: 0, upgrade_required_nodes: 1, blocked_nodes: 0 },
       centers: [{
-        center_id: 'center-ratoma', code: 'RATOMA', name: 'Centre Ratoma', city: 'Conakry', health_score: 98,
+        center_id: 'center-ratoma', code: 'RATOMA', name: 'Centre Ratoma', city: 'Conakry', health_score: 88,
         health_status: 'healthy', node_count: 1, online_nodes: 1, sync_pending: 0, revalidation_required: 0,
-        corrupt_leases: 0, version_drift_nodes: 0, alerts: [],
+        corrupt_leases: 0, version_drift_nodes: 1, alerts: [],
       }],
       nodes: [{
         node_id: nodeId, reference: 'EDGE-RATOMA-01', center_id: 'center-ratoma', center_code: 'RATOMA', label: 'Gateway Ratoma',
         status: 'active', online: true, capabilities: ['release-staging-v1', 'release-attestation-v1'], last_sequence: 9,
         last_seen_at: new Date().toISOString(), software_version: 'edge-agent-0.3.0', clock_skew_seconds: 1,
         telemetry: { active_leases: 0, finalized_leases: 0, synced_leases: 10, sync_pending: 0, revalidation_required: 0, corrupt_leases: 0, media_files: 10, media_bytes: 1000 },
-        health_score: 98, health_status: 'healthy', alerts: [], version_drift: false, missing_capabilities: [],
+        health_score: 88, health_status: 'healthy', alerts: [], version_drift: true, missing_capabilities: ['supply-chain-evidence-v1'],
       }],
     }),
   }));
@@ -118,6 +129,7 @@ test('super_admin can operate signed canary rollout and see attestations', async
   await expect(panel).toBeVisible();
   await expect(panel.getByText('Pilotage super-admin')).toBeVisible();
   await expect(panel.getByText('edge-agent-0.3.1', { exact: true }).first()).toBeVisible();
+  await expect(panel.getByText('Supply chain OK', { exact: true })).toBeVisible();
   await expect(panel.getByText('Gateway Ratoma', { exact: false })).toBeVisible();
 
   await panel.getByRole('button', { name: 'Canary', exact: true }).click();

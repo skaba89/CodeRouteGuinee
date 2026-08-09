@@ -1,0 +1,41 @@
+[Unit]
+Description=CodeRoute Guinea Center Edge Agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=coderoute-edge
+Group=coderoute-edge
+EnvironmentFile=/etc/coderoute-edge/edge.env
+WorkingDirectory=/opt/coderoute-edge/releases/current/edge_agent
+ExecStart=/opt/coderoute-edge/releases/current/.venv/bin/python -m coderoute_edge
+Restart=on-failure
+RestartSec=5s
+TimeoutStartSec=90s
+TimeoutStopSec=30s
+UMask=0077
+
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+LockPersonality=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+RemoveIPC=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+ReadOnlyPaths=/etc/coderoute-edge /opt/coderoute-edge/releases
+ReadWritePaths=/var/lib/coderoute-edge /var/cache/coderoute-edge
+
+[Install]
+WantedBy=multi-user.target

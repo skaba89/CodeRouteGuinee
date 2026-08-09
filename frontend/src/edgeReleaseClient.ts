@@ -8,6 +8,17 @@ const API_BASE_URL = normalizeApiBaseUrl(
   import.meta.env.VITE_API_BASE_URL ?? import.meta.env.VITE_API_URL ?? 'http://localhost:8000',
 );
 
+export type EdgeSupplyChainEvidence = {
+  builder: string;
+  source_commit_sha: string;
+  workflow_ref: string;
+  provenance_url: string;
+  sbom_sha256: string;
+  sbom_attestation_url?: string | null;
+  subject_sha256: string;
+  vulnerability_scan_status: 'passed' | 'failed';
+};
+
 export type EdgeReleaseManifest = {
   kind: string;
   version: number;
@@ -22,6 +33,7 @@ export type EdgeReleaseManifest = {
   created_at: string;
   min_current_version?: string | null;
   release_notes?: string | null;
+  supply_chain?: EdgeSupplyChainEvidence | null;
 };
 
 export type EdgeRelease = {
@@ -39,6 +51,7 @@ export type EdgeRelease = {
   signing_key_id: string;
   created_at?: string | null;
   updated_at?: string | null;
+  supply_chain_ready?: boolean;
 };
 
 export type EdgeReleaseCreatePayload = {
@@ -123,6 +136,15 @@ export function getEdgeReleases(): Promise<EdgeRelease[]> {
 export function createEdgeRelease(payload: EdgeReleaseCreatePayload): Promise<EdgeRelease> {
   return request<EdgeRelease>('/api/v1/center-edge/releases', {
     method: 'POST', body: JSON.stringify(payload),
+  }, true);
+}
+
+export function attachEdgeSupplyChainEvidence(
+  releaseId: string,
+  evidence: EdgeSupplyChainEvidence,
+): Promise<EdgeRelease> {
+  return request<EdgeRelease>(`/api/v1/center-edge/releases/${encodeURIComponent(releaseId)}/supply-chain`, {
+    method: 'POST', body: JSON.stringify(evidence),
   }, true);
 }
 

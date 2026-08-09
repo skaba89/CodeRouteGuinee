@@ -28,6 +28,7 @@ jobs:
           AUTO_CREATE_TABLES: 'true'
           ENVIRONMENT: test
           EDGE_LEASE_SIGNING_SECRET: coderoute-agent-ci-edge-signing-secret-at-least-32-characters
+          EDGE_RELEASE_SIGNING_SECRET: coderoute-agent-ci-release-signing-secret-at-least-32-characters
         run: |
           candidates=(
             tests/test_exam_attempt_access.py
@@ -36,6 +37,8 @@ jobs:
             tests/test_center_edge_offline.py
             tests/test_center_edge_fleet.py
             tests/test_center_edge_release.py
+            tests/test_center_edge_supply_chain.py
+            tests/test_edge_install_authorization.py
             tests/test_media_policy.py
             tests/test_question_media_schema_compat.py
             tests/test_e2e_exam_question_trace.py
@@ -66,9 +69,9 @@ jobs:
           python-version: '3.12'
       - name: Install Center Edge Agent dependencies
         run: pip install -q -r edge_agent/requirements.txt
-      - name: Compile Center Edge Agent
-        run: python -m compileall -q edge_agent/coderoute_edge
-      - name: Test encrypted offline agent
+      - name: Compile Center Edge Agent and privileged scripts
+        run: python -m compileall -q edge_agent/coderoute_edge edge_agent/scripts
+      - name: Test encrypted offline agent, release chain and system updater
         env:
           PYTHONPATH: edge_agent
         run: pytest -q --tb=short --disable-warnings edge_agent/tests
@@ -114,6 +117,7 @@ jobs:
             tests/e2e/national-edge-fleet.spec.ts
             tests/e2e/edge-release-rollout.spec.ts
             tests/e2e/center-edge-release-local.spec.ts
+            tests/e2e/edge-supply-chain.spec.ts
           )
           selected=()
           for file in "${candidates[@]}"; do
@@ -153,7 +157,7 @@ jobs:
             description="$3"
             case "$result" in
               success) state=success ;;
-              failure|cancelled) state=failure ;; 
+              failure|cancelled) state=failure ;;
               *) state=error ;;
             esac
             gh api \
@@ -166,7 +170,7 @@ jobs:
           }
 
           publish_status "$BACKEND_RESULT" "agent-ci/backend-targeted" "Targeted backend regression suite"
-          publish_status "$EDGE_AGENT_RESULT" "agent-ci/edge-agent" "Center Edge Agent encrypted offline suite"
+          publish_status "$EDGE_AGENT_RESULT" "agent-ci/edge-agent" "Center Edge Agent + P9 updater suite"
           publish_status "$FRONTEND_BUILD_RESULT" "agent-ci/frontend-build" "Frontend typecheck and production build"
           publish_status "$FRONTEND_E2E_RESULT" "agent-ci/frontend-e2e" "Targeted Playwright regressions"
 

@@ -35,14 +35,14 @@ def _meets_minimum(current: str, minimum: str | None) -> bool:
 class EdgeReleaseManager:
     """Gestion non privilégiée des releases.
 
-    Ce composant peut vérifier et télécharger un artefact, mais ne modifie jamais
-    le code en cours d'exécution. L'activation est confiée à l'updater local.
+    P9 écrit uniquement dans un staging séparé de l'arbre exécutable root-owned.
+    Le daemon peut télécharger et vérifier, mais ne peut pas déplacer `current`.
     """
 
     def __init__(self, config: EdgeAgentConfig, central: CentralClient):
         self.config = config
         self.central = central
-        self.root = config.release_dir
+        self.root = getattr(config, "release_staging_dir", None) or config.release_dir
         self.root.mkdir(parents=True, exist_ok=True)
 
     @property
@@ -118,6 +118,9 @@ class EdgeReleaseManager:
         bundle = offer.get("release")
         if not isinstance(bundle, dict) or not self.central.verify_release_bundle(bundle):
             raise RuntimeError("Signature centrale de release Edge invalide")
+        install_authorization = offer.get("install_authorization")
+        if not isinstance(install_authorization, dict):
+            raise RuntimeError("Autorisation d'installation centrale P9 absente")
 
         manifest = bundle.get("manifest")
         if not isinstance(manifest, dict) or manifest.get("kind") != "center_edge_release_manifest_v1":
@@ -163,8 +166,11 @@ class EdgeReleaseManager:
             "artifact_sha256": expected_sha,
             "artifact_size_bytes": expected_size,
             "artifact_path": str(final_path.resolve()),
+            "manifest": manifest,
             "manifest_hash": bundle.get("manifest_hash"),
+            "manifest_signature_b64": bundle.get("manifest_signature_b64"),
             "signing_key_id": bundle.get("signing_key_id"),
+            "install_authorization": install_authorization,
             "verified": True,
         }
         self._write_json_atomic(self.staged_state_path, state)

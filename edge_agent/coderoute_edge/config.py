@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 from dataclasses import dataclass
 from pathlib import Path
@@ -7,6 +8,16 @@ from pathlib import Path
 
 def _truthy(value: str | None) -> bool:
     return (value or "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _installed_version(release_dir: Path) -> str | None:
+    state = release_dir / "current" / ".release-state.json"
+    try:
+        data = json.loads(state.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    value = str(data.get("software_version") or "").strip() if isinstance(data, dict) else ""
+    return value or None
 
 
 @dataclass(frozen=True)
@@ -21,6 +32,7 @@ class EdgeAgentConfig:
     operator_token: str
     allowed_origins: tuple[str, ...]
     release_dir: Path = Path(".coderoute-edge/releases")
+    release_staging_dir: Path | None = None
     software_version: str = "edge-agent-0.4.0"
     max_media_bytes: int = 50 * 1024 * 1024
     max_release_bytes: int = 512 * 1024 * 1024
@@ -35,6 +47,7 @@ class EdgeAgentConfig:
     systemd_service_name: str = "coderoute-edge.service"
     healthcheck_timeout_seconds: int = 60
     healthcheck_ca_path: Path | None = None
+    runtime_python: str = "/usr/bin/python3"
 
     @classmethod
     def from_env(cls) -> "EdgeAgentConfig":
@@ -46,6 +59,10 @@ class EdgeAgentConfig:
         storage_key_path = Path(os.environ.get("CODEROUTE_EDGE_STORAGE_KEY_PATH", ".coderoute-edge/storage.key"))
         media_cache_dir = Path(os.environ.get("CODEROUTE_EDGE_MEDIA_DIR", ".coderoute-edge/media"))
         release_dir = Path(os.environ.get("CODEROUTE_EDGE_RELEASE_DIR", ".coderoute-edge/releases"))
+        release_staging_dir = Path(os.environ.get(
+            "CODEROUTE_EDGE_RELEASE_STAGING_DIR",
+            ".coderoute-edge/release-staging",
+        ))
         operator_token = os.environ.get("CODEROUTE_EDGE_OPERATOR_TOKEN", "").strip()
         origins = tuple(
             origin.strip()
@@ -55,7 +72,8 @@ class EdgeAgentConfig:
             ).split(",")
             if origin.strip()
         )
-        version = os.environ.get("CODEROUTE_EDGE_SOFTWARE_VERSION", "edge-agent-0.4.0").strip()
+        explicit_version = os.environ.get("CODEROUTE_EDGE_SOFTWARE_VERSION", "").strip()
+        version = explicit_version or _installed_version(release_dir) or "edge-agent-0.4.0"
         max_media = int(os.environ.get("CODEROUTE_EDGE_MAX_MEDIA_BYTES", str(50 * 1024 * 1024)))
         max_release = int(os.environ.get("CODEROUTE_EDGE_MAX_RELEASE_BYTES", str(512 * 1024 * 1024)))
         bind_host = os.environ.get("CODEROUTE_EDGE_BIND_HOST", "0.0.0.0").strip()
@@ -72,6 +90,7 @@ class EdgeAgentConfig:
         healthcheck_timeout = int(os.environ.get("CODEROUTE_EDGE_HEALTHCHECK_TIMEOUT_SECONDS", "60"))
         ca_raw = os.environ.get("CODEROUTE_EDGE_HEALTHCHECK_CA_PATH", "").strip()
         healthcheck_ca = Path(ca_raw) if ca_raw else None
+        runtime_python = os.environ.get("CODEROUTE_EDGE_RUNTIME_PYTHON", "/usr/bin/python3").strip()
 
         errors: list[str] = []
         if not central_url.startswith("https://"):
@@ -107,6 +126,10 @@ class EdgeAgentConfig:
             errors.append("CODEROUTE_EDGE_SYSTEMD_SERVICE invalide")
         if healthcheck_timeout < 10 or healthcheck_timeout > 600:
             errors.append("CODEROUTE_EDGE_HEALTHCHECK_TIMEOUT_SECONDS doit être compris entre 10 et 600")
+        if not runtime_python.startswith("/"):
+            errors.append("CODEROUTE_EDGE_RUNTIME_PYTHON doit être un chemin absolu")
+        if release_staging_dir.resolve() == release_dir.resolve():
+            errors.append("CODEROUTE_EDGE_RELEASE_STAGING_DIR doit être distinct de CODEROUTE_EDGE_RELEASE_DIR en P9")
         if errors:
             raise RuntimeError("Configuration Edge invalide : " + "; ".join(errors))
 
@@ -121,6 +144,7 @@ class EdgeAgentConfig:
             operator_token=operator_token,
             allowed_origins=origins,
             release_dir=release_dir,
+            release_staging_dir=release_staging_dir,
             software_version=version,
             max_media_bytes=max_media,
             max_release_bytes=max_release,
@@ -135,4 +159,5 @@ class EdgeAgentConfig:
             systemd_service_name=systemd_service_name,
             healthcheck_timeout_seconds=healthcheck_timeout,
             healthcheck_ca_path=healthcheck_ca,
+            runtime_python=runtime_python,
         )

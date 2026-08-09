@@ -1,0 +1,13 @@
+[Unit]
+Description=CodeRoute Guinea Center Edge Update Check Timer
+
+[Timer]
+OnBootSec=10min
+OnUnitActiveSec=15min
+RandomizedDelaySec=2min
+AccuracySec=1min
+Persistent=true
+Unit=coderoute-edge-updater.service
+
+[Install]
+WantedBy=timers.target
