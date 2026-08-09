@@ -14,6 +14,7 @@ from app.models_center_incident import CenterIncident
 from app.models_device_session import DeviceSession
 from app.models_user import User
 from app.soc_config import get_soc_settings
+from app.soc_metrics import record_audit_chain_check
 
 router = APIRouter(prefix="/operations/security", tags=["security-operations"])
 
@@ -57,6 +58,8 @@ def security_status(
     )
 
     audit = verify_audit_chain(db)
+    record_audit_chain_check(bool(audit.get("valid", False)), now)
+
     alerts: list[dict] = []
     if not audit.get("valid", False):
         alerts.append({"code": "AUDIT_CHAIN_INVALID", "severity": "critical"})
