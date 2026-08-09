@@ -49,15 +49,12 @@ jobs:
           )
           selected=()
           for file in "${candidates[@]}"; do
-            if [ -f "$file" ]; then
-              selected+=("$file")
-            fi
+            if [ -f "$file" ]; then selected+=("$file"); fi
           done
           if [ "${#selected[@]}" -eq 0 ]; then
             echo "No targeted backend tests found on this branch."
             exit 0
           fi
-          printf 'Running targeted backend tests:\n - %s\n' "${selected[@]}"
           pytest -q --tb=short --disable-warnings "${selected[@]}"
 
   edge-agent:
@@ -121,17 +118,13 @@ jobs:
           )
           selected=()
           for file in "${candidates[@]}"; do
-            if [ -f "$file" ]; then
-              selected+=("$file")
-            fi
+            if [ -f "$file" ]; then selected+=("$file"); fi
           done
           if [ "${#selected[@]}" -eq 0 ]; then
             echo "No targeted frontend E2E tests found on this branch."
             exit 0
           fi
-          echo "Installing Chromium for targeted Playwright tests."
           npx playwright install --with-deps chromium
-          printf 'Running targeted frontend tests:\n - %s\n' "${selected[@]}"
           npx playwright test "${selected[@]}" --timeout=30000 --retries=1
 
   publish-agent-statuses:
@@ -152,37 +145,17 @@ jobs:
         shell: bash
         run: |
           publish_status() {
-            result="$1"
-            context="$2"
-            description="$3"
+            result="$1"; context="$2"; description="$3"
             case "$result" in
               success) state=success ;;
               failure|cancelled) state=failure ;;
               *) state=error ;;
             esac
-            gh api \
-              --method POST \
-              -H "Accept: application/vnd.github+json" \
-              "/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
-              -f state="$state" \
-              -f context="$context" \
-              -f description="$description ($result)"
+            gh api --method POST -H "Accept: application/vnd.github+json" "/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -f state="$state" -f context="$context" -f description="$description ($result)"
           }
-
           publish_status "$BACKEND_RESULT" "agent-ci/backend-targeted" "Targeted backend regression suite"
           publish_status "$EDGE_AGENT_RESULT" "agent-ci/edge-agent" "Center Edge Agent + P9 updater suite"
           publish_status "$FRONTEND_BUILD_RESULT" "agent-ci/frontend-build" "Frontend typecheck and production build"
           publish_status "$FRONTEND_E2E_RESULT" "agent-ci/frontend-e2e" "Targeted Playwright regressions"
-
-          if [ "$BACKEND_RESULT" = success ] && [ "$EDGE_AGENT_RESULT" = success ] && [ "$FRONTEND_BUILD_RESULT" = success ] && [ "$FRONTEND_E2E_RESULT" = success ]; then
-            overall=success
-          else
-            overall=failure
-          fi
-          gh api \
-            --method POST \
-            -H "Accept: application/vnd.github+json" \
-            "/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
-            -f state="$overall" \
-            -f context="agent-ci/overall" \
-            -f description="Agent branch validation"
+          if [ "$BACKEND_RESULT" = success ] && [ "$EDGE_AGENT_RESULT" = success ] && [ "$FRONTEND_BUILD_RESULT" = success ] && [ "$FRONTEND_E2E_RESULT" = success ]; then overall=success; else overall=failure; fi
+          gh api --method POST -H "Accept: application/vnd.github+json" "/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -f state="$overall" -f context="agent-ci/overall" -f description="Agent branch validation"
