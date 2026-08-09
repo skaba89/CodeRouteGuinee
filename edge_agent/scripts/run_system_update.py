@@ -18,10 +18,21 @@ def main() -> int:
     )
     args = parser.parse_args()
     config = EdgeAgentConfig.from_env()
-    result = apply_system_update_transaction(
-        config,
-        emergency_window_bypass=args.emergency_window_bypass,
-    )
+    if not (config.release_dir / "staged.json").is_file():
+        print(json.dumps({"ok": True, "phase": "skipped", "reason": "no_staged_release"}))
+        return 0
+    try:
+        result = apply_system_update_transaction(
+            config,
+            emergency_window_bypass=args.emergency_window_bypass,
+        )
+    except RuntimeError as exc:
+        message = str(exc)
+        if "hors fenêtre" in message or "Mise à jour Edge bloquée" in message:
+            print(json.dumps({"ok": True, "phase": "skipped", "reason": message}, ensure_ascii=False))
+            return 0
+        print(json.dumps({"ok": False, "phase": "preflight", "error": message}, ensure_ascii=False))
+        return 30
     print(json.dumps(result, ensure_ascii=False, sort_keys=True))
     if result.get("ok"):
         return 0
