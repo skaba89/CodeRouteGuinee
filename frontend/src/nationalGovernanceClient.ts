@@ -81,7 +81,9 @@ export type HomologationEvidenceCode =
 
 export type HomologationEvidence = {
   reference: string;
-  artifact_sha256: string;
+  // Optional for legacy P12 records created before SHA-256 evidence integrity.
+  // Such records are displayed as migration-required and rejected on submit.
+  artifact_sha256?: string | null;
   issued_at: string;
   note?: string | null;
   attached_by?: string;
