@@ -23,6 +23,7 @@ StagedVerifier = Callable[[dict[str, Any], Path], dict[str, Any]]
 
 
 def _json_atomic(path: Path, payload: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(path.suffix + ".tmp")
     tmp.write_text(json.dumps(payload, sort_keys=True, ensure_ascii=False, indent=2), encoding="utf-8")
     os.replace(tmp, path)
@@ -61,8 +62,8 @@ def _probe_health(public_url: str, timeout_seconds: int, ca_path: Path | None) -
     raise RuntimeError(f"Health-check Edge expiré : {last_error}")
 
 
-def _read_staged(release_root: Path) -> dict[str, Any]:
-    path = release_root / "staged.json"
+def _read_staged(staging_root: Path) -> dict[str, Any]:
+    path = staging_root / "staged.json"
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
@@ -72,20 +73,20 @@ def _read_staged(release_root: Path) -> dict[str, Any]:
     return data
 
 
-def _verify_staged_with_local_trust(staged: dict[str, Any], release_root: Path) -> dict[str, Any]:
+def _verify_staged_with_local_trust(staged: dict[str, Any], staging_root: Path) -> dict[str, Any]:
     trust_store = Path(os.environ.get(
         "CODEROUTE_EDGE_RELEASE_TRUST_PATH",
         "/etc/coderoute-edge/release-trust.json",
     ))
     return verify_staged_release_for_root(
         staged,
-        release_root=release_root,
+        release_root=staging_root,
         trust_store_path=trust_store,
     )
 
 
 def _failed_receipt(
-    release_root: Path,
+    staging_root: Path,
     staged: dict[str, Any],
     *,
     error: str,
@@ -101,7 +102,7 @@ def _failed_receipt(
         "rollback_release_id": rollback.get("release_id") if rollback else None,
         "rollback_version": rollback.get("software_version") if rollback else None,
     }
-    _json_atomic(release_root / "install-receipt.json", receipt)
+    _json_atomic(staging_root / "install-receipt.json", receipt)
     return receipt
 
 
@@ -114,6 +115,33 @@ def _sha256_file(path: Path) -> str:
                 break
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _copy_into_root_workspace(staged: dict[str, Any], staging_root: Path, release_root: Path) -> dict[str, Any]:
+    if staging_root.resolve() == release_root.resolve():
+        return staged
+    release_root.mkdir(parents=True, exist_ok=True)
+    release_id = str(staged.get("release_id") or "")
+    source = Path(str(staged.get("artifact_path") or "")).resolve()
+    expected_source = (staging_root / f"{release_id}.tar.gz").resolve()
+    if source != expected_source or not source.is_file():
+        raise RuntimeError("Artefact de staging introuvable ou hors staging approuvé")
+    destination = release_root / f"{release_id}.tar.gz"
+    tmp = release_root / f".root-copy-{release_id}.tmp"
+    with source.open("rb") as src, tmp.open("wb") as dst:
+        shutil.copyfileobj(src, dst, length=1024 * 1024)
+        dst.flush()
+        os.fsync(dst.fileno())
+    os.replace(tmp, destination)
+    root_state = dict(staged)
+    root_state["artifact_path"] = str(destination.resolve())
+    _json_atomic(release_root / "staged.json", root_state)
+    return root_state
+
+
+def _handoff_receipt(staging_root: Path, receipt: dict[str, Any]) -> None:
+    _json_atomic(staging_root / "install-receipt.json", receipt)
+    (staging_root / "staged.json").unlink(missing_ok=True)
 
 
 def _prepare_offline_runtime(target_root: Path, runtime_python: str) -> dict[str, Any]:
@@ -184,25 +212,22 @@ def apply_system_update_transaction(
     runtime_prepare: RuntimePrepare = _prepare_offline_runtime,
     staged_verifier: StagedVerifier = _verify_staged_with_local_trust,
 ) -> dict[str, Any]:
-    """Applique une release vérifiée comme transaction système locale.
-
-    Ordre P9 : fenêtre -> quiescence -> signature root-owned -> re-hash/extract
-    P8 -> runtime offline hash-locké -> restart -> health/version. Un échec
-    après bascule déclenche un rollback local puis un second health-check.
-    """
+    """Applique une release depuis le staging non privilégié vers l'arbre root-owned."""
     state = assert_safe_maintenance(
         config.database_path,
         config.maintenance_windows,
         config.maintenance_timezone,
         bypass_window=emergency_window_bypass,
     )
-    staged = _read_staged(config.release_dir)
-    root_verification = staged_verifier(staged, config.release_dir)
+    staging_root = getattr(config, "release_staging_dir", None) or config.release_dir
+    staged = _read_staged(staging_root)
+    root_verification = staged_verifier(staged, staging_root)
     expected_version = str(root_verification.get("software_version") or staged.get("software_version") or "")
     if not expected_version:
         raise RuntimeError("Version staged absente")
 
     try:
+        _copy_into_root_workspace(staged, staging_root, config.release_dir)
         installed = apply_verified_release(config.release_dir)
         target_root = Path(str(installed.get("current_path") or ""))
         runtime = runtime_prepare(target_root, config.runtime_python)
@@ -213,11 +238,12 @@ def apply_system_update_transaction(
         except Exception:
             rollback_receipt = None
         failed = _failed_receipt(
-            config.release_dir,
+            staging_root,
             staged,
             error=f"apply/runtime: {exc}",
             rollback=rollback_receipt,
         )
+        _handoff_receipt(staging_root, failed)
         return {
             "ok": False,
             "phase": "runtime" if rollback_receipt else "critical",
@@ -235,6 +261,7 @@ def apply_system_update_transaction(
             raise RuntimeError(
                 f"Version démarrée {running_version or 'inconnue'} différente de la version attendue {expected_version}"
             )
+        _handoff_receipt(staging_root, installed)
         return {
             "ok": True,
             "phase": "confirmed",
@@ -264,7 +291,8 @@ def apply_system_update_transaction(
         if rollback_error is not None:
             error += f"; rollback: {rollback_error}"
             rollback_receipt = None
-        failed = _failed_receipt(config.release_dir, staged, error=error, rollback=rollback_receipt)
+        failed = _failed_receipt(staging_root, staged, error=error, rollback=rollback_receipt)
+        _handoff_receipt(staging_root, failed)
         return {
             "ok": False,
             "phase": "rolled_back" if rollback_receipt else "critical",
