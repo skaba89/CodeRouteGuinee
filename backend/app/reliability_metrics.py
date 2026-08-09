@@ -11,7 +11,7 @@ import time
 from datetime import UTC, datetime
 
 from prometheus_client import CollectorRegistry, Counter, Gauge, Histogram, generate_latest, multiprocess
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 from starlette.middleware.base import BaseHTTPMiddleware
 
@@ -35,13 +35,13 @@ HTTP_INFLIGHT = Gauge(
 )
 READINESS_COMPONENT = Gauge(
     "coderoute_readiness_component_state",
-    "État d'un composant de readiness: 1=ok/disabled, 0.5=warning/degraded, 0=error.",
+    "État le plus récemment observé d'un composant de readiness: 1=ok/disabled, 0.5=warning/degraded, 0=error.",
     ("component",),
-    multiprocess_mode="livemin",
+    multiprocess_mode="livemostrecent",
 )
 RELIABILITY_EVIDENCE_LAST_SUCCESS = Gauge(
     "coderoute_reliability_evidence_last_success_timestamp_seconds",
-    "Dernier événement d'exploitation réussi par type.",
+    "Horodatage réel du dernier événement d'exploitation réussi par type.",
     ("kind",),
     multiprocess_mode="livemax",
 )
@@ -51,6 +51,7 @@ _EVIDENCE_ACTIONS = {
     "restore_drill_passed": "reliability.restore_drill_passed",
     "ha_failover_probe_passed": "reliability.ha_failover_probe_passed",
 }
+_ACTION_TO_KIND = {action: kind for kind, action in _EVIDENCE_ACTIONS.items()}
 
 
 def _route_template(request) -> str:
@@ -97,24 +98,52 @@ def update_readiness_metrics(checks: dict[str, dict]) -> None:
         READINESS_COMPONENT.labels(component=component).set(mapping.get(state, 0.0))
 
 
+def _parse_occurred_at(details) -> datetime | None:
+    if not isinstance(details, dict):
+        return None
+    raw = details.get("occurred_at")
+    if not isinstance(raw, str) or not raw.strip():
+        return None
+    try:
+        value = datetime.fromisoformat(raw)
+    except ValueError:
+        return None
+    return value if value.tzinfo is not None else value.replace(tzinfo=UTC)
+
+
+def latest_reliability_evidence_times(db: Session) -> dict[str, datetime | None]:
+    """Retourne l'heure réelle des preuves, jamais leur heure tardive d'ingestion."""
+    result: dict[str, datetime | None] = {kind: None for kind in _EVIDENCE_ACTIONS}
+    rows = db.execute(
+        select(AuditLog.action, AuditLog.details)
+        .where(AuditLog.action.in_(tuple(_ACTION_TO_KIND)))
+        .order_by(AuditLog.created_at.desc())
+        .limit(3000)
+    ).all()
+    for action, details in rows:
+        kind = _ACTION_TO_KIND.get(str(action))
+        if kind is None:
+            continue
+        occurred = _parse_occurred_at(details)
+        if occurred is None:
+            continue
+        current = result[kind]
+        if current is None or occurred > current:
+            result[kind] = occurred
+    return result
+
+
 def refresh_reliability_evidence_metrics(db: Session) -> None:
-    """Recharge les timestamps depuis le journal central après un restart API."""
-    for kind, action in _EVIDENCE_ACTIONS.items():
-        latest = db.scalar(select(func.max(AuditLog.created_at)).where(AuditLog.action == action))
-        timestamp = 0.0
-        if latest is not None:
-            if latest.tzinfo is None:
-                latest = latest.replace(tzinfo=UTC)
-            timestamp = latest.timestamp()
-        RELIABILITY_EVIDENCE_LAST_SUCCESS.labels(kind=kind).set(timestamp)
+    for kind, occurred in latest_reliability_evidence_times(db).items():
+        RELIABILITY_EVIDENCE_LAST_SUCCESS.labels(kind=kind).set(
+            occurred.timestamp() if occurred is not None else 0.0
+        )
 
 
 def record_reliability_evidence_metric(kind: str, occurred_at: datetime) -> None:
     if kind not in _EVIDENCE_ACTIONS:
         return
-    value = occurred_at
-    if value.tzinfo is None:
-        value = value.replace(tzinfo=UTC)
+    value = occurred_at if occurred_at.tzinfo is not None else occurred_at.replace(tzinfo=UTC)
     RELIABILITY_EVIDENCE_LAST_SUCCESS.labels(kind=kind).set(value.timestamp())
 
 
