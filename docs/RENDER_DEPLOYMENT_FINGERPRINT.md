@@ -25,6 +25,8 @@ Aucun secret, token, credential Render ou variable applicative sensible n'est ex
 
 Render doit donc attendre la réussite des checks CI du commit avant le déploiement. Le workflow `National Code Readiness` couvre les changements `backend/**`, `frontend/**`, `ops/**` et `render.yaml`.
 
+Le gate national exécute également les régressions transverses P10.2/PITR, P11/SOC, P12/homologation, le Go-Live Evidence Pack et les scénarios E2E du Command Center. Les anciens workflows de patch à permission `contents: write`, utilisés pendant la construction du Command Center, sont supprimés du livrable final ; seul le contrôle permanent doit rester.
+
 ## Vérification depuis GitHub — recommandée
 
 Après la fin du déploiement Render :
