@@ -35,14 +35,14 @@ def _meets_minimum(current: str, minimum: str | None) -> bool:
 class EdgeReleaseManager:
     """Gestion non privilégiée des releases.
 
-    Ce composant peut vérifier et télécharger un artefact, mais ne modifie jamais
-    le code en cours d'exécution. L'activation est confiée à l'updater local.
+    P9 écrit uniquement dans un staging séparé de l'arbre exécutable root-owned.
+    Le daemon peut télécharger et vérifier, mais ne peut pas déplacer `current`.
     """
 
     def __init__(self, config: EdgeAgentConfig, central: CentralClient):
         self.config = config
         self.central = central
-        self.root = config.release_dir
+        self.root = getattr(config, "release_staging_dir", None) or config.release_dir
         self.root.mkdir(parents=True, exist_ok=True)
 
     @property
@@ -155,9 +155,6 @@ class EdgeReleaseManager:
             tmp_path.unlink(missing_ok=True)
             raise
 
-        # P9 conserve la preuve signée complète pour que l'updater root puisse
-        # refaire sa propre vérification depuis un trust store qu'un daemon
-        # compromis ne peut pas modifier.
         state = {
             "release_id": release_id,
             "action": str(offer.get("action") or "install"),
