@@ -37,6 +37,7 @@ jobs:
         run: |
           pytest -q --tb=short --disable-warnings \
             tests/test_distributed_ha.py \
+            tests/test_middleware_ha.py \
             tests/test_ha_config.py \
             tests/test_pra_scripts.py \
             tests/test_health.py
