@@ -1,0 +1,75 @@
+name: P12 Evidence UI Source Patch
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/p12-ui-patch.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref || github.ref_name }}
+      - name: Integrate evidence panel and PITR readiness label
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          dashboard = Path('frontend/src/components/NationalDashboard.tsx')
+          text = dashboard.read_text(encoding='utf-8')
+          import_anchor = "import { NationalGovernancePanel } from './NationalGovernancePanel';\n"
+          import_line = "import { NationalHomologationEvidencePanel } from './NationalHomologationEvidencePanel';\n"
+          if import_line not in text:
+              if text.count(import_anchor) != 1:
+                  raise SystemExit('NationalGovernancePanel import anchor missing/duplicated')
+              text = text.replace(import_anchor, import_anchor + import_line, 1)
+          render_anchor = '      <NationalGovernancePanel />\n'
+          render_line = '      <NationalHomologationEvidencePanel />\n'
+          if render_line not in text:
+              if text.count(render_anchor) != 1:
+                  raise SystemExit('NationalGovernancePanel render anchor missing/duplicated')
+              text = text.replace(render_anchor, render_anchor + render_line, 1)
+          dashboard.write_text(text, encoding='utf-8')
+
+          panel = Path('frontend/src/components/NationalGovernancePanel.tsx')
+          text = panel.read_text(encoding='utf-8')
+          pitr = "  pitr_provider: 'PITR fournisseur',\n"
+          restore = "  restore_drill: 'Restore drill',\n"
+          if pitr not in text:
+              if text.count(restore) != 1:
+                  raise SystemExit('restore_drill label anchor missing/duplicated')
+              text = text.replace(restore, restore + pitr, 1)
+          panel.write_text(text, encoding='utf-8')
+          PY
+      - name: Verify patch scope
+        shell: bash
+        run: |
+          git diff -- frontend/src/components/NationalDashboard.tsx frontend/src/components/NationalGovernancePanel.tsx
+          python - <<'PY'
+          from pathlib import Path
+          dashboard = Path('frontend/src/components/NationalDashboard.tsx').read_text(encoding='utf-8')
+          assert dashboard.count("import { NationalHomologationEvidencePanel } from './NationalHomologationEvidencePanel';") == 1
+          assert dashboard.count('<NationalHomologationEvidencePanel />') == 1
+          panel = Path('frontend/src/components/NationalGovernancePanel.tsx').read_text(encoding='utf-8')
+          assert panel.count("pitr_provider: 'PITR fournisseur'") == 1
+          PY
+      - name: Commit exact UI integration
+        shell: bash
+        run: |
+          if git diff --quiet -- frontend/src/components/NationalDashboard.tsx frontend/src/components/NationalGovernancePanel.tsx; then
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add frontend/src/components/NationalDashboard.tsx frontend/src/components/NationalGovernancePanel.tsx
+          git commit -m 'frontend: integrate hashed homologation evidence workflow'
+          git push origin HEAD:${{ github.event.pull_request.head.ref || github.ref_name }}
