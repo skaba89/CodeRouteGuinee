@@ -226,7 +226,7 @@ class GlobalRateLimitMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next: "Callable") -> Response:
         path = request.url.path
-        if path.startswith("/health") or path.startswith("/static"):
+        if path.startswith("/health") or path.startswith("/static") or path == "/internal/metrics":
             return await call_next(request)
 
         identity = self._client_ip(request)
