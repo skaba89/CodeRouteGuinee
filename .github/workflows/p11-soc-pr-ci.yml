@@ -1,4 +1,4 @@
-name: P11 SOC PR CI
+name: P11 SOC CI
 
 on:
   pull_request:
@@ -8,12 +8,25 @@ on:
       - 'ops/**'
       - 'render.yaml'
       - 'docs/P11_SOC_SECURITY_OPERATIONS.md'
+      - 'docs/P11_GO_LIVE_GATE.md'
+      - '.github/workflows/p11-soc-pr-ci.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - 'ops/**'
+      - 'render.yaml'
+      - 'docs/P11_SOC_SECURITY_OPERATIONS.md'
+      - 'docs/P11_GO_LIVE_GATE.md'
       - '.github/workflows/p11-soc-pr-ci.yml'
   workflow_dispatch:
 
 jobs:
   p11-backend-security:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -35,6 +48,8 @@ jobs:
           DATABASE_URL: sqlite+pysqlite:///:memory:
           AUTO_CREATE_TABLES: 'true'
           ENVIRONMENT: test
+          SOC_ENABLED: 'false'
+          AUDIT_CHAIN_ENABLED: 'false'
           EDGE_LEASE_SIGNING_SECRET: coderoute-p11-ci-edge-signing-secret-at-least-32-characters
           EDGE_RELEASE_SIGNING_SECRET: coderoute-p11-ci-release-signing-secret-at-least-32-characters
         run: |
@@ -55,7 +70,9 @@ jobs:
             tests/test_soc_privacy.py \
             tests/test_audit_chain_p11.py \
             tests/test_audit_immutability_p11.py \
-            tests/test_soc_runtime_security.py
+            tests/test_soc_runtime_security.py \
+            tests/test_soc_go_live_readiness.py \
+            tests/test_go_live_evidence_pack.py
 
   p11-security-iac:
     runs-on: ubuntu-latest
@@ -66,7 +83,7 @@ jobs:
           python-version: '3.12'
       - name: Install YAML validator
         run: pip install -q PyYAML
-      - name: Validate dormant SOC rollout and security rules
+      - name: Validate dormant rollout, go-live boundary and security rules
         shell: bash
         run: |
           python - <<'PY'
@@ -87,6 +104,14 @@ jobs:
           assert env['AUDIT_CHAIN_HMAC_KEY']['sync'] is False
           assert env['OTEL_EXPORTER_OTLP_HEADERS']['sync'] is False
 
+          security_status = Path('backend/app/routers/security_operations.py').read_text(encoding='utf-8')
+          for marker in ('OTLP_NOT_READY', 'WAF_NOT_READY', 'SIEM_NOT_READY', '"go_live": go_live'):
+              assert marker in security_status, marker
+
+          evidence_pack = Path('backend/scripts/collect_go_live_evidence.py').read_text(encoding='utf-8')
+          assert '"P11_NO_CRITICAL_SIGNAL"' in evidence_pack
+          assert 'security.get("status") == "ok"' in evidence_pack
+
           rules = yaml.safe_load(Path('ops/prometheus/security.rules.yml').read_text(encoding='utf-8'))
           expressions = '\n'.join(
               str(rule.get('expr', ''))
@@ -105,31 +130,34 @@ jobs:
 
           load = Path('ops/load/k6-national-smoke.js').read_text(encoding='utf-8')
           assert 'ALLOW_PRODUCTION_LOAD_TEST' in load
-          print('P11 SOC/IaC invariants: OK')
+          print('P11 SOC/IaC/go-live invariants: OK')
           PY
 
   p11-frontend:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: frontend
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
       - name: Install frontend dependencies
-        working-directory: frontend
         run: npm ci
+      - name: Reject high and critical npm vulnerabilities
+        run: npm run audit:security
       - name: Typecheck SOC dashboard
-        working-directory: frontend
         run: npm run typecheck
       - name: Build production frontend
-        working-directory: frontend
         run: npm run build
       - name: Install Chromium
-        working-directory: frontend
         run: npx playwright install --with-deps chromium
       - name: Run national SOC E2E
-        working-directory: frontend
         env:
           VITE_API_BASE_URL: http://localhost:8000
           CI: 'true'
-        run: npx playwright test tests/e2e/national-soc-security.spec.ts --timeout=30000 --retries=1
+        run: npx playwright test tests/e2e/national-soc-security.spec.ts --project=chromium --timeout=30000 --retries=1
