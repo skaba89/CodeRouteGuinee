@@ -55,7 +55,6 @@ def _compute_hmac(entry: AuditLog, *, seq: int, prev_hash: str, key: str) -> str
 
 
 def _legacy_digest(entries: list[AuditLog]) -> str:
-    """Empreinte exacte de tout l'historique pré-P11, y compris ancien chaînage."""
     digest = hashlib.sha256()
     ordered = sorted(entries, key=lambda item: (_dt(item.created_at) or "", item.id or ""))
     for item in ordered:
@@ -149,11 +148,12 @@ def append_audit(
 
 
 def ensure_audit_chain_anchor(db: Session) -> dict:
-    """Crée l'ancre P11 même si une ancienne chaîne SHA existe déjà."""
+    """Crée l'ancre P11 une seule fois, même avec plusieurs instances au boot."""
     settings = get_soc_settings()
     if not settings.audit_chain_enabled:
         return {"enabled": False, "created": False}
 
+    _lock_chain(db)
     existing_anchor = _p11_anchor(db)
     if existing_anchor:
         return {"enabled": True, "created": False, "anchor_id": existing_anchor.id}
@@ -208,9 +208,7 @@ def verify_audit_chain(db: Session) -> dict:
     anchor_seq = int(anchor.seq)
     legacy = list(
         db.scalars(
-            select(AuditLog).where(
-                (AuditLog.seq.is_(None)) | (AuditLog.seq < anchor_seq)
-            )
+            select(AuditLog).where((AuditLog.seq.is_(None)) | (AuditLog.seq < anchor_seq))
         ).all()
     )
     expected_count = int(anchor.details.get("legacy_count", -1))
@@ -226,40 +224,20 @@ def verify_audit_chain(db: Session) -> dict:
 
     entries = list(
         db.scalars(
-            select(AuditLog)
-            .where(AuditLog.seq >= anchor_seq)
-            .order_by(AuditLog.seq.asc())
+            select(AuditLog).where(AuditLog.seq >= anchor_seq).order_by(AuditLog.seq.asc())
         ).all()
     )
     expected_seq = anchor_seq
     expected_prev = anchor.prev_hash or GENESIS_HASH
-    for index, item in enumerate(entries):
+    for item in entries:
         seq = int(item.seq or 0)
         if seq != expected_seq:
-            return {
-                "enabled": True,
-                "valid": False,
-                "total_entries": len(entries),
-                "broken_at_seq": seq,
-                "reason": "sequence_gap",
-            }
+            return {"enabled": True, "valid": False, "total_entries": len(entries), "broken_at_seq": seq, "reason": "sequence_gap"}
         if item.prev_hash != expected_prev:
-            return {
-                "enabled": True,
-                "valid": False,
-                "total_entries": len(entries),
-                "broken_at_seq": seq,
-                "reason": "prev_hash_mismatch",
-            }
+            return {"enabled": True, "valid": False, "total_entries": len(entries), "broken_at_seq": seq, "reason": "prev_hash_mismatch"}
         recomputed = _compute_hmac(item, seq=seq, prev_hash=item.prev_hash or GENESIS_HASH, key=key)
         if not item.entry_hash or not hmac.compare_digest(item.entry_hash, recomputed):
-            return {
-                "enabled": True,
-                "valid": False,
-                "total_entries": len(entries),
-                "broken_at_seq": seq,
-                "reason": "entry_hmac_mismatch",
-            }
+            return {"enabled": True, "valid": False, "total_entries": len(entries), "broken_at_seq": seq, "reason": "entry_hmac_mismatch"}
         expected_prev = item.entry_hash
         expected_seq += 1
 
