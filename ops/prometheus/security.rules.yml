@@ -1,0 +1,61 @@
+groups:
+  - name: coderoute-soc-national
+    interval: 30s
+    rules:
+      - alert: CodeRouteSOCAuditChainInvalid
+        expr: coderoute_audit_chain_valid < 1
+        for: 1m
+        labels:
+          severity: critical
+          service: coderoute
+          domain: security
+        annotations:
+          summary: "Intégrité du journal d'audit CodeRoute invalide"
+          runbook: "docs/P11_SOC_SECURITY_OPERATIONS.md#audit-chain"
+
+      - alert: CodeRouteSOCAuditVerificationStale
+        expr: |
+          coderoute_audit_chain_last_verify_timestamp_seconds == 0
+          or
+          (time() - coderoute_audit_chain_last_verify_timestamp_seconds) > 1800
+        for: 5m
+        labels:
+          severity: critical
+          service: coderoute
+          domain: security
+        annotations:
+          summary: "Journal d'audit non vérifié depuis plus de 30 minutes"
+          runbook: "docs/P11_SOC_SECURITY_OPERATIONS.md#audit-chain"
+
+      - alert: CodeRouteSOCBruteForceSignal
+        expr: sum(rate(coderoute_security_events_total{kind="access_denied"}[5m])) > 0.2
+        for: 5m
+        labels:
+          severity: warning
+          service: coderoute
+          domain: security
+        annotations:
+          summary: "Hausse soutenue des accès refusés"
+          runbook: "docs/P11_SOC_SECURITY_OPERATIONS.md#authentification"
+
+      - alert: CodeRouteSOCRateLimitSpike
+        expr: sum(rate(coderoute_security_events_total{kind="rate_limited"}[5m])) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          service: coderoute
+          domain: security
+        annotations:
+          summary: "Hausse des requêtes bloquées par rate limiting"
+          runbook: "docs/P11_SOC_SECURITY_OPERATIONS.md#abus-et-ddos"
+
+      - alert: CodeRouteSOCServerErrorBurst
+        expr: sum(rate(coderoute_security_events_total{kind="server_error"}[5m])) > 0.05
+        for: 3m
+        labels:
+          severity: critical
+          service: coderoute
+          domain: security
+        annotations:
+          summary: "Rafale de 5xx observée par la télémétrie SOC"
+          runbook: "docs/P11_SOC_SECURITY_OPERATIONS.md#incident-applicatif"

@@ -1,15 +1,20 @@
 from __future__ import annotations
 
 import secrets
+import time
 
 from fastapi import APIRouter, HTTPException, Request, Response, status
 from prometheus_client import CONTENT_TYPE_LATEST
 
+from app.audit_chain import verify_audit_chain
 from app.db.session import SessionLocal
 from app.reliability_config import get_reliability_settings
 from app.reliability_metrics import prometheus_payload, refresh_reliability_evidence_metrics
+from app.soc_config import get_soc_settings
+from app.soc_metrics import record_audit_chain_check
 
 router = APIRouter(tags=["metrics"])
+_AUDIT_VERIFY_LAST_MONOTONIC = 0.0
 
 
 def _provided_token(request: Request) -> str:
@@ -17,6 +22,19 @@ def _provided_token(request: Request) -> str:
     if authorization.lower().startswith("bearer "):
         return authorization[7:].strip()
     return request.headers.get("x-metrics-token", "").strip()
+
+
+def _maybe_refresh_audit_integrity(db) -> None:
+    global _AUDIT_VERIFY_LAST_MONOTONIC
+    soc = get_soc_settings()
+    if not soc.enabled or not soc.audit_chain_enabled:
+        return
+    now = time.monotonic()
+    if now - _AUDIT_VERIFY_LAST_MONOTONIC < soc.audit_verify_interval_seconds:
+        return
+    report = verify_audit_chain(db)
+    record_audit_chain_check(bool(report.get("valid", False)))
+    _AUDIT_VERIFY_LAST_MONOTONIC = now
 
 
 @router.get("/internal/metrics", include_in_schema=False)
@@ -33,9 +51,12 @@ def metrics(request: Request) -> Response:
         db = SessionLocal()
         try:
             refresh_reliability_evidence_metrics(db)
+            _maybe_refresh_audit_integrity(db)
         finally:
             db.close()
     except Exception:
+        # Le scrape reste disponible même si PostgreSQL est temporairement indisponible.
+        # L'alerte de fraîcheur du contrôle d'audit signalera l'absence de vérification.
         pass
 
     return Response(
