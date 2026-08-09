@@ -1,0 +1,67 @@
+name: PITR Readiness Source Patch
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/pitr-readiness-patch.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref || github.ref_name }}
+      - name: Apply one exact readiness change
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('backend/app/national_governance.py')
+          text = path.read_text(encoding='utf-8')
+          before = '''    operational_evidence = [
+              ("backup_off_region", "reliability.backup_uploaded", timedelta(hours=26)),
+              ("restore_drill", "reliability.restore_drill_passed", timedelta(days=35)),
+              ("api_failover", "reliability.ha_failover_probe_passed", timedelta(days=35)),
+          ]'''.replace('          ', '    ')
+          after = '''    operational_evidence = [
+              ("backup_off_region", "reliability.backup_uploaded", timedelta(hours=26)),
+              ("restore_drill", "reliability.restore_drill_passed", timedelta(days=35)),
+              ("pitr_provider", "reliability.pitr_drill_passed", timedelta(days=35)),
+              ("api_failover", "reliability.ha_failover_probe_passed", timedelta(days=35)),
+          ]'''.replace('          ', '    ')
+          if 'reliability.pitr_drill_passed' in text:
+              print('PITR readiness already present')
+          elif before not in text:
+              raise SystemExit('expected build_readiness operational_evidence block not found')
+          else:
+              path.write_text(text.replace(before, after, 1), encoding='utf-8')
+              print('PITR readiness gate inserted')
+          PY
+      - name: Verify diff scope
+        shell: bash
+        run: |
+          git diff -- backend/app/national_governance.py
+          python - <<'PY'
+          from pathlib import Path
+          text = Path('backend/app/national_governance.py').read_text(encoding='utf-8')
+          assert text.count('reliability.pitr_drill_passed') == 1
+          assert '("pitr_provider", "reliability.pitr_drill_passed", timedelta(days=35))' in text
+          PY
+      - name: Commit exact source patch
+        shell: bash
+        run: |
+          if git diff --quiet -- backend/app/national_governance.py; then
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add backend/app/national_governance.py
+          git commit -m 'governance: require fresh PITR evidence for national readiness'
+          git push origin HEAD:${{ github.event.pull_request.head.ref || github.ref_name }}
