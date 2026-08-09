@@ -10,9 +10,13 @@ from app.routers import national_readiness as national_readiness
 # L'initialisation du package n'a lieu qu'une fois par processus Python.
 dashboard.router.include_router(national_readiness.router)
 
-# Center Edge : le protocole offline est exposé via le garde strict qui lie
-# chaque lease au DeviceSession + CenterStation officiels de la tentative.
+# Center Edge : les gardes stricts sont montés AVANT leurs implémentations
+# génériques afin que FastAPI résolve les routes sensibles par la version gardée.
 from app.routers import center_edge as center_edge
+from app.routers import center_edge_release as center_edge_release
+from app.routers import center_edge_release_guard as center_edge_release_guard
 from app.routers import center_edge_station_guard as center_edge_station_guard
 
 center_edge.router.include_router(center_edge_station_guard.router)
+center_edge.router.include_router(center_edge_release_guard.router)
+center_edge.router.include_router(center_edge_release.router)

@@ -8,15 +8,23 @@ from urllib.parse import urlsplit, urlunsplit
 from .central import CentralClient
 from .media import MediaCache
 from .operator_view import build_operator_status
+from .release import EdgeReleaseManager
 from .store import EdgeStore
 from .tickets import media_ticket
 
 
 class EdgeAgentService:
-    def __init__(self, store: EdgeStore, central: CentralClient, media: MediaCache):
+    def __init__(
+        self,
+        store: EdgeStore,
+        central: CentralClient,
+        media: MediaCache,
+        release_manager: EdgeReleaseManager | None = None,
+    ):
         self.store = store
         self.central = central
         self.media = media
+        self.release_manager = release_manager
 
     def _fleet_telemetry(self) -> dict[str, int]:
         status = self.operator_status()
@@ -124,10 +132,35 @@ class EdgeAgentService:
     def heartbeat(self) -> dict[str, Any]:
         return self.central.heartbeat(self._fleet_telemetry())
 
+    def release_check(self) -> dict[str, Any]:
+        if not self.release_manager:
+            raise RuntimeError("Gestionnaire de release Edge non configuré")
+        self.heartbeat()
+        return self.release_manager.check()
+
+    def release_stage(self) -> dict[str, Any]:
+        if not self.release_manager:
+            raise RuntimeError("Gestionnaire de release Edge non configuré")
+        offer = self.release_check()
+        return self.release_manager.stage(offer)
+
+    def release_status(self) -> dict[str, Any]:
+        if not self.release_manager:
+            return {"enabled": False, "staged": None, "install_receipt": None}
+        return {"enabled": True, **self.release_manager.status()}
+
+    def release_attest_install(self) -> dict[str, Any]:
+        if not self.release_manager:
+            raise RuntimeError("Gestionnaire de release Edge non configuré")
+        return self.release_manager.attest_install_receipt()
+
     def status(self) -> dict[str, Any]:
         """Statut public minimal utilisé par /health."""
         return {"lease_counts": self.store.counts()}
 
     def operator_status(self) -> dict[str, Any]:
         """Vue détaillée réservée à l'opérateur authentifié du centre."""
-        return build_operator_status(self.store, self.media)
+        return {
+            **build_operator_status(self.store, self.media),
+            "release": self.release_status(),
+        }
