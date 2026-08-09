@@ -46,6 +46,8 @@ jobs:
             tests/test_reliability_config.py \
             tests/test_reliability_api.py \
             tests/test_reliability_security.py \
+            tests/test_reliability_evidence_time.py \
+            tests/test_reliability_evidence_publisher.py \
             tests/test_metrics_endpoint.py \
             tests/test_secure_backup_bundle.py \
             tests/test_offsite_backup.py \
@@ -81,6 +83,7 @@ jobs:
           assert 'BACKUP_ENCRYPTION_KEY_B64' not in backend_env
           assert 'AWS_ACCESS_KEY_ID' not in backend_env
           assert 'AWS_SECRET_ACCESS_KEY' not in backend_env
+          assert 'BACKUP_DATABASE_URL' not in backend_env
 
           assert backup['type'] == 'cron'
           assert backup['runtime'] == 'docker'
@@ -97,7 +100,8 @@ jobs:
           assert evidence_source['name'] == 'coderoute-backend'
           assert evidence_source['envVarKey'] == 'RELIABILITY_EVIDENCE_TOKEN'
 
-          rules = yaml.safe_load(Path('ops/prometheus/coderoute.rules.yml').read_text(encoding='utf-8'))
+          rules_text = Path('ops/prometheus/coderoute.rules.yml').read_text(encoding='utf-8')
+          rules = yaml.safe_load(rules_text)
           alerts = {
               rule['alert']
               for group in rules['groups']
@@ -113,5 +117,6 @@ jobs:
               'CodeRouteFailoverEvidenceStale',
           }
           assert required_alerts <= alerts
+          assert 'configuration|database|schema|migrations"} == 0' in rules_text
           print('P10.2 IaC and alert invariants: OK')
           PY
