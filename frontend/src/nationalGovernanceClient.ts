@@ -72,12 +72,38 @@ export type TechnicalContract = {
   alignment: { aligned: boolean; runtime?: ExamPolicyParameters; drift: Array<Record<string, unknown>> };
 };
 
+export type HomologationEvidenceCode =
+  | 'dntt_exam_rules'
+  | 'legal_review'
+  | 'security_assessment'
+  | 'operations_readiness'
+  | 'content_signoff';
+
+export type HomologationEvidence = {
+  reference: string;
+  // Optional for legacy P12 records created before SHA-256 evidence integrity.
+  // Such records are displayed as migration-required and rejected on submit.
+  artifact_sha256?: string | null;
+  issued_at: string;
+  note?: string | null;
+  attached_by?: string;
+  attached_at?: string;
+};
+
 export type HomologationDocument = {
   kind: string;
   policy_reference: string;
   policy_sha256: string;
   target_scope: 'pilot' | 'national';
-  evidence: Record<string, { reference: string; issued_at: string; note?: string | null }>;
+  evidence: Partial<Record<HomologationEvidenceCode, HomologationEvidence>>;
+  evidence_history?: Array<{
+    code: HomologationEvidenceCode;
+    reference?: string | null;
+    artifact_sha256?: string | null;
+    issued_at?: string | null;
+    replaced_by?: string;
+    replaced_at?: string;
+  }>;
   approvals: Array<{ actor_id: string; role: string; approved_at: string; note: string }>;
   decision?: Record<string, unknown> | null;
   document_sha256: string;
@@ -101,9 +127,11 @@ async function request<T>(path: string, init?: RequestInit, mutating = false): P
       const payload = await response.json() as { detail?: unknown };
       if (typeof payload.detail === 'string') detail = payload.detail;
       else if (payload.detail && typeof payload.detail === 'object') {
-        const object = payload.detail as { code?: unknown; blockers?: unknown; drift?: unknown };
+        const object = payload.detail as { code?: unknown; blockers?: unknown; missing?: unknown; invalid?: unknown };
         if (object.code) detail = String(object.code);
         if (Array.isArray(object.blockers) && object.blockers.length) detail += ` — ${object.blockers.join(', ')}`;
+        if (Array.isArray(object.missing) && object.missing.length) detail += ` — manquantes: ${object.missing.join(', ')}`;
+        if (Array.isArray(object.invalid) && object.invalid.length) detail += ' — intégrité de preuve invalide';
       }
     } catch { /* fallback */ }
     throw new Error(detail);
@@ -160,5 +188,40 @@ export function createHomologationDossier(payload: {
 }): Promise<GovernanceRecord<HomologationDocument>> {
   return request('/api/v1/national-governance/homologation-dossiers', {
     method: 'POST', body: JSON.stringify(payload),
+  }, true);
+}
+
+export function attachHomologationEvidence(
+  reference: string,
+  payload: {
+    code: HomologationEvidenceCode;
+    reference: string;
+    artifact_sha256: string;
+    issued_at: string;
+    note?: string | null;
+  },
+): Promise<GovernanceRecord<HomologationDocument>> {
+  return request(`/api/v1/national-governance/homologation-dossiers/${encodeURIComponent(reference)}/evidence`, {
+    method: 'POST', body: JSON.stringify(payload),
+  }, true);
+}
+
+export function submitHomologationDossier(reference: string): Promise<GovernanceRecord<HomologationDocument>> {
+  return request(`/api/v1/national-governance/homologation-dossiers/${encodeURIComponent(reference)}/submit`, { method: 'POST' }, true);
+}
+
+export function approveHomologationDossier(reference: string, note: string): Promise<GovernanceRecord<HomologationDocument>> {
+  return request(`/api/v1/national-governance/homologation-dossiers/${encodeURIComponent(reference)}/approve`, {
+    method: 'POST', body: JSON.stringify({ note }),
+  }, true);
+}
+
+export function decideHomologationDossier(
+  reference: string,
+  approve: boolean,
+  note: string,
+): Promise<GovernanceRecord<HomologationDocument>> {
+  return request(`/api/v1/national-governance/homologation-dossiers/${encodeURIComponent(reference)}/decision?approve=${approve ? 'true' : 'false'}`, {
+    method: 'POST', body: JSON.stringify({ note }),
   }, true);
 }

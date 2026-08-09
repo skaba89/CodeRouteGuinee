@@ -24,6 +24,7 @@ const CHECK_LABELS: Record<string, string> = {
   accredited_centers: 'Centres accrédités',
   backup_off_region: 'Backup hors région',
   restore_drill: 'Restore drill',
+  pitr_provider: 'PITR fournisseur',
   api_failover: 'Failover API',
 };
 
