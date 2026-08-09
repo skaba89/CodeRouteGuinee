@@ -1,0 +1,93 @@
+name: P10 PITR Evidence PR CI
+
+on:
+  pull_request:
+    paths:
+      - 'backend/app/routers/reliability.py'
+      - 'backend/app/reliability_metrics.py'
+      - 'backend/app/national_governance.py'
+      - 'backend/scripts/collect_go_live_evidence.py'
+      - 'backend/scripts/publish_reliability_evidence.py'
+      - 'backend/tests/test_reliability_api.py'
+      - 'backend/tests/test_reliability_evidence_publisher.py'
+      - 'backend/tests/test_go_live_evidence_pitr.py'
+      - 'backend/tests/test_national_readiness_pitr.py'
+      - 'ops/prometheus/coderoute.rules.yml'
+      - 'docs/P10_2_PITR_EVIDENCE.md'
+      - '.github/workflows/p10-pitr-pr-ci.yml'
+  workflow_dispatch:
+
+jobs:
+  pitr-backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install backend dependencies
+        working-directory: backend
+        run: pip install -q -r requirements.txt
+      - name: Compile changed modules
+        working-directory: backend
+        run: python -m compileall -q app scripts/collect_go_live_evidence.py scripts/publish_reliability_evidence.py
+      - name: Run PITR and reliability regressions
+        working-directory: backend
+        env:
+          PYTHONPATH: .
+          DATABASE_URL: sqlite+pysqlite:///:memory:
+          AUTO_CREATE_TABLES: 'true'
+          ENVIRONMENT: test
+          SOC_ENABLED: 'false'
+          AUDIT_CHAIN_ENABLED: 'false'
+          EDGE_LEASE_SIGNING_SECRET: coderoute-pitr-ci-edge-signing-secret-at-least-32-characters
+          EDGE_RELEASE_SIGNING_SECRET: coderoute-pitr-ci-release-signing-secret-at-least-32-characters
+        run: |
+          pytest -q --tb=short --disable-warnings \
+            tests/test_reliability_api.py \
+            tests/test_reliability_evidence_time.py \
+            tests/test_reliability_evidence_publisher.py \
+            tests/test_go_live_evidence_pack.py \
+            tests/test_go_live_evidence_pitr.py \
+            tests/test_national_readiness_pitr.py \
+            tests/test_national_governance.py \
+            tests/test_national_homologation.py
+
+  pitr-observability-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install YAML validator
+        run: pip install -q PyYAML
+      - name: Verify PITR alert and readiness invariants
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import yaml
+
+          rules = yaml.safe_load(Path('ops/prometheus/coderoute.rules.yml').read_text(encoding='utf-8'))
+          alerts = {
+              rule['alert']
+              for group in rules['groups']
+              for rule in group['rules']
+              if 'alert' in rule
+          }
+          assert 'CodeRoutePITREvidenceStale' in alerts
+          rules_text = Path('ops/prometheus/coderoute.rules.yml').read_text(encoding='utf-8')
+          assert 'kind="pitr_drill_passed"' in rules_text
+          assert '3024000' in rules_text
+
+          governance = Path('backend/app/national_governance.py').read_text(encoding='utf-8')
+          assert governance.count('reliability.pitr_drill_passed') == 1
+          assert '("pitr_provider", "reliability.pitr_drill_passed", timedelta(days=35))' in governance
+
+          reliability = Path('backend/app/routers/reliability.py').read_text(encoding='utf-8')
+          assert 'observed_rpo_minutes' in reliability
+          assert 'observed_rto_minutes' in reliability
+          print('PITR evidence/readiness invariants: OK')
+          PY
