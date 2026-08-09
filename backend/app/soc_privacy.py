@@ -23,11 +23,23 @@ _PSEUDONYM_KEYS = {
     "actor_id": "actor",
     "entity_id": "entity",
     "device_session_id": "device",
+    "email": "email",
+    "phone": "phone",
+    "telephone": "phone",
+    "identity_number": "identity",
+    "nni": "identity",
     "ip": "ip",
     "client_ip": "ip",
 }
+_SECRET_KEYS = {
+    "password", "passwd", "pwd", "token", "access_token", "refresh_token",
+    "csrf_token", "secret", "secret_key", "api_key", "authorization", "cookie",
+    "client_secret", "private_key", "pin", "cvv",
+}
+_OPAQUE_KEYS = {"url", "query", "query_string", "body", "request_body", "form_data"}
 _UUID_RE = re.compile(r"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}\b")
 _IPV4_RE = re.compile(r"(?<![\d.])(?:\d{1,3}\.){3}\d{1,3}(?![\d.])")
+_EMAIL_RE = re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b")
 
 
 def pseudonymize(value: object, namespace: str) -> str:
@@ -51,14 +63,17 @@ def pseudonymize_ip(value: object) -> str:
 
 
 def sanitize_identifier_field(key: str, value: object) -> object:
-    namespace = _PSEUDONYM_KEYS.get(key.lower())
+    lowered = key.lower()
+    if lowered in _SECRET_KEYS or lowered in _OPAQUE_KEYS:
+        return _REDACTED
+    namespace = _PSEUDONYM_KEYS.get(lowered)
     if namespace is None:
         return value
     return pseudonymize_ip(value) if namespace == "ip" else pseudonymize(value, namespace)
 
 
 def sanitize_free_text(text: str) -> str:
-    """Supprime UUID/IP bruts qui auraient échappé aux champs structurés."""
+    """Supprime UUID/IP/email bruts qui auraient échappé aux champs structurés."""
     if not text:
         return text
 
@@ -73,8 +88,12 @@ def sanitize_free_text(text: str) -> str:
             return value
         return pseudonymize_ip(value)
 
+    def _email(match: re.Match[str]) -> str:
+        return pseudonymize(match.group(0).lower(), "email")
+
     text = _UUID_RE.sub(_uuid, text)
-    return _IPV4_RE.sub(_ip, text)
+    text = _IPV4_RE.sub(_ip, text)
+    return _EMAIL_RE.sub(_email, text)
 
 
 def _sanitize_nested(key: str, value: object) -> object:
@@ -88,6 +107,12 @@ def _sanitize_nested(key: str, value: object) -> object:
     if isinstance(value, (list, tuple)):
         return [_sanitize_nested(key, item) for item in value]
     return value
+
+
+def sanitize_context(context: dict | None) -> dict:
+    if not isinstance(context, dict):
+        return {}
+    return {str(key): _sanitize_nested(str(key), value) for key, value in context.items()}
 
 
 def _inject_trace_context(record: logging.LogRecord) -> None:
