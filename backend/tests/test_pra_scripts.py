@@ -24,6 +24,16 @@ def test_production_entrypoint_does_not_migrate_or_seed_by_default():
     assert "./scripts/predeploy.sh" in script
 
 
+def test_prometheus_multiprocess_directory_is_bounded_and_cleaned_before_gunicorn():
+    script = _text("entrypoint.sh")
+    assert 'PROMETHEUS_MULTIPROC_DIR="/tmp/coderoute-prometheus"' in script
+    assert 'rm -rf -- "$PROMETHEUS_MULTIPROC_DIR"' in script
+    assert 'exec gunicorn app.main:app -c gunicorn.conf.py' in script
+    gunicorn = _text("gunicorn.conf.py")
+    assert "def child_exit" in gunicorn
+    assert "mark_process_dead(worker.pid)" in gunicorn
+
+
 def test_restore_drill_refuses_protected_database_and_requires_opt_in():
     script = _text("scripts/restore_drill.sh")
     assert "ALLOW_DESTRUCTIVE_RESTORE_DRILL" in script
@@ -64,3 +74,20 @@ def test_backup_has_checksum_manifest_and_no_plaintext_url_output():
     assert "coderoute_postgres_backup_v1" in script
     assert 'echo "$SOURCE_URL"' not in script
     assert 'echo "$PG_URL"' not in script
+
+
+def test_offsite_orchestrator_removes_plaintext_before_upload_completion():
+    script = _text("scripts/run_offsite_backup.sh")
+    assert "secure_backup_bundle.py pack" in script
+    assert 'rm -f -- "$DUMP" "$MANIFEST"' in script
+    assert "upload_backup_s3.py" in script
+    assert script.index('rm -f -- "$DUMP" "$MANIFEST"') < script.index("upload_backup_s3.py")
+    assert "trap cleanup EXIT INT TERM" in script
+
+
+def test_secure_restore_uses_ephemeral_directory_and_cleanup_trap():
+    script = _text("scripts/secure_restore_drill.sh")
+    assert "mktemp -d" in script
+    assert "trap cleanup EXIT INT TERM" in script
+    assert "secure_backup_bundle.py unpack" in script
+    assert "restore_drill.sh" in script
