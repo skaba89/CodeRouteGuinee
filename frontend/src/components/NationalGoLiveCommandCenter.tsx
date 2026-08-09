@@ -74,6 +74,9 @@ function DomainCard({
             </div>
           </div>
         ))}
+        {items.length === 0 && (
+          <div style={{ fontSize: 11, color: 'var(--muted)' }}>Source de readiness indisponible — aucun PASS déduit.</div>
+        )}
       </div>
     </div>
   );
@@ -95,25 +98,39 @@ export function NationalGoLiveCommandCenter() {
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
-      try {
-        const [nextReliability, nextSecurity, nextGovernance] = await Promise.all([
-          getReliabilityStatus(),
-          getSecurityOperationsStatus(),
-          getGovernanceReadiness(),
-        ]);
-        if (!cancelled) {
-          setReliability(nextReliability);
-          setSecurity(nextSecurity);
-          setGovernance(nextGovernance);
-          setNowMs(Date.now());
-          setError('');
-        }
-      } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : 'Command Center indisponible.');
-      } finally {
-        if (!cancelled) setLoading(false);
+      const results = await Promise.allSettled([
+        getReliabilityStatus(),
+        getSecurityOperationsStatus(),
+        getGovernanceReadiness(),
+      ] as const);
+      if (cancelled) return;
+
+      const [reliabilityResult, securityResult, governanceResult] = results;
+      const failedSources: string[] = [];
+
+      if (reliabilityResult.status === 'fulfilled') setReliability(reliabilityResult.value);
+      else {
+        setReliability(null);
+        failedSources.push('P10.2/PRA');
       }
+
+      if (securityResult.status === 'fulfilled') setSecurity(securityResult.value);
+      else {
+        setSecurity(null);
+        failedSources.push('P11/SOC');
+      }
+
+      if (governanceResult.status === 'fulfilled') setGovernance(governanceResult.value);
+      else {
+        setGovernance(null);
+        failedSources.push('P12/gouvernance');
+      }
+
+      setNowMs(Date.now());
+      setError(failedSources.length ? `Readiness incomplète : ${failedSources.join(' · ')}` : '');
+      setLoading(false);
     };
+
     void load();
     const refresh = window.setInterval(() => { void load(); }, 60_000);
     return () => {
@@ -186,7 +203,8 @@ export function NationalGoLiveCommandCenter() {
   const p10Status = allPassed(p10);
   const p11Status = allPassed(p11);
   const p12Status = governance?.go_live_allowed === true && allPassed(p12) === 'pass' ? 'pass' : p12.length ? 'blocked' : 'unknown';
-  const automatedReady = p10Status === 'pass' && p11Status === 'pass' && p12Status === 'pass';
+  const incompleteSources = !reliability || !security || !governance;
+  const automatedReady = !incompleteSources && p10Status === 'pass' && p11Status === 'pass' && p12Status === 'pass';
   const blockerCount = [...p10, ...p11, ...p12].filter(item => item.status !== 'pass').length;
 
   return (
@@ -198,8 +216,8 @@ export function NationalGoLiveCommandCenter() {
             Vue consolidée P10.2 PRA/PITR · P11 SOC/WAF/SIEM · P12 gouvernance/homologation
           </div>
         </div>
-        <span data-testid="national-automated-readiness" className={`badge ${automatedReady ? 'bg' : 'br'}`}>
-          {automatedReady ? 'Gates automatisables prêts' : `${blockerCount} blocker(s)`}
+        <span data-testid="national-automated-readiness" className={`badge ${automatedReady ? 'bg' : incompleteSources ? 'bgo' : 'br'}`}>
+          {automatedReady ? 'Gates automatisables prêts' : incompleteSources ? 'Readiness incomplète' : `${blockerCount} blocker(s)`}
         </span>
       </div>
 
