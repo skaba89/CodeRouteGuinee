@@ -17,9 +17,9 @@ jobs:
       - name: Install backend dependencies
         working-directory: backend
         run: pip install -q -r requirements.txt
-      - name: Compile backend
+      - name: Compile backend and operational scripts
         working-directory: backend
-        run: python -m compileall -q app
+        run: python -m compileall -q app scripts
       - name: Validate operational shell scripts
         working-directory: backend
         run: bash -n entrypoint.sh scripts/*.sh
@@ -46,6 +46,13 @@ jobs:
             tests/test_middleware_ha.py
             tests/test_ha_config.py
             tests/test_pra_scripts.py
+            tests/test_reliability_config.py
+            tests/test_reliability_api.py
+            tests/test_reliability_security.py
+            tests/test_metrics_endpoint.py
+            tests/test_secure_backup_bundle.py
+            tests/test_offsite_backup.py
+            tests/test_ha_failover_probe.py
             tests/test_media_policy.py
             tests/test_question_media_schema_compat.py
             tests/test_e2e_exam_question_trace.py
@@ -176,7 +183,7 @@ jobs:
               -f description="$description ($result)"
           }
 
-          publish_status "$BACKEND_RESULT" "agent-ci/backend-targeted" "Targeted backend + P10 HA/PRA suite"
+          publish_status "$BACKEND_RESULT" "agent-ci/backend-targeted" "Targeted backend + P10.2 reliability suite"
           publish_status "$EDGE_AGENT_RESULT" "agent-ci/edge-agent" "Center Edge Agent + P9 updater suite"
           publish_status "$FRONTEND_BUILD_RESULT" "agent-ci/frontend-build" "Frontend typecheck and production build"
           publish_status "$FRONTEND_E2E_RESULT" "agent-ci/frontend-e2e" "Targeted Playwright regressions"

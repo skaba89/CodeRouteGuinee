@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.db.session import get_db
 from app.distributed import check_shared_state, instance_id
+from app.reliability_metrics import update_readiness_metrics
 
 router = APIRouter(tags=["health"])
 settings = get_settings()
@@ -159,6 +160,7 @@ def readiness(response: Response, db: Session = Depends(get_db)) -> dict:
         checks["schema"] = {"status": "error", "detail": exc.__class__.__name__}
         checks["migrations"] = {"status": "error", "detail": exc.__class__.__name__}
 
+    update_readiness_metrics(checks)
     blocking_checks = [name for name, check in checks.items() if check.get("status") == "error"]
     overall = "not_ready" if blocking_checks else "ready"
     if blocking_checks:

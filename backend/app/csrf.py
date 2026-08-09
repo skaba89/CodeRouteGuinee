@@ -142,6 +142,9 @@ _EXEMPT_PATHS = {
     "/api/v1/registration/school",
     "/api/v1/payments/webhook/wave",
     "/api/v1/payments/webhook/paydunya",
+    # M2M P10.2 : secret dédié long, aucune session/cookie navigateur.
+    # L'exemption est volontairement exacte et testée contre les sous-chemins.
+    "/api/v1/operations/reliability/evidence",
     "/docs",
     "/openapi.json",
     "/redoc",
