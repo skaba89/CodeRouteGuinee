@@ -12,10 +12,13 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app.core.config import get_settings
+from app.reliability_config import get_reliability_settings
 
 # Validation production au démarrage
 try:
-    get_settings().validate_production_secrets()
+    _startup_settings = get_settings()
+    _startup_settings.validate_production_secrets()
+    get_reliability_settings().validate(production=_startup_settings.is_production)
 except RuntimeError as _e:
     import logging as _log
     _log.getLogger("coderoute.startup").critical(str(_e))
@@ -25,6 +28,7 @@ from app.db.session import init_db
 from app.logging_config import setup_logging
 from app.middleware import GlobalRateLimitMiddleware, RequestIDMiddleware, ResponseCacheMiddleware, TimingMiddleware
 from app.monitoring import init_sentry
+from app.reliability_metrics import ReliabilityMetricsMiddleware
 from app.routers import (
     audio,
     audit,
@@ -48,11 +52,13 @@ from app.routers import (
     exams,
     health,
     institutional_authorizations,
+    metrics,
     operations,
     payment_reconciliation,
     payments,
     question_governance,
     questions,
+    reliability,
     sessions,
     supervision,
     training,
@@ -110,6 +116,7 @@ if os.path.isdir(_static_dir):
 # L'ordre d'enregistrement est inversé : le dernier ajouté s'exécute en premier
 _settings = _get_settings()
 app.add_middleware(ResponseCacheMiddleware, environment=_settings.environment)
+app.add_middleware(ReliabilityMetricsMiddleware)
 app.add_middleware(TimingMiddleware)
 app.add_middleware(RequestIDMiddleware)
 
@@ -168,7 +175,6 @@ if os.environ.get("ENVIRONMENT", "development").lower() == "production":
     app.add_middleware(_CsrfMiddleware)
 
 
-
 # ── Handler d'erreur global 500 ────────────────────────────────────────────
 
 
@@ -221,6 +227,7 @@ async def validation_exception_handler(_req: Request, exc: _ValidationError) -> 
     )
 
 
+app.include_router(metrics.router)
 app.include_router(audio.router, prefix=settings.api_v1_prefix)
 app.include_router(health.router)
 app.include_router(auth.router, prefix=settings.api_v1_prefix)
@@ -238,6 +245,7 @@ app.include_router(documents.router, prefix=settings.api_v1_prefix)
 app.include_router(payments.router, prefix=settings.api_v1_prefix)
 app.include_router(payment_reconciliation.router, prefix=settings.api_v1_prefix)
 app.include_router(operations.router, prefix=settings.api_v1_prefix)
+app.include_router(reliability.router, prefix=settings.api_v1_prefix)
 app.include_router(entries.router, prefix=settings.api_v1_prefix)
 app.include_router(center_incidents.router, prefix=settings.api_v1_prefix)
 app.include_router(center_stations.router, prefix=settings.api_v1_prefix)
