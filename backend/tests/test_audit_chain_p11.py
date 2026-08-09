@@ -1,5 +1,4 @@
-from datetime import UTC, datetime
-
+import pytest
 from sqlalchemy import create_engine, select, text
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -8,6 +7,12 @@ from app.audit_chain import ensure_audit_chain_anchor, verify_audit_chain
 from app.db.base import Base
 from app.models_audit import AuditLog
 from app.soc_config import get_soc_settings
+
+
+@pytest.fixture(autouse=True)
+def _clear_soc_cache_after_test():
+    yield
+    get_soc_settings.cache_clear()
 
 
 def _session_factory():
@@ -28,26 +33,8 @@ def _enable_chain(monkeypatch, key: str = "audit-hmac-test-key-" + ("x" * 40)) -
     get_soc_settings.cache_clear()
 
 
-def _legacy(db, *, action: str, seq=None, prev_hash=None, entry_hash=None) -> AuditLog:
-    row = AuditLog(
-        actor_id=None,
-        action=action,
-        entity="legacy",
-        details={"source": "pre-p11"},
-        created_at=datetime.now(UTC).replace(tzinfo=None),
-        seq=seq,
-        prev_hash=prev_hash,
-        entry_hash=entry_hash,
-    )
-    db.add(row)
-    # P11 listener skips a legacy row only if it already carries entry_hash.
-    # For a truly unchained legacy row, insert it with the feature disabled.
-    db.commit()
-    return row
-
-
 def test_unchained_legacy_rows_are_anchored_then_new_rows_are_hmac(monkeypatch) -> None:
-    engine, Factory = _session_factory()
+    _engine, Factory = _session_factory()
     monkeypatch.setenv("AUDIT_CHAIN_ENABLED", "false")
     get_soc_settings.cache_clear()
     with Factory() as db:
@@ -73,7 +60,7 @@ def test_unchained_legacy_rows_are_anchored_then_new_rows_are_hmac(monkeypatch) 
 
 
 def test_old_sha_chain_is_preserved_and_anchored_without_rewrite(monkeypatch) -> None:
-    engine, Factory = _session_factory()
+    _engine, Factory = _session_factory()
     monkeypatch.setenv("AUDIT_CHAIN_ENABLED", "false")
     get_soc_settings.cache_clear()
     with Factory() as db:
