@@ -129,7 +129,19 @@ class EdgeAgentService:
             self.store.mark_synced(attempt_id)
         return result
 
+    def _try_auto_attest_release_receipt(self) -> None:
+        if not self.release_manager or not self.release_manager.install_receipt_path.exists():
+            return
+        try:
+            self.release_manager.attest_install_receipt()
+        except Exception:
+            # Le reçu reste sur disque pour le heartbeat suivant ou l'action
+            # opérateur. Une panne du control plane ne doit jamais casser le
+            # heartbeat de présence ni le service d'examen local.
+            return
+
     def heartbeat(self) -> dict[str, Any]:
+        self._try_auto_attest_release_receipt()
         return self.central.heartbeat(self._fleet_telemetry())
 
     def release_check(self) -> dict[str, Any]:
