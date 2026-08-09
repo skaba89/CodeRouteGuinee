@@ -83,7 +83,7 @@ test('DNTT sees go-live blocked when no national policy is active', async ({ pag
 test('DNTT sees homologation eligible when policy and operational evidence are aligned', async ({ page }) => {
   await common(page);
   const active = policy();
-  const checks = ['active_policy', 'runtime_alignment', 'official_question_bank', 'accredited_centers', 'backup_off_region', 'restore_drill', 'api_failover']
+  const checks = ['active_policy', 'runtime_alignment', 'official_question_bank', 'accredited_centers', 'backup_off_region', 'restore_drill', 'pitr_provider', 'api_failover']
     .map(code => ({ code, required: true, status: 'pass', evidence: {} }));
   await page.route('**/api/v1/national-governance/readiness', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ generated_at: new Date().toISOString(), go_live_allowed: true, active_policy: active, blockers: [], checks }) }));
   await page.route('**/api/v1/national-governance/technical-contract', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ runtime, active_policy: active, alignment: { aligned: true, runtime, drift: [] } }) }));
@@ -96,4 +96,5 @@ test('DNTT sees homologation eligible when policy and operational evidence are a
   await expect(panel.getByText('Conforme')).toBeVisible();
   await expect(panel.getByText('40 Q · seuil 35')).toBeVisible();
   await expect(panel.getByText('DNTT-POLICY-OFFICIAL_EXAM_CATEGORY_B-2026.1')).toBeVisible();
+  await expect(panel.getByText('PITR fournisseur')).toBeVisible();
 });
