@@ -25,27 +25,14 @@ jobs:
 
           path = Path('backend/app/national_governance.py')
           text = path.read_text(encoding='utf-8')
-          before = '''    operational_evidence = [
-              ("backup_off_region", "reliability.backup_uploaded", timedelta(hours=26)),
-              ("restore_drill", "reliability.restore_drill_passed", timedelta(days=35)),
-              ("api_failover", "reliability.ha_failover_probe_passed", timedelta(days=35)),
-          ]'''
-          after = '''    operational_evidence = [
-              ("backup_off_region", "reliability.backup_uploaded", timedelta(hours=26)),
-              ("restore_drill", "reliability.restore_drill_passed", timedelta(days=35)),
-              ("pitr_provider", "reliability.pitr_drill_passed", timedelta(days=35)),
-              ("api_failover", "reliability.ha_failover_probe_passed", timedelta(days=35)),
-          ]'''
-          # YAML block indentation adds ten spaces to the Python source embedded above;
-          # normalize only those leading ten spaces from each literal line.
-          before = '\n'.join(line[10:] if line.startswith('          ') else line for line in before.splitlines())
-          after = '\n'.join(line[10:] if line.startswith('          ') else line for line in after.splitlines())
-          if 'reliability.pitr_drill_passed' in text:
+          pitr_line = '        ("pitr_provider", "reliability.pitr_drill_passed", timedelta(days=35)),\n'
+          anchor = '        ("api_failover", "reliability.ha_failover_probe_passed", timedelta(days=35)),\n'
+          if pitr_line in text:
               print('PITR readiness already present')
-          elif before not in text:
-              raise SystemExit('expected build_readiness operational_evidence block not found')
+          elif text.count(anchor) != 1:
+              raise SystemExit(f'expected exactly one api_failover anchor, found {text.count(anchor)}')
           else:
-              path.write_text(text.replace(before, after, 1), encoding='utf-8')
+              path.write_text(text.replace(anchor, pitr_line + anchor, 1), encoding='utf-8')
               print('PITR readiness gate inserted')
           PY
       - name: Verify diff scope
