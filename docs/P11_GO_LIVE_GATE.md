@@ -23,6 +23,8 @@ Le but est d'empêcher qu'une chaîne HMAC valide soit interprétée comme une p
 
 Chaque contrôle expose `passed`, `code` et `detail`. Les contrôles en échec sont listés dans `go_live.blockers`.
 
+Lorsque `SOC_ENABLED=true` mais OTLP, WAF ou SIEM ne sont pas finalisés, `/api/v1/operations/security/status` reste volontairement en `warning` avec `OTLP_NOT_READY`, `WAF_NOT_READY` ou `SIEM_NOT_READY`. Le Go-Live Evidence Pack exige déjà `security.status=ok`; il reste donc fail-closed sans dupliquer les règles de configuration.
+
 ## Ce que ce gate ne prouve pas
 
 Les flags sont activés uniquement **après** recette externe. Même `go_live.ready=true` ne remplace pas :
@@ -49,3 +51,18 @@ Ces éléments restent listés dans `go_live.external_evidence_still_required` e
 8. Réaliser le sign-off humain avant production nationale.
 
 Aucun script de ce dépôt n'active automatiquement WAF, SIEM ou SOC en production.
+
+## Gate CI permanent
+
+`.github/workflows/p11-soc-pr-ci.yml` protège le contrat P11 sur les pull requests concernées et sur les push correspondants vers `main`. La suite valide :
+
+- configuration SOC et confidentialité/pseudonymisation ;
+- chaîne audit HMAC et append-only ;
+- contrôles `go_live` et warnings OTLP/WAF/SIEM ;
+- régression du Go-Live Evidence Pack ;
+- invariants Render/Prometheus/OTLP/charge ;
+- audit npm high/critical ;
+- typecheck et build de production ;
+- E2E dashboard SOC incluant les états `Go-live bloqué` et `Gate runtime prêt`.
+
+Un pipeline vert valide le **contrat logiciel**. Les preuves d'exploitation externes restent nécessaires avant le sign-off.
