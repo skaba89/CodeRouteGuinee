@@ -29,8 +29,6 @@ def metrics(request: Request) -> Response:
     if not supplied or not settings.metrics_token or not secrets.compare_digest(supplied, settings.metrics_token):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Metrics authentication required")
 
-    # Les métriques processus restent accessibles même si PostgreSQL est en panne.
-    # L'enrichissement des preuves PRA est best-effort et ne masque pas l'incident.
     try:
         db = SessionLocal()
         try:
@@ -40,4 +38,7 @@ def metrics(request: Request) -> Response:
     except Exception:
         pass
 
-    return Response(content=prometheus_payload(), media_type=CONTENT_TYPE_LATEST)
+    return Response(
+        content=prometheus_payload(),
+        headers={"Content-Type": CONTENT_TYPE_LATEST, "Cache-Control": "no-store"},
+    )
