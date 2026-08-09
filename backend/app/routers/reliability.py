@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 import secrets
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Literal
 
 from fastapi import APIRouter, Depends, Header, HTTPException, status
@@ -31,6 +31,7 @@ _ACTIONS: dict[str, str] = {
     "ha_failover_probe_passed": "reliability.ha_failover_probe_passed",
 }
 _SHA256 = re.compile(r"^[a-f0-9]{64}$")
+_MAX_CLOCK_SKEW = timedelta(minutes=5)
 
 
 class ReliabilityEvidenceCreate(BaseModel):
@@ -51,7 +52,11 @@ class ReliabilityEvidenceRead(BaseModel):
     occurred_at: datetime
 
 
-def _safe_details(payload: ReliabilityEvidenceCreate) -> dict:
+def _normalized_occurred_at(value: datetime) -> datetime:
+    return value if value.tzinfo is not None else value.replace(tzinfo=UTC)
+
+
+def _safe_details(payload: ReliabilityEvidenceCreate, *, occurred_at: datetime) -> dict:
     if payload.artifact_sha256 is not None and not _SHA256.fullmatch(payload.artifact_sha256):
         raise HTTPException(status_code=422, detail="artifact_sha256 invalide")
     reference = (payload.reference or "").strip()
@@ -59,7 +64,7 @@ def _safe_details(payload: ReliabilityEvidenceCreate) -> dict:
         raise HTTPException(status_code=422, detail="reference doit être un identifiant interne, pas une URL/credential")
     return {
         "kind": payload.kind,
-        "occurred_at": payload.occurred_at.isoformat(),
+        "occurred_at": occurred_at.isoformat(),
         "artifact_sha256": payload.artifact_sha256,
         "region": (payload.region or "").strip() or None,
         "reference": reference or None,
@@ -101,14 +106,12 @@ def record_reliability_evidence(
     if not supplied or not settings.evidence_token or not secrets.compare_digest(supplied, settings.evidence_token):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Reliability evidence authentication required")
 
-    occurred_at = payload.occurred_at
-    if occurred_at.tzinfo is None:
-        occurred_at = occurred_at.replace(tzinfo=UTC)
+    occurred_at = _normalized_occurred_at(payload.occurred_at)
     now = datetime.now(UTC)
-    if occurred_at > now.replace(microsecond=0):
-        raise HTTPException(status_code=422, detail="occurred_at ne peut pas être dans le futur")
+    if occurred_at > now + _MAX_CLOCK_SKEW:
+        raise HTTPException(status_code=422, detail="occurred_at dépasse la tolérance d'horloge autorisée")
 
-    details = _safe_details(payload)
+    details = _safe_details(payload, occurred_at=occurred_at)
     db.add(
         AuditLog(
             actor_id=None,
