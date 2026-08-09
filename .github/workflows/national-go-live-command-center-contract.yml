@@ -7,6 +7,11 @@ on:
       - 'frontend/src/components/NationalGoLiveCommandCenter.tsx'
       - 'frontend/src/components/NationalDashboard.tsx'
       - 'frontend/tests/e2e/national-go-live-command-center.spec.ts'
+      - 'backend/app/routers/health.py'
+      - 'backend/scripts/verify_render_deployment.py'
+      - 'backend/tests/test_health.py'
+      - 'backend/tests/test_render_deployment_fingerprint.py'
+      - 'render.yaml'
       - '.github/workflows/national-code-readiness.yml'
       - '.github/workflows/national-go-live-command-center-contract.yml'
   push:
@@ -17,9 +22,17 @@ on:
       - 'frontend/src/components/NationalGoLiveCommandCenter.tsx'
       - 'frontend/src/components/NationalDashboard.tsx'
       - 'frontend/tests/e2e/national-go-live-command-center.spec.ts'
+      - 'backend/app/routers/health.py'
+      - 'backend/scripts/verify_render_deployment.py'
+      - 'backend/tests/test_health.py'
+      - 'backend/tests/test_render_deployment_fingerprint.py'
+      - 'render.yaml'
       - '.github/workflows/national-code-readiness.yml'
       - '.github/workflows/national-go-live-command-center-contract.yml'
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   contract:
@@ -82,3 +95,41 @@ jobs:
           assert not leaked, f'temporary write-capable workflow leaked into deliverable: {leaked}'
           print('National Go-Live Command Center contract: OK')
           PY
+
+  render-fingerprint-backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install backend dependencies
+        working-directory: backend
+        run: pip install -q -r requirements.txt
+      - name: Compile deployment identity modules when present
+        working-directory: backend
+        shell: bash
+        run: |
+          python -m compileall -q app/routers/health.py
+          if [[ -f scripts/verify_render_deployment.py ]]; then
+            python -m compileall -q scripts/verify_render_deployment.py
+          fi
+      - name: Execute health and Render fingerprint regressions
+        working-directory: backend
+        env:
+          PYTHONPATH: .
+          DATABASE_URL: sqlite+pysqlite:///:memory:
+          AUTO_CREATE_TABLES: 'true'
+          ENVIRONMENT: test
+          SOC_ENABLED: 'false'
+          AUDIT_CHAIN_ENABLED: 'false'
+          EDGE_LEASE_SIGNING_SECRET: coderoute-national-contract-edge-secret-at-least-32-characters
+          EDGE_RELEASE_SIGNING_SECRET: coderoute-national-contract-release-secret-at-least-32-characters
+        shell: bash
+        run: |
+          tests=(tests/test_health.py)
+          if [[ -f tests/test_render_deployment_fingerprint.py ]]; then
+            tests+=(tests/test_render_deployment_fingerprint.py)
+          fi
+          pytest -q --tb=short --disable-warnings "${tests[@]}"
