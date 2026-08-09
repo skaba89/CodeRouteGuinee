@@ -57,6 +57,8 @@ export function NationalSecurityOperationsPanel() {
   const badge = statusBadge(status?.status ?? 'disabled');
   const auditValid = Boolean(status?.audit_chain.valid);
   const socEnabled = Boolean(status?.soc_policy.enabled);
+  const goLive = status?.go_live;
+  const failedGoLiveControls = goLive?.controls.filter(control => !control.passed) ?? [];
 
   return (
     <div className="card" data-testid="national-security-operations">
@@ -80,6 +82,46 @@ export function NationalSecurityOperationsPanel() {
               P11 est livré mais volontairement dormant. Provisionner les clés SOC/audit puis activer selon le runbook.
             </div>
           )}
+
+          {goLive && (
+            <div
+              data-testid="security-go-live-gate"
+              style={{
+                border: `1px solid ${goLive.ready ? '#86efac' : '#fcd34d'}`,
+                borderRadius: 12,
+                padding: 14,
+                marginBottom: 14,
+                background: 'var(--surface)',
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                <div>
+                  <div style={{ fontWeight: 850 }}>Go-live sécurité nationale</div>
+                  <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 3 }}>
+                    Gate runtime P11 : SOC + HMAC + OTLP + WAF + SIEM + absence de signal actif
+                  </div>
+                </div>
+                <span className={`badge ${goLive.ready ? 'bg' : 'bgo'}`}>
+                  {goLive.ready ? 'Gate runtime prêt' : 'Go-live bloqué'}
+                </span>
+              </div>
+
+              {failedGoLiveControls.length > 0 && (
+                <div style={{ display: 'grid', gap: 5, marginTop: 10 }}>
+                  {failedGoLiveControls.slice(0, 7).map(control => (
+                    <div key={control.code} style={{ fontSize: 11.5, color: 'var(--muted)' }}>
+                      <strong>{control.code}</strong> · {control.detail}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 10 }}>
+                {goLive.external_evidence_still_required.length} preuve(s) externe(s) restent à archiver : ce gate ne remplace ni le WAF/SIEM/OTLP réellement observé, ni les tests staging, ni les sign-offs.
+              </div>
+            </div>
+          )}
+
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(155px,1fr))', gap: 10 }}>
             <Metric
               label="Chaîne audit"

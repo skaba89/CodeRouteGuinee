@@ -13,6 +13,12 @@ export type SecurityAlert = {
   severity: 'warning' | 'critical' | string;
 };
 
+export type SecurityGoLiveControl = {
+  code: string;
+  passed: boolean;
+  detail: string;
+};
+
 export type SecurityOperationsStatus = {
   status: 'disabled' | 'ok' | 'warning' | 'critical' | string;
   generated_at: string;
@@ -38,6 +44,12 @@ export type SecurityOperationsStatus = {
     anchor_seq?: number;
     head_seq?: number;
     head_hash?: string | null;
+  };
+  go_live?: {
+    ready: boolean;
+    controls: SecurityGoLiveControl[];
+    blockers: string[];
+    external_evidence_still_required: string[];
   };
   signals: {
     login_failed_15m: number;
