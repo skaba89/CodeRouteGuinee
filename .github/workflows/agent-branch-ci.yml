@@ -20,6 +20,9 @@ jobs:
       - name: Compile backend
         working-directory: backend
         run: python -m compileall -q app
+      - name: Validate operational shell scripts
+        working-directory: backend
+        run: bash -n entrypoint.sh scripts/*.sh
       - name: Run targeted regression tests
         working-directory: backend
         env:
@@ -36,6 +39,8 @@ jobs:
             tests/test_center_edge_offline.py
             tests/test_center_edge_fleet.py
             tests/test_center_edge_release.py
+            tests/test_distributed_ha.py
+            tests/test_pra_scripts.py
             tests/test_media_policy.py
             tests/test_question_media_schema_compat.py
             tests/test_e2e_exam_question_trace.py
@@ -153,7 +158,7 @@ jobs:
             description="$3"
             case "$result" in
               success) state=success ;;
-              failure|cancelled) state=failure ;; 
+              failure|cancelled) state=failure ;;
               *) state=error ;;
             esac
             gh api \
@@ -165,7 +170,7 @@ jobs:
               -f description="$description ($result)"
           }
 
-          publish_status "$BACKEND_RESULT" "agent-ci/backend-targeted" "Targeted backend regression suite"
+          publish_status "$BACKEND_RESULT" "agent-ci/backend-targeted" "Targeted backend + P10 HA/PRA suite"
           publish_status "$EDGE_AGENT_RESULT" "agent-ci/edge-agent" "Center Edge Agent encrypted offline suite"
           publish_status "$FRONTEND_BUILD_RESULT" "agent-ci/frontend-build" "Frontend typecheck and production build"
           publish_status "$FRONTEND_E2E_RESULT" "agent-ci/frontend-e2e" "Targeted Playwright regressions"
