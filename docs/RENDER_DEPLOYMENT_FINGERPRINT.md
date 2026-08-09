@@ -31,6 +31,8 @@ Le nettoyage est lui-même conditionné par la présence des invariants permanen
 
 Le workflow actif `Frontend Build and Edge Bridge CI` est également un gate Render observable à quatre jobs : audit/build frontend, E2E nationaux critiques, tests backend health/fingerprint et validation du Blueprint. Il reste conditionnel tant que le vérificateur n'est pas présent sur une branche, puis devient strict automatiquement.
 
+La branche de livraison est synchronisée avec le `main` qui contient ce gate avant la recette finale ; le workflow est donc hérité de la branche par défaut et n'est pas redéfini par la PR fonctionnelle.
+
 Le workflow permanent `National Go-Live Command Center Contract` possède en plus un job backend `render-fingerprint-backend`. Il exécute `test_health.py` et, dès que le vérificateur est présent, `test_render_deployment_fingerprint.py`. Ce deuxième gate rend la preuve de SHA testable depuis une PR avant tout rollout Render.
 
 ## Vérification depuis GitHub — recommandée
