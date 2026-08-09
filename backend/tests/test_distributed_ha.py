@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 
 import pytest
@@ -26,43 +27,41 @@ class FakeAsyncRedis:
         return True
 
 
-@pytest.mark.asyncio
-async def test_distributed_rate_limit_accepts_and_rejects_from_shared_backend(monkeypatch) -> None:
+def test_distributed_rate_limit_accepts_and_rejects_from_shared_backend(monkeypatch) -> None:
     fake = FakeAsyncRedis()
     monkeypatch.setattr(distributed, "get_async_redis", lambda: fake)
     monkeypatch.setattr(distributed, "cache_namespace", lambda: "coderoute:test")
 
-    allowed, count, retry_after = await distributed.distributed_rate_limit(
+    allowed, count, retry_after = asyncio.run(distributed.distributed_rate_limit(
         "203.0.113.4",
         limit=3,
         window_seconds=60,
-    )
+    ))
     assert allowed is True
     assert count == 1
     assert retry_after == 0
     assert fake.eval_calls
 
     fake.eval_result = [0, 3, 2500]
-    allowed, count, retry_after = await distributed.distributed_rate_limit(
+    allowed, count, retry_after = asyncio.run(distributed.distributed_rate_limit(
         "203.0.113.4",
         limit=3,
         window_seconds=60,
-    )
+    ))
     assert allowed is False
     assert count == 3
     assert retry_after == 3
 
 
-@pytest.mark.asyncio
-async def test_distributed_cache_round_trip_is_binary_safe(monkeypatch) -> None:
+def test_distributed_cache_round_trip_is_binary_safe(monkeypatch) -> None:
     fake = FakeAsyncRedis()
     monkeypatch.setattr(distributed, "get_async_redis", lambda: fake)
     monkeypatch.setattr(distributed, "cache_namespace", lambda: "coderoute:test")
 
     body = b"\x00CodeRoute\xff"
     headers = {"content-type": "application/octet-stream"}
-    await distributed.distributed_cache_set("GET:/public?", body, headers, ttl=15)
-    restored = await distributed.distributed_cache_get("GET:/public?")
+    asyncio.run(distributed.distributed_cache_set("GET:/public?", body, headers, ttl=15))
+    restored = asyncio.run(distributed.distributed_cache_get("GET:/public?"))
 
     assert restored is not None
     restored_body, restored_headers = restored
@@ -73,10 +72,9 @@ async def test_distributed_cache_round_trip_is_binary_safe(monkeypatch) -> None:
     assert json.loads(stored_json)["body_b64"]
 
 
-@pytest.mark.asyncio
-async def test_distributed_helpers_fail_closed_when_no_client(monkeypatch) -> None:
+def test_distributed_helpers_fail_closed_when_no_client(monkeypatch) -> None:
     monkeypatch.setattr(distributed, "get_async_redis", lambda: None)
     with pytest.raises(RuntimeError, match="shared state"):
-        await distributed.distributed_rate_limit("ip", limit=1, window_seconds=1)
+        asyncio.run(distributed.distributed_rate_limit("ip", limit=1, window_seconds=1))
     with pytest.raises(RuntimeError, match="shared state"):
-        await distributed.distributed_cache_get("key")
+        asyncio.run(distributed.distributed_cache_get("key"))
