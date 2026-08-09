@@ -1,11 +1,9 @@
-# render.yaml — CodeRoute Guinée P10.2
+# render.yaml — CodeRoute Guinée P11
 # Les variables marquées sync:false DOIVENT être saisies manuellement dans
-# Render Dashboard → Environment avant le premier déploiement.
-# Les variables generateValue:true sont auto-générées par Render.
+# Render Dashboard → Environment avant activation de la fonction concernée.
 
 services:
   # ── Shared state Redis/Valkey ────────────────────────────────────────────
-  # Cache public + rate limiting uniquement. Aucune donnée d'examen durable.
   - type: keyvalue
     name: coderoute-shared-state
     plan: starter
@@ -84,6 +82,37 @@ services:
         value: "5"
       - key: DR_RTO_MINUTES
         value: "30"
+
+      # P11 SOC — livré dormant par défaut. Provisionner d'abord les deux clés
+      # stables dans le coffre, puis activer SOC_ENABLED et AUDIT_CHAIN_ENABLED.
+      - key: SOC_ENABLED
+        value: "false"
+      - key: SOC_PSEUDONYM_KEY
+        sync: false
+      - key: AUDIT_CHAIN_ENABLED
+        value: "false"
+      - key: AUDIT_CHAIN_HMAC_KEY
+        sync: false
+      - key: AUDIT_VERIFY_INTERVAL_SECONDS
+        value: "900"
+      # OTLP reste désactivé tant qu'un collector privé n'est pas provisionné.
+      - key: OTEL_TRACES_ENABLED
+        value: "false"
+      - key: OTEL_EXPORTER_OTLP_ENDPOINT
+        sync: false
+      - key: OTEL_EXPORTER_OTLP_HEADERS
+        sync: false
+      - key: OTEL_SERVICE_NAME
+        value: "coderoute-api"
+      - key: OTEL_SAMPLE_RATIO
+        value: "0.05"
+      # WAF/SIEM sont des prérequis d'infrastructure, jamais simulés par l'API.
+      - key: WAF_REQUIRED
+        value: "false"
+      - key: WAF_PROVIDER
+        sync: false
+      - key: SIEM_REQUIRED
+        value: "false"
 
       # Politique PRA visible par l'API, sans clé AES ni credential objet.
       - key: BACKUP_REQUIRED
@@ -175,8 +204,6 @@ services:
         value: "7"
 
   # ── Backup logique quotidien chiffré hors région ────────────────────────
-  # Render garantit qu'un cron donné n'a qu'un run actif à la fois.
-  # Le job est éphémère : dump clair et bundle local sont supprimés par trap.
   - type: cron
     name: coderoute-offsite-backup
     runtime: docker
