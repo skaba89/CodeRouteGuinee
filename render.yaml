@@ -1,5 +1,11 @@
 # render.yaml — CodeRoute Guinée P10
+# Les variables marquées sync:false DOIVENT être saisies manuellement dans
+# Render Dashboard → Environment avant le premier déploiement.
+# Les variables generateValue:true sont auto-générées par Render.
+
 services:
+  # ── Shared state Redis/Valkey ────────────────────────────────────────────
+  # Cache public + rate limiting uniquement. Aucune donnée d'examen durable.
   - type: keyvalue
     name: coderoute-shared-state
     plan: starter
@@ -8,6 +14,7 @@ services:
     maxmemoryPolicy: allkeys-lru
     persistenceMode: off
 
+  # ── Backend FastAPI HA ──────────────────────────────────────────────────
   - type: web
     name: coderoute-backend
     runtime: docker
@@ -24,20 +31,31 @@ services:
         value: "/app"
       - key: WEB_CONCURRENCY
         value: "2"
+
+      # Sécurité — valeurs partagées entre toutes les instances API.
       - key: SECRET_KEY
         generateValue: true
       - key: CSRF_SECRET
         generateValue: true
       - key: ADMIN_REGISTRATION_TOKEN
         generateValue: true
+
+      # Signature centrale des leases Center Edge. Toutes les instances API
+      # doivent partager la même valeur afin qu'un lease reste vérifiable.
       - key: EDGE_LEASE_SIGNING_SECRET
         generateValue: true
+      # Signature P9 des releases Center Edge, également partagée.
       - key: EDGE_RELEASE_SIGNING_SECRET
         generateValue: true
+
+      # Base de données Neon — OBLIGATOIRE : saisir dans Render Dashboard
+      # Format : postgresql+psycopg://USER:PASSWORD@HOST/DB?sslmode=require
       - key: DATABASE_URL
         sync: false
       - key: ALEMBIC_DATABASE_URL
         sync: false
+
+      # P10 shared state privé Render.
       - key: REDIS_URL
         fromService:
           type: keyvalue
@@ -51,22 +69,30 @@ services:
         value: "2"
       - key: DEPLOYMENT_ID
         value: "production"
+
+      # Migrations/seeds : jamais en concurrence au démarrage des instances.
       - key: RUN_MIGRATIONS_ON_STARTUP
         value: "false"
       - key: RUN_BOOTSTRAP_SEED_ON_STARTUP
         value: "false"
       - key: AUTO_CREATE_TABLES
         value: "false"
+
+      # Bootstrap admin — saisir dans Render Dashboard
       - key: BOOTSTRAP_ADMIN_EMAIL
         sync: false
       - key: BOOTSTRAP_ADMIN_PASSWORD
         sync: false
       - key: BOOTSTRAP_ADMIN_NAME
         value: "Directeur National CodeRoute"
+
+      # Application
       - key: ENVIRONMENT
         value: "production"
       - key: ENABLE_API_DOCS
         value: "false"
+
+      # Portique centre — paramètres opérationnels ajustables après homologation DNTT
       - key: EXAM_CHECKIN_OPEN_MINUTES_BEFORE
         value: "60"
       - key: EXAM_CHECKIN_CLOSE_MINUTES_AFTER
@@ -75,16 +101,23 @@ services:
         value: "10"
       - key: EXAM_START_CLOSE_MINUTES_AFTER
         value: "45"
+
+      # CORS / Hosts — uniquement le domaine Render (pas de localhost)
       - key: CORS_ORIGINS
         value: "https://coderouteguinee-frontend.onrender.com"
       - key: ALLOWED_HOSTS
         value: "coderouteguinee-backend.onrender.com"
+
+      # Email Brevo — optionnel pour le pilote
       - key: BREVO_API_KEY
         sync: false
       - key: EMAIL_FROM
         value: "noreply@coderoute.gov.gn"
       - key: EMAIL_FROM_NAME
         value: "CodeRoute Guinée — DNTT"
+
+      # Media Factory Cloudinary — secrets à saisir dans Render Dashboard.
+      # Les fichiers sont téléversés directement navigateur -> Cloudinary.
       - key: CLOUDINARY_CLOUD_NAME
         sync: false
       - key: CLOUDINARY_API_KEY
@@ -93,19 +126,26 @@ services:
         sync: false
       - key: CLOUDINARY_UPLOAD_FOLDER
         value: "coderoute/questions"
+
+      # Mobile Money — sandbox pour le pilote
       - key: MOBILE_MONEY_MODE
         value: "sandbox"
+
+      # Performance DB : budget par instance, avec 2 instances API.
       - key: DB_POOL_RECYCLE
         value: "60"
       - key: DB_POOL_SIZE
         value: "2"
       - key: DB_MAX_OVERFLOW
         value: "3"
+
+      # Durée tokens
       - key: ACCESS_TOKEN_EXPIRE_MINUTES
         value: "30"
       - key: REFRESH_TOKEN_EXPIRE_DAYS
         value: "7"
 
+  # ── Frontend Vite ────────────────────────────────────────────────────────
   - type: web
     name: coderoute-frontend
     runtime: static
