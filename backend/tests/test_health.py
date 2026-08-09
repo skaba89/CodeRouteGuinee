@@ -16,6 +16,28 @@ def test_health_liveness_does_not_depend_on_external_services() -> None:
         assert "runtime" in response.json()
 
 
+def test_health_exposes_privacy_safe_render_deployment_fingerprint(monkeypatch) -> None:
+    commit = "0123456789abcdef0123456789abcdef01234567"
+    monkeypatch.setenv("RENDER_GIT_COMMIT", commit)
+    monkeypatch.setenv("RENDER_GIT_BRANCH", "main")
+    monkeypatch.setenv("RENDER_GIT_REPO_SLUG", "skaba89/CodeRouteGuinee")
+    monkeypatch.setenv("RENDER_SERVICE_NAME", "coderoute-backend")
+    monkeypatch.setenv("RENDER_INSTANCE_ID", "srv-instance-1")
+
+    client = TestClient(app)
+    for path in ("/health/live", "/health/readiness"):
+        response = client.get(path)
+        assert response.status_code == 200
+        runtime = response.json()["runtime"]
+        assert runtime["git_commit"] == commit
+        assert runtime["git_branch"] == "main"
+        assert runtime["git_repo_slug"] == "skaba89/CodeRouteGuinee"
+        assert runtime["render_service_name"] == "coderoute-backend"
+        assert runtime["render_instance_id"] == "srv-instance-1"
+        assert "secret" not in runtime
+        assert "token" not in runtime
+
+
 def test_readiness_reports_database_schema_migrations_and_shared_state() -> None:
     client = TestClient(app)
     response = client.get("/health/readiness")
