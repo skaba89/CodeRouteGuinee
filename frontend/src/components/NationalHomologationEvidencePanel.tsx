@@ -8,6 +8,7 @@ import {
   submitHomologationDossier,
   type GovernanceRecord,
   type HomologationDocument,
+  type HomologationEvidence,
   type HomologationEvidenceCode,
 } from '../nationalGovernanceClient';
 
@@ -27,6 +28,14 @@ function badge(status: string): string {
   if (status === 'ready_for_decision' || status === 'pending_approval') return 'bgo';
   if (status === 'rejected') return 'br';
   return 'bgr';
+}
+
+function hasValidHash(evidence: HomologationEvidence | undefined): boolean {
+  return Boolean(evidence?.artifact_sha256 && SHA256_RE.test(evidence.artifact_sha256));
+}
+
+function validEvidenceCount(document: HomologationDocument): number {
+  return EVIDENCE_CODES.filter(code => hasValidHash(document.evidence?.[code])).length;
 }
 
 export function NationalHomologationEvidencePanel() {
@@ -65,7 +74,7 @@ export function NationalHomologationEvidencePanel() {
     () => dossiers.find(item => item.reference === selectedReference) ?? null,
     [dossiers, selectedReference],
   );
-  const selectedEvidenceCount = selected ? Object.keys(selected.document.evidence ?? {}).length : 0;
+  const selectedEvidenceCount = selected ? validEvidenceCount(selected.document) : 0;
 
   async function act(key: string, fn: () => Promise<unknown>, success: string) {
     setBusy(key); setMessage(null);
@@ -137,7 +146,7 @@ export function NationalHomologationEvidencePanel() {
             <select value={selectedReference} onChange={event => setSelectedReference(event.target.value)}>
               {dossiers.map(item => (
                 <option key={item.reference} value={item.reference}>
-                  {item.reference} · {item.status} · {Object.keys(item.document.evidence ?? {}).length}/5
+                  {item.reference} · {item.status} · {validEvidenceCount(item.document)}/5 hashées
                 </option>
               ))}
             </select>
@@ -148,16 +157,23 @@ export function NationalHomologationEvidencePanel() {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 8, marginBottom: 14 }}>
                 {EVIDENCE_CODES.map(evidenceCode => {
                   const evidence = selected.document.evidence?.[evidenceCode];
+                  const hashed = hasValidHash(evidence);
                   return (
                     <div key={evidenceCode} style={{ border: '1px solid var(--border)', borderRadius: 10, padding: 11 }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
                         <strong style={{ fontSize: 12 }}>{EVIDENCE_LABELS[evidenceCode]}</strong>
-                        <span className={`badge ${evidence ? 'bg' : 'br'}`}>{evidence ? 'Hashée' : 'Manquante'}</span>
+                        <span className={`badge ${hashed ? 'bg' : 'br'}`}>
+                          {hashed ? 'Hashée' : evidence ? 'À re-hasher' : 'Manquante'}
+                        </span>
                       </div>
                       {evidence && (
                         <div style={{ fontSize: 10.5, color: 'var(--muted)', marginTop: 6 }}>
                           <div>{evidence.reference}</div>
-                          <code title={evidence.artifact_sha256}>{evidence.artifact_sha256.slice(0, 16)}…</code>
+                          {hashed && evidence.artifact_sha256 ? (
+                            <code title={evidence.artifact_sha256}>{evidence.artifact_sha256.slice(0, 16)}…</code>
+                          ) : (
+                            <div>SHA-256 absent : remplacer cette ancienne référence avant soumission.</div>
+                          )}
                         </div>
                       )}
                     </div>
