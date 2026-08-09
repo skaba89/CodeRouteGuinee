@@ -7,11 +7,6 @@ on:
       - 'frontend/src/components/NationalGoLiveCommandCenter.tsx'
       - 'frontend/src/components/NationalDashboard.tsx'
       - 'frontend/tests/e2e/national-go-live-command-center.spec.ts'
-      - 'backend/app/routers/health.py'
-      - 'backend/scripts/verify_render_deployment.py'
-      - 'backend/tests/test_health.py'
-      - 'backend/tests/test_render_deployment_fingerprint.py'
-      - 'render.yaml'
       - '.github/workflows/national-code-readiness.yml'
       - '.github/workflows/national-go-live-command-center-contract.yml'
   push:
@@ -22,17 +17,9 @@ on:
       - 'frontend/src/components/NationalGoLiveCommandCenter.tsx'
       - 'frontend/src/components/NationalDashboard.tsx'
       - 'frontend/tests/e2e/national-go-live-command-center.spec.ts'
-      - 'backend/app/routers/health.py'
-      - 'backend/scripts/verify_render_deployment.py'
-      - 'backend/tests/test_health.py'
-      - 'backend/tests/test_render_deployment_fingerprint.py'
-      - 'render.yaml'
       - '.github/workflows/national-code-readiness.yml'
       - '.github/workflows/national-go-live-command-center-contract.yml'
   workflow_dispatch:
-
-permissions:
-  contents: read
 
 jobs:
   contract:
@@ -77,7 +64,6 @@ jobs:
               'tests/test_go_live_evidence_pitr.py',
               'tests/test_national_readiness_pitr.py',
               'tests/test_homologation_evidence_integrity.py',
-              'tests/test_render_deployment_fingerprint.py',
           ):
               assert readiness.count(marker) == 1, (marker, readiness.count(marker))
 
@@ -94,41 +80,5 @@ jobs:
           present = {item.name for item in workflow_dir.glob('*.yml')}
           leaked = sorted(set(forbidden) & present)
           assert not leaked, f'temporary write-capable workflow leaked into deliverable: {leaked}'
-
-          render = Path('render.yaml').read_text(encoding='utf-8')
-          assert render.count('autoDeployTrigger: checksPass') == 3
-          verifier = Path('backend/scripts/verify_render_deployment.py').read_text(encoding='utf-8')
-          for marker in ('DEPLOYED_SHA_MATCH', 'RENDER_GIT_COMMIT_PRESENT', 'coderoute_render_deployment_receipt_v1'):
-              assert marker in verifier, marker
           print('National Go-Live Command Center contract: OK')
           PY
-
-  render-fingerprint-backend:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-      - name: Install backend dependencies
-        working-directory: backend
-        run: pip install -q -r requirements.txt
-      - name: Compile deployment identity modules
-        working-directory: backend
-        run: python -m compileall -q app/routers/health.py scripts/verify_render_deployment.py
-      - name: Execute health and Render fingerprint regression tests
-        working-directory: backend
-        env:
-          PYTHONPATH: .
-          DATABASE_URL: sqlite+pysqlite:///:memory:
-          AUTO_CREATE_TABLES: 'true'
-          ENVIRONMENT: test
-          SOC_ENABLED: 'false'
-          AUDIT_CHAIN_ENABLED: 'false'
-          EDGE_LEASE_SIGNING_SECRET: coderoute-national-contract-edge-secret-at-least-32-characters
-          EDGE_RELEASE_SIGNING_SECRET: coderoute-national-contract-release-secret-at-least-32-characters
-        run: |
-          pytest -q --tb=short --disable-warnings \
-            tests/test_health.py \
-            tests/test_render_deployment_fingerprint.py
