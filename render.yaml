@@ -85,7 +85,7 @@ services:
       - key: DR_RTO_MINUTES
         value: "30"
 
-      # P10.2 backup chiffré hors région — valeurs à provisionner AVANT merge.
+      # Politique PRA visible par l'API, sans clé AES ni credential objet.
       - key: BACKUP_REQUIRED
         value: "true"
       - key: BACKUP_REQUIRE_OFF_REGION
@@ -96,19 +96,9 @@ services:
         sync: false
       - key: BACKUP_S3_BUCKET
         sync: false
-      - key: BACKUP_S3_ENDPOINT_URL
-        sync: false
       - key: BACKUP_S3_PREFIX
         value: "coderoute/production"
-      - key: BACKUP_ENCRYPTION_KEY_B64
-        sync: false
       - key: BACKUP_ENCRYPTION_KEY_ID
-        sync: false
-      - key: BACKUP_S3_SSE_MODE
-        sync: false
-      - key: AWS_ACCESS_KEY_ID
-        sync: false
-      - key: AWS_SECRET_ACCESS_KEY
         sync: false
 
       # Migrations/seeds : jamais en concurrence au démarrage des instances.
@@ -183,6 +173,57 @@ services:
         value: "30"
       - key: REFRESH_TOKEN_EXPIRE_DAYS
         value: "7"
+
+  # ── Backup logique quotidien chiffré hors région ────────────────────────
+  # Render garantit qu'un cron donné n'a qu'un run actif à la fois.
+  # Le job est éphémère : dump clair et bundle local sont supprimés par trap.
+  - type: cron
+    name: coderoute-offsite-backup
+    runtime: docker
+    dockerContext: backend
+    dockerfilePath: backend/Dockerfile
+    dockerCommand: "./scripts/run_offsite_backup.sh"
+    plan: starter
+    region: frankfurt
+    schedule: "30 1 * * *"
+    envVars:
+      - key: PYTHONPATH
+        value: "/app"
+      - key: BACKUP_DATABASE_URL
+        sync: false
+      - key: BACKUP_PRIMARY_REGION
+        value: "frankfurt"
+      - key: BACKUP_TARGET_REGION
+        sync: false
+      - key: BACKUP_REQUIRE_OFF_REGION
+        value: "true"
+      - key: BACKUP_S3_BUCKET
+        sync: false
+      - key: BACKUP_S3_PREFIX
+        value: "coderoute/production"
+      - key: BACKUP_S3_ENDPOINT_URL
+        sync: false
+      - key: BACKUP_S3_SSE_MODE
+        sync: false
+      - key: BACKUP_S3_KMS_KEY_ID
+        sync: false
+      - key: BACKUP_ENCRYPTION_KEY_B64
+        sync: false
+      - key: BACKUP_ENCRYPTION_KEY_ID
+        sync: false
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
+      - key: CODEROUTE_API_BASE_URL
+        value: "https://coderouteguinee-backend.onrender.com"
+      - key: RELIABILITY_EVIDENCE_TOKEN
+        fromService:
+          type: web
+          name: coderoute-backend
+          envVarKey: RELIABILITY_EVIDENCE_TOKEN
+      - key: PUBLISH_RELIABILITY_EVIDENCE
+        value: "true"
 
   # ── Frontend Vite ────────────────────────────────────────────────────────
   - type: web
