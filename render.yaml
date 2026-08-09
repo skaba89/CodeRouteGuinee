@@ -61,8 +61,10 @@ services:
           type: keyvalue
           name: coderoute-shared-state
           property: connectionString
+      # Redis est requis comme configuration HA mais reste reconstructible :
+      # une panne runtime déclenche le fallback local et un état degraded.
       - key: REDIS_REQUIRED
-        value: "true"
+        value: "false"
       - key: HA_MODE
         value: "true"
       - key: EXPECTED_API_INSTANCES
