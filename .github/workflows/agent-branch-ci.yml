@@ -43,6 +43,7 @@ jobs:
             tests/test_center_edge_supply_chain.py
             tests/test_edge_install_authorization.py
             tests/test_distributed_ha.py
+            tests/test_middleware_ha.py
             tests/test_ha_config.py
             tests/test_pra_scripts.py
             tests/test_media_policy.py
@@ -136,8 +137,8 @@ jobs:
             exit 0
           fi
           echo "Installing Chromium for targeted Playwright tests."
-          npx playwright install --with-deps chromium
           printf 'Running targeted frontend tests:\n - %s\n' "${selected[@]}"
+          npx playwright install --with-deps chromium
           npx playwright test "${selected[@]}" --timeout=30000 --retries=1
 
   publish-agent-statuses:
