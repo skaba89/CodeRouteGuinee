@@ -1,0 +1,84 @@
+name: National Go-Live Command Center Contract
+
+on:
+  pull_request:
+    paths:
+      - 'frontend/src/reliabilityClient.ts'
+      - 'frontend/src/components/NationalGoLiveCommandCenter.tsx'
+      - 'frontend/src/components/NationalDashboard.tsx'
+      - 'frontend/tests/e2e/national-go-live-command-center.spec.ts'
+      - '.github/workflows/national-code-readiness.yml'
+      - '.github/workflows/national-go-live-command-center-contract.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'frontend/src/reliabilityClient.ts'
+      - 'frontend/src/components/NationalGoLiveCommandCenter.tsx'
+      - 'frontend/src/components/NationalDashboard.tsx'
+      - 'frontend/tests/e2e/national-go-live-command-center.spec.ts'
+      - '.github/workflows/national-code-readiness.yml'
+      - '.github/workflows/national-go-live-command-center-contract.yml'
+  workflow_dispatch:
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify dashboard, fail-closed semantics and CI hygiene
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          dashboard = Path('frontend/src/components/NationalDashboard.tsx').read_text(encoding='utf-8')
+          assert dashboard.count("import { NationalGoLiveCommandCenter } from './NationalGoLiveCommandCenter';") == 1
+          assert dashboard.count('<NationalGoLiveCommandCenter />') == 1
+
+          component = Path('frontend/src/components/NationalGoLiveCommandCenter.tsx').read_text(encoding='utf-8')
+          for marker in (
+              'Promise.allSettled',
+              'Readiness incomplète',
+              'Gates automatisables prêts',
+              'Décision institutionnelle toujours requise.',
+              'pitr_drill_passed',
+          ):
+              assert marker in component, marker
+
+          spec = Path('frontend/tests/e2e/national-go-live-command-center.spec.ts').read_text(encoding='utf-8')
+          for marker in (
+              'blockers without claiming institutional approval',
+              'institutional sign-off remains mandatory',
+              'fails closed when one readiness source is unavailable',
+          ):
+              assert marker in spec, marker
+
+          readiness = Path('.github/workflows/national-code-readiness.yml').read_text(encoding='utf-8')
+          for marker in (
+              'tests/e2e/national-go-live-command-center.spec.ts',
+              'tests/e2e/national-homologation-evidence.spec.ts',
+              'tests/test_soc_go_live_readiness.py',
+              'tests/test_go_live_evidence_pack.py',
+              'tests/test_go_live_evidence_pitr.py',
+              'tests/test_national_readiness_pitr.py',
+              'tests/test_homologation_evidence_integrity.py',
+          ):
+              assert readiness.count(marker) == 1, (marker, readiness.count(marker))
+
+          forbidden = (
+              'go-live-command-center-ui-patch.yml',
+              'cleanup-go-live-command-center-ui-patch.yml',
+              'national-readiness-command-center-patch.yml',
+              'national-readiness-command-center-patch-v2.yml',
+              'cleanup-national-go-live-command-center.yml',
+              'command-center-resilience-patch.yml',
+              'final-cleanup-national-go-live-temp.yml',
+          )
+          workflow_dir = Path('.github/workflows')
+          present = {item.name for item in workflow_dir.glob('*.yml')}
+          leaked = sorted(set(forbidden) & present)
+          assert not leaked, f'temporary write-capable workflow leaked into deliverable: {leaked}'
+          print('National Go-Live Command Center contract: OK')
+          PY
