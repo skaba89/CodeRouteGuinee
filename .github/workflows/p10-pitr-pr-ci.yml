@@ -1,4 +1,4 @@
-name: P10 PITR Evidence PR CI
+name: P10 PITR Evidence CI
 
 on:
   pull_request:
@@ -9,9 +9,33 @@ on:
       - 'backend/scripts/collect_go_live_evidence.py'
       - 'backend/scripts/publish_reliability_evidence.py'
       - 'backend/tests/test_reliability_api.py'
+      - 'backend/tests/test_reliability_evidence_time.py'
       - 'backend/tests/test_reliability_evidence_publisher.py'
+      - 'backend/tests/test_go_live_evidence_pack.py'
       - 'backend/tests/test_go_live_evidence_pitr.py'
       - 'backend/tests/test_national_readiness_pitr.py'
+      - 'backend/tests/test_national_governance.py'
+      - 'backend/tests/test_national_homologation.py'
+      - 'ops/prometheus/coderoute.rules.yml'
+      - 'docs/P10_2_PITR_EVIDENCE.md'
+      - '.github/workflows/p10-pitr-pr-ci.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'backend/app/routers/reliability.py'
+      - 'backend/app/reliability_metrics.py'
+      - 'backend/app/national_governance.py'
+      - 'backend/scripts/collect_go_live_evidence.py'
+      - 'backend/scripts/publish_reliability_evidence.py'
+      - 'backend/tests/test_reliability_api.py'
+      - 'backend/tests/test_reliability_evidence_time.py'
+      - 'backend/tests/test_reliability_evidence_publisher.py'
+      - 'backend/tests/test_go_live_evidence_pack.py'
+      - 'backend/tests/test_go_live_evidence_pitr.py'
+      - 'backend/tests/test_national_readiness_pitr.py'
+      - 'backend/tests/test_national_governance.py'
+      - 'backend/tests/test_national_homologation.py'
       - 'ops/prometheus/coderoute.rules.yml'
       - 'docs/P10_2_PITR_EVIDENCE.md'
       - '.github/workflows/p10-pitr-pr-ci.yml'
