@@ -1,0 +1,176 @@
+name: National Code Readiness
+
+on:
+  pull_request:
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - 'ops/**'
+      - 'render.yaml'
+      - '.github/workflows/national-code-readiness.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - 'ops/**'
+      - 'render.yaml'
+      - '.github/workflows/national-code-readiness.yml'
+  workflow_dispatch:
+
+jobs:
+  frontend-security-and-critical-e2e:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Reject high/critical npm vulnerabilities
+        run: npm run audit:security
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Production build
+        run: npm run build
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Critical national frontend regressions
+        env:
+          CI: 'true'
+          VITE_API_BASE_URL: http://localhost:8000
+        run: >-
+          npx playwright test
+          tests/e2e/edge-exam-bridge.spec.ts
+          tests/e2e/national-soc-security.spec.ts
+          tests/e2e/national-governance.spec.ts
+          --project=chromium --timeout=30000 --retries=1
+
+  p10-p11-reliability-security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install backend dependencies
+        working-directory: backend
+        run: pip install -q -r requirements.txt
+      - name: Compile application and operational probes
+        working-directory: backend
+        run: python -m compileall -q app scripts
+      - name: Validate operational shell scripts
+        working-directory: backend
+        run: bash -n entrypoint.sh scripts/*.sh
+      - name: P10.2 and P11 regression suite
+        working-directory: backend
+        env:
+          PYTHONPATH: .
+          DATABASE_URL: sqlite+pysqlite:///:memory:
+          AUTO_CREATE_TABLES: 'true'
+          ENVIRONMENT: test
+          EDGE_LEASE_SIGNING_SECRET: coderoute-readiness-edge-signing-secret-at-least-32-characters
+          EDGE_RELEASE_SIGNING_SECRET: coderoute-readiness-release-signing-secret-at-least-32-characters
+          SOC_ENABLED: 'false'
+          AUDIT_CHAIN_ENABLED: 'false'
+        run: |
+          pytest -q --tb=short --disable-warnings \
+            tests/test_distributed_ha.py \
+            tests/test_middleware_ha.py \
+            tests/test_ha_config.py \
+            tests/test_health.py \
+            tests/test_pra_scripts.py \
+            tests/test_reliability_config.py \
+            tests/test_reliability_api.py \
+            tests/test_reliability_security.py \
+            tests/test_reliability_evidence_time.py \
+            tests/test_reliability_evidence_publisher.py \
+            tests/test_metrics_endpoint.py \
+            tests/test_secure_backup_bundle.py \
+            tests/test_offsite_backup.py \
+            tests/test_ha_failover_probe.py \
+            tests/test_soc_config.py \
+            tests/test_soc_privacy.py \
+            tests/test_audit_chain_p11.py \
+            tests/test_audit_immutability_p11.py \
+            tests/test_soc_runtime_security.py
+
+  p12-governance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install backend dependencies
+        working-directory: backend
+        run: pip install -q -r requirements.txt
+      - name: Compile governance modules
+        working-directory: backend
+        run: python -m compileall -q app/national_governance.py app/national_governance_guard.py app/routers/national_governance.py
+      - name: P12 governance and homologation guards
+        working-directory: backend
+        env:
+          PYTHONPATH: .
+          DATABASE_URL: sqlite+pysqlite:///:memory:
+          AUTO_CREATE_TABLES: 'true'
+          ENVIRONMENT: test
+          SOC_ENABLED: 'false'
+          AUDIT_CHAIN_ENABLED: 'false'
+        run: |
+          pytest -q --tb=short --disable-warnings \
+            tests/test_national_governance.py \
+            tests/test_national_homologation.py
+
+  deployment-safety-invariants:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install YAML validator
+        run: pip install -q PyYAML
+      - name: Verify HA, backup secret isolation and dormant SOC rollout
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import yaml
+
+          render = yaml.safe_load(Path('render.yaml').read_text(encoding='utf-8'))
+          services = {item['name']: item for item in render['services']}
+          backend = services['coderoute-backend']
+          backup = services['coderoute-offsite-backup']
+          env = {item['key']: item for item in backend['envVars'] if 'key' in item}
+          backup_env = {item['key']: item for item in backup['envVars'] if 'key' in item}
+
+          assert backend['numInstances'] == 2
+          assert backend['healthCheckPath'] == '/health/readiness'
+          assert env['HA_MODE']['value'] == 'true'
+          assert env['EXPECTED_API_INSTANCES']['value'] == '2'
+          assert env['METRICS_ENABLED']['value'] == 'true'
+          assert env['RELIABILITY_EVIDENCE_ENABLED']['value'] == 'true'
+
+          for forbidden in ('BACKUP_ENCRYPTION_KEY_B64', 'AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY', 'BACKUP_DATABASE_URL'):
+              assert forbidden not in env, f'{forbidden} must not be present on the web service'
+          for required in ('BACKUP_DATABASE_URL', 'BACKUP_ENCRYPTION_KEY_B64', 'AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY'):
+              assert required in backup_env, f'{required} missing from backup service'
+
+          assert env['SOC_ENABLED']['value'] == 'false'
+          assert env['AUDIT_CHAIN_ENABLED']['value'] == 'false'
+          assert env['OTEL_TRACES_ENABLED']['value'] == 'false'
+          assert env['WAF_REQUIRED']['value'] == 'false'
+          assert env['SIEM_REQUIRED']['value'] == 'false'
+          assert env['SOC_PSEUDONYM_KEY']['sync'] is False
+          assert env['AUDIT_CHAIN_HMAC_KEY']['sync'] is False
+
+          print('National deployment code/IaC invariants: OK')
+          PY
