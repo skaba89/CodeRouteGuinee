@@ -1,0 +1,201 @@
+name: Edge Release Supply Chain
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version Edge, ex. edge-agent-0.4.0'
+        required: true
+        type: string
+  push:
+    tags:
+      - 'edge-agent-*'
+
+permissions:
+  contents: read
+  id-token: write
+  attestations: write
+
+jobs:
+  build-audit-attest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Resolve and validate version
+        id: version
+        shell: bash
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          if [ "${GITHUB_REF_TYPE}" = tag ]; then
+            VERSION="${GITHUB_REF_NAME}"
+          else
+            VERSION="${INPUT_VERSION}"
+          fi
+          if ! [[ "$VERSION" =~ ^edge-agent-[0-9]+\.[0-9]+\.[0-9]+([._-][A-Za-z0-9._-]+)?$ ]]; then
+            echo "Invalid Edge version: $VERSION" >&2
+            exit 2
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Install Edge test dependencies
+        run: python -m pip install --disable-pip-version-check -r edge_agent/requirements.txt
+
+      - name: Compile Edge package and release scripts
+        run: python -m compileall -q edge_agent/coderoute_edge edge_agent/scripts
+
+      - name: Run Center Edge regression suite
+        env:
+          PYTHONPATH: edge_agent
+        run: pytest -q --tb=short --disable-warnings edge_agent/tests
+
+      - name: Build binary wheelhouse
+        run: |
+          rm -rf edge_agent/wheelhouse
+          mkdir -p edge_agent/wheelhouse
+          python -m pip download \
+            --only-binary=:all: \
+            --dest edge_agent/wheelhouse \
+            -r edge_agent/requirements.runtime.txt
+
+      - name: Generate SHA-256 runtime lock
+        run: python edge_agent/scripts/build_runtime_lock.py
+
+      - name: Prove runtime can install without Internet
+        shell: bash
+        run: |
+          python -m venv /tmp/coderoute-edge-offline-check
+          /tmp/coderoute-edge-offline-check/bin/pip install \
+            --disable-pip-version-check \
+            --no-index \
+            --find-links edge_agent/wheelhouse \
+            --require-hashes \
+            -r edge_agent/requirements.runtime.lock
+          /tmp/coderoute-edge-offline-check/bin/python - <<'PY'
+          import cryptography, fastapi, httpx, uvicorn
+          print('offline-runtime-ok')
+          PY
+
+      - name: Install vulnerability auditor
+        run: python -m pip install --disable-pip-version-check pip-audit==2.10.1
+
+      - name: Audit runtime and generate CycloneDX SBOM
+        id: audit
+        shell: bash
+        run: |
+          mkdir -p dist/edge-releases
+          set +e
+          pip-audit \
+            -r edge_agent/requirements.runtime.lock \
+            --no-deps \
+            -f json \
+            -o dist/edge-releases/dependency-audit.json
+          AUDIT_RC=$?
+          pip-audit \
+            -r edge_agent/requirements.runtime.lock \
+            --no-deps \
+            -f cyclonedx-json \
+            -o dist/edge-releases/edge-runtime.sbom.cdx.json
+          SBOM_RC=$?
+          set -e
+          if [ ! -s dist/edge-releases/dependency-audit.json ] || [ ! -s dist/edge-releases/edge-runtime.sbom.cdx.json ]; then
+            echo 'Audit or SBOM output missing' >&2
+            exit 3
+          fi
+          if [ "$AUDIT_RC" -eq 0 ] && [ "$SBOM_RC" -eq 0 ]; then
+            SCAN_STATUS=passed
+          else
+            SCAN_STATUS=failed
+          fi
+          echo "audit_rc=$AUDIT_RC" >> "$GITHUB_OUTPUT"
+          echo "sbom_rc=$SBOM_RC" >> "$GITHUB_OUTPUT"
+          echo "scan_status=$SCAN_STATUS" >> "$GITHUB_OUTPUT"
+
+      - name: Build deterministic autonomous Edge artifact
+        id: artifact
+        shell: bash
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          python edge_agent/scripts/build_release_artifact.py \
+            --version "$VERSION" \
+            --output-dir dist/edge-releases \
+            > dist/edge-releases/build-result.json
+          ARTIFACT="dist/edge-releases/${VERSION}.tar.gz"
+          SHA="$(sha256sum "$ARTIFACT" | awk '{print $1}')"
+          SIZE="$(stat -c%s "$ARTIFACT")"
+          SBOM_SHA="$(sha256sum dist/edge-releases/edge-runtime.sbom.cdx.json | awk '{print $1}')"
+          echo "path=$ARTIFACT" >> "$GITHUB_OUTPUT"
+          echo "sha256=$SHA" >> "$GITHUB_OUTPUT"
+          echo "size=$SIZE" >> "$GITHUB_OUTPUT"
+          echo "sbom_sha256=$SBOM_SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Attest artifact build provenance
+        id: provenance
+        uses: actions/attest@v4.2.1
+        with:
+          subject-path: ${{ steps.artifact.outputs.path }}
+
+      - name: Attest CycloneDX SBOM
+        id: sbom_attestation
+        uses: actions/attest@v4.2.1
+        with:
+          subject-path: ${{ steps.artifact.outputs.path }}
+          sbom-path: dist/edge-releases/edge-runtime.sbom.cdx.json
+
+      - name: Build DNTT control-plane evidence bundle
+        shell: bash
+        env:
+          ARTIFACT_SHA: ${{ steps.artifact.outputs.sha256 }}
+          SBOM_SHA: ${{ steps.artifact.outputs.sbom_sha256 }}
+          SCAN_STATUS: ${{ steps.audit.outputs.scan_status }}
+          PROVENANCE_URL: ${{ steps.provenance.outputs.attestation-url }}
+          SBOM_ATTESTATION_URL: ${{ steps.sbom_attestation.outputs.attestation-url }}
+        run: |
+          python - <<'PY'
+          import json, os
+          evidence = {
+              'builder': 'github-actions',
+              'source_commit_sha': os.environ['GITHUB_SHA'],
+              'workflow_ref': f"{os.environ['GITHUB_WORKFLOW']}@{os.environ['GITHUB_REF']}",
+              'provenance_url': os.environ['PROVENANCE_URL'],
+              'sbom_sha256': os.environ['SBOM_SHA'],
+              'sbom_attestation_url': os.environ['SBOM_ATTESTATION_URL'],
+              'subject_sha256': os.environ['ARTIFACT_SHA'],
+              'vulnerability_scan_status': os.environ['SCAN_STATUS'],
+          }
+          with open('dist/edge-releases/control-plane-evidence.json', 'w', encoding='utf-8') as handle:
+              json.dump(evidence, handle, sort_keys=True, indent=2)
+          PY
+
+      - name: Upload signed release evidence bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: edge-release-${{ steps.version.outputs.version }}
+          path: |
+            ${{ steps.artifact.outputs.path }}
+            dist/edge-releases/${{ steps.version.outputs.version }}.manifest-input.json
+            dist/edge-releases/build-result.json
+            dist/edge-releases/dependency-audit.json
+            dist/edge-releases/edge-runtime.sbom.cdx.json
+            dist/edge-releases/control-plane-evidence.json
+            edge_agent/requirements.runtime.lock
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Fail closed on vulnerability or SBOM audit failure
+        if: always()
+        shell: bash
+        env:
+          AUDIT_RC: ${{ steps.audit.outputs.audit_rc }}
+          SBOM_RC: ${{ steps.audit.outputs.sbom_rc }}
+        run: |
+          if [ "${AUDIT_RC:-1}" -ne 0 ] || [ "${SBOM_RC:-1}" -ne 0 ]; then
+            echo 'Edge runtime vulnerability/SBOM gate failed. Release must not be promoted.' >&2
+            exit 1
+          fi
