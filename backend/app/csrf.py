@@ -120,8 +120,8 @@ def set_csrf_cookie(response, token: str) -> None:
     response.set_cookie(
         key      = CSRF_COOKIE_NAME,
         value    = token,
-        httponly = False,                    # JS doit pouvoir lire le token
-        secure   = prod,                     # HTTPS only en prod (requis par SameSite=None)
+        httponly = False,
+        secure   = prod,
         samesite = "none" if prod else "lax",
         max_age  = CSRF_TOKEN_TTL,
         path     = "/",
@@ -136,12 +136,13 @@ _EXEMPT_PATHS = {
     "/api/v1/auth/register",
     "/api/v1/auth/refresh",
     "/api/v1/auth/csrf-token",
-    # Inscription publique candidat libre : aucune session préalable
-    # → aucun token CSRF possible (même logique que /auth/register)
     "/api/v1/registration/candidate",
     "/api/v1/registration/school",
     "/api/v1/payments/webhook/wave",
     "/api/v1/payments/webhook/paydunya",
+    # Endpoint machine-to-machine : authentification dédiée par secret long,
+    # sans cookie navigateur. L'exemption est volontairement exacte.
+    "/api/v1/operations/reliability/evidence",
     "/docs",
     "/openapi.json",
     "/redoc",
@@ -151,58 +152,38 @@ _MUTATIVE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 
 
 def check_csrf(request: Request) -> None:
-    """
-    Vérifie le token CSRF sur les requêtes mutatives (pattern Double-Submit).
-
-    Trois contrôles :
-      1. Le header X-CSRF-Token est présent et sa signature HMAC est valide
-         (et le token n'est pas expiré).
-      2. Le cookie csrf_token est présent.
-      3. Le header et le cookie CORRESPONDENT (comparaison timing-safe).
-
-    Le point 3 est l'essence du double-submit : un site tiers peut forcer le
-    navigateur à envoyer le cookie (c'est le principe même du CSRF), mais il
-    ne peut PAS lire ce cookie pour le recopier dans le header (politique
-    d'origine identique). Sans cette comparaison, un token signé quelconque
-    suffirait — la protection serait illusoire.
-
-    Lève HTTP 403 si un contrôle échoue.
-    """
+    """Vérifie le double-submit CSRF pour les requêtes navigateur mutatives."""
     if request.method not in _MUTATIVE_METHODS:
         return
 
-    # Exclure les paths exemptés (webhooks, login initial, etc.)
     path = request.url.path
     if path in _EXEMPT_PATHS:
         return
     if path.startswith("/static"):
         return
 
-    # 1. Token du header
     token = request.headers.get(CSRF_HEADER_NAME, "")
     if not token:
         raise HTTPException(
-            status_code = status.HTTP_403_FORBIDDEN,
-            detail      = "Token CSRF manquant (header X-CSRF-Token requis)",
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Token CSRF manquant (header X-CSRF-Token requis)",
         )
 
     if not verify_csrf_token(token):
         raise HTTPException(
-            status_code = status.HTTP_403_FORBIDDEN,
-            detail      = "Token CSRF invalide ou expiré",
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Token CSRF invalide ou expiré",
         )
 
-    # 2. Token du cookie
     cookie_token = request.cookies.get(CSRF_COOKIE_NAME, "")
     if not cookie_token:
         raise HTTPException(
-            status_code = status.HTTP_403_FORBIDDEN,
-            detail      = "Cookie CSRF manquant — appeler /api/v1/auth/csrf-token",
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Cookie CSRF manquant — appeler /api/v1/auth/csrf-token",
         )
 
-    # 3. Correspondance header ↔ cookie (cœur du double-submit, timing-safe)
     if not hmac.compare_digest(token, cookie_token):
         raise HTTPException(
-            status_code = status.HTTP_403_FORBIDDEN,
-            detail      = "Token CSRF incohérent (header ≠ cookie)",
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Token CSRF incohérent (header ≠ cookie)",
         )
