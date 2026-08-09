@@ -1,10 +1,18 @@
-# render.yaml — CodeRoute Guinée
-# Les variables marquées sync:false DOIVENT être saisies manuellement dans
-# Render Dashboard → Environment avant le premier déploiement.
-# Les variables generateValue:true sont auto-générées par Render.
+# render.yaml — CodeRoute Guinée P10
+# Les secrets `sync:false` restent à saisir dans Render Dashboard.
 
 services:
-  # ── Backend FastAPI ──────────────────────────────────────────────────────
+  # État partagé HA : cache public + rate limiting uniquement.
+  # Aucune réponse/résultat d'examen n'est stocké ici.
+  - type: keyvalue
+    name: coderoute-shared-state
+    plan: starter
+    region: frankfurt
+    ipAllowList: []
+    maxmemoryPolicy: allkeys-lru
+    persistenceMode: off
+
+  # ── Backend FastAPI HA ──────────────────────────────────────────────────
   - type: web
     name: coderoute-backend
     runtime: docker
@@ -12,33 +20,56 @@ services:
     dockerfilePath: backend/Dockerfile
     plan: starter
     region: frankfurt
-    healthCheckPath: /health
+    numInstances: 2
+    healthCheckPath: /health/readiness
+    maxShutdownDelaySeconds: 60
+    preDeployCommand: "./scripts/predeploy.sh"
     envVars:
       - key: PYTHONPATH
         value: "/app"
 
-      # Sécurité — OBLIGATOIRE : saisir dans Render Dashboard
+      # Sécurité partagée entre toutes les instances API.
       - key: SECRET_KEY
         generateValue: true
       - key: CSRF_SECRET
         generateValue: true
       - key: ADMIN_REGISTRATION_TOKEN
         generateValue: true
-
-      # Signature centrale des leases Center Edge. Toutes les instances API
-      # doivent partager la même valeur afin qu'un lease reste vérifiable
-      # après redéploiement ou changement d'instance.
       - key: EDGE_LEASE_SIGNING_SECRET
         generateValue: true
+      - key: EDGE_RELEASE_SIGNING_SECRET
+        generateValue: true
 
-      # Base de données Neon — OBLIGATOIRE : saisir dans Render Dashboard
-      # Format : postgresql+psycopg://USER:PASSWORD@HOST/DB?sslmode=require
+      # Base de données Neon/PostgreSQL.
       - key: DATABASE_URL
         sync: false
       - key: ALEMBIC_DATABASE_URL
         sync: false
 
-      # Bootstrap admin — saisir dans Render Dashboard
+      # État distribué Redis/Valkey via réseau privé Render.
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: coderoute-shared-state
+          property: connectionString
+      - key: REDIS_REQUIRED
+        value: "true"
+      - key: HA_MODE
+        value: "true"
+      - key: EXPECTED_API_INSTANCES
+        value: "2"
+      - key: DEPLOYMENT_ID
+        value: "production"
+
+      # Les migrations sont exécutées une fois dans le pre-deploy.
+      - key: RUN_MIGRATIONS_ON_STARTUP
+        value: "false"
+      - key: RUN_BOOTSTRAP_SEED_ON_STARTUP
+        value: "false"
+      - key: AUTO_CREATE_TABLES
+        value: "false"
+
+      # Bootstrap admin : utilisé uniquement par une procédure initiale contrôlée.
       - key: BOOTSTRAP_ADMIN_EMAIL
         sync: false
       - key: BOOTSTRAP_ADMIN_PASSWORD
@@ -52,7 +83,7 @@ services:
       - key: ENABLE_API_DOCS
         value: "false"
 
-      # Portique centre — paramètres opérationnels ajustables après homologation DNTT
+      # Portique centre — paramètres à aligner sur homologation DNTT.
       - key: EXAM_CHECKIN_OPEN_MINUTES_BEFORE
         value: "60"
       - key: EXAM_CHECKIN_CLOSE_MINUTES_AFTER
@@ -62,13 +93,13 @@ services:
       - key: EXAM_START_CLOSE_MINUTES_AFTER
         value: "45"
 
-      # CORS / Hosts — uniquement le domaine Render (pas de localhost)
+      # CORS / Hosts
       - key: CORS_ORIGINS
         value: "https://coderouteguinee-frontend.onrender.com"
       - key: ALLOWED_HOSTS
         value: "coderouteguinee-backend.onrender.com"
 
-      # Email Brevo — optionnel pour le pilote
+      # Email Brevo
       - key: BREVO_API_KEY
         sync: false
       - key: EMAIL_FROM
@@ -76,9 +107,7 @@ services:
       - key: EMAIL_FROM_NAME
         value: "CodeRoute Guinée — DNTT"
 
-      # Media Factory Cloudinary — secrets à saisir dans Render Dashboard.
-      # Les fichiers sont téléversés directement navigateur -> Cloudinary :
-      # le backend ne reçoit jamais le binaire, seulement la demande de signature.
+      # Media Factory Cloudinary
       - key: CLOUDINARY_CLOUD_NAME
         sync: false
       - key: CLOUDINARY_API_KEY
@@ -88,11 +117,12 @@ services:
       - key: CLOUDINARY_UPLOAD_FOLDER
         value: "coderoute/questions"
 
-      # Mobile Money — sandbox pour le pilote
+      # Mobile Money
       - key: MOBILE_MONEY_MODE
         value: "sandbox"
 
-      # Performance DB
+      # Pool DB : budget par instance. Avec 2 instances, contrôler le total
+      # contre la limite du pooler PostgreSQL/Neon.
       - key: DB_POOL_RECYCLE
         value: "60"
       - key: DB_POOL_SIZE
@@ -100,7 +130,6 @@ services:
       - key: DB_MAX_OVERFLOW
         value: "3"
 
-      # Durée tokens
       - key: ACCESS_TOKEN_EXPIRE_MINUTES
         value: "30"
       - key: REFRESH_TOKEN_EXPIRE_DAYS
