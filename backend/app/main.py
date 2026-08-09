@@ -13,22 +13,28 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app.core.config import get_settings
 from app.reliability_config import get_reliability_settings
+from app.soc_config import get_soc_settings
 
 # Validation production au démarrage
 try:
     _startup_settings = get_settings()
     _startup_settings.validate_production_secrets()
     get_reliability_settings().validate(production=_startup_settings.is_production)
+    get_soc_settings().validate(production=_startup_settings.is_production)
 except RuntimeError as _e:
     import logging as _log
     _log.getLogger("coderoute.startup").critical(str(_e))
     raise
+
+from app.audit_chain import ensure_audit_chain_anchor
 from app.core.config import get_settings as _get_settings
-from app.db.session import init_db
+from app.db.session import SessionLocal, init_db
 from app.logging_config import setup_logging
 from app.middleware import GlobalRateLimitMiddleware, RequestIDMiddleware, ResponseCacheMiddleware, TimingMiddleware
 from app.monitoring import init_sentry
 from app.reliability_metrics import ReliabilityMetricsMiddleware
+from app.soc_logging import install_soc_log_filter
+from app.soc_telemetry import SOCRequestMiddleware, init_soc_telemetry
 from app.routers import (
     audio,
     audit,
@@ -59,6 +65,7 @@ from app.routers import (
     question_governance,
     questions,
     reliability,
+    security_operations,
     sessions,
     supervision,
     training,
@@ -72,9 +79,9 @@ from app.routers.tarifs import router_public as tarifs_public_router
 
 settings = get_settings()
 
-
-# Initialiser le logging structuré
+# Initialiser le logging structuré puis la barrière SOC de pseudonymisation.
 setup_logging()
+install_soc_log_filter()
 
 
 @asynccontextmanager
@@ -85,8 +92,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         release="0.14.0",
         traces_sample_rate=settings.sentry_sample_rate,
     )
+    init_soc_telemetry()
+
     # init_db() ne fait rien si AUTO_CREATE_TABLES=false (production).
-    # Les migrations sont gérées par Alembic dans entrypoint.sh.
+    # Les migrations sont gérées par Alembic dans le pre-deploy P10.
     try:
         init_db()
     except Exception as e:
@@ -94,6 +103,15 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         logging.getLogger("app.startup").warning(
             "init_db() non-critique ignoré au démarrage: %s", e
         )
+
+    # P11 : avant de servir du trafic, figer les anciennes lignes d'audit et
+    # activer la tête de chaîne HMAC. Si le mode est désactivé, no-op.
+    if get_soc_settings().audit_chain_enabled:
+        db = SessionLocal()
+        try:
+            ensure_audit_chain_anchor(db)
+        finally:
+            db.close()
     yield
 
 
@@ -113,21 +131,21 @@ if os.path.isdir(_static_dir):
     app.mount("/static", StaticFiles(directory=_static_dir), name="static")
 
 # ── Middleware — ordre : externe → interne ────────────────────────────────────
-# L'ordre d'enregistrement est inversé : le dernier ajouté s'exécute en premier
+# L'ordre d'enregistrement Starlette est inversé : le dernier ajouté s'exécute
+# en premier. RequestID est donc volontairement ajouté après SOCRequest afin que
+# request.state.request_id soit déjà disponible dans la télémétrie SOC.
 _settings = _get_settings()
 app.add_middleware(ResponseCacheMiddleware, environment=_settings.environment)
 app.add_middleware(ReliabilityMetricsMiddleware)
 app.add_middleware(TimingMiddleware)
+app.add_middleware(SOCRequestMiddleware)
 app.add_middleware(RequestIDMiddleware)
 
 # Compression GZip — essentiel pour les réseaux 3G/Edge en Guinée
-# minimum_size=500 : ne compresse pas les toutes petites réponses (overhead inutile)
 from starlette.middleware.gzip import GZipMiddleware
 app.add_middleware(GZipMiddleware, minimum_size=500)
 
 # Rate limiting global par IP — protection anti-abus à l'échelle nationale
-# 300 req/min par IP (un centre normal fait ~5 req/s en pointe)
-# Activé uniquement en production pour ne pas gêner les tests
 if _settings.environment.lower() == "production":
     app.add_middleware(GlobalRateLimitMiddleware, max_requests=300, window_seconds=60)
 
@@ -159,7 +177,6 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
 app.add_middleware(SecurityHeadersMiddleware)
 
-
 # ── Middleware CSRF — actif uniquement en production ──────────────────────────
 if os.environ.get("ENVIRONMENT", "development").lower() == "production":
     from app.csrf import check_csrf as _check_csrf
@@ -173,9 +190,6 @@ if os.environ.get("ENVIRONMENT", "development").lower() == "production":
             return await call_next(request)
 
     app.add_middleware(_CsrfMiddleware)
-
-
-# ── Handler d'erreur global 500 ────────────────────────────────────────────
 
 
 def _cors_headers(request: Request) -> dict:
@@ -192,19 +206,34 @@ def _cors_headers(request: Request) -> dict:
     return {}
 
 
+def _route_template(request: Request) -> str:
+    route = request.scope.get("route")
+    value = getattr(route, "path", None)
+    return value[:160] if isinstance(value, str) and value else "unmatched"
+
+
 @app.exception_handler(Exception)
 async def global_exception_handler(_req: Request, exc: Exception) -> _JSONResponse:
-    """Capture toutes les erreurs 500 non gérées — envoie à Sentry, retourne JSON propre.
-    Inclut les headers CORS pour que le frontend puisse lire l'erreur."""
+    """Capture les 500 sans exporter URL/query/identité brute."""
     from app.sentry import capture_exception as _sentry_cap
-    _sentry_cap(exc, context={
-        "method": _req.method,
-        "url":    str(_req.url),
-        "path":   _req.url.path,
-    })
+    route = _route_template(_req)
+    request_id = getattr(_req.state, "request_id", None)
+    _sentry_cap(
+        exc,
+        context={
+            "method": _req.method,
+            "route": route,
+            "request_id": request_id,
+        },
+    )
     import logging as _log
     _log.getLogger("coderoute.errors").error(
-        "Erreur 500 non gérée %s %s : %s", _req.method, _req.url.path, exc, exc_info=True
+        "Erreur 500 non gérée %s %s : %s",
+        _req.method,
+        route,
+        exc,
+        extra={"method": _req.method, "route": route, "request_id": request_id},
+        exc_info=True,
     )
     return _JSONResponse(
         status_code=500,
@@ -215,7 +244,6 @@ async def global_exception_handler(_req: Request, exc: Exception) -> _JSONRespon
 
 @app.exception_handler(_ValidationError)
 async def validation_exception_handler(_req: Request, exc: _ValidationError) -> _JSONResponse:
-    """Retourne un JSON lisible pour les erreurs de validation (422)."""
     errors = []
     for err in exc.errors():
         field = " → ".join(str(loc) for loc in err.get("loc", []))
@@ -246,6 +274,7 @@ app.include_router(payments.router, prefix=settings.api_v1_prefix)
 app.include_router(payment_reconciliation.router, prefix=settings.api_v1_prefix)
 app.include_router(operations.router, prefix=settings.api_v1_prefix)
 app.include_router(reliability.router, prefix=settings.api_v1_prefix)
+app.include_router(security_operations.router, prefix=settings.api_v1_prefix)
 app.include_router(entries.router, prefix=settings.api_v1_prefix)
 app.include_router(center_incidents.router, prefix=settings.api_v1_prefix)
 app.include_router(center_stations.router, prefix=settings.api_v1_prefix)
@@ -262,10 +291,10 @@ app.include_router(supervision.router, prefix=settings.api_v1_prefix)
 app.include_router(users.router, prefix=settings.api_v1_prefix)
 
 app.include_router(elearning_public_router, prefix=settings.api_v1_prefix)
-app.include_router(elearning_admin_router,  prefix=settings.api_v1_prefix)
+app.include_router(elearning_admin_router, prefix=settings.api_v1_prefix)
 app.include_router(rgpd_router, prefix=settings.api_v1_prefix)
 app.include_router(tarifs_public_router, prefix=settings.api_v1_prefix)
-app.include_router(tarifs_admin_router,  prefix=settings.api_v1_prefix)
+app.include_router(tarifs_admin_router, prefix=settings.api_v1_prefix)
 
 from app.routers.admin_ops import router as admin_ops_router
 app.include_router(admin_ops_router, prefix=settings.api_v1_prefix)
