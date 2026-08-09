@@ -1,0 +1,68 @@
+name: P10 HA PR CI
+
+on:
+  pull_request:
+    paths:
+      - 'backend/**'
+      - 'render.yaml'
+      - 'docs/HA_PRA_P10.md'
+      - '.github/workflows/p10-ha-pr-ci.yml'
+
+jobs:
+  p10-backend-ha:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install backend dependencies
+        working-directory: backend
+        run: pip install -q -r requirements.txt
+      - name: Compile backend
+        working-directory: backend
+        run: python -m compileall -q app
+      - name: Validate operational shell scripts
+        working-directory: backend
+        run: bash -n entrypoint.sh scripts/*.sh
+      - name: Run P10 HA/PRA regressions
+        working-directory: backend
+        env:
+          PYTHONPATH: .
+          DATABASE_URL: sqlite+pysqlite:///:memory:
+          AUTO_CREATE_TABLES: 'true'
+          ENVIRONMENT: test
+          EDGE_LEASE_SIGNING_SECRET: coderoute-p10-pr-edge-signing-secret-at-least-32-characters
+          EDGE_RELEASE_SIGNING_SECRET: coderoute-p10-pr-release-signing-secret-at-least-32-characters
+        run: |
+          pytest -q --tb=short --disable-warnings \
+            tests/test_distributed_ha.py \
+            tests/test_ha_config.py \
+            tests/test_pra_scripts.py \
+            tests/test_health.py
+
+  p10-render-blueprint-static:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify HA Blueprint invariants
+        shell: python
+        run: |
+          from pathlib import Path
+          text = Path('render.yaml').read_text(encoding='utf-8')
+          required = [
+              'type: keyvalue',
+              'numInstances: 2',
+              'healthCheckPath: /health/readiness',
+              'preDeployCommand: "./scripts/predeploy.sh"',
+              'key: REDIS_URL',
+              'key: HA_MODE',
+              'key: EXPECTED_API_INSTANCES',
+              'key: RUN_MIGRATIONS_ON_STARTUP',
+              'key: RUN_BOOTSTRAP_SEED_ON_STARTUP',
+              'key: WEB_CONCURRENCY',
+          ]
+          missing = [item for item in required if item not in text]
+          if missing:
+              raise SystemExit(f'Missing P10 Blueprint invariants: {missing}')
+          print('P10 Render Blueprint static invariants: OK')
