@@ -54,6 +54,7 @@ jobs:
             tests/test_soc_config.py \
             tests/test_soc_privacy.py \
             tests/test_audit_chain_p11.py \
+            tests/test_audit_immutability_p11.py \
             tests/test_soc_runtime_security.py
 
   p11-security-iac:
@@ -92,6 +93,8 @@ jobs:
               for group in rules['groups']
               for rule in group['rules']
           )
+          assert 'coderoute_soc_audit_expected == 1' in expressions
+          assert 'coderoute_soc_audit_expected == 0' in expressions
           assert 'absent(coderoute_audit_chain_valid)' in expressions
           assert 'absent(coderoute_audit_chain_last_verify_timestamp_seconds)' in expressions
 
