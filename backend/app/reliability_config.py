@@ -1,11 +1,11 @@
-"""Configuration P10.2 — observabilité, SLO et PRA.
+"""Configuration P10.2 — observabilité, SLO et politique PRA.
 
-Séparée des paramètres métier afin de garder explicites les secrets machine
-(metrics/evidence) et les contraintes de sauvegarde hors région.
+L'API ne charge volontairement aucune clé AES ni credential S3. Ces secrets
+appartiennent exclusivement au service cron de sauvegarde. Le backend connaît
+uniquement la politique et les identifiants non secrets nécessaires au pilotage.
 """
 from __future__ import annotations
 
-import base64
 import os
 from dataclasses import dataclass
 from functools import lru_cache
@@ -46,11 +46,9 @@ class ReliabilitySettings:
     backup_required: bool
     backup_s3_bucket: str
     backup_s3_prefix: str
-    backup_s3_endpoint_url: str
     backup_primary_region: str
     backup_target_region: str
     backup_require_off_region: bool
-    backup_encryption_key_b64: str
     backup_encryption_key_id: str
 
     def safe_policy(self) -> dict:
@@ -100,13 +98,6 @@ class ReliabilitySettings:
                 errors.append("BACKUP_TARGET_REGION est obligatoire lorsque BACKUP_REQUIRED=true")
             if not self.backup_encryption_key_id:
                 errors.append("BACKUP_ENCRYPTION_KEY_ID est obligatoire lorsque BACKUP_REQUIRED=true")
-            try:
-                key = base64.b64decode(self.backup_encryption_key_b64, validate=True)
-                if len(key) != 32:
-                    raise ValueError("bad length")
-            except Exception:
-                errors.append("BACKUP_ENCRYPTION_KEY_B64 doit être une clé AES-256 de 32 octets encodée en base64")
-
             if self.backup_require_off_region:
                 if not self.backup_primary_region:
                     errors.append("BACKUP_PRIMARY_REGION est obligatoire pour la règle hors région")
@@ -132,10 +123,8 @@ def get_reliability_settings() -> ReliabilitySettings:
         backup_required=_bool("BACKUP_REQUIRED", False),
         backup_s3_bucket=os.getenv("BACKUP_S3_BUCKET", "").strip(),
         backup_s3_prefix=os.getenv("BACKUP_S3_PREFIX", "coderoute/production").strip("/"),
-        backup_s3_endpoint_url=os.getenv("BACKUP_S3_ENDPOINT_URL", "").strip(),
         backup_primary_region=os.getenv("BACKUP_PRIMARY_REGION", "").strip(),
         backup_target_region=os.getenv("BACKUP_TARGET_REGION", "").strip(),
         backup_require_off_region=_bool("BACKUP_REQUIRE_OFF_REGION", True),
-        backup_encryption_key_b64=os.getenv("BACKUP_ENCRYPTION_KEY_B64", "").strip(),
         backup_encryption_key_id=os.getenv("BACKUP_ENCRYPTION_KEY_ID", "").strip(),
     )
