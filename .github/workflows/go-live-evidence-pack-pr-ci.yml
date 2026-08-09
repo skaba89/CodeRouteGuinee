@@ -28,4 +28,9 @@ jobs:
         working-directory: backend
         env:
           PYTHONPATH: .
+          DATABASE_URL: sqlite+pysqlite:///:memory:
+          AUTO_CREATE_TABLES: 'true'
+          ENVIRONMENT: test
+          SOC_ENABLED: 'false'
+          AUDIT_CHAIN_ENABLED: 'false'
         run: pytest -q --tb=short --disable-warnings tests/test_go_live_evidence_pack.py
