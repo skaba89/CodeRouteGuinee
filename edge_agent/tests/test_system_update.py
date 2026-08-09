@@ -67,6 +67,9 @@ def _db(path: Path, statuses: list[str] | None = None) -> None:
 
 def _config(tmp_path: Path, database: Path) -> SimpleNamespace:
     return SimpleNamespace(
+        node_id="node-p9-test",
+        center_id="center-p9-test",
+        software_version="edge-agent-0.3.0",
         database_path=database,
         maintenance_windows="sun@01:00-04:00",
         maintenance_timezone="Africa/Conakry",
@@ -84,7 +87,16 @@ def _runtime(_root: Path, python: str) -> dict:
     return {"python": python, "requirements_lock_sha256": "f" * 64, "wheel_count": 12}
 
 
-def _trusted_for_transaction(staged: dict, _root: Path) -> dict:
+def _trusted_for_transaction(
+    staged: dict,
+    _root: Path,
+    node_id: str,
+    center_id: str,
+    current_version: str,
+) -> dict:
+    assert node_id == "node-p9-test"
+    assert center_id == "center-p9-test"
+    assert current_version == "edge-agent-0.3.0"
     return {
         "release_id": staged["release_id"],
         "software_version": staged["software_version"],
@@ -92,6 +104,8 @@ def _trusted_for_transaction(staged: dict, _root: Path) -> dict:
         "artifact_size_bytes": staged["artifact_size_bytes"],
         "signing_key_id": "test-key",
         "manifest_hash": "f" * 64,
+        "authorization_key_id": "test-key",
+        "authorization_hash": "e" * 64,
     }
 
 
