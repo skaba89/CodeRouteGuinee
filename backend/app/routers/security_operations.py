@@ -32,6 +32,27 @@ def _count_action(db: Session, action: str, since: datetime) -> int:
     )
 
 
+def security_configuration_alerts(soc: SOCSettings) -> list[dict]:
+    """Expose incomplete P11 infrastructure only after the SOC is activated.
+
+    A dormant rollout stays intentionally quiet. Once SOC_ENABLED=true, OTLP,
+    WAF and SIEM become explicit warning-level prerequisites so downstream
+    evidence collectors cannot mistake a partially activated SOC for a fully
+    operational national security posture.
+    """
+    if not soc.enabled:
+        return []
+
+    alerts: list[dict] = []
+    if not (soc.otel_traces_enabled and soc.otel_endpoint):
+        alerts.append({"code": "OTLP_NOT_READY", "severity": "warning"})
+    if not (soc.waf_required and soc.waf_provider):
+        alerts.append({"code": "WAF_NOT_READY", "severity": "warning"})
+    if not soc.siem_required:
+        alerts.append({"code": "SIEM_NOT_READY", "severity": "warning"})
+    return alerts
+
+
 def build_security_go_live_controls(
     soc: SOCSettings,
     audit: dict[str, Any],
@@ -132,6 +153,7 @@ def security_status(
         alerts.append({"code": "AUDIT_CHAIN_DISABLED", "severity": "critical"})
     elif soc.enabled and soc.audit_chain_enabled and not audit.get("valid", False):
         alerts.append({"code": "AUDIT_CHAIN_INVALID", "severity": "critical"})
+    alerts.extend(security_configuration_alerts(soc))
     if login_blocked_15m > 0 or login_failed_15m >= 10:
         alerts.append({"code": "AUTH_BRUTE_FORCE_SIGNAL", "severity": "warning"})
     if suspicious_devices > 0:
