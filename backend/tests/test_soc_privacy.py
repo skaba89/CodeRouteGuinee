@@ -1,8 +1,15 @@
 import logging
-from types import SimpleNamespace
+
+import pytest
 
 from app import soc_privacy
 from app.soc_config import get_soc_settings
+
+
+@pytest.fixture(autouse=True)
+def _clear_soc_cache_after_test():
+    yield
+    get_soc_settings.cache_clear()
 
 
 def _enable_soc(monkeypatch) -> None:
