@@ -18,7 +18,8 @@ def main() -> int:
     )
     args = parser.parse_args()
     config = EdgeAgentConfig.from_env()
-    if not (config.release_dir / "staged.json").is_file():
+    staging_root = config.release_staging_dir or config.release_dir
+    if not (staging_root / "staged.json").is_file():
         print(json.dumps({"ok": True, "phase": "skipped", "reason": "no_staged_release"}))
         return 0
     try:
