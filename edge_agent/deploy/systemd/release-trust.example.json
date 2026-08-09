@@ -1,0 +1,9 @@
+{
+  "trusted_keys": [
+    {
+      "key_id": "edge-release-v1:<FINGERPRINT_DNTT>",
+      "public_key_b64": "<CLE_PUBLIQUE_ED25519_BASE64URL>",
+      "active": true
+    }
+  ]
+}
