@@ -10,15 +10,37 @@ L'outil est **strictement en lecture seule**. Il ne change ni Render, ni Postgre
 
 Depuis le backend déployé :
 
-- `/health/live` : liveness, instance/runtime et `deployment_id` ;
+- `/health/live` : liveness, instance/runtime, `deployment_id`, SHA Git Render et dépôt réellement servi ;
 - `/health/readiness` : configuration, DB, schéma, migrations et shared-state ;
-- `/api/v1/operations/reliability` : dernière preuve backup, restore drill et failover ;
+- `/api/v1/operations/reliability` : dernière preuve backup, restore drill, PITR et failover ;
 - `/api/v1/operations/security/status` : activation SOC, chaîne HMAC et signaux sécurité ;
 - `/api/v1/national-governance/technical-contract` : alignement politique/runtime ;
 - `/api/v1/national-governance/readiness` : blockers P12 automatisés ;
 - `/api/v1/national-governance/homologation-dossiers` : accessibilité des dossiers d'homologation.
 
 Les endpoints administratifs exigent un bearer token d'un `admin` ou `super_admin`.
+
+## Preuve obligatoire du SHA déployé
+
+Le pack ne peut plus être vert uniquement parce que la CI et la liveness sont vertes. Il exige un **SHA Git attendu complet de 40 caractères** et le compare à `runtime.git_commit`, lui-même alimenté par la variable native Render `RENDER_GIT_COMMIT`.
+
+Variables recommandées :
+
+```bash
+CODEROUTE_EXPECTED_GIT_COMMIT=<sha-main-complet>
+CODEROUTE_EXPECTED_REPO_SLUG=skaba89/CodeRouteGuinee
+```
+
+Dans GitHub Actions, `GITHUB_SHA` est utilisé comme fallback si `CODEROUTE_EXPECTED_GIT_COMMIT` n'est pas défini.
+
+Les contrôles associés sont :
+
+- `P10_EXPECTED_GIT_SHA` ;
+- `P10_RENDER_GIT_SHA_PRESENT` ;
+- `P10_DEPLOYED_SHA_MATCH` ;
+- `P10_DEPLOYED_REPO_MATCH` lorsque le dépôt attendu est fourni.
+
+L'absence du SHA attendu, l'absence de `RENDER_GIT_COMMIT` ou une différence entre les deux bloque le pack.
 
 ## Sécurité
 
@@ -41,6 +63,8 @@ cd backend
 export CODEROUTE_API_BASE_URL="https://coderouteguinee-backend.onrender.com"
 export CODEROUTE_ADMIN_BEARER_TOKEN="<token-admin-court-vivant>"
 export CODEROUTE_EXPECTED_DEPLOYMENT_ID="production"
+export CODEROUTE_EXPECTED_GIT_COMMIT="$(git rev-parse origin/main)"
+export CODEROUTE_EXPECTED_REPO_SLUG="skaba89/CodeRouteGuinee"
 
 python scripts/collect_go_live_evidence.py \
   --output-dir ../go-live-evidence/production-$(date -u +%Y%m%dT%H%M%SZ) \
@@ -56,6 +80,8 @@ cd backend
 $env:CODEROUTE_API_BASE_URL = "https://coderouteguinee-backend.onrender.com"
 $env:CODEROUTE_ADMIN_BEARER_TOKEN = "<token-admin-court-vivant>"
 $env:CODEROUTE_EXPECTED_DEPLOYMENT_ID = "production"
+$env:CODEROUTE_EXPECTED_GIT_COMMIT = (git rev-parse origin/main).Trim()
+$env:CODEROUTE_EXPECTED_REPO_SLUG = "skaba89/CodeRouteGuinee"
 
 $EvidenceDir = "../go-live-evidence/production-$(Get-Date -AsUTC -Format yyyyMMddTHHmmssZ)"
 python scripts/collect_go_live_evidence.py `
@@ -102,6 +128,7 @@ Les deux hashes calculés doivent correspondre exactement à ceux de `SHA256SUMS
 
 Le pack garde toujours `institutional_homologation_claimed=false` et rappelle les preuves externes non déductibles du logiciel :
 
+- reçu `Verify Render Deployment` archivé pour le SHA candidat ;
 - PITR réellement activé chez le fournisseur et RPO/RTO mesurés ;
 - objet de backup réellement présent hors région et restore drill archivé ;
 - SIEM/OTLP, WAF/DDoS, astreinte et exercices SOC ;
@@ -115,11 +142,13 @@ Le pack garde toujours `institutional_homologation_claimed=false` et rappelle le
 Le pack peut fournir automatiquement :
 
 - preuve liveness/readiness ;
+- preuve que le SHA Render correspond au SHA attendu ;
+- vérification du dépôt Git runtime ;
 - état DB/schéma/migrations ;
 - état shared-state ;
-- fraîcheur des preuves `backup_uploaded`, `restore_drill_passed`, `ha_failover_probe_passed`.
+- fraîcheur des preuves `backup_uploaded`, `restore_drill_passed`, `pitr_drill_passed`, `ha_failover_probe_passed`.
 
-Il ne remplace pas : la console du fournisseur PostgreSQL pour PITR, le reçu S3/objet, le rapport du restore drill ni la mesure RPO/RTO.
+Il ne remplace pas : la console du fournisseur PostgreSQL pour PITR, le reçu S3/objet, le rapport du restore drill, la mesure RPO/RTO ni l'archivage du reçu de déploiement.
 
 ## Utilisation pour #138 — P11
 
@@ -145,15 +174,22 @@ Il ne remplace jamais une décision DNTT, un avis juridique ou les pièces insti
 
 ## Recette avant usage national
 
-Le script est couvert par `backend/tests/test_go_live_evidence_pack.py` :
+Le collecteur est couvert par :
+
+- `backend/tests/test_go_live_evidence_pack.py` ;
+- `backend/tests/test_go_live_evidence_pitr.py`.
+
+La recette couvre notamment :
 
 - refus de credentials/query string dans l'URL cible ;
 - refus HTTP non chiffré hors localhost ;
 - redaction secrets/emails ;
 - impossibilité de déclarer une homologation ;
+- blocage lorsque le SHA attendu manque ;
+- blocage lorsque le SHA Render diffère ;
 - blocage lorsque les endpoints authentifiés ne sont pas collectés ;
-- blocage lorsque les preuves PRA sont trop anciennes.
+- blocage lorsque PITR ou les autres preuves PRA sont absentes/trop anciennes.
 
 ## Gate CI permanent
 
-Le workflow `.github/workflows/go-live-evidence-pack-pr-ci.yml` exécute la compilation et les tests de sécurité du collecteur sur les pull requests concernées **et sur chaque push correspondant vers `main`**. Le `conftest` backend est isolé avec une base SQLite mémoire et `ENVIRONMENT=test`, afin qu'un échec du gate indique un vrai problème de code/test et non l'absence d'une base de production dans GitHub Actions.
+Le workflow `.github/workflows/go-live-evidence-pack-pr-ci.yml` exécute la compilation et les deux suites de tests du collecteur sur les pull requests concernées **et sur chaque push correspondant vers `main`**. Le `conftest` backend est isolé avec une base SQLite mémoire et `ENVIRONMENT=test`, afin qu'un échec du gate indique un vrai problème de code/test et non l'absence d'une base de production dans GitHub Actions.

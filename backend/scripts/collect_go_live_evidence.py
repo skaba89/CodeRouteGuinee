@@ -6,8 +6,8 @@ security and national-governance endpoints, writes a machine-readable JSON
 snapshot plus a Markdown summary, and generates SHA-256 checksums.
 
 It never turns an operational or institutional requirement into a synthetic
-"pass". Missing runtime evidence, SOC activation, PITR, WAF/SIEM or DNTT
-approval remain explicit blockers.
+"pass". Missing runtime evidence, deployed-SHA proof, SOC activation, PITR,
+WAF/SIEM or DNTT approval remain explicit blockers.
 """
 from __future__ import annotations
 
@@ -25,6 +25,7 @@ from urllib.parse import urljoin, urlparse, urlunparse
 from urllib.request import Request, urlopen
 
 DEFAULT_TIMEOUT_SECONDS = 15.0
+_FULL_GIT_SHA_RE = re.compile(r"^[0-9a-fA-F]{40}$")
 
 _ENDPOINTS: tuple[tuple[str, str, bool], ...] = (
     ("health_live", "/health/live", False),
@@ -227,6 +228,8 @@ def evaluate_snapshot(
     *,
     now: datetime,
     expected_deployment_id: str | None = None,
+    expected_git_commit: str | None = None,
+    expected_repo_slug: str | None = None,
 ) -> dict[str, Any]:
     checks: list[dict[str, Any]] = []
     blockers: list[str] = []
@@ -252,12 +255,46 @@ def evaluate_snapshot(
         "readiness=ready" if readiness.get("status") == "ready" else f"readiness={readiness.get('status') or 'unknown'}",
     )
 
+    runtime = live.get("runtime") if isinstance(live.get("runtime"), dict) else {}
     if expected_deployment_id:
-        deployment_id = ((live.get("runtime") or {}).get("deployment_id") if isinstance(live.get("runtime"), dict) else None)
+        deployment_id = runtime.get("deployment_id")
         add_check(
             "DEPLOYMENT_ID_MATCH",
             deployment_id == expected_deployment_id,
             f"deployment_id={deployment_id!r}, attendu={expected_deployment_id!r}",
+        )
+
+    deployed_commit = str(runtime.get("git_commit") or "").strip().lower()
+    expected_commit = str(expected_git_commit or "").strip().lower()
+    expected_commit_valid = bool(_FULL_GIT_SHA_RE.fullmatch(expected_commit))
+    deployed_commit_valid = bool(_FULL_GIT_SHA_RE.fullmatch(deployed_commit))
+    add_check(
+        "P10_EXPECTED_GIT_SHA",
+        expected_commit_valid,
+        f"SHA Git attendu={expected_commit}" if expected_commit_valid else "SHA Git attendu absent ou invalide (40 hex requis)",
+    )
+    add_check(
+        "P10_RENDER_GIT_SHA_PRESENT",
+        deployed_commit_valid,
+        f"SHA Render={deployed_commit}" if deployed_commit_valid else "RENDER_GIT_COMMIT absent ou invalide dans /health/live",
+    )
+    add_check(
+        "P10_DEPLOYED_SHA_MATCH",
+        expected_commit_valid and deployed_commit_valid and deployed_commit == expected_commit,
+        (
+            f"SHA Render={deployed_commit}, SHA attendu={expected_commit}"
+            if expected_commit_valid or deployed_commit_valid
+            else "comparaison SHA impossible"
+        ),
+    )
+
+    if expected_repo_slug:
+        deployed_repo = str(runtime.get("git_repo_slug") or "").strip()
+        expected_repo = expected_repo_slug.strip()
+        add_check(
+            "P10_DEPLOYED_REPO_MATCH",
+            bool(deployed_repo) and deployed_repo.lower() == expected_repo.lower(),
+            f"repo Render={deployed_repo or 'missing'}, attendu={expected_repo}",
         )
 
     reliability_obs = observations.get("reliability") or {}
@@ -353,6 +390,7 @@ def evaluate_snapshot(
     )
 
     manual_evidence_required = [
+        "P10.2: reçu du workflow Verify Render Deployment archivé pour le SHA candidat",
         "P10.2: preuve fournisseur PITR source, fenêtre de rétention et rapport du test archivé",
         "P10.2: preuve externe du bucket/objet backup hors région et restore drill archivé",
         "P11: preuve SIEM/OTLP, WAF/DDoS, astreinte, tests staging et sign-off sécurité",
@@ -384,6 +422,8 @@ def collect_snapshot(
     token: str,
     timeout_seconds: float,
     expected_deployment_id: str | None,
+    expected_git_commit: str | None = None,
+    expected_repo_slug: str | None = None,
     now: datetime | None = None,
 ) -> dict[str, Any]:
     generated_at = now or utc_now()
@@ -402,12 +442,19 @@ def collect_snapshot(
         "generated_at": generated_at.isoformat(),
         "target_origin": _safe_origin(base_url),
         "authenticated_endpoints_requested": bool(token),
+        "expected_runtime": {
+            "deployment_id": expected_deployment_id,
+            "git_commit": expected_git_commit,
+            "git_repo_slug": expected_repo_slug,
+        },
         "observations": observations,
     }
     snapshot["assessment"] = evaluate_snapshot(
         observations,
         now=generated_at,
         expected_deployment_id=expected_deployment_id,
+        expected_git_commit=expected_git_commit,
+        expected_repo_slug=expected_repo_slug,
     )
     return _sanitize(snapshot)
 
@@ -508,6 +555,16 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default=os.getenv("CODEROUTE_EXPECTED_DEPLOYMENT_ID", ""),
         help="Optional expected runtime deployment_id.",
     )
+    parser.add_argument(
+        "--expected-git-commit",
+        default=os.getenv("CODEROUTE_EXPECTED_GIT_COMMIT", os.getenv("GITHUB_SHA", "")),
+        help="Required 40-character Git SHA expected on Render. Defaults to CODEROUTE_EXPECTED_GIT_COMMIT or GITHUB_SHA.",
+    )
+    parser.add_argument(
+        "--expected-repo-slug",
+        default=os.getenv("CODEROUTE_EXPECTED_REPO_SLUG", "skaba89/CodeRouteGuinee"),
+        help="Expected Render repository slug.",
+    )
     parser.add_argument("--timeout", type=float, default=DEFAULT_TIMEOUT_SECONDS)
     parser.add_argument(
         "--allow-http",
@@ -533,6 +590,11 @@ def main(argv: list[str] | None = None) -> int:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 2
 
+    expected_git_commit = (args.expected_git_commit or "").strip()
+    if expected_git_commit and not _FULL_GIT_SHA_RE.fullmatch(expected_git_commit):
+        print("ERROR: --expected-git-commit doit contenir exactement 40 caractères hexadécimaux", file=sys.stderr)
+        return 2
+
     # Token read from environment only: avoid exposing it in shell history/process arguments.
     token = os.getenv("CODEROUTE_ADMIN_BEARER_TOKEN", "").strip()
     snapshot = collect_snapshot(
@@ -540,6 +602,8 @@ def main(argv: list[str] | None = None) -> int:
         token=token,
         timeout_seconds=float(args.timeout),
         expected_deployment_id=(args.expected_deployment_id or "").strip() or None,
+        expected_git_commit=expected_git_commit or None,
+        expected_repo_slug=(args.expected_repo_slug or "").strip() or None,
     )
     outputs = write_pack(snapshot, Path(args.output_dir))
 
