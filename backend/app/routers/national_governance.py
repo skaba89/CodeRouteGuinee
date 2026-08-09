@@ -28,6 +28,7 @@ from app.national_governance import (
     submit_policy,
     technical_contract,
 )
+from app.national_governance_guard import assert_single_active_policy_code
 
 router = APIRouter(prefix="/national-governance", tags=["national-governance"])
 
@@ -107,6 +108,7 @@ def policy_activate(
     db: Session = Depends(get_db),
     user: User = Depends(require_roles("super_admin")),
 ) -> dict:
+    assert_single_active_policy_code(db, reference)
     return activate_policy(db, user, reference)
 
 
