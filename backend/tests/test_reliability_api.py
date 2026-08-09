@@ -15,6 +15,8 @@ class FakeReliabilitySettings:
     backup_target_region = "paris"
     backup_primary_region = "frankfurt"
     backup_require_off_region = True
+    dr_rpo_minutes = 5
+    dr_rto_minutes = 30
 
     def safe_policy(self):
         return {
@@ -136,6 +138,85 @@ def test_restore_and_failover_evidence_require_success_fields(monkeypatch) -> No
         )
     assert restore.status_code == 422
     assert failover.status_code == 422
+
+
+def test_pitr_evidence_requires_report_reference_hash_and_measured_targets(monkeypatch) -> None:
+    monkeypatch.setattr(reliability_router, "get_reliability_settings", _settings)
+    token = _settings().evidence_token
+    now = datetime.now(UTC).isoformat()
+    with TestClient(app) as client:
+        incomplete = client.post(
+            "/api/v1/operations/reliability/evidence",
+            headers={"X-Reliability-Evidence-Token": token},
+            json={"kind": "pitr_drill_passed", "occurred_at": now},
+        )
+        bad_rpo = client.post(
+            "/api/v1/operations/reliability/evidence",
+            headers={"X-Reliability-Evidence-Token": token},
+            json={
+                "kind": "pitr_drill_passed",
+                "occurred_at": now,
+                "artifact_sha256": "d" * 64,
+                "reference": "PITR-DRILL-2026-08-09",
+                "observed_rpo_minutes": 5.5,
+                "observed_rto_minutes": 20,
+            },
+        )
+        bad_rto = client.post(
+            "/api/v1/operations/reliability/evidence",
+            headers={"X-Reliability-Evidence-Token": token},
+            json={
+                "kind": "pitr_drill_passed",
+                "occurred_at": now,
+                "artifact_sha256": "e" * 64,
+                "reference": "PITR-DRILL-2026-08-09",
+                "observed_rpo_minutes": 4,
+                "observed_rto_minutes": 31,
+            },
+        )
+    assert incomplete.status_code == 422
+    assert bad_rpo.status_code == 422
+    assert "RPO" in bad_rpo.text
+    assert bad_rto.status_code == 422
+    assert "RTO" in bad_rto.text
+
+
+def test_valid_pitr_evidence_is_audited_with_measured_rpo_rto(monkeypatch) -> None:
+    monkeypatch.setattr(reliability_router, "get_reliability_settings", _settings)
+    init_db()
+    token = _settings().evidence_token
+    occurred = datetime.now(UTC) - timedelta(seconds=5)
+    artifact = "f" * 64
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/v1/operations/reliability/evidence",
+            headers={"X-Reliability-Evidence-Token": token},
+            json={
+                "kind": "pitr_drill_passed",
+                "occurred_at": occurred.isoformat(),
+                "artifact_sha256": artifact,
+                "reference": "PITR-DRILL-2026-08-09",
+                "observed_rpo_minutes": 3.5,
+                "observed_rto_minutes": 18.0,
+            },
+        )
+    assert response.status_code == 201, response.text
+
+    db = SessionLocal()
+    try:
+        event = db.scalar(
+            select(AuditLog)
+            .where(AuditLog.action == "reliability.pitr_drill_passed")
+            .order_by(AuditLog.created_at.desc(), AuditLog.id.desc())
+        )
+        assert event is not None
+        assert event.details["artifact_sha256"] == artifact
+        assert event.details["reference"] == "PITR-DRILL-2026-08-09"
+        assert event.details["observed_rpo_minutes"] == 3.5
+        assert event.details["observed_rto_minutes"] == 18.0
+    finally:
+        db.close()
 
 
 def test_evidence_allows_small_clock_skew_but_rejects_large_future_skew(monkeypatch) -> None:
