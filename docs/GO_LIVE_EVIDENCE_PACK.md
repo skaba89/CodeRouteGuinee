@@ -45,6 +45,8 @@ export CODEROUTE_EXPECTED_DEPLOYMENT_ID="production"
 python scripts/collect_go_live_evidence.py \
   --output-dir ../go-live-evidence/production-$(date -u +%Y%m%dT%H%M%SZ) \
   --fail-on-blocker
+
+unset CODEROUTE_ADMIN_BEARER_TOKEN
 ```
 
 Sur PowerShell :
@@ -55,12 +57,15 @@ $env:CODEROUTE_API_BASE_URL = "https://coderouteguinee-backend.onrender.com"
 $env:CODEROUTE_ADMIN_BEARER_TOKEN = "<token-admin-court-vivant>"
 $env:CODEROUTE_EXPECTED_DEPLOYMENT_ID = "production"
 
+$EvidenceDir = "../go-live-evidence/production-$(Get-Date -AsUTC -Format yyyyMMddTHHmmssZ)"
 python scripts/collect_go_live_evidence.py `
-  --output-dir "../go-live-evidence/production-$(Get-Date -AsUTC -Format yyyyMMddTHHmmssZ)" `
+  --output-dir $EvidenceDir `
   --fail-on-blocker
+
+$env:CODEROUTE_ADMIN_BEARER_TOKEN = $null
 ```
 
-Après la collecte, supprimer le token de l'environnement du shell.
+Toujours supprimer le token de l'environnement du shell dès la collecte terminée.
 
 ## Fichiers produits
 
@@ -71,6 +76,25 @@ Chaque pack contient :
 - `SHA256SUMS` : empreinte SHA-256 des deux fichiers précédents.
 
 Le SHA permet de prouver qu'un dossier présenté en comité est identique à celui qui a été collecté.
+
+### Vérifier les empreintes avant archivage
+
+Linux/macOS :
+
+```bash
+cd ../go-live-evidence/<dossier>
+sha256sum -c SHA256SUMS
+```
+
+PowerShell :
+
+```powershell
+Get-Content "$EvidenceDir/SHA256SUMS"
+Get-FileHash "$EvidenceDir/evidence.json" -Algorithm SHA256
+Get-FileHash "$EvidenceDir/evidence.md" -Algorithm SHA256
+```
+
+Les deux hashes calculés doivent correspondre exactement à ceux de `SHA256SUMS` avant dépôt dans la GED/coffre de preuves.
 
 ## Lecture des résultats
 
