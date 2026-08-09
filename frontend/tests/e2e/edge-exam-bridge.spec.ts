@@ -63,10 +63,17 @@ test('Edge bootstrap removes the claim from the URL and stores only the candidat
 test('Edge finalization never exposes a local verdict and redirects to DNTT sync pending', async ({ page }) => {
   const attemptId = 'attempt-edge-final-12345678';
   const localAnswers: Record<string, string> = {};
+  const edgeRequests: string[] = [];
+  let answerCalls = 0;
   let finalizeCalls = 0;
+
+  page.on('request', request => {
+    if (request.url().startsWith(EDGE_ORIGIN)) edgeRequests.push(`${request.method()} ${request.url()}`);
+  });
 
   await page.route(`${EDGE_ORIGIN}/v1/exams/${attemptId}/answers`, async route => {
     if (await preflight(route)) return;
+    answerCalls += 1;
     const body = JSON.parse(route.request().postData() || '{}') as { question_id?: string; answer?: string };
     if (body.question_id && body.answer) localAnswers[body.question_id] = body.answer;
     await route.fulfill({ status: 200, headers: { ...corsHeaders, 'content-type': 'application/json' }, body: JSON.stringify({ saved: true, sequence: 1 }) });
@@ -95,7 +102,8 @@ test('Edge finalization never exposes a local verdict and redirects to DNTT sync
     return { status: response.status, body: await response.text() };
   }, attemptId);
 
-  expect(responseResult.status, responseResult.body).toBe(200);
+  const diagnostic = JSON.stringify({ response: responseResult, answerCalls, finalizeCalls, localAnswers, edgeRequests });
+  expect(responseResult.status, diagnostic).toBe(200);
   await expect.poll(() => finalizeCalls).toBe(1);
   expect(localAnswers).toEqual({ q1: 'A' });
   await expect(page).toHaveURL(/#\/edge-pending$/);
