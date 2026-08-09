@@ -1,0 +1,45 @@
+name: Verify Render Deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: 'Backend Render URL'
+        required: true
+        default: 'https://coderouteguinee-backend.onrender.com'
+      expected_repo_slug:
+        description: 'Expected Render Git repository slug'
+        required: true
+        default: 'skaba89/CodeRouteGuinee'
+
+permissions:
+  contents: read
+
+jobs:
+  verify-deployed-sha:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Verify Render runtime serves this exact main SHA
+        working-directory: backend
+        env:
+          CODEROUTE_API_BASE_URL: ${{ inputs.base_url }}
+          CODEROUTE_EXPECTED_GIT_COMMIT: ${{ github.sha }}
+          CODEROUTE_EXPECTED_REPO_SLUG: ${{ inputs.expected_repo_slug }}
+        run: |
+          python scripts/verify_render_deployment.py \
+            --receipt ../render-deployment-receipt.json
+
+      - name: Upload deployment receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: render-deployment-receipt-${{ github.sha }}
+          path: render-deployment-receipt.json
+          if-no-files-found: error
+          retention-days: 90
