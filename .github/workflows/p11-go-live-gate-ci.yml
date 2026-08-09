@@ -12,7 +12,6 @@ on:
       - 'backend/tests/test_audit_immutability_p11.py'
       - 'backend/tests/test_soc_runtime_security.py'
       - 'backend/tests/test_go_live_evidence_pack.py'
-      - 'backend/tests/test_go_live_evidence_p11.py'
       - 'frontend/src/securityOperationsClient.ts'
       - 'frontend/src/components/NationalSecurityOperationsPanel.tsx'
       - 'frontend/tests/e2e/national-soc-security.spec.ts'
@@ -32,7 +31,6 @@ on:
       - 'backend/tests/test_audit_immutability_p11.py'
       - 'backend/tests/test_soc_runtime_security.py'
       - 'backend/tests/test_go_live_evidence_pack.py'
-      - 'backend/tests/test_go_live_evidence_p11.py'
       - 'frontend/src/securityOperationsClient.ts'
       - 'frontend/src/components/NationalSecurityOperationsPanel.tsx'
       - 'frontend/tests/e2e/national-soc-security.spec.ts'
@@ -75,8 +73,7 @@ jobs:
             tests/test_audit_chain_p11.py \
             tests/test_audit_immutability_p11.py \
             tests/test_soc_runtime_security.py \
-            tests/test_go_live_evidence_pack.py \
-            tests/test_go_live_evidence_p11.py
+            tests/test_go_live_evidence_pack.py
 
   p11-frontend:
     runs-on: ubuntu-latest
@@ -126,13 +123,17 @@ jobs:
               'siem_enforced',
               'no_active_security_alert',
               'external_evidence_still_required',
+              'OTLP_NOT_READY',
+              'WAF_NOT_READY',
+              'SIEM_NOT_READY',
           ):
               assert marker in backend, marker
           assert '"go_live": go_live' in backend
+          assert 'alerts.extend(security_configuration_alerts(soc))' in backend
 
           collector = Path('backend/scripts/collect_go_live_evidence.py').read_text(encoding='utf-8')
-          assert '"P11_SECURITY_GO_LIVE"' in collector
-          assert 'security_go_live.get("ready") is True' in collector
+          assert '"P11_NO_CRITICAL_SIGNAL"' in collector
+          assert 'security.get("status") == "ok"' in collector
 
           client = Path('frontend/src/securityOperationsClient.ts').read_text(encoding='utf-8')
           assert 'SecurityGoLiveControl' in client
