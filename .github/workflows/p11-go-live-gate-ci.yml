@@ -1,0 +1,88 @@
+name: P11 Security Go-Live Gate CI
+
+on:
+  pull_request:
+    paths:
+      - 'backend/app/routers/security_operations.py'
+      - 'backend/tests/test_soc_go_live_readiness.py'
+      - 'backend/tests/test_soc_config.py'
+      - 'backend/tests/test_soc_privacy.py'
+      - 'backend/tests/test_audit_chain_p11.py'
+      - 'backend/tests/test_audit_immutability_p11.py'
+      - 'backend/tests/test_soc_runtime_security.py'
+      - 'docs/P11_GO_LIVE_GATE.md'
+      - '.github/workflows/p11-go-live-gate-ci.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'backend/app/routers/security_operations.py'
+      - 'backend/tests/test_soc_go_live_readiness.py'
+      - 'backend/tests/test_soc_config.py'
+      - 'backend/tests/test_soc_privacy.py'
+      - 'backend/tests/test_audit_chain_p11.py'
+      - 'backend/tests/test_audit_immutability_p11.py'
+      - 'backend/tests/test_soc_runtime_security.py'
+      - 'docs/P11_GO_LIVE_GATE.md'
+      - '.github/workflows/p11-go-live-gate-ci.yml'
+  workflow_dispatch:
+
+jobs:
+  p11-go-live:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install backend dependencies
+        working-directory: backend
+        run: pip install -q -r requirements.txt
+      - name: Compile security modules
+        working-directory: backend
+        run: python -m compileall -q app/routers/security_operations.py app/soc_config.py app/audit_chain.py
+      - name: Run P11 security and go-live regressions
+        working-directory: backend
+        env:
+          PYTHONPATH: .
+          DATABASE_URL: sqlite+pysqlite:///:memory:
+          AUTO_CREATE_TABLES: 'true'
+          ENVIRONMENT: test
+          SOC_ENABLED: 'false'
+          AUDIT_CHAIN_ENABLED: 'false'
+          EDGE_LEASE_SIGNING_SECRET: coderoute-p11-gate-edge-signing-secret-at-least-32-characters
+          EDGE_RELEASE_SIGNING_SECRET: coderoute-p11-gate-release-signing-secret-at-least-32-characters
+        run: |
+          pytest -q --tb=short --disable-warnings \
+            tests/test_soc_go_live_readiness.py \
+            tests/test_soc_config.py \
+            tests/test_soc_privacy.py \
+            tests/test_audit_chain_p11.py \
+            tests/test_audit_immutability_p11.py \
+            tests/test_soc_runtime_security.py
+
+  p11-gate-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify fail-closed controls remain explicit
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          text = Path('backend/app/routers/security_operations.py').read_text(encoding='utf-8')
+          for marker in (
+              'soc_enabled',
+              'audit_hmac_enabled',
+              'audit_chain_valid',
+              'otel_enabled',
+              'waf_enforced',
+              'siem_enforced',
+              'no_active_security_alert',
+              'external_evidence_still_required',
+          ):
+              assert marker in text, marker
+          assert '"go_live": go_live' in text
+          print('P11 go-live contract: OK')
+          PY
