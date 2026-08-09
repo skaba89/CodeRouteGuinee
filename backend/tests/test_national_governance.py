@@ -2,14 +2,13 @@ import json
 
 import pytest
 from fastapi import HTTPException
-from sqlalchemy import select
+from sqlalchemy import delete, select
 
 from app.db.session import SessionLocal, init_db
 from app.exam_engine import CATEGORY_DISTRIBUTION, EXAM_DURATION_MINUTES, EXAM_PASS_THRESHOLD, EXAM_QUESTIONS_TOTAL
 from app.models_institutional_authorization import InstitutionalAuthorization
 from app.models_user import User
 from app.national_governance import (
-    ApprovalRequest,
     ExamPolicyParameters,
     LegalReference,
     PolicyCreate,
@@ -17,9 +16,9 @@ from app.national_governance import (
     approve_policy,
     compare_policy_to_runtime,
     create_policy,
-    policy_reference,
     submit_policy,
 )
+from app.national_governance_guard import assert_single_active_policy_code
 
 
 def _user(identifier: str, role: str) -> User:
@@ -31,6 +30,16 @@ def _user(identifier: str, role: str) -> User:
         role=role,
         is_active=True,
     )
+
+
+def _reset_governance(db) -> None:
+    db.execute(
+        delete(InstitutionalAuthorization).where(
+            InstitutionalAuthorization.reference.like("DNTT-POLICY-%")
+            | InstitutionalAuthorization.reference.like("DNTT-HOMO-%")
+        )
+    )
+    db.commit()
 
 
 def _payload(code: str, version: str = "2099.1", *, question_count: int | None = None) -> PolicyCreate:
@@ -63,6 +72,15 @@ def _payload(code: str, version: str = "2099.1", *, question_count: int | None =
     )
 
 
+def _approve(db, creator: User, approver1: User, approver2: User, code: str, version: str = "2099.1") -> str:
+    created = create_policy(db, creator, _payload(code, version=version))
+    reference = created["reference"]
+    submit_policy(db, creator, reference)
+    approve_policy(db, approver1, reference, "Première validation indépendante")
+    approve_policy(db, approver2, reference, "Deuxième validation indépendante")
+    return reference
+
+
 def test_runtime_contract_is_explicit_and_aligned() -> None:
     payload = _payload("P12ALIGN")
     result = compare_policy_to_runtime(payload.parameters.model_dump())
@@ -77,6 +95,7 @@ def test_policy_requires_four_eyes_before_activation() -> None:
     approver2 = _user("00000000-0000-4000-8000-000000000123", "super_admin")
 
     with SessionLocal() as db:
+        _reset_governance(db)
         created = create_policy(db, creator, _payload("P12FOUREYES"))
         reference = created["reference"]
         submitted = submit_policy(db, creator, reference)
@@ -104,6 +123,7 @@ def test_approved_policy_with_runtime_drift_cannot_activate() -> None:
     approver2 = _user("00000000-0000-4000-8000-000000000126", "super_admin")
 
     with SessionLocal() as db:
+        _reset_governance(db)
         created = create_policy(db, creator, _payload("P12DRIFT", version="2099.2", question_count=EXAM_QUESTIONS_TOTAL + 1))
         reference = created["reference"]
         submit_policy(db, creator, reference)
@@ -121,6 +141,7 @@ def test_policy_document_tamper_is_detected() -> None:
     init_db()
     creator = _user("00000000-0000-4000-8000-000000000127", "admin")
     with SessionLocal() as db:
+        _reset_governance(db)
         created = create_policy(db, creator, _payload("P12TAMPER", version="2099.3"))
         reference = created["reference"]
         record = db.scalar(select(InstitutionalAuthorization).where(InstitutionalAuthorization.reference == reference))
@@ -134,3 +155,22 @@ def test_policy_document_tamper_is_detected() -> None:
             submit_policy(db, creator, reference)
         assert tampered.value.status_code == 409
         assert tampered.value.detail["code"] == "INSTITUTIONAL_DOCUMENT_HASH_MISMATCH"
+
+
+def test_second_active_policy_code_is_blocked_while_runtime_is_single_policy() -> None:
+    init_db()
+    creator = _user("00000000-0000-4000-8000-000000000128", "admin")
+    approver1 = _user("00000000-0000-4000-8000-000000000129", "admin")
+    approver2 = _user("00000000-0000-4000-8000-000000000130", "super_admin")
+
+    with SessionLocal() as db:
+        _reset_governance(db)
+        first_reference = _approve(db, creator, approver1, approver2, "CATEGORY_B", version="2099.4")
+        activate_policy(db, approver2, first_reference)
+
+        second_reference = _approve(db, creator, approver1, approver2, "CATEGORY_C", version="2099.5")
+        with pytest.raises(HTTPException) as conflict:
+            assert_single_active_policy_code(db, second_reference)
+        assert conflict.value.status_code == 409
+        assert conflict.value.detail["code"] == "ACTIVE_POLICY_CODE_CONFLICT"
+        assert conflict.value.detail["active_reference"] == first_reference
