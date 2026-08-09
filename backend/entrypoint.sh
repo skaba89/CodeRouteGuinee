@@ -1,100 +1,103 @@
 #!/usr/bin/env bash
-# entrypoint.sh — CodeRoute Guinée
-# Auto-setup au démarrage : migrations + seed admin + Gunicorn
-set -e
+# entrypoint.sh — CodeRoute Guinée P10
+set -euo pipefail
+
+ENVIRONMENT_VALUE="${ENVIRONMENT:-development}"
+RUN_MIGRATIONS_ON_STARTUP_VALUE="${RUN_MIGRATIONS_ON_STARTUP:-}"
+RUN_BOOTSTRAP_SEED_ON_STARTUP_VALUE="${RUN_BOOTSTRAP_SEED_ON_STARTUP:-}"
+
+if [ -z "$RUN_MIGRATIONS_ON_STARTUP_VALUE" ]; then
+  if [ "$ENVIRONMENT_VALUE" = "production" ]; then
+    RUN_MIGRATIONS_ON_STARTUP_VALUE=false
+  else
+    RUN_MIGRATIONS_ON_STARTUP_VALUE=true
+  fi
+fi
+if [ -z "$RUN_BOOTSTRAP_SEED_ON_STARTUP_VALUE" ]; then
+  if [ "$ENVIRONMENT_VALUE" = "production" ]; then
+    RUN_BOOTSTRAP_SEED_ON_STARTUP_VALUE=false
+  else
+    RUN_BOOTSTRAP_SEED_ON_STARTUP_VALUE=true
+  fi
+fi
 
 echo "════════════════════════════════════════════"
 echo "  CodeRoute Guinée — Démarrage"
-echo "  Environnement : ${ENVIRONMENT:-development}"
+echo "  Environnement : ${ENVIRONMENT_VALUE}"
 echo "════════════════════════════════════════════"
 
-# Vérification DATABASE_URL
-if [ -z "${DATABASE_URL:-}" ] || echo "${DATABASE_URL}" | grep -q "CHANGE_ME"; then
-    echo "⚠️  DATABASE_URL non configurée — définir dans Render Dashboard"
+if [ "$RUN_MIGRATIONS_ON_STARTUP_VALUE" = "true" ]; then
+  echo "── Migrations Alembic au startup (mode explicite/dev) ──"
+  ./scripts/predeploy.sh
+else
+  echo "✅ Migrations au startup désactivées — utiliser le pre-deploy fail-closed."
 fi
 
-# ── 1. Migrations Alembic ─────────────────────────────────────────
-if [ -n "${DATABASE_URL:-}" ] && ! echo "${DATABASE_URL}" | grep -q "CHANGE_ME"; then
-    echo "── Migrations Alembic ──"
-    MIGRATE_URL="${ALEMBIC_DATABASE_URL:-$DATABASE_URL}"
-    DATABASE_URL="$MIGRATE_URL" alembic upgrade head && echo "✅ Migrations OK" || \
-        echo "⚠️  Migrations échouées — le serveur démarre quand même"
-fi
-
-# ── 2. Seed admin (si BOOTSTRAP_ADMIN_PASSWORD défini) ───────────
-if [ -n "${BOOTSTRAP_ADMIN_PASSWORD:-}" ] && [ -n "${DATABASE_URL:-}" ] && \
-   ! echo "${DATABASE_URL}" | grep -q "CHANGE_ME"; then
+if [ "$RUN_BOOTSTRAP_SEED_ON_STARTUP_VALUE" = "true" ]; then
+  if [ -n "${BOOTSTRAP_ADMIN_PASSWORD:-}" ] && [ -n "${DATABASE_URL:-}" ] && [[ "${DATABASE_URL}" != *"CHANGE_ME"* ]]; then
     echo "── Bootstrap admin ──"
     python3 - << 'PYEOF'
 import os, sys, logging, uuid
 logging.basicConfig(level=logging.WARNING)
-
 try:
     from app.db.session import SessionLocal
     from app.models_user import User
     from app.security import get_password_hash
     from sqlalchemy import select
 
-    ADMIN_EMAIL    = os.environ.get("BOOTSTRAP_ADMIN_EMAIL", "super_admin@coderoute.gov.gn")
-    ADMIN_PASSWORD = os.environ.get("BOOTSTRAP_ADMIN_PASSWORD", "")
-    ADMIN_NAME     = os.environ.get("BOOTSTRAP_ADMIN_NAME", "Directeur National CodeRoute")
-
-    if not ADMIN_PASSWORD:
-        print("⏭️  BOOTSTRAP_ADMIN_PASSWORD vide — seed ignoré")
+    email = os.environ.get("BOOTSTRAP_ADMIN_EMAIL", "super_admin@coderoute.gov.gn")
+    password = os.environ.get("BOOTSTRAP_ADMIN_PASSWORD", "")
+    name = os.environ.get("BOOTSTRAP_ADMIN_NAME", "Directeur National CodeRoute")
+    if not password:
         sys.exit(0)
-
     db = SessionLocal()
-    existing = db.execute(select(User).where(User.email == ADMIN_EMAIL)).scalar_one_or_none()
-    if existing:
-        print(f"✅ Admin déjà présent : {ADMIN_EMAIL}")
-    else:
-        admin = User(
+    existing = db.execute(select(User).where(User.email == email)).scalar_one_or_none()
+    if not existing:
+        db.add(User(
             id=str(uuid.uuid4()),
-            email=ADMIN_EMAIL,
-            full_name=ADMIN_NAME,
-            password_hash=get_password_hash(ADMIN_PASSWORD),
+            email=email,
+            full_name=name,
+            password_hash=get_password_hash(password),
             role="super_admin",
             is_active=True,
-        )
-        db.add(admin)
+        ))
         db.commit()
-        print(f"✅ Admin créé : {ADMIN_EMAIL}")
+        print("✅ Admin bootstrap créé")
+    else:
+        print("✅ Admin bootstrap déjà présent")
     db.close()
-except Exception as e:
-    print(f"⚠️  Seed admin ignoré : {e}", file=sys.stderr)
+except Exception as exc:
+    print(f"ERROR: bootstrap admin échoué: {exc.__class__.__name__}", file=sys.stderr)
+    raise
 PYEOF
-fi
+  fi
 
-# ── 3. Seed questions (si DB disponible) ─────────────────────────
-if [ -n "${DATABASE_URL:-}" ] && ! echo "${DATABASE_URL}" | grep -q "CHANGE_ME"; then
+  if [ -n "${DATABASE_URL:-}" ] && [[ "${DATABASE_URL}" != *"CHANGE_ME"* ]]; then
+    echo "── Seed initial contrôlé ──"
     python3 - << 'PYEOF'
-import sys, logging
-logging.basicConfig(level=logging.WARNING)
+from app.db.session import SessionLocal
+from app.models_question import Question
+from app.models_center import Center
+
+db = SessionLocal()
 try:
-    from app.db.session import SessionLocal
-    from app.models_question import Question
-    from app.models_center import Center
-    db = SessionLocal()
     n_q = db.query(Question).count()
     n_c = db.query(Center).count()
     if n_q < 50:
         from app.seed_full import seed_questions
-        questions = seed_questions(db); db.commit()
-        print(f"✅ Questions insérées : {len(questions)}")
-    else:
-        print(f"✅ Questions : {n_q} déjà présentes")
+        seed_questions(db)
+        db.commit()
     if n_c < 1:
         from app.seed_full import seed_centers
-        centers = seed_centers(db); db.commit()
-        print(f"✅ Centres insérés : {len(centers)}")
-    else:
-        print(f"✅ Centres : {n_c} déjà présents")
+        seed_centers(db)
+        db.commit()
+finally:
     db.close()
-except Exception as e:
-    print(f"⚠️  Seed ignoré : {e}", file=sys.stderr)
 PYEOF
+  fi
+else
+  echo "✅ Seeds au startup désactivés — aucune course entre instances HA."
 fi
 
-# ── 4. Démarrage Gunicorn ─────────────────────────────────────────
 echo "── Démarrage Gunicorn ──"
 exec gunicorn app.main:app -c gunicorn.conf.py
