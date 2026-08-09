@@ -13,7 +13,7 @@ from coderoute_edge.release_trust import verify_staged_release_for_root
 
 def _signed_stage(tmp_path: Path) -> tuple[dict, Path]:
     root = tmp_path / "releases"
-    root.mkdir()
+    root.mkdir(parents=True)
     private = Ed25519PrivateKey.generate()
     public = b64url(private.public_key().public_bytes(
         encoding=serialization.Encoding.Raw,
