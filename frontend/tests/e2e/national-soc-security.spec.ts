@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 function fakeJwt(): string {
   const header = Buffer.from(JSON.stringify({ alg: 'none', typ: 'JWT' })).toString('base64url');
@@ -6,11 +6,11 @@ function fakeJwt(): string {
   return `${header}.${payload}.test`;
 }
 
-async function bootstrapAdmin(page: Parameters<typeof test>[0] extends never ? never : any) {
+async function bootstrapAdmin(page: Page) {
   await page.addInitScript((token: string) => {
     localStorage.setItem('coderoute-auth-token', token);
   }, fakeJwt());
-  await page.route('**/api/v1/auth/me', async (route: any) => {
+  await page.route('**/api/v1/auth/me', async route => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -19,7 +19,7 @@ async function bootstrapAdmin(page: Parameters<typeof test>[0] extends never ? n
       }),
     });
   });
-  await page.route('**/api/v1/dashboard/by-center', async (route: any) => {
+  await page.route('**/api/v1/dashboard/by-center', async route => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -29,7 +29,7 @@ async function bootstrapAdmin(page: Parameters<typeof test>[0] extends never ? n
       }),
     });
   });
-  await page.route('**/api/v1/center-edge/fleet', async (route: any) => {
+  await page.route('**/api/v1/center-edge/fleet', async route => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -41,7 +41,7 @@ async function bootstrapAdmin(page: Parameters<typeof test>[0] extends never ? n
       }),
     });
   });
-  await page.route('**/api/v1/center-edge/releases**', async (route: any) => {
+  await page.route('**/api/v1/center-edge/releases**', async route => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
   });
 }
