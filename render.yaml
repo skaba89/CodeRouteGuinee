@@ -1,4 +1,4 @@
-# render.yaml — CodeRoute Guinée P10
+# render.yaml — CodeRoute Guinée P10.2
 # Les variables marquées sync:false DOIVENT être saisies manuellement dans
 # Render Dashboard → Environment avant le premier déploiement.
 # Les variables generateValue:true sont auto-générées par Render.
@@ -39,17 +39,12 @@ services:
         generateValue: true
       - key: ADMIN_REGISTRATION_TOKEN
         generateValue: true
-
-      # Signature centrale des leases Center Edge. Toutes les instances API
-      # doivent partager la même valeur afin qu'un lease reste vérifiable.
       - key: EDGE_LEASE_SIGNING_SECRET
         generateValue: true
-      # Signature P9 des releases Center Edge, également partagée.
       - key: EDGE_RELEASE_SIGNING_SECRET
         generateValue: true
 
-      # Base de données Neon — OBLIGATOIRE : saisir dans Render Dashboard
-      # Format : postgresql+psycopg://USER:PASSWORD@HOST/DB?sslmode=require
+      # Base de données Neon/PostgreSQL.
       - key: DATABASE_URL
         sync: false
       - key: ALEMBIC_DATABASE_URL
@@ -61,8 +56,6 @@ services:
           type: keyvalue
           name: coderoute-shared-state
           property: connectionString
-      # Redis est requis comme configuration HA mais reste reconstructible :
-      # une panne runtime déclenche le fallback local et un état degraded.
       - key: REDIS_REQUIRED
         value: "false"
       - key: HA_MODE
@@ -71,6 +64,52 @@ services:
         value: "2"
       - key: DEPLOYMENT_ID
         value: "production"
+
+      # P10.2 observabilité Prometheus + preuve machine PRA.
+      - key: METRICS_ENABLED
+        value: "true"
+      - key: METRICS_TOKEN
+        generateValue: true
+      - key: RELIABILITY_EVIDENCE_ENABLED
+        value: "true"
+      - key: RELIABILITY_EVIDENCE_TOKEN
+        generateValue: true
+      - key: SLO_AVAILABILITY_PERCENT
+        value: "99.9"
+      - key: SLO_P95_LATENCY_MS
+        value: "1000"
+      - key: SLO_MAX_5XX_PERCENT
+        value: "1.0"
+      - key: DR_RPO_MINUTES
+        value: "5"
+      - key: DR_RTO_MINUTES
+        value: "30"
+
+      # P10.2 backup chiffré hors région — valeurs à provisionner AVANT merge.
+      - key: BACKUP_REQUIRED
+        value: "true"
+      - key: BACKUP_REQUIRE_OFF_REGION
+        value: "true"
+      - key: BACKUP_PRIMARY_REGION
+        value: "frankfurt"
+      - key: BACKUP_TARGET_REGION
+        sync: false
+      - key: BACKUP_S3_BUCKET
+        sync: false
+      - key: BACKUP_S3_ENDPOINT_URL
+        sync: false
+      - key: BACKUP_S3_PREFIX
+        value: "coderoute/production"
+      - key: BACKUP_ENCRYPTION_KEY_B64
+        sync: false
+      - key: BACKUP_ENCRYPTION_KEY_ID
+        sync: false
+      - key: BACKUP_S3_SSE_MODE
+        sync: false
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
 
       # Migrations/seeds : jamais en concurrence au démarrage des instances.
       - key: RUN_MIGRATIONS_ON_STARTUP
@@ -104,13 +143,13 @@ services:
       - key: EXAM_START_CLOSE_MINUTES_AFTER
         value: "45"
 
-      # CORS / Hosts — uniquement le domaine Render (pas de localhost)
+      # CORS / Hosts
       - key: CORS_ORIGINS
         value: "https://coderouteguinee-frontend.onrender.com"
       - key: ALLOWED_HOSTS
         value: "coderouteguinee-backend.onrender.com"
 
-      # Email Brevo — optionnel pour le pilote
+      # Email Brevo
       - key: BREVO_API_KEY
         sync: false
       - key: EMAIL_FROM
@@ -118,8 +157,7 @@ services:
       - key: EMAIL_FROM_NAME
         value: "CodeRoute Guinée — DNTT"
 
-      # Media Factory Cloudinary — secrets à saisir dans Render Dashboard.
-      # Les fichiers sont téléversés directement navigateur -> Cloudinary.
+      # Media Factory Cloudinary
       - key: CLOUDINARY_CLOUD_NAME
         sync: false
       - key: CLOUDINARY_API_KEY
@@ -141,7 +179,6 @@ services:
       - key: DB_MAX_OVERFLOW
         value: "3"
 
-      # Durée tokens
       - key: ACCESS_TOKEN_EXPIRE_MINUTES
         value: "30"
       - key: REFRESH_TOKEN_EXPIRE_DAYS
