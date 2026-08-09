@@ -55,13 +55,13 @@ groups:
           runbook: "docs/P10_2_DR_OBSERVABILITY.md#alertes"
 
       - alert: CodeRouteCriticalReadinessFailure
-        expr: coderoute_readiness_component_state{component=~"configuration|database|schema|migrations"} < 1
+        expr: coderoute_readiness_component_state{component=~"configuration|database|schema|migrations"} == 0
         for: 2m
         labels:
           severity: critical
           service: coderoute
         annotations:
-          summary: "Un composant critique de readiness n'est pas sain"
+          summary: "Un composant critique de readiness est en erreur"
           runbook: "docs/P10_2_DR_OBSERVABILITY.md#readiness"
 
       - alert: CodeRouteSharedStateDegraded
