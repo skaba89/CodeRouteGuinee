@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
+import shutil
 import subprocess
 import time
 from pathlib import Path
@@ -88,6 +90,76 @@ def _failed_receipt(
     return receipt
 
 
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        while True:
+            chunk = handle.read(1024 * 1024)
+            if not chunk:
+                break
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _prepare_offline_runtime(target_root: Path, runtime_python: str) -> dict[str, Any]:
+    edge_root = target_root / "edge_agent"
+    lock = edge_root / "requirements.runtime.lock"
+    wheelhouse = edge_root / "wheelhouse"
+    if not lock.is_file() or not wheelhouse.is_dir() or not any(wheelhouse.glob("*.whl")):
+        raise RuntimeError("Runtime P9 incomplet : lock hashé ou wheelhouse absent de l'artefact signé")
+
+    lock_sha = _sha256_file(lock)
+    venv = target_root / ".venv"
+    marker = target_root / ".runtime-ready.json"
+    if marker.is_file() and (venv / "bin" / "python").is_file():
+        try:
+            previous = json.loads(marker.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            previous = {}
+        if previous.get("requirements_lock_sha256") == lock_sha:
+            return previous
+
+    if venv.exists():
+        shutil.rmtree(venv)
+    subprocess.run(
+        [runtime_python, "-m", "venv", str(venv)],
+        check=True,
+        timeout=120,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    pip = venv / "bin" / "pip"
+    subprocess.run(
+        [
+            str(pip),
+            "install",
+            "--disable-pip-version-check",
+            "--no-index",
+            "--find-links",
+            str(wheelhouse),
+            "--require-hashes",
+            "-r",
+            str(lock),
+        ],
+        check=True,
+        timeout=300,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    ready = {
+        "requirements_lock_sha256": lock_sha,
+        "python": runtime_python,
+        "venv_python": str((venv / "bin" / "python").resolve()),
+        "wheel_count": len(list(wheelhouse.glob("*.whl"))),
+    }
+    _json_atomic(marker, ready)
+    return ready
+
+
 def apply_system_update_transaction(
     config: EdgeAgentConfig,
     *,
@@ -97,10 +169,10 @@ def apply_system_update_transaction(
 ) -> dict[str, Any]:
     """Applique une release vérifiée comme transaction système locale.
 
-    L'ordre est volontairement strict : fenêtre -> quiescence -> re-hash/extract
-    P8 -> restart -> health/version. Un échec post-restart déclenche un rollback
-    local puis un second health-check. Le reçu final reste `failed` pour la
-    release fautive afin que la DNTT mette automatiquement son rollout en pause.
+    Ordre P9 : fenêtre -> quiescence -> re-hash/extract P8 -> runtime offline
+    hash-locké -> restart -> health/version. Un échec après bascule déclenche un
+    rollback local puis un second health-check. Le reçu final reste `failed`
+    pour la release fautive afin que la DNTT auto-pause le rollout.
     """
     state = assert_safe_maintenance(
         config.database_path,
@@ -115,9 +187,28 @@ def apply_system_update_transaction(
 
     try:
         installed = apply_verified_release(config.release_dir)
+        target_root = Path(str(installed.get("current_path") or ""))
+        runtime = _prepare_offline_runtime(target_root, config.runtime_python)
     except Exception as exc:
-        failed = _failed_receipt(config.release_dir, staged, error=f"apply: {exc}", rollback=None)
-        return {"ok": False, "phase": "apply", "receipt": failed, "quiescent": state.quiescent}
+        rollback_receipt: dict[str, Any] | None = None
+        try:
+            # apply_verified_release peut avoir déjà déplacé `current`.
+            rollback_receipt = rollback_to_previous(config.release_dir)
+        except Exception:
+            rollback_receipt = None
+        failed = _failed_receipt(
+            config.release_dir,
+            staged,
+            error=f"apply/runtime: {exc}",
+            rollback=rollback_receipt,
+        )
+        return {
+            "ok": False,
+            "phase": "runtime" if rollback_receipt else "critical",
+            "receipt": failed,
+            "rollback": rollback_receipt,
+            "quiescent": state.quiescent,
+        }
 
     try:
         restart_service(config.systemd_service_name)
@@ -131,11 +222,12 @@ def apply_system_update_transaction(
             "ok": True,
             "phase": "confirmed",
             "receipt": installed,
+            "runtime": runtime,
             "health": health,
             "quiescent": state.quiescent,
         }
     except Exception as primary_exc:
-        rollback_receipt: dict[str, Any] | None = None
+        rollback_receipt = None
         rollback_error: Exception | None = None
         try:
             rollback_receipt = rollback_to_previous(config.release_dir)
