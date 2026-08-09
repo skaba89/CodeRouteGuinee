@@ -27,6 +27,8 @@ Render doit donc attendre la réussite des checks CI du commit avant le déploie
 
 Le gate national exécute également les régressions transverses P10.2/PITR, P11/SOC, P12/homologation, le Go-Live Evidence Pack et les scénarios E2E du Command Center. Les anciens workflows de patch à permission `contents: write`, utilisés pendant la construction du Command Center, sont supprimés du livrable final ; seul le contrôle permanent doit rester.
 
+Le nettoyage est lui-même conditionné par la présence des invariants permanents et du scénario E2E fail-closed ; le commit final de validation est ensuite créé par le flux normal de la PR afin que les checks s'exécutent sur l'arbre nettoyé.
+
 Le workflow permanent `National Go-Live Command Center Contract` possède en plus un job backend `render-fingerprint-backend`. Il exécute `test_health.py` et, dès que le vérificateur est présent, `test_render_deployment_fingerprint.py`. Ce deuxième gate rend la preuve de SHA testable depuis une PR avant tout rollout Render.
 
 ## Vérification depuis GitHub — recommandée
