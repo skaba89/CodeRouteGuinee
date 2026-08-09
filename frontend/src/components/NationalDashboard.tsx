@@ -9,6 +9,7 @@ import {
 import { EdgeReleasePanel } from './EdgeReleasePanel';
 import { EdgeSupplyChainPanel } from './EdgeSupplyChainPanel';
 import { NationalGovernancePanel } from './NationalGovernancePanel';
+import { NationalGoLiveCommandCenter } from './NationalGoLiveCommandCenter';
 import { NationalHomologationEvidencePanel } from './NationalHomologationEvidencePanel';
 
 function fmtNumber(value: number): string {
@@ -283,6 +284,7 @@ export function NationalDashboard() {
         )}
       </div>
 
+      <NationalGoLiveCommandCenter />
       <NationalGovernancePanel />
       <NationalHomologationEvidencePanel />
       <EdgeSupplyChainPanel />
