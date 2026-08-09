@@ -19,7 +19,7 @@ from .updater import apply_verified_release, rollback_to_previous
 RestartService = Callable[[str], None]
 HealthProbe = Callable[[str, int, Path | None], dict[str, Any]]
 RuntimePrepare = Callable[[Path, str], dict[str, Any]]
-StagedVerifier = Callable[[dict[str, Any], Path], dict[str, Any]]
+StagedVerifier = Callable[[dict[str, Any], Path, str, str, str], dict[str, Any]]
 
 
 def _json_atomic(path: Path, payload: dict[str, Any]) -> None:
@@ -73,7 +73,13 @@ def _read_staged(staging_root: Path) -> dict[str, Any]:
     return data
 
 
-def _verify_staged_with_local_trust(staged: dict[str, Any], staging_root: Path) -> dict[str, Any]:
+def _verify_staged_with_local_trust(
+    staged: dict[str, Any],
+    staging_root: Path,
+    node_id: str,
+    center_id: str,
+    current_version: str,
+) -> dict[str, Any]:
     trust_store = Path(os.environ.get(
         "CODEROUTE_EDGE_RELEASE_TRUST_PATH",
         "/etc/coderoute-edge/release-trust.json",
@@ -82,6 +88,9 @@ def _verify_staged_with_local_trust(staged: dict[str, Any], staging_root: Path) 
         staged,
         release_root=staging_root,
         trust_store_path=trust_store,
+        expected_node_id=node_id,
+        expected_center_id=center_id,
+        expected_current_version=current_version,
     )
 
 
@@ -222,7 +231,13 @@ def apply_system_update_transaction(
     )
     staging_root = getattr(config, "release_staging_dir", None) or config.release_dir
     staged = _read_staged(staging_root)
-    root_verification = staged_verifier(staged, staging_root)
+    root_verification = staged_verifier(
+        staged,
+        staging_root,
+        config.node_id,
+        config.center_id,
+        config.software_version,
+    )
     expected_version = str(root_verification.get("software_version") or staged.get("software_version") or "")
     if not expected_version:
         raise RuntimeError("Version staged absente")
