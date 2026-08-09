@@ -34,7 +34,7 @@ def _build_configuration_check(current_settings) -> dict:
     }
 
     if current_settings.secret_key in placeholders or current_settings.secret_key.startswith("CHANGE_ME"):
-        errors.append("SECRET_KEY must be replaced (placeholder detected)")
+        (errors if is_production else warnings).append("SECRET_KEY must be replaced (placeholder detected)")
     elif len(current_settings.secret_key) < 32:
         warnings.append("SECRET_KEY should contain at least 32 characters")
 
@@ -47,17 +47,17 @@ def _build_configuration_check(current_settings) -> dict:
 
     origins = current_settings.cors_origin_list
     if not origins:
-        errors.append("CORS_ORIGINS must contain at least one origin")
+        (errors if is_production else warnings).append("CORS_ORIGINS must contain at least one origin")
     if "*" in origins:
-        errors.append("CORS_ORIGINS must not contain wildcard origin")
+        (errors if is_production else warnings).append("CORS_ORIGINS must not contain wildcard origin")
     if is_production and any("localhost" in origin or "127.0.0.1" in origin for origin in origins):
         errors.append("CORS_ORIGINS must not contain local origins in production")
 
     allowed_hosts = current_settings.allowed_host_list
     if not allowed_hosts:
-        errors.append("ALLOWED_HOSTS must contain at least one host")
+        (errors if is_production else warnings).append("ALLOWED_HOSTS must contain at least one host")
     if "*" in allowed_hosts:
-        errors.append("ALLOWED_HOSTS must not contain wildcard host in production")
+        (errors if is_production else warnings).append("ALLOWED_HOSTS must not contain wildcard host in production")
     if is_production and any(host in {"localhost", "127.0.0.1", "testserver"} for host in allowed_hosts):
         errors.append("ALLOWED_HOSTS must not contain local hosts in production")
 
