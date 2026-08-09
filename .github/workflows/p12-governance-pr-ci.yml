@@ -1,25 +1,54 @@
-name: P12 Governance PR CI
+name: P12 Governance CI
 
 on:
   pull_request:
     paths:
       - 'backend/app/national_governance.py'
+      - 'backend/app/national_governance_evidence.py'
       - 'backend/app/national_governance_guard.py'
       - 'backend/app/routers/national_governance.py'
       - 'backend/app/main.py'
       - 'backend/tests/test_national_governance.py'
       - 'backend/tests/test_national_homologation.py'
+      - 'backend/tests/test_homologation_evidence_integrity.py'
       - 'frontend/src/nationalGovernanceClient.ts'
       - 'frontend/src/components/NationalGovernancePanel.tsx'
+      - 'frontend/src/components/NationalHomologationEvidencePanel.tsx'
       - 'frontend/src/components/NationalDashboard.tsx'
       - 'frontend/tests/e2e/national-governance.spec.ts'
+      - 'frontend/tests/e2e/national-homologation-evidence.spec.ts'
+      - 'frontend/package-lock.json'
       - 'docs/P12_NATIONAL_GOVERNANCE_HOMOLOGATION.md'
+      - 'docs/P12_HOMOLOGATION_EVIDENCE_INTEGRITY.md'
+      - '.github/workflows/p12-governance-pr-ci.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'backend/app/national_governance.py'
+      - 'backend/app/national_governance_evidence.py'
+      - 'backend/app/national_governance_guard.py'
+      - 'backend/app/routers/national_governance.py'
+      - 'backend/app/main.py'
+      - 'backend/tests/test_national_governance.py'
+      - 'backend/tests/test_national_homologation.py'
+      - 'backend/tests/test_homologation_evidence_integrity.py'
+      - 'frontend/src/nationalGovernanceClient.ts'
+      - 'frontend/src/components/NationalGovernancePanel.tsx'
+      - 'frontend/src/components/NationalHomologationEvidencePanel.tsx'
+      - 'frontend/src/components/NationalDashboard.tsx'
+      - 'frontend/tests/e2e/national-governance.spec.ts'
+      - 'frontend/tests/e2e/national-homologation-evidence.spec.ts'
+      - 'frontend/package-lock.json'
+      - 'docs/P12_NATIONAL_GOVERNANCE_HOMOLOGATION.md'
+      - 'docs/P12_HOMOLOGATION_EVIDENCE_INTEGRITY.md'
       - '.github/workflows/p12-governance-pr-ci.yml'
   workflow_dispatch:
 
 jobs:
   governance-backend:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -30,8 +59,8 @@ jobs:
         run: pip install -q -r requirements.txt
       - name: Compile P12 modules
         working-directory: backend
-        run: python -m compileall -q app/national_governance.py app/national_governance_guard.py app/routers/national_governance.py
-      - name: Run P12 governance tests
+        run: python -m compileall -q app/national_governance.py app/national_governance_evidence.py app/national_governance_guard.py app/routers/national_governance.py
+      - name: Run P12 governance and evidence integrity tests
         working-directory: backend
         env:
           PYTHONPATH: .
@@ -40,13 +69,17 @@ jobs:
           ENVIRONMENT: test
           SOC_ENABLED: 'false'
           AUDIT_CHAIN_ENABLED: 'false'
+          EDGE_LEASE_SIGNING_SECRET: coderoute-p12-ci-edge-signing-secret-at-least-32-characters
+          EDGE_RELEASE_SIGNING_SECRET: coderoute-p12-ci-release-signing-secret-at-least-32-characters
         run: |
           pytest -q --tb=short --disable-warnings \
             tests/test_national_governance.py \
-            tests/test_national_homologation.py
+            tests/test_national_homologation.py \
+            tests/test_homologation_evidence_integrity.py
 
   governance-frontend:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: frontend
@@ -59,6 +92,8 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - name: Install frontend dependencies
         run: npm ci
+      - name: Reject high and critical npm vulnerabilities
+        run: npm run audit:security
       - name: Typecheck
         run: npm run typecheck
       - name: Build
@@ -66,4 +101,50 @@ jobs:
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
       - name: Run P12 DNTT E2E
-        run: npx playwright test tests/e2e/national-governance.spec.ts --project=chromium
+        env:
+          CI: 'true'
+          VITE_API_BASE_URL: http://localhost:8000
+        run: >-
+          npx playwright test
+          tests/e2e/national-governance.spec.ts
+          tests/e2e/national-homologation-evidence.spec.ts
+          --project=chromium --timeout=30000 --retries=1
+
+  governance-evidence-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify hashed evidence remains mandatory
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          evidence = Path('backend/app/national_governance_evidence.py').read_text(encoding='utf-8')
+          for marker in (
+              'artifact_sha256',
+              'HOMOLOGATION_EVIDENCE_INTEGRITY_INVALID',
+              'evidence_history',
+              'attach_hashed_evidence',
+              'validate_dossier_evidence_integrity',
+          ):
+              assert marker in evidence, marker
+
+          router = Path('backend/app/routers/national_governance.py').read_text(encoding='utf-8')
+          assert 'EvidenceIntegrityRequest' in router
+          assert 'attach_hashed_evidence' in router
+          assert router.count('validate_dossier_evidence_integrity(db, reference)') >= 2
+
+          client = Path('frontend/src/nationalGovernanceClient.ts').read_text(encoding='utf-8')
+          assert 'artifact_sha256' in client
+          assert 'attachHomologationEvidence' in client
+          assert 'submitHomologationDossier' in client
+          assert 'approveHomologationDossier' in client
+          assert 'decideHomologationDossier' in client
+
+          panel = Path('frontend/src/components/NationalHomologationEvidencePanel.tsx').read_text(encoding='utf-8')
+          assert 'homologation-evidence-workflow' in panel
+          assert 'Soumettre les 5 preuves' in panel
+          assert 'Homologuer' in panel
+          print('P12 hashed evidence contract: OK')
+          PY
