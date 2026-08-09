@@ -112,6 +112,8 @@ class CentralClient:
             "fleet-telemetry-v1",
             "media-prefetch-v1",
             "operator-status-v1",
+            "release-attestation-v1",
+            "release-staging-v1",
         ]
         signing_payload: dict[str, Any] = {
             "capabilities": sorted(capabilities),
@@ -163,6 +165,77 @@ class CentralClient:
             bundle["lease"],
             str(bundle["lease_signature_b64"]),
         )
+
+    def release_signing_key(self) -> dict[str, Any]:
+        response = self.http.get("/api/v1/center-edge/release-signing-key")
+        response.raise_for_status()
+        return response.json()
+
+    def verify_release_bundle(self, bundle: dict[str, Any]) -> bool:
+        key = self.release_signing_key()
+        if str(bundle.get("signing_key_id")) != str(key.get("key_id")):
+            return False
+        return verify_signed_payload(
+            str(key["public_key_b64"]),
+            bundle["manifest"],
+            str(bundle["manifest_signature_b64"]),
+        )
+
+    def check_release(self, current_version: str) -> dict[str, Any]:
+        sequence = self.store.next_node_sequence()
+        sent_at = _iso_z(datetime.now(UTC))
+        fields = {"current_version": current_version.strip()}
+        signed = _machine_payload(
+            action="release.check",
+            node_id=self.config.node_id,
+            center_id=self.config.center_id,
+            sequence=sequence,
+            sent_at=sent_at,
+            fields=fields,
+        )
+        payload = {
+            "node_id": self.config.node_id,
+            "center_id": self.config.center_id,
+            "sequence": sequence,
+            "sent_at": sent_at,
+            **fields,
+            "signature_b64": sign_payload(self.private_key, signed),
+        }
+        return self._post("/api/v1/center-edge/release/check", payload).json()
+
+    def attest_release(
+        self,
+        *,
+        release_id: str,
+        software_version: str,
+        result: str,
+        artifact_sha256: str,
+    ) -> dict[str, Any]:
+        sequence = self.store.next_node_sequence()
+        sent_at = _iso_z(datetime.now(UTC))
+        fields = {
+            "release_id": release_id,
+            "software_version": software_version.strip(),
+            "result": result.strip().lower(),
+            "artifact_sha256": artifact_sha256.strip().lower(),
+        }
+        signed = _machine_payload(
+            action="release.attest",
+            node_id=self.config.node_id,
+            center_id=self.config.center_id,
+            sequence=sequence,
+            sent_at=sent_at,
+            fields=fields,
+        )
+        payload = {
+            "node_id": self.config.node_id,
+            "center_id": self.config.center_id,
+            "sequence": sequence,
+            "sent_at": sent_at,
+            **fields,
+            "signature_b64": sign_payload(self.private_key, signed),
+        }
+        return self._post("/api/v1/center-edge/release/attest", payload).json()
 
     def sync_offline(self, sync_payload: dict[str, Any]) -> dict[str, Any]:
         sequence = self.store.next_node_sequence()

@@ -21,6 +21,53 @@ export type EdgeLeaseSummary = {
   updated_at: number;
 };
 
+export type EdgeLocalReleaseState = {
+  enabled: boolean;
+  staged?: {
+    release_id?: string;
+    action?: string;
+    software_version?: string;
+    artifact_sha256?: string;
+    artifact_size_bytes?: number;
+    verified?: boolean;
+    corrupt?: boolean;
+  } | null;
+  install_receipt?: {
+    release_id?: string;
+    software_version?: string;
+    artifact_sha256?: string;
+    result?: string;
+    corrupt?: boolean;
+  } | null;
+};
+
+export type EdgeReleaseOffer = {
+  update_available: boolean;
+  action: 'none' | 'install' | 'rollback' | string;
+  current_version?: string;
+  source_release_id?: string;
+  rollout_status?: string;
+  release?: {
+    release_id: string;
+    manifest: {
+      software_version: string;
+      artifact: { sha256: string; size_bytes: number; url: string; format: string };
+      release_notes?: string | null;
+    };
+  };
+};
+
+export type EdgeReleaseStageResult = {
+  staged: boolean;
+  reason?: string;
+  release_id?: string;
+  action?: string;
+  software_version?: string;
+  artifact_sha256?: string;
+  artifact_size_bytes?: number;
+  verified?: boolean;
+};
+
 export type EdgeOperatorStatus = {
   node_id: string;
   center_id: string;
@@ -30,6 +77,7 @@ export type EdgeOperatorStatus = {
   sync_pending: number;
   revalidation_required: number;
   media_cache: { files: number; bytes: number };
+  release?: EdgeLocalReleaseState;
 };
 
 export type EdgeHealth = {
@@ -145,8 +193,6 @@ export async function activateEdgeLease(
       lang,
     }),
   });
-  // Le claim brut ne doit jamais être conservé par la console. Seule l'URL candidat
-  // temporaire est rendue à l'opérateur pour transfert vers le poste correspondant.
   return {
     attempt_id: result.attempt_id,
     lease_id: result.lease_id,
@@ -161,4 +207,20 @@ export async function activateEdgeLease(
 
 export function syncEdgeAttempt(url: string, token: string, attemptId: string): Promise<Record<string, unknown>> {
   return edgeFetch<Record<string, unknown>>(url, `/operator/sync/${encodeURIComponent(attemptId)}`, token, { method: 'POST' });
+}
+
+export function checkLocalEdgeRelease(url: string, token: string): Promise<EdgeReleaseOffer> {
+  return edgeFetch<EdgeReleaseOffer>(url, '/operator/releases/check', token, { method: 'POST' });
+}
+
+export function stageLocalEdgeRelease(url: string, token: string): Promise<EdgeReleaseStageResult> {
+  return edgeFetch<EdgeReleaseStageResult>(url, '/operator/releases/stage', token, { method: 'POST' });
+}
+
+export function getLocalEdgeReleaseStatus(url: string, token: string): Promise<EdgeLocalReleaseState> {
+  return edgeFetch<EdgeLocalReleaseState>(url, '/operator/releases/status', token);
+}
+
+export function attestLocalEdgeInstall(url: string, token: string): Promise<Record<string, unknown>> {
+  return edgeFetch<Record<string, unknown>>(url, '/operator/releases/attest-install', token, { method: 'POST' });
 }

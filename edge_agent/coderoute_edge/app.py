@@ -14,6 +14,7 @@ from .central import CentralClient
 from .config import EdgeAgentConfig
 from .crypto import load_or_create_storage_key, load_private_key
 from .media import MediaCache
+from .release import EdgeReleaseManager
 from .service import EdgeAgentService
 from .store import EdgeStore
 from .tickets import verify_media_ticket
@@ -52,7 +53,8 @@ def build_service(config: EdgeAgentConfig) -> EdgeAgentService:
         public_url=config.public_url,
         max_media_bytes=config.max_media_bytes,
     )
-    return EdgeAgentService(store, central, media)
+    releases = EdgeReleaseManager(config, central)
+    return EdgeAgentService(store, central, media, releases)
 
 
 def create_app(
@@ -170,6 +172,31 @@ def create_app(
             "software_version": config.software_version,
             **service.operator_status(),
         }
+
+    @app.post("/operator/releases/check", dependencies=[Depends(require_operator)])
+    def operator_release_check() -> dict:
+        try:
+            return service.release_check()
+        except Exception as exc:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"Release check failed: {exc}") from exc
+
+    @app.post("/operator/releases/stage", dependencies=[Depends(require_operator)])
+    def operator_release_stage() -> dict:
+        try:
+            return service.release_stage()
+        except Exception as exc:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"Release staging failed: {exc}") from exc
+
+    @app.get("/operator/releases/status", dependencies=[Depends(require_operator)])
+    def operator_release_status() -> dict:
+        return service.release_status()
+
+    @app.post("/operator/releases/attest-install", dependencies=[Depends(require_operator)])
+    def operator_release_attest_install() -> dict:
+        try:
+            return service.release_attest_install()
+        except Exception as exc:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"Release attestation failed: {exc}") from exc
 
     @app.get("/v1/exams/{attempt_id}")
     def candidate_exam(
