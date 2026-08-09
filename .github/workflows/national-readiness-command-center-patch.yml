@@ -1,0 +1,107 @@
+name: Extend National Readiness for Command Center
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/national-readiness-command-center-patch.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref || github.ref_name }}
+      - name: Verify feature is integrated before extending the permanent gate
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          dashboard = Path('frontend/src/components/NationalDashboard.tsx').read_text(encoding='utf-8')
+          assert "import { NationalGoLiveCommandCenter } from './NationalGoLiveCommandCenter';" in dashboard
+          assert '<NationalGoLiveCommandCenter />' in dashboard
+          for path in (
+              'frontend/src/components/NationalGoLiveCommandCenter.tsx',
+              'frontend/src/reliabilityClient.ts',
+              'frontend/tests/e2e/national-go-live-command-center.spec.ts',
+          ):
+              assert Path(path).exists(), path
+          PY
+      - name: Extend National Code Readiness exactly once
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('.github/workflows/national-code-readiness.yml')
+          text = path.read_text(encoding='utf-8')
+
+          def insert_after(anchor: str, lines: list[str]) -> None:
+              global text
+              missing = [line for line in lines if line not in text]
+              if not missing:
+                  return
+              if text.count(anchor) != 1:
+                  raise SystemExit(f'expected exactly one anchor {anchor!r}, found {text.count(anchor)}')
+              addition = ''.join(line for line in lines if line not in text)
+              text = text.replace(anchor, anchor + addition, 1)
+
+          insert_after(
+              '          tests/e2e/national-governance.spec.ts\n',
+              [
+                  '          tests/e2e/national-homologation-evidence.spec.ts\n',
+                  '          tests/e2e/national-go-live-command-center.spec.ts\n',
+              ],
+          )
+          insert_after(
+              '            tests/test_soc_runtime_security.py\n',
+              [
+                  '            tests/test_soc_go_live_readiness.py \\\n',
+                  '            tests/test_go_live_evidence_pack.py \\\n',
+                  '            tests/test_go_live_evidence_pitr.py \\\n',
+                  '            tests/test_national_readiness_pitr.py\n',
+              ],
+          )
+          insert_after(
+              '            tests/test_national_homologation.py\n',
+              ['            tests/test_homologation_evidence_integrity.py\n'],
+          )
+
+          path.write_text(text, encoding='utf-8')
+          PY
+      - name: Verify permanent gate scope
+        shell: bash
+        run: |
+          git diff -- .github/workflows/national-code-readiness.yml
+          python - <<'PY'
+          from pathlib import Path
+          text = Path('.github/workflows/national-code-readiness.yml').read_text(encoding='utf-8')
+          markers = (
+              'tests/e2e/national-go-live-command-center.spec.ts',
+              'tests/e2e/national-homologation-evidence.spec.ts',
+              'tests/test_soc_go_live_readiness.py',
+              'tests/test_go_live_evidence_pack.py',
+              'tests/test_go_live_evidence_pitr.py',
+              'tests/test_national_readiness_pitr.py',
+              'tests/test_homologation_evidence_integrity.py',
+          )
+          for marker in markers:
+              assert text.count(marker) == 1, (marker, text.count(marker))
+          PY
+      - name: Commit permanent readiness extension
+        shell: bash
+        run: |
+          if git diff --quiet -- .github/workflows/national-code-readiness.yml; then
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add .github/workflows/national-code-readiness.yml
+          git commit -m 'ci: include national go-live gates in readiness suite'
+          git push origin HEAD:${{ github.event.pull_request.head.ref || github.ref_name }}
