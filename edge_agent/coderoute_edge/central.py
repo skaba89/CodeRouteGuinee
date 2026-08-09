@@ -110,10 +110,13 @@ class CentralClient:
             "answer-journal-v1",
             "exam-lease-v1",
             "fleet-telemetry-v1",
+            "maintenance-updater-v1",
             "media-prefetch-v1",
             "operator-status-v1",
             "release-attestation-v1",
+            "release-key-rotation-v1",
             "release-staging-v1",
+            "supply-chain-evidence-v1",
         ]
         signing_payload: dict[str, Any] = {
             "capabilities": sorted(capabilities),
@@ -172,14 +175,21 @@ class CentralClient:
         return response.json()
 
     def verify_release_bundle(self, bundle: dict[str, Any]) -> bool:
-        key = self.release_signing_key()
-        if str(bundle.get("signing_key_id")) != str(key.get("key_id")):
-            return False
-        return verify_signed_payload(
-            str(key["public_key_b64"]),
-            bundle["manifest"],
-            str(bundle["manifest_signature_b64"]),
-        )
+        key_response = self.release_signing_key()
+        signing_key_id = str(bundle.get("signing_key_id") or "")
+        trusted = key_response.get("trusted_keys")
+        candidates = trusted if isinstance(trusted, list) else [key_response]
+        for candidate in candidates:
+            if not isinstance(candidate, dict) or str(candidate.get("key_id") or "") != signing_key_id:
+                continue
+            public_key = str(candidate.get("public_key_b64") or "")
+            if public_key and verify_signed_payload(
+                public_key,
+                bundle["manifest"],
+                str(bundle["manifest_signature_b64"]),
+            ):
+                return True
+        return False
 
     def check_release(self, current_version: str) -> dict[str, Any]:
         sequence = self.store.next_node_sequence()
