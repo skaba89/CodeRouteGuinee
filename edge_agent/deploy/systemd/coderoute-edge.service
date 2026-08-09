@@ -34,8 +34,8 @@ RemoveIPC=true
 CapabilityBoundingSet=
 AmbientCapabilities=
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
-ReadOnlyPaths=/etc/coderoute-edge
-ReadWritePaths=/var/lib/coderoute-edge /var/cache/coderoute-edge /opt/coderoute-edge/releases
+ReadOnlyPaths=/etc/coderoute-edge /opt/coderoute-edge/releases
+ReadWritePaths=/var/lib/coderoute-edge /var/cache/coderoute-edge
 
 [Install]
 WantedBy=multi-user.target
