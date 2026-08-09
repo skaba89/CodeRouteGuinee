@@ -77,6 +77,17 @@ def _runtime(_root: Path, python: str) -> dict:
     return {"python": python, "requirements_lock_sha256": "f" * 64, "wheel_count": 12}
 
 
+def _trusted_for_transaction(staged: dict, _root: Path) -> dict:
+    return {
+        "release_id": staged["release_id"],
+        "software_version": staged["software_version"],
+        "artifact_sha256": staged["artifact_sha256"],
+        "artifact_size_bytes": staged["artifact_size_bytes"],
+        "signing_key_id": "test-key",
+        "manifest_hash": "f" * 64,
+    }
+
+
 def _current_target(root: Path) -> Path:
     link = root / "current"
     return (link.parent / os.readlink(link)).resolve()
@@ -97,6 +108,7 @@ def test_system_update_confirms_exact_running_version(tmp_path: Path) -> None:
         restart_service=lambda service: restarts.append(service),
         health_probe=lambda *_args: {"status": "ok", "software_version": "edge-agent-0.4.0"},
         runtime_prepare=_runtime,
+        staged_verifier=_trusted_for_transaction,
     )
 
     assert result["ok"] is True
@@ -126,6 +138,7 @@ def test_health_version_mismatch_rolls_back_and_marks_bad_release_failed(tmp_pat
         restart_service=lambda service: restarts.append(service),
         health_probe=lambda *_args: next(probes),
         runtime_prepare=_runtime,
+        staged_verifier=_trusted_for_transaction,
     )
 
     assert result["ok"] is False
@@ -156,6 +169,7 @@ def test_active_exam_blocks_transaction_before_link_switch_or_restart(tmp_path: 
             restart_service=lambda service: restarts.append(service),
             health_probe=lambda *_args: {"status": "ok", "software_version": "edge-agent-0.4.0"},
             runtime_prepare=_runtime,
+            staged_verifier=_trusted_for_transaction,
         )
 
     assert restarts == []
