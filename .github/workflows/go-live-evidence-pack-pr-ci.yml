@@ -1,0 +1,31 @@
+name: Go-Live Evidence Pack PR CI
+
+on:
+  pull_request:
+    paths:
+      - 'backend/scripts/collect_go_live_evidence.py'
+      - 'backend/tests/test_go_live_evidence_pack.py'
+      - 'docs/GO_LIVE_EVIDENCE_PACK.md'
+      - '.gitignore'
+      - '.github/workflows/go-live-evidence-pack-pr-ci.yml'
+  workflow_dispatch:
+
+jobs:
+  evidence-pack:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install backend dependencies
+        working-directory: backend
+        run: pip install -q -r requirements.txt
+      - name: Compile collector
+        working-directory: backend
+        run: python -m compileall -q scripts/collect_go_live_evidence.py
+      - name: Run evidence-pack safety tests
+        working-directory: backend
+        env:
+          PYTHONPATH: .
+        run: pytest -q --tb=short --disable-warnings tests/test_go_live_evidence_pack.py
