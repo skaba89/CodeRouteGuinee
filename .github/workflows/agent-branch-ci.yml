@@ -38,6 +38,7 @@ jobs:
             tests/test_center_edge_fleet.py
             tests/test_center_edge_release.py
             tests/test_center_edge_supply_chain.py
+            tests/test_edge_install_authorization.py
             tests/test_media_policy.py
             tests/test_question_media_schema_compat.py
             tests/test_e2e_exam_question_trace.py
