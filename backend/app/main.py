@@ -59,6 +59,7 @@ from app.routers import (
     exams,
     health,
     institutional_authorizations,
+    media_library,
     metrics,
     national_governance,
     operations,
@@ -264,6 +265,7 @@ app.include_router(candidates.router, prefix=settings.api_v1_prefix)
 app.include_router(candidate_identity.router, prefix=settings.api_v1_prefix)
 app.include_router(centers.router, prefix=settings.api_v1_prefix)
 app.include_router(questions.router, prefix=settings.api_v1_prefix)
+app.include_router(media_library.router, prefix=settings.api_v1_prefix)
 app.include_router(question_governance.router, prefix=settings.api_v1_prefix)
 app.include_router(sessions.router, prefix=settings.api_v1_prefix)
 app.include_router(exams.router, prefix=settings.api_v1_prefix)
