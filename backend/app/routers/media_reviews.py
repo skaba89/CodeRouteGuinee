@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
@@ -41,15 +41,7 @@ def _four_eyes(asset: MediaAsset, reviewer: User) -> None:
 
 
 def _audit(db: Session, *, actor_id: str, action: str, asset: MediaAsset, details: dict) -> None:
-    db.add(
-        AuditLog(
-            actor_id=actor_id,
-            action=action,
-            entity="media_asset",
-            entity_id=asset.id,
-            details=details,
-        )
-    )
+    db.add(AuditLog(actor_id=actor_id, action=action, entity="media_asset", entity_id=asset.id, details=details))
 
 
 @router.get("/assets/{media_id}/quality-gate", response_model=MediaQualityGateRead)
@@ -59,11 +51,13 @@ def asset_quality_gate(
     _current_user: User = Depends(require_roles("admin", "super_admin")),
 ) -> dict:
     asset = _asset_or_404(db, media_id)
+    is_exam = asset.usage_type == "exam"
     return evaluate_media_asset(
         db,
         asset,
         require_quality_approval=True,
-        require_regulatory_approval=True,
+        require_regulatory_approval=is_exam,
+        require_exam_usage=is_exam,
     )
 
 
@@ -81,15 +75,8 @@ def submit_quality_review(
     asset.quality_status = "review_required"
     asset.validated_by = None
     asset.validated_at = None
-    _audit(
-        db,
-        actor_id=current_user.id,
-        action="media_asset.quality_submitted",
-        asset=asset,
-        details={"reason": payload.reason.strip()},
-    )
-    db.commit()
-    db.refresh(asset)
+    _audit(db, actor_id=current_user.id, action="media_asset.quality_submitted", asset=asset, details={"reason": payload.reason.strip()})
+    db.commit(); db.refresh(asset)
     return asset
 
 
@@ -111,25 +98,16 @@ def approve_quality_review(
         asset,
         require_quality_approval=False,
         require_regulatory_approval=False,
+        require_exam_usage=asset.usage_type == "exam",
     )
     if not technical["passed"]:
-        raise HTTPException(
-            status_code=409,
-            detail={"code": "MEDIA_TECHNICAL_GATE_BLOCKED", "blockers": technical["blockers"]},
-        )
+        raise HTTPException(status_code=409, detail={"code": "MEDIA_TECHNICAL_GATE_BLOCKED", "blockers": technical["blockers"]})
 
     asset.quality_status = "validated"
     asset.validated_by = current_user.id
     asset.validated_at = datetime.now(UTC).replace(tzinfo=None)
-    _audit(
-        db,
-        actor_id=current_user.id,
-        action="media_asset.quality_approved",
-        asset=asset,
-        details={"reason": payload.reason.strip(), "score": technical["score"]},
-    )
-    db.commit()
-    db.refresh(asset)
+    _audit(db, actor_id=current_user.id, action="media_asset.quality_approved", asset=asset, details={"reason": payload.reason.strip(), "score": technical["score"]})
+    db.commit(); db.refresh(asset)
     return asset
 
 
@@ -148,15 +126,8 @@ def reject_quality_review(
     asset.regulatory_authority_reference = None
     asset.validated_by = current_user.id
     asset.validated_at = datetime.now(UTC).replace(tzinfo=None)
-    _audit(
-        db,
-        actor_id=current_user.id,
-        action="media_asset.quality_rejected",
-        asset=asset,
-        details={"reason": payload.reason.strip()},
-    )
-    db.commit()
-    db.refresh(asset)
+    _audit(db, actor_id=current_user.id, action="media_asset.quality_rejected", asset=asset, details={"reason": payload.reason.strip()})
+    db.commit(); db.refresh(asset)
     return asset
 
 
@@ -175,15 +146,8 @@ def submit_regulatory_review(
         raise HTTPException(status_code=409, detail="Le média est déjà validé réglementairement")
     asset.regulatory_status = "under_review"
     asset.regulatory_authority_reference = None
-    _audit(
-        db,
-        actor_id=current_user.id,
-        action="media_asset.regulatory_submitted",
-        asset=asset,
-        details={"reason": payload.reason.strip()},
-    )
-    db.commit()
-    db.refresh(asset)
+    _audit(db, actor_id=current_user.id, action="media_asset.regulatory_submitted", asset=asset, details={"reason": payload.reason.strip()})
+    db.commit(); db.refresh(asset)
     return asset
 
 
@@ -205,12 +169,10 @@ def approve_regulatory_review(
         asset,
         require_quality_approval=True,
         require_regulatory_approval=False,
+        require_exam_usage=asset.usage_type == "exam",
     )
     if not gate["passed"]:
-        raise HTTPException(
-            status_code=409,
-            detail={"code": "MEDIA_QUALITY_GATE_BLOCKED", "blockers": gate["blockers"]},
-        )
+        raise HTTPException(status_code=409, detail={"code": "MEDIA_QUALITY_GATE_BLOCKED", "blockers": gate["blockers"]})
 
     asset.regulatory_status = "validated"
     asset.regulatory_authority_reference = payload.authority_reference.strip()
@@ -221,14 +183,9 @@ def approve_regulatory_review(
         actor_id=current_user.id,
         action="media_asset.regulatory_approved",
         asset=asset,
-        details={
-            "reason": payload.reason.strip(),
-            "authority_reference": payload.authority_reference.strip(),
-            "score": gate["score"],
-        },
+        details={"reason": payload.reason.strip(), "authority_reference": payload.authority_reference.strip(), "score": gate["score"]},
     )
-    db.commit()
-    db.refresh(asset)
+    db.commit(); db.refresh(asset)
     return asset
 
 
@@ -245,15 +202,8 @@ def reject_regulatory_review(
     asset.regulatory_authority_reference = None
     asset.validated_by = current_user.id
     asset.validated_at = datetime.now(UTC).replace(tzinfo=None)
-    _audit(
-        db,
-        actor_id=current_user.id,
-        action="media_asset.regulatory_rejected",
-        asset=asset,
-        details={"reason": payload.reason.strip()},
-    )
-    db.commit()
-    db.refresh(asset)
+    _audit(db, actor_id=current_user.id, action="media_asset.regulatory_rejected", asset=asset, details={"reason": payload.reason.strip()})
+    db.commit(); db.refresh(asset)
     return asset
 
 
