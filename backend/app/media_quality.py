@@ -2,6 +2,11 @@
 
 Automated checks prove technical facts only. Human pedagogical and regulatory
 approval remain explicit statuses and are never inferred by this module.
+
+Legacy questions without a normalized ``QuestionMedia(primary)`` remain
+compatible during the controlled migration window. Once a normalized primary
+media is attached, every real transition to ``Question.validation_status =
+'approved'`` is blocked unless the asset is fully publishable.
 """
 from __future__ import annotations
 
@@ -9,12 +14,19 @@ import re
 from datetime import date
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import event, inspect as sa_inspect, select
 from sqlalchemy.orm import Session
 
 from app.models_media import MediaAsset, QuestionMedia
+from app.models_question import Question
 
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+
+
+class MediaApprovalBlocked(RuntimeError):
+    def __init__(self, assessment: dict[str, Any]):
+        self.assessment = assessment
+        super().__init__("La question ne peut pas être approuvée : média principal non conforme")
 
 
 def _delivery_url(asset: MediaAsset) -> str | None:
@@ -38,7 +50,13 @@ def evaluate_media_asset(
 
     def check(code: str, passed: bool, detail: str, points: int = 0) -> None:
         nonlocal score
-        item = {"code": code, "passed": bool(passed), "detail": detail, "points": points if passed else 0, "max_points": points}
+        item = {
+            "code": code,
+            "passed": bool(passed),
+            "detail": detail,
+            "points": points if passed else 0,
+            "max_points": points,
+        }
         checks.append(item)
         if passed:
             score += points
@@ -78,8 +96,12 @@ def evaluate_media_asset(
         check("EXAM_VIDEO_DURATION", duration_ok, f"durée={asset.duration_seconds!r}s, cible=6-20s")
         poster = _linked_asset(db, asset.poster_media_id)
         fallback = _linked_asset(db, asset.fallback_media_id)
-        poster_ok = bool(poster and poster.archived_at is None and poster.media_type == "image" and poster.quality_status == "validated")
-        fallback_ok = bool(fallback and fallback.archived_at is None and fallback.media_type == "image" and fallback.quality_status == "validated")
+        poster_ok = bool(
+            poster and poster.archived_at is None and poster.media_type == "image" and poster.quality_status == "validated"
+        )
+        fallback_ok = bool(
+            fallback and fallback.archived_at is None and fallback.media_type == "image" and fallback.quality_status == "validated"
+        )
         check("VIDEO_POSTER_VALIDATED", poster_ok, "poster image validé" if poster_ok else "poster image validé obligatoire")
         check("VIDEO_FALLBACK_VALIDATED", fallback_ok, "fallback image validé" if fallback_ok else "fallback image validé obligatoire")
 
@@ -176,3 +198,23 @@ def evaluate_question_media_gate(
         "legacy_migration_required": False,
         **result,
     }
+
+
+@event.listens_for(Session, "before_flush")
+def _enforce_media_gate_on_question_approval(session: Session, _flush_context, _instances) -> None:
+    """Fail closed only for questions that have entered the normalized media path."""
+    for obj in tuple(session.dirty):
+        if not isinstance(obj, Question) or obj.validation_status != "approved":
+            continue
+        state = sa_inspect(obj)
+        history = state.attrs.validation_status.history
+        if not history.has_changes():
+            continue
+        with session.no_autoflush:
+            assessment = evaluate_question_media_gate(
+                session,
+                obj.id,
+                require_regulatory_approval=True,
+            )
+        if assessment.get("mode") == "normalized" and not assessment.get("passed"):
+            raise MediaApprovalBlocked(assessment)
