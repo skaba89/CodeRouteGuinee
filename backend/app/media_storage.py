@@ -2,6 +2,9 @@
 
 The API returns short-lived upload material only. Long-lived storage secrets are
 read server-side from environment variables and are never returned to clients.
+
+For S3-compatible providers, upload and delivery URLs are deliberately
+separated: a presigned PUT URL must never be persisted as an exam media URL.
 """
 from __future__ import annotations
 
@@ -11,6 +14,7 @@ import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
+from urllib.parse import quote
 
 from app.cloudinary_service import build_upload_signature, is_configured as cloudinary_is_configured
 from app.media_policy import get_media_upload_policy
@@ -41,6 +45,7 @@ class UploadTarget:
     method: str
     upload_url: str
     storage_key: str | None
+    delivery_url: str | None
     expires_in_seconds: int | None
     fields: dict[str, str | int]
     headers: dict[str, str]
@@ -52,6 +57,7 @@ class UploadTarget:
             "method": self.method,
             "upload_url": self.upload_url,
             "storage_key": self.storage_key,
+            "delivery_url": self.delivery_url,
             "expires_in_seconds": self.expires_in_seconds,
             "fields": self.fields,
             "headers": self.headers,
@@ -87,6 +93,18 @@ def _validate_content_type(media_type: str, content_type: str) -> dict:
     return policy
 
 
+def _delivery_url(storage_key: str) -> str:
+    base = os.getenv("MEDIA_PUBLIC_BASE_URL", "").strip().rstrip("/")
+    if not base:
+        raise MediaStorageError(
+            "MEDIA_PUBLIC_BASE_URL est obligatoire pour séparer l'URL de lecture durable de l'URL d'upload S3-compatible"
+        )
+    if not base.startswith("https://"):
+        raise MediaStorageError("MEDIA_PUBLIC_BASE_URL doit utiliser HTTPS")
+    encoded_path = "/".join(quote(part, safe="-_.~") for part in storage_key.split("/"))
+    return f"{base}/{encoded_path}"
+
+
 class CloudinaryMediaStorage:
     name = "cloudinary"
 
@@ -107,6 +125,7 @@ class CloudinaryMediaStorage:
             method="POST",
             upload_url=str(signed["upload_url"]),
             storage_key=None,
+            delivery_url=None,
             expires_in_seconds=15 * 60,
             fields=fields,
             headers={},
@@ -127,11 +146,12 @@ class S3CompatibleMediaStorage:
         prefix = os.getenv("MEDIA_S3_PREFIX", "coderoute/media").strip("/")
         safe_name = _safe_filename(filename)
         storage_key = f"{prefix}/{media_type}/{uuid.uuid4()}/{safe_name}"
+        durable_delivery_url = _delivery_url(storage_key)
         expires = 15 * 60
 
         try:
             import boto3
-        except ImportError as exc:  # pragma: no cover - dependency is part of production requirements
+        except ImportError as exc:  # pragma: no cover
             raise MediaStorageError("boto3 est requis pour un stockage S3-compatible") from exc
 
         endpoint = os.getenv("MEDIA_S3_ENDPOINT_URL", "").strip() or None
@@ -159,7 +179,7 @@ class S3CompatibleMediaStorage:
                 Params={"Bucket": bucket, "Key": storage_key, "ContentType": content_type},
                 ExpiresIn=expires,
             )
-        except Exception as exc:  # noqa: BLE001 - provider SDK failures are translated to a safe operational error
+        except Exception as exc:  # noqa: BLE001
             raise MediaStorageError(f"Impossible de générer la cible d'upload {self.name}") from exc
 
         return UploadTarget(
@@ -167,6 +187,7 @@ class S3CompatibleMediaStorage:
             method="PUT",
             upload_url=upload_url,
             storage_key=storage_key,
+            delivery_url=durable_delivery_url,
             expires_in_seconds=expires,
             fields={},
             headers={"Content-Type": content_type},
