@@ -17,6 +17,22 @@ QuestionMediaRole = Literal["primary", "poster", "fallback", "explanation"]
 
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 _COUNTRY_RE = re.compile(r"^[A-Z]{2}$")
+_OPTIONAL_TEXT_FIELDS = (
+    "storage_provider",
+    "storage_key",
+    "public_url",
+    "secure_url",
+    "mime_type",
+    "poster_media_id",
+    "fallback_media_id",
+    "theme",
+    "subtheme",
+    "regulatory_scope",
+    "source_reference",
+    "license_type",
+    "license_reference",
+    "copyright_owner",
+)
 
 
 def _strip(value: str | None) -> str | None:
@@ -52,23 +68,7 @@ class MediaAssetCreate(BaseModel):
     license_expiration_date: date | None = None
     copyright_owner: str | None = Field(default=None, max_length=255)
 
-    @field_validator(
-        "storage_provider",
-        "storage_key",
-        "public_url",
-        "secure_url",
-        "mime_type",
-        "poster_media_id",
-        "fallback_media_id",
-        "theme",
-        "subtheme",
-        "regulatory_scope",
-        "source_reference",
-        "license_type",
-        "license_reference",
-        "copyright_owner",
-        mode="before",
-    )
+    @field_validator(*_OPTIONAL_TEXT_FIELDS, mode="before")
     @classmethod
     def strip_optional_text(cls, value):
         return _strip(value) if isinstance(value, str) or value is None else value
@@ -117,6 +117,11 @@ class MediaAssetUpdate(BaseModel):
     license_reference: str | None = Field(default=None, max_length=1000)
     license_expiration_date: date | None = None
     copyright_owner: str | None = Field(default=None, max_length=255)
+
+    @field_validator(*_OPTIONAL_TEXT_FIELDS, mode="before")
+    @classmethod
+    def strip_optional_text(cls, value):
+        return _strip(value) if isinstance(value, str) or value is None else value
 
     @field_validator("checksum_sha256")
     @classmethod
