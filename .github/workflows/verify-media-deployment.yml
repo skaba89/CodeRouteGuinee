@@ -1,0 +1,64 @@
+name: Verify Render Media Deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      frontend_url:
+        description: Public Render frontend root URL
+        required: true
+        default: https://coderouteguinee-frontend.onrender.com
+      backend_url:
+        description: Public Render backend root URL
+        required: true
+        default: https://coderouteguinee-backend.onrender.com
+
+permissions:
+  contents: read
+
+jobs:
+  verify-render-runtime-and-media:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Verify exact backend SHA and public Guinea media pack
+        env:
+          FRONTEND_URL: ${{ inputs.frontend_url }}
+          BACKEND_URL: ${{ inputs.backend_url }}
+          EXPECTED_SHA: ${{ github.sha }}
+        shell: bash
+        run: |
+          set +e
+          mkdir -p deployment-receipts
+
+          python backend/scripts/verify_render_deployment.py \
+            --base-url "$BACKEND_URL" \
+            --expected-commit "$EXPECTED_SHA" \
+            --expected-repo-slug skaba89/CodeRouteGuinee \
+            --receipt deployment-receipts/render-backend.json
+          backend_status=$?
+
+          python backend/scripts/verify_media_deployment.py \
+            --frontend-url "$FRONTEND_URL" \
+            --receipt deployment-receipts/render-media.json
+          media_status=$?
+
+          echo "backend_status=$backend_status"
+          echo "media_status=$media_status"
+          if [ "$backend_status" -ne 0 ] || [ "$media_status" -ne 0 ]; then
+            exit 2
+          fi
+
+      - name: Upload deployment receipts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coderoute-render-media-deployment-receipts
+          path: deployment-receipts/*.json
+          if-no-files-found: warn
+          retention-days: 30
