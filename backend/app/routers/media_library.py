@@ -9,7 +9,11 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.deps import require_roles
-from app.media_storage import MediaStorageError, get_media_storage_provider
+from app.media_storage import (
+    MediaStorageError,
+    MediaStorageValidationError,
+    get_media_storage_provider,
+)
 from app.media_validation import validate_asset_metadata, validation_sensitive_changes
 from app.models_audit import AuditLog
 from app.models_media import MediaAsset, QuestionMedia
@@ -323,7 +327,9 @@ def create_upload_target(
             filename=payload.filename,
             content_type=payload.content_type,
         )
-    except (MediaStorageError, ValueError) as exc:
+    except MediaStorageValidationError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+    except MediaStorageError as exc:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
     return MediaUploadTargetResponse(**target.as_dict())
 
