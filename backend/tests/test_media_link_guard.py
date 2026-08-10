@@ -16,11 +16,16 @@ from app.schemas_media import QuestionMediaLinkCreate
 LINK_PATH = "/media-library/questions/{question_id}/links"
 
 
-def test_media_link_guard_locks_question_asset_and_exclusive_role():
+def _ready_assessment():
+    return {"passed": True, "score": 100, "checks": [], "blockers": []}
+
+
+def test_media_link_guard_locks_question_asset_and_exclusive_role(monkeypatch):
     question = SimpleNamespace(id="q-1")
     asset = SimpleNamespace(id="m-1", archived_at=None)
     db = MagicMock()
     db.scalar.side_effect = [question, asset, None]
+    monkeypatch.setattr(media_link_guard, "evaluate_media_asset", lambda *_args, **_kwargs: _ready_assessment())
 
     result = media_link_guard.link_question_media_guard(
         question_id="q-1",
@@ -40,15 +45,55 @@ def test_media_link_guard_locks_question_asset_and_exclusive_role():
     audits = [call.args[0] for call in db.add.call_args_list if isinstance(call.args[0], AuditLog)]
     assert len(audits) == 1
     assert audits[0].details["concurrency_guard"] == "question_row_lock"
+    assert audits[0].details["official_primary_gate_enforced"] is True
     db.commit.assert_called_once()
 
 
-def test_media_link_guard_rejects_competing_primary_before_insert():
+def test_media_link_guard_rejects_non_publishable_primary_before_insert(monkeypatch):
+    question = SimpleNamespace(id="q-1")
+    asset = SimpleNamespace(id="m-blocked", archived_at=None)
+    db = MagicMock()
+    db.scalar.side_effect = [question, asset]
+    monkeypatch.setattr(
+        media_link_guard,
+        "evaluate_media_asset",
+        lambda *_args, **_kwargs: {
+            "passed": False,
+            "score": 70,
+            "checks": [
+                {"code": "RIGHTS_TRACEABLE", "passed": False},
+                {"code": "REGULATORY_APPROVED", "passed": False},
+            ],
+            "blockers": [
+                "RIGHTS_TRACEABLE: preuve de droits insuffisante ou expirée",
+                "REGULATORY_APPROVED: regulatory_status=under_review; authority_ref=absente",
+            ],
+        },
+    )
+
+    with pytest.raises(HTTPException) as exc:
+        media_link_guard.link_question_media_guard(
+            question_id="q-1",
+            payload=QuestionMediaLinkCreate(media_id="m-blocked", role="primary", display_order=0),
+            db=db,
+            current_user=SimpleNamespace(id="admin-1", role="admin"),
+        )
+
+    assert exc.value.status_code == 409
+    assert exc.value.detail["code"] == "MEDIA_PRIMARY_NOT_PUBLISHABLE"
+    assert exc.value.detail["blocker_codes"] == ["RIGHTS_TRACEABLE", "REGULATORY_APPROVED"]
+    assert exc.value.detail["institutional_validation_inferred"] is False
+    db.add.assert_not_called()
+    db.commit.assert_not_called()
+
+
+def test_media_link_guard_rejects_competing_primary_before_insert(monkeypatch):
     question = SimpleNamespace(id="q-1")
     asset = SimpleNamespace(id="m-2", archived_at=None)
     occupied = SimpleNamespace(id="link-old", media_id="m-1")
     db = MagicMock()
     db.scalar.side_effect = [question, asset, occupied]
+    monkeypatch.setattr(media_link_guard, "evaluate_media_asset", lambda *_args, **_kwargs: _ready_assessment())
 
     with pytest.raises(HTTPException) as exc:
         media_link_guard.link_question_media_guard(
@@ -62,6 +107,26 @@ def test_media_link_guard_rejects_competing_primary_before_insert():
     assert exc.value.detail["link_id"] == "link-old"
     db.add.assert_not_called()
     db.commit.assert_not_called()
+
+
+def test_non_primary_link_does_not_require_official_primary_gate(monkeypatch):
+    question = SimpleNamespace(id="q-1")
+    asset = SimpleNamespace(id="m-explanation", archived_at=None)
+    db = MagicMock()
+    db.scalar.side_effect = [question, asset]
+    evaluate = MagicMock()
+    monkeypatch.setattr(media_link_guard, "evaluate_media_asset", evaluate)
+
+    result = media_link_guard.link_question_media_guard(
+        question_id="q-1",
+        payload=QuestionMediaLinkCreate(media_id="m-explanation", role="explanation", display_order=0),
+        db=db,
+        current_user=SimpleNamespace(id="admin-1", role="admin"),
+    )
+
+    assert result.role == "explanation"
+    evaluate.assert_not_called()
+    db.commit.assert_called_once()
 
 
 def test_manual_media_link_route_is_replaced_once_by_concurrency_guard():
