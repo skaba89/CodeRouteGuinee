@@ -164,34 +164,60 @@ function PremiumImage({ url, alt }: { url: string; alt?: string }) {
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [retryKey, setRetryKey] = useState(0);
 
+  function retry() {
+    setState('loading');
+    setRetryKey(key => key + 1);
+  }
+
   return (
-    <div ref={frameRef} data-testid="exam-media-image-frame" style={{ borderRadius: 14, overflow: 'hidden', background: '#f5f7fa', border: '1px solid var(--border)', boxShadow: '0 8px 24px rgba(13,33,55,.12)' }}>
-      <div style={{ aspectRatio: '16 / 9', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg,#edf2f7,#f8fafc)' }}>
+    <div ref={frameRef} data-testid="exam-media-image-frame" style={{ borderRadius: 14, overflow: 'hidden', background: '#0d2137', border: '1px solid var(--border)', boxShadow: '0 8px 24px rgba(13,33,55,.12)' }}>
+      <div data-testid="exam-media-image-viewport" style={{ aspectRatio: '16 / 9', position: 'relative', overflow: 'hidden', background: '#0d2137' }}>
         {state === 'loading' && (
-          <div aria-live="polite" style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', color: 'var(--muted)', fontSize: 12 }}>
+          <div aria-live="polite" style={{ position: 'absolute', inset: 0, zIndex: 1, display: 'grid', placeItems: 'center', color: 'rgba(255,255,255,.78)', fontSize: 12, background: 'linear-gradient(135deg,#0d2137,#1b3254)' }}>
             Chargement de l'image…
           </div>
         )}
 
         {state !== 'error' ? (
           <img
-            key={retryKey}
+            key={`${url}:${retryKey}`}
             data-testid="exam-media-image"
             src={url}
             alt={alt ?? 'Illustration de la question'}
             loading="eager"
             decoding="async"
-            onLoad={() => setState('ready')}
+            onLoad={(event) => {
+              const { naturalWidth, naturalHeight } = event.currentTarget;
+              if (naturalWidth < 320 || naturalHeight < 180) {
+                setState('error');
+                return;
+              }
+              setState('ready');
+            }}
             onError={() => setState('error')}
-            style={{ width: '100%', height: '100%', objectFit: 'contain', display: state === 'loading' ? 'none' : 'block' }}
+            style={{
+              position: 'absolute',
+              inset: 0,
+              zIndex: 0,
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              objectPosition: 'center',
+              display: 'block',
+              opacity: state === 'ready' ? 1 : 0,
+              visibility: state === 'ready' ? 'visible' : 'hidden',
+              transition: 'opacity 160ms ease-out',
+            }}
           />
         ) : (
-          <div role="alert" style={{ textAlign: 'center', padding: 20, color: 'var(--ink2)', maxWidth: 360 }}>
-            <div style={{ fontWeight: 800, marginBottom: 6 }}>Image momentanément indisponible</div>
-            <div style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.5, marginBottom: 12 }}>
-              La connexion peut être instable. Vous pouvez continuer l'épreuve ou tenter un nouveau chargement.
+          <div role="alert" style={{ position: 'absolute', inset: 0, zIndex: 1, display: 'grid', placeItems: 'center', textAlign: 'center', padding: 20, color: '#fff', background: 'linear-gradient(135deg,#0d2137,#1b3254)' }}>
+            <div style={{ maxWidth: 360 }}>
+              <div style={{ fontWeight: 800, marginBottom: 6 }}>Image momentanément indisponible</div>
+              <div style={{ fontSize: 12, color: 'rgba(255,255,255,.72)', lineHeight: 1.5, marginBottom: 12 }}>
+                Le média n'a pas pu être rendu correctement. Vous pouvez continuer l'épreuve ou tenter un nouveau chargement.
+              </div>
+              <button type="button" className="secondary-button btn-sm" onClick={retry}>Réessayer</button>
             </div>
-            <button type="button" className="secondary-button btn-sm" onClick={() => { setState('loading'); setRetryKey(key => key + 1); }}>Réessayer</button>
           </div>
         )}
 
@@ -200,7 +226,7 @@ function PremiumImage({ url, alt }: { url: string; alt?: string }) {
             type="button"
             onClick={() => { void requestFullscreen(frameRef.current); }}
             aria-label="Afficher l'image en plein écran"
-            style={{ position: 'absolute', top: 10, right: 10, border: '1px solid rgba(13,33,55,.18)', borderRadius: 8, background: 'rgba(255,255,255,.9)', color: '#0d2137', padding: '6px 9px', fontSize: 11, cursor: 'pointer', minHeight: 'unset', boxShadow: '0 2px 8px rgba(13,33,55,.12)' }}
+            style={{ position: 'absolute', top: 10, right: 10, zIndex: 2, border: '1px solid rgba(255,255,255,.45)', borderRadius: 8, background: 'rgba(0,0,0,.62)', color: '#fff', padding: '6px 9px', fontSize: 11, cursor: 'pointer', minHeight: 'unset', boxShadow: '0 2px 8px rgba(13,33,55,.18)' }}
           >
             Plein écran
           </button>
