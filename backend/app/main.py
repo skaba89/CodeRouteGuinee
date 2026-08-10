@@ -12,6 +12,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app.core.config import get_settings
+from app.media_quality import MediaApprovalBlocked
 from app.reliability_config import get_reliability_settings
 from app.soc_config import get_soc_settings
 
@@ -196,6 +197,21 @@ def _route_template(request: Request) -> str:
     route = request.scope.get("route")
     value = getattr(route, "path", None)
     return value[:160] if isinstance(value, str) and value else "unmatched"
+
+
+@app.exception_handler(MediaApprovalBlocked)
+async def media_approval_blocked_handler(_req: Request, exc: MediaApprovalBlocked) -> _JSONResponse:
+    return _JSONResponse(
+        status_code=409,
+        content={
+            "detail": {
+                "code": "MEDIA_QUALITY_GATE_BLOCKED",
+                "message": str(exc),
+                "assessment": exc.assessment,
+            }
+        },
+        headers=_cors_headers(_req),
+    )
 
 
 @app.exception_handler(Exception)
