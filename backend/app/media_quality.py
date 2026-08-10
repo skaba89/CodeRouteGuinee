@@ -1,4 +1,4 @@
-"""Premium media quality gate for exam publication.
+"""Premium media quality gate for media review and exam publication.
 
 Automated checks prove technical facts only. Human pedagogical and regulatory
 approval remain explicit statuses and are never inferred by this module.
@@ -6,7 +6,7 @@ approval remain explicit statuses and are never inferred by this module.
 Legacy questions without a normalized ``QuestionMedia(primary)`` remain
 compatible during the controlled migration window. Once a normalized primary
 media is attached, every real transition to ``Question.validation_status =
-'approved'`` is blocked unless the asset is fully publishable.
+'approved'`` is blocked unless the asset is fully publishable for an exam.
 """
 from __future__ import annotations
 
@@ -43,6 +43,7 @@ def evaluate_media_asset(
     *,
     require_quality_approval: bool = True,
     require_regulatory_approval: bool = False,
+    require_exam_usage: bool = False,
 ) -> dict[str, Any]:
     checks: list[dict[str, Any]] = []
     blockers: list[str] = []
@@ -50,21 +51,25 @@ def evaluate_media_asset(
 
     def check(code: str, passed: bool, detail: str, points: int = 0) -> None:
         nonlocal score
-        item = {
+        checks.append({
             "code": code,
             "passed": bool(passed),
             "detail": detail,
             "points": points if passed else 0,
             "max_points": points,
-        }
-        checks.append(item)
+        })
         if passed:
             score += points
         else:
             blockers.append(f"{code}: {detail}")
 
     check("NOT_ARCHIVED", asset.archived_at is None, "média actif" if asset.archived_at is None else "média archivé")
-    check("EXAM_USAGE", asset.usage_type == "exam", f"usage_type={asset.usage_type}")
+    exam_usage_ok = (not require_exam_usage) or asset.usage_type == "exam"
+    check(
+        "EXAM_USAGE",
+        exam_usage_ok,
+        f"usage_type={asset.usage_type}" if require_exam_usage else f"usage_type={asset.usage_type} (usage examen non exigé à cette étape)",
+    )
     check("DELIVERY_URL", bool(_delivery_url(asset)), "URL de livraison présente" if _delivery_url(asset) else "URL de livraison absente", 5)
     check(
         "CHECKSUM_SHA256",
@@ -91,7 +96,7 @@ def evaluate_media_asset(
         check("HD_RESOLUTION", True, "non applicable à l'audio", 20)
         check("MOBILE_READABILITY", True, "non applicable à l'audio", 10)
 
-    if asset.media_type == "video":
+    if asset.media_type == "video" and require_exam_usage:
         duration_ok = bool(asset.duration_seconds is not None and 6 <= asset.duration_seconds <= 20)
         check("EXAM_VIDEO_DURATION", duration_ok, f"durée={asset.duration_seconds!r}s, cible=6-20s")
         poster = _linked_asset(db, asset.poster_media_id)
@@ -105,14 +110,20 @@ def evaluate_media_asset(
         check("VIDEO_POSTER_VALIDATED", poster_ok, "poster image validé" if poster_ok else "poster image validé obligatoire")
         check("VIDEO_FALLBACK_VALIDATED", fallback_ok, "fallback image validé" if fallback_ok else "fallback image validé obligatoire")
 
-    source_ok = asset.source_type in {"original", "licensed", "partner", "public_domain", "internal"}
+    # A generated/legacy asset may pass a general pedagogical review, but never
+    # the official-exam primary-media gate. This keeps 3D/AI usable for courses
+    # and explanations while preventing automatic officialisation.
+    if require_exam_usage:
+        source_ok = asset.source_type in {"original", "licensed", "partner", "public_domain", "internal"}
+    else:
+        source_ok = asset.source_type in {"original", "licensed", "partner", "public_domain", "internal", "generated", "legacy"}
     check("SOURCE_TRACEABLE", source_ok, f"source_type={asset.source_type}")
 
     if asset.source_type in {"licensed", "partner"}:
         rights_ok = bool(asset.license_reference and asset.copyright_owner)
     elif asset.source_type == "public_domain":
         rights_ok = bool(asset.source_reference)
-    elif asset.source_type in {"original", "internal"}:
+    elif asset.source_type in {"original", "internal", "generated", "legacy"}:
         rights_ok = bool(asset.source_reference or asset.copyright_owner)
     else:
         rights_ok = False
@@ -191,6 +202,7 @@ def evaluate_question_media_gate(
         asset,
         require_quality_approval=True,
         require_regulatory_approval=require_regulatory_approval,
+        require_exam_usage=True,
     )
     return {
         "question_id": question_id,
