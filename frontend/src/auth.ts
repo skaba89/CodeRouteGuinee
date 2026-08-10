@@ -15,17 +15,18 @@ export const demoRoles: Array<{ label: string; value: UserRole }> = [
 ];
 
 export const navigationItems: NavigationItem[] = [
-  { label: 'Accueil',         href: '#/',           roles: ['candidate','center','driving_school','admin','super_admin'] },
-  { label: 'Entraînement',    href: '#/training',   roles: ['candidate','driving_school','admin','super_admin'] },
-  { label: 'Cours',         href: '#/elearning',  roles: ['candidate','driving_school','admin','super_admin'] },
-  { label: 'Examen',          href: '#/exam',       roles: ['candidate','center','admin','super_admin'] },
-  { label: 'Résultats',       href: '#/results',    roles: ['candidate','admin','super_admin'] },
-  { label: 'Espace candidat', href: '#/candidate',  roles: ['candidate','admin','super_admin'] },
-  { label: 'Espace centre',   href: '#/center',     roles: ['center','admin','super_admin'] },
-  { label: 'Auto-école',      href: '#/school',     roles: ['driving_school','admin','super_admin'] },
-  { label: 'Administration',  href: '#/admin',      roles: ['admin','super_admin'] },
-  { label: 'Dossier État',    href: '#/dossier',    roles: ['admin','super_admin'] },
-  { label: 'Portail DNTT',    href: '#/ministerial', roles: ['admin','super_admin'] },
+  { label: 'Accueil',         href: '#/',                    roles: ['candidate','center','driving_school','admin','super_admin'] },
+  { label: 'Entraînement',    href: '#/training',            roles: ['candidate','driving_school','admin','super_admin'] },
+  { label: 'Cours',           href: '#/elearning',           roles: ['candidate','driving_school','admin','super_admin'] },
+  { label: 'Examen',          href: '#/exam',                roles: ['candidate','center','admin','super_admin'] },
+  { label: 'Résultats',       href: '#/results',             roles: ['candidate','admin','super_admin'] },
+  { label: 'Espace candidat', href: '#/candidate',           roles: ['candidate','admin','super_admin'] },
+  { label: 'Espace centre',   href: '#/center',              roles: ['center','admin','super_admin'] },
+  { label: 'Auto-école',      href: '#/school',              roles: ['driving_school','admin','super_admin'] },
+  { label: 'Administration',  href: '#/admin',               roles: ['admin','super_admin'] },
+  { label: 'Médiathèque',     href: '#/admin/media-library', roles: ['admin','super_admin'] },
+  { label: 'Dossier État',    href: '#/dossier',             roles: ['admin','super_admin'] },
+  { label: 'Portail DNTT',    href: '#/ministerial',         roles: ['admin','super_admin'] },
 ];
 
 export function canAccessRoute(role: UserRole, href: string): boolean {
