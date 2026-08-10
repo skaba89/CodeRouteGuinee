@@ -32,6 +32,13 @@ center_edge.router.include_router(center_edge_install_authorization_guard.router
 center_edge.router.include_router(center_edge_supply_chain.router)
 center_edge.router.include_router(center_edge_release.router)
 
+# Media : métriques de migration admin-only ajoutées au routeur médiathèque
+# existant afin d'éviter un nouveau point de montage dans main.py.
+from app.routers import media_library as media_library
+from app.routers import media_migration_progress as media_migration_progress
+
+media_library.router.include_router(media_migration_progress.router)
+
 # Media Phase 5 : remplace uniquement la lecture candidate des questions de
 # l'examen officiel. Le routeur historique continue de porter score, soumission,
 # timeout, certificats et gardes centre. Le remplacement est fail-closed : si la
