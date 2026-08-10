@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "collection": "guinea-exam-demo-media",
+  "purpose": "Examen blanc et démonstration UI uniquement",
+  "governance": {
+    "source_type": "generated",
+    "quality_status": "DEMO_NOT_OFFICIAL",
+    "regulatory_status": "NOT_REVIEWED",
+    "official_exam_allowed": false,
+    "note": "Ces médias générés illustrent des situations routières adaptées au contexte guinéen. Ils ne constituent pas une homologation DNTT. Une intégration à la banque officielle exige ingestion via MediaAsset, revue qualité humaine, traçabilité des droits et validation réglementaire explicite."
+  },
+  "assets": [
+    {
+      "id": "demo-stop-conakry",
+      "file": "stop-conakry.webp",
+      "kind": "image",
+      "question_keys": ["stop"],
+      "semantic_guard": "media_alt contient STOP"
+    },
+    {
+      "id": "demo-yield-roundabout-conakry",
+      "file": "yield-roundabout-conakry.webp",
+      "kind": "image",
+      "question_keys": ["give_way"],
+      "semantic_guard": "media_alt contient cédez/passage"
+    },
+    {
+      "id": "demo-no-entry-conakry",
+      "file": "no-entry-conakry.webp",
+      "kind": "image",
+      "question_keys": ["no_entry"],
+      "semantic_guard": "media_alt contient sens interdit/interdit"
+    },
+    {
+      "id": "demo-roundabout-approach",
+      "file": "roundabout-approach-demo.mp4",
+      "kind": "video",
+      "duration_seconds": 6,
+      "question_keys": ["roundabout"],
+      "poster": "yield-roundabout-conakry.webp",
+      "fallback": "yield-roundabout-conakry.webp",
+      "semantic_guard": "media_alt contient giratoire/rond-point"
+    }
+  ]
+}
