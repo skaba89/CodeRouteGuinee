@@ -26,6 +26,37 @@ function short(value: string, length = 170): string {
   return value.length > length ? `${value.slice(0, length - 1)}…` : value;
 }
 
+function csvCell(value: unknown): string {
+  const text = String(value ?? '').replace(/\r?\n/g, ' ').replace(/"/g, '""');
+  return `"${text}"`;
+}
+
+function buildBatchTemplate(items: MediaMigrationQueueItem[]): string {
+  const header = [
+    'question_id',
+    'media_id',
+    'queue_state',
+    'validation_status',
+    'category',
+    'text',
+    'current_primary_media_id',
+    'blocker_codes',
+    'next_action',
+  ].join(';');
+  const rows = items.map(item => [
+    item.question_id,
+    '',
+    csvCell(item.queue_state),
+    csvCell(item.validation_status),
+    csvCell(item.category),
+    csvCell(item.text),
+    csvCell(item.primary_media?.id ?? ''),
+    csvCell(item.blocker_codes.join('|')),
+    csvCell(item.next_action),
+  ].join(';'));
+  return `\uFEFF${[header, ...rows].join('\r\n')}\r\n`;
+}
+
 export function MediaMigrationQueuePanel({ onMapQuestion }: { onMapQuestion?: (question: MediaQueueQuestionRef) => void }) {
   const [data, setData] = useState<MediaMigrationQueueResponse | null>(null);
   const [stateFilter, setStateFilter] = useState<MediaMigrationQueueState>('needs_action');
@@ -41,13 +72,26 @@ export function MediaMigrationQueuePanel({ onMapQuestion }: { onMapQuestion?: (q
         state_filter: stateFilter,
         question_status: questionStatus || undefined,
         search: search || undefined,
-        limit: 100,
+        limit: 200,
       }));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'File de migration indisponible');
     } finally {
       setLoading(false);
     }
+  }
+
+  function downloadTemplate() {
+    if (!data || data.items.length === 0) return;
+    const blob = new Blob([buildBatchTemplate(data.items)], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `coderoute-media-migration-${stateFilter}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
   }
 
   function treat(item: MediaMigrationQueueItem) {
@@ -65,9 +109,14 @@ export function MediaMigrationQueuePanel({ onMapQuestion }: { onMapQuestion?: (q
           <h2 style={{ margin: 0 }}>File des questions à traiter</h2>
           <p style={s.muted}>Priorité aux questions déjà approuvées. Aucun média n’est choisi automatiquement.</p>
         </div>
-        <button type="button" className="btn-secondary" disabled={loading} onClick={() => void refresh()} data-testid="refresh-media-queue">
-          {loading ? 'Analyse…' : 'Actualiser la file'}
-        </button>
+        <div style={s.headerActions}>
+          <button type="button" className="btn-secondary" disabled={!data || data.items.length === 0} onClick={downloadTemplate} data-testid="export-media-queue-csv">
+            Exporter CSV du filtre
+          </button>
+          <button type="button" className="btn-secondary" disabled={loading} onClick={() => void refresh()} data-testid="refresh-media-queue">
+            {loading ? 'Analyse…' : 'Actualiser la file'}
+          </button>
+        </div>
       </header>
 
       <div style={s.filters}>
@@ -154,7 +203,7 @@ export function MediaMigrationQueuePanel({ onMapQuestion }: { onMapQuestion?: (q
           </div>
 
           <p style={s.notice}>
-            Cette file réutilise le quality gate de l’examen officiel et ne déclare aucune homologation institutionnelle.
+            Exportez ce filtre, renseignez uniquement la colonne `media_id`, puis importez le CSV dans le plan par lots. Les colonnes de contexte sont ignorées par le migrateur.
           </p>
         </>
       )}
@@ -167,6 +216,7 @@ export function MediaMigrationQueuePanel({ onMapQuestion }: { onMapQuestion?: (q
 const s: Record<string, CSSProperties> = {
   shell: { maxWidth: 1440, margin: '18px auto 40px', padding: 24, display: 'grid', gap: 16, border: '1px solid var(--border)', borderRadius: 18, background: 'var(--surface)', boxShadow: '0 8px 24px rgba(0,0,0,.04)' },
   header: { display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' },
+  headerActions: { display: 'flex', gap: 8, flexWrap: 'wrap' },
   eyebrow: { margin: 0, textTransform: 'uppercase', letterSpacing: '.08em', fontSize: 11, fontWeight: 800, color: 'var(--muted)' },
   muted: { margin: 0, color: 'var(--muted)', fontSize: 12, lineHeight: 1.5 },
   filters: { display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'end' },
