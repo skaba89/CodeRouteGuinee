@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { MediaLibraryPage as MediaLibraryCore } from './media-library';
 import { MediaMigrationProgressPanel } from '../components/MediaMigrationProgressPanel';
 import { MediaMigrationQueuePanel, type MediaQueueQuestionRef } from '../components/MediaMigrationQueuePanel';
+import { MediaBatchMigrationWorkbench } from '../components/MediaBatchMigrationWorkbench';
 import { MediaQuestionMappingWorkbench, type MediaMappingQuestionRef } from '../components/MediaQuestionMappingWorkbench';
 import { MediaVideoSupportWorkbench } from '../components/MediaVideoSupportWorkbench';
 
@@ -10,8 +11,8 @@ import { MediaVideoSupportWorkbench } from '../components/MediaVideoSupportWorkb
  *
  * The existing media-library implementation remains untouched. Additive
  * panels handle migration observability, actionable migration, controlled
- * question mapping and resilient video support independently from upload/review
- * workflows.
+ * batch/manual question mapping and resilient video support independently from
+ * upload/review workflows.
  */
 export function MediaLibraryPage() {
   const [focusedQuestion, setFocusedQuestion] = useState<MediaMappingQuestionRef | null>(null);
@@ -25,6 +26,7 @@ export function MediaLibraryPage() {
       <MediaLibraryCore />
       <MediaMigrationProgressPanel />
       <MediaMigrationQueuePanel onMapQuestion={focusQuestion} />
+      <MediaBatchMigrationWorkbench />
       <MediaQuestionMappingWorkbench focusQuestion={focusedQuestion} />
       <MediaVideoSupportWorkbench />
     </>
