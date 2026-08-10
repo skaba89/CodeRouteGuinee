@@ -40,7 +40,7 @@ async function emptyMediaLibrary(page: Page) {
   });
 }
 
-test('migration queue can focus an explicit legacy question in the manual mapping workbench', async ({ page }) => {
+test('migration queue exports an operator CSV and can focus an explicit legacy question', async ({ page }) => {
   await auth(page, 'admin');
   await emptyMediaLibrary(page);
 
@@ -65,7 +65,7 @@ test('migration queue can focus an explicit legacy question in the manual mappin
       }],
       total: 1,
       matched_questions: 1,
-      limit: 100,
+      limit: 200,
       offset: 0,
       state_filter: 'needs_action',
       counts_by_state: { publishable: 0, normalized_blocked: 0, legacy_only: 1, no_media: 0 },
@@ -86,6 +86,11 @@ test('migration queue can focus an explicit legacy question in the manual mappin
   await expect(item).toContainText('Legacy à migrer');
   await expect(item).toContainText('Priorité examen officiel');
 
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByTestId('export-media-queue-csv').click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe('coderoute-media-migration-needs_action.csv');
+
   await page.getByTestId('treat-media-question-q-legacy-001').click();
   const focused = page.getByTestId('mapping-focused-question');
   await expect(focused).toBeVisible();
@@ -93,7 +98,7 @@ test('migration queue can focus an explicit legacy question in the manual mappin
   await expect(page.getByTestId('media-question-mapping')).toContainText('Aucun média normalisé associé à cette question.');
 });
 
-test('batch migration requires a successful dry-run before transactional apply', async ({ page }) => {
+test('batch migration imports exported-style CSV and requires successful dry-run before apply', async ({ page }) => {
   await auth(page, 'admin');
   await emptyMediaLibrary(page);
   const dryRunValues: boolean[] = [];
@@ -147,9 +152,19 @@ test('batch migration requires a successful dry-run before transactional apply',
 
   await page.goto('/#/admin/media-library');
   const plan = page.getByTestId('media-migration-plan-input');
-  await plan.fill('question_id,media_id\nq-001,media-001');
-
   const apply = page.getByTestId('apply-media-migration-plan');
+  await expect(apply).toBeDisabled();
+
+  await page.getByTestId('import-media-migration-csv').setInputFiles({
+    name: 'migration.csv',
+    mimeType: 'text/csv',
+    buffer: Buffer.from(
+      '\uFEFFquestion_id;media_id;queue_state;validation_status;category;text\r\n' +
+      '"q-001";"media-001";"legacy_only";"approved";"Signalisation";"Question STOP"\r\n',
+      'utf8',
+    ),
+  });
+  await expect(plan).toHaveValue(/q-001.*media-001/);
   await expect(apply).toBeDisabled();
 
   await page.getByTestId('dry-run-media-migration-plan').click();
@@ -159,6 +174,6 @@ test('batch migration requires a successful dry-run before transactional apply',
 
   await apply.click();
   await expect(page.getByText(/Migration appliquée : 1 association/i)).toBeVisible();
-  await expect(dryRunValues).toEqual([true, false]);
+  expect(dryRunValues).toEqual([true, false]);
   await expect(apply).toBeDisabled();
 });

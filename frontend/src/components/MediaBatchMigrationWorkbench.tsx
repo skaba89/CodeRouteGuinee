@@ -1,4 +1,4 @@
-import { useMemo, useState, type CSSProperties } from 'react';
+import { useMemo, useState, type CSSProperties, type ChangeEvent } from 'react';
 import { useAuthSession } from '../authSession';
 import {
   runMediaMigrationPlan,
@@ -6,15 +6,24 @@ import {
   type MediaMigrationPlanResult,
 } from '../mediaMigrationPlanApi';
 
+function cleanCsvCell(value: string): string {
+  const trimmed = value.trim();
+  if (trimmed.length >= 2 && trimmed.startsWith('"') && trimmed.endsWith('"')) {
+    return trimmed.slice(1, -1).replace(/""/g, '"').trim();
+  }
+  return trimmed;
+}
+
 function parseMappings(raw: string): { mappings: MediaMigrationPlanMapping[]; errors: string[] } {
   const mappings: MediaMigrationPlanMapping[] = [];
   const errors: string[] = [];
   const seen = new Set<string>();
+  const normalizedRaw = raw.replace(/^\uFEFF/, '');
 
-  raw.split(/\r?\n/).forEach((sourceLine, index) => {
+  normalizedRaw.split(/\r?\n/).forEach((sourceLine, index) => {
     const line = sourceLine.trim();
     if (!line || line.startsWith('#')) return;
-    const parts = line.split(/[;,\t]/).map(value => value.trim());
+    const parts = line.split(/[;,\t]/).map(cleanCsvCell);
     if (index === 0 && parts[0]?.toLowerCase() === 'question_id' && parts[1]?.toLowerCase() === 'media_id') return;
     if (parts.length < 2 || !parts[0] || !parts[1]) {
       errors.push(`Ligne ${index + 1} : question_id et media_id sont obligatoires.`);
@@ -64,6 +73,27 @@ export function MediaBatchMigrationWorkbench() {
       && parsed.errors.length === 0
       && reason.trim().length >= 8
   );
+
+  function invalidateDryRun() {
+    setValidatedFingerprint('');
+    setResult(null);
+    setSuccess('');
+  }
+
+  async function importPlanFile(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setError('');
+    try {
+      const text = (await file.text()).replace(/^\uFEFF/, '');
+      setRawPlan(text);
+      invalidateDryRun();
+    } catch {
+      setError('Impossible de lire le fichier CSV sélectionné.');
+    } finally {
+      event.target.value = '';
+    }
+  }
 
   async function dryRun() {
     setError(''); setSuccess(''); setResult(null); setValidatedFingerprint('');
@@ -130,17 +160,25 @@ export function MediaBatchMigrationWorkbench() {
 
       <div style={s.columns}>
         <div style={s.panel}>
+          <label style={s.label}>Importer un plan CSV préparé
+            <input
+              type="file"
+              accept=".csv,.txt,text/csv,text/plain"
+              data-testid="import-media-migration-csv"
+              onChange={e => { void importPlanFile(e); }}
+            />
+          </label>
           <label style={s.label}>Plan CSV / point-virgule
             <textarea
               data-testid="media-migration-plan-input"
               rows={12}
               spellCheck={false}
               value={rawPlan}
-              onChange={e => { setRawPlan(e.target.value); setValidatedFingerprint(''); }}
+              onChange={e => { setRawPlan(e.target.value); invalidateDryRun(); }}
               placeholder={'question_id,media_id\nUUID-QUESTION,UUID-MEDIA'}
             />
           </label>
-          <div style={s.hint}>Formats acceptés : virgule, point-virgule ou tabulation. En-tête facultatif. Commentaires avec #.</div>
+          <div style={s.hint}>Formats acceptés : virgule, point-virgule ou tabulation, BOM UTF‑8 et cellules citées. Les colonnes après `media_id` sont ignorées : le CSV exporté depuis la file peut être réimporté directement après remplissage.</div>
           <div style={s.parseSummary}>
             <strong>{parsed.mappings.length} association(s) détectée(s)</strong>
             {parsed.errors.length > 0 && <span style={{ color: 'var(--danger,#b91c1c)' }}>{parsed.errors.length} erreur(s) locale(s)</span>}
@@ -149,11 +187,11 @@ export function MediaBatchMigrationWorkbench() {
 
         <div style={s.panel}>
           <label style={s.label}>Motif auditable
-            <textarea rows={4} value={reason} onChange={e => { setReason(e.target.value); setValidatedFingerprint(''); }} />
+            <textarea rows={4} value={reason} onChange={e => { setReason(e.target.value); invalidateDryRun(); }} />
           </label>
           {isSuperAdmin ? (
             <label style={s.checkbox}>
-              <input type="checkbox" checked={replaceExisting} onChange={e => { setReplaceExisting(e.target.checked); setValidatedFingerprint(''); }} />
+              <input type="checkbox" checked={replaceExisting} onChange={e => { setReplaceExisting(e.target.checked); invalidateDryRun(); }} />
               Autoriser le remplacement d’un `primary` existant
             </label>
           ) : (
@@ -167,7 +205,7 @@ export function MediaBatchMigrationWorkbench() {
               2. Appliquer le lot
             </button>
           </div>
-          <p style={s.notice}>Toute modification du CSV, du motif ou de l’option de remplacement invalide le dry-run côté interface. Le serveur revalide également le plan avant écriture.</p>
+          <p style={s.notice}>Toute modification ou import du CSV, du motif ou de l’option de remplacement invalide le dry-run côté interface. Le serveur revalide également le plan avant écriture.</p>
         </div>
       </div>
 
@@ -215,7 +253,7 @@ const s: Record<string, CSSProperties> = {
   panel: { padding: 16, border: '1px solid var(--border)', borderRadius: 16, background: 'var(--bg)', display: 'grid', gap: 12 },
   label: { display: 'grid', gap: 6, fontSize: 12, fontWeight: 700 },
   checkbox: { display: 'flex', gap: 8, alignItems: 'center', fontSize: 12, fontWeight: 700 },
-  hint: { color: 'var(--muted)', fontSize: 11 },
+  hint: { color: 'var(--muted)', fontSize: 11, lineHeight: 1.5 },
   parseSummary: { display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'space-between', fontSize: 12 },
   actions: { display: 'flex', gap: 8, flexWrap: 'wrap' },
   notice: { margin: 0, padding: 10, borderRadius: 10, background: 'var(--surface)', color: 'var(--muted)', fontSize: 11, lineHeight: 1.5 },
