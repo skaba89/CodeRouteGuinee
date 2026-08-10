@@ -40,12 +40,13 @@ def test_s3_compatible_target_uses_presigned_put_without_exposing_credentials(mo
     class FakeS3:
         def generate_presigned_url(self, operation, Params, ExpiresIn):
             captured.update({"operation": operation, "Params": Params, "ExpiresIn": ExpiresIn})
-            return "https://objects.example.test/presigned-upload"
+            return "https://objects.example.test/presigned-upload?signature=short-lived"
 
     import boto3
 
     monkeypatch.setenv("MEDIA_S3_BUCKET", "coderoute-media")
     monkeypatch.setenv("MEDIA_S3_PREFIX", "national/media")
+    monkeypatch.setenv("MEDIA_PUBLIC_BASE_URL", "https://media.coderoute.example")
     monkeypatch.setenv("MEDIA_S3_ACCESS_KEY_ID", "sensitive-access-key")
     monkeypatch.setenv("MEDIA_S3_SECRET_ACCESS_KEY", "sensitive-secret-key")
     monkeypatch.setattr(boto3, "client", lambda *args, **kwargs: FakeS3())
@@ -60,11 +61,13 @@ def test_s3_compatible_target_uses_presigned_put_without_exposing_credentials(mo
     serialized = repr(payload)
     assert target.provider == "r2"
     assert target.method == "PUT"
-    assert target.upload_url == "https://objects.example.test/presigned-upload"
+    assert target.upload_url.startswith("https://objects.example.test/presigned-upload?")
     assert target.storage_key is not None
     assert target.storage_key.startswith("national/media/video/")
     assert ".." not in target.storage_key
     assert "Intersection-premium.mp4" in target.storage_key
+    assert target.delivery_url == f"https://media.coderoute.example/{target.storage_key}"
+    assert "signature=" not in target.delivery_url
     assert target.headers == {"Content-Type": "video/mp4"}
     assert "sensitive-access-key" not in serialized
     assert "sensitive-secret-key" not in serialized
@@ -76,6 +79,25 @@ def test_s3_compatible_target_uses_presigned_put_without_exposing_credentials(mo
 def test_s3_requires_bucket(monkeypatch):
     monkeypatch.delenv("MEDIA_S3_BUCKET", raising=False)
     with pytest.raises(MediaStorageError, match="MEDIA_S3_BUCKET"):
+        S3CompatibleMediaStorage("s3").build_upload_target(
+            media_type="image",
+            filename="q1.webp",
+            content_type="image/webp",
+        )
+
+
+def test_s3_requires_durable_https_delivery_base(monkeypatch):
+    monkeypatch.setenv("MEDIA_S3_BUCKET", "coderoute-media")
+    monkeypatch.delenv("MEDIA_PUBLIC_BASE_URL", raising=False)
+    with pytest.raises(MediaStorageError, match="MEDIA_PUBLIC_BASE_URL"):
+        S3CompatibleMediaStorage("s3").build_upload_target(
+            media_type="image",
+            filename="q1.webp",
+            content_type="image/webp",
+        )
+
+    monkeypatch.setenv("MEDIA_PUBLIC_BASE_URL", "http://media.internal")
+    with pytest.raises(MediaStorageError, match="HTTPS"):
         S3CompatibleMediaStorage("s3").build_upload_target(
             media_type="image",
             filename="q1.webp",
@@ -106,6 +128,7 @@ def test_cloudinary_target_supports_audio_via_provider_video(monkeypatch):
     )
     assert target.provider == "cloudinary"
     assert target.method == "POST"
+    assert target.delivery_url is None
     assert target.upload_url.endswith("/video/upload")
     assert target.fields["api_key"] == "public-api-key"
     assert target.policy["resource_type"] == "audio"
