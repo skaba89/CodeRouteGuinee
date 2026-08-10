@@ -3,7 +3,7 @@
 Les médias d'examen sont du contenu métier sensible : ils doivent être servis
 sur HTTPS, depuis une origine publique, sans possibilité de pointer vers une
 adresse interne (SSRF / fuite d'infrastructure). Ce module centralise aussi les
-contraintes que le frontend doit appliquer avant l'upload Cloudinary.
+contraintes que le frontend doit appliquer avant l'upload vers le stockage.
 """
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from urllib.parse import urlsplit
 
 from app.core.config import get_settings
 
-MEDIA_TYPES = {"image", "video"}
+MEDIA_TYPES = {"image", "video", "audio"}
 
 IMAGE_UPLOAD_POLICY = {
     "resource_type": "image",
@@ -37,6 +37,21 @@ VIDEO_UPLOAD_POLICY = {
     "poster_required": True,
 }
 
+AUDIO_UPLOAD_POLICY = {
+    "resource_type": "audio",
+    "max_bytes": 15 * 1024 * 1024,
+    "max_duration_seconds": 10 * 60,
+    "accepted_mime_types": [
+        "audio/mpeg",
+        "audio/mp4",
+        "audio/ogg",
+        "audio/wav",
+        "audio/x-wav",
+        "audio/webm",
+    ],
+    "delivery_formats": ["mp3", "m4a", "ogg"],
+}
+
 
 def get_media_upload_policy(resource_type: str) -> dict:
     """Retourne une copie sérialisable de la politique d'upload demandée."""
@@ -45,7 +60,9 @@ def get_media_upload_policy(resource_type: str) -> dict:
         return dict(IMAGE_UPLOAD_POLICY)
     if normalized == "video":
         return dict(VIDEO_UPLOAD_POLICY)
-    raise ValueError("resource_type doit être 'image' ou 'video'")
+    if normalized == "audio":
+        return dict(AUDIO_UPLOAD_POLICY)
+    raise ValueError("resource_type doit être 'image', 'video' ou 'audio'")
 
 
 def _is_non_public_ip(hostname: str) -> bool:
@@ -78,13 +95,15 @@ def validate_media_url(value: str, resource_type: str) -> str:
     - pas d'identifiants embarqués dans l'URL ;
     - pas d'IP privées/loopback/link-local en production ;
     - pas de noms d'hôtes internes évidents ;
-    - cohérence `image`/`video` pour une URL Cloudinary standard ;
+    - cohérence du type pour une URL Cloudinary standard ;
     - si Cloudinary est configuré, une URL `res.cloudinary.com` doit appartenir
       au cloud du projet et non à un autre compte.
+
+    Cloudinary livre les ressources audio via son resource_type ``video``.
     """
     normalized_type = (resource_type or "").strip().lower()
     if normalized_type not in MEDIA_TYPES:
-        raise ValueError("Le type de média doit être 'image' ou 'video'.")
+        raise ValueError("Le type de média doit être 'image', 'video' ou 'audio'.")
 
     normalized = (value or "").strip()
     if not normalized:
@@ -118,7 +137,7 @@ def validate_media_url(value: str, resource_type: str) -> str:
         if port not in (None, 443):
             raise ValueError("Un média HTTPS de production doit utiliser le port standard 443.")
 
-    # L'API d'upload n'est jamais une URL de livraison à persister dans Question.
+    # L'API d'upload n'est jamais une URL de livraison à persister dans la médiathèque.
     if hostname == "api.cloudinary.com":
         raise ValueError("L'URL d'upload Cloudinary ne peut pas être utilisée comme URL de média final.")
 
@@ -128,9 +147,10 @@ def validate_media_url(value: str, resource_type: str) -> str:
             raise ValueError("L'URL Cloudinary de livraison est malformée.")
 
         cloud_name, cloud_resource_type = path_parts[0], path_parts[1]
-        if cloud_resource_type not in MEDIA_TYPES:
+        if cloud_resource_type not in {"image", "video"}:
             raise ValueError("Le type de ressource Cloudinary est invalide.")
-        if cloud_resource_type != normalized_type:
+        expected_cloudinary_type = "image" if normalized_type == "image" else "video"
+        if cloud_resource_type != expected_cloudinary_type:
             raise ValueError("Le type déclaré du média ne correspond pas à l'URL Cloudinary.")
 
         settings = get_settings()
