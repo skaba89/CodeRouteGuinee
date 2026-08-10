@@ -158,7 +158,7 @@ def test_media_migration_plan_is_mounted_once_under_media_library_router():
     matches = [
         route
         for route in media_library.router.routes
-        if getattr(route, "path", None) == "/migration-plan"
+        if getattr(route, "path", None) == "/media-library/migration-plan"
         and "POST" in (getattr(route, "methods", set()) or set())
     ]
     assert len(matches) == 1
