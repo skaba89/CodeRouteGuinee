@@ -402,7 +402,11 @@ def link_question_media(
     return link
 
 
-@router.delete("/questions/{question_id}/links/{link_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/questions/{question_id}/links/{link_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_model=None,
+)
 def unlink_question_media(
     question_id: str,
     link_id: str,
