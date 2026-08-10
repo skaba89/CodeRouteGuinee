@@ -7,6 +7,7 @@ export {
   CandidatePage,
   CenterPage,
   AdminPage,
+  MediaLibraryPage,
   InstitutionalDossierPage,
   ExamPage,
   ResultsPage,
