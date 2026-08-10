@@ -116,7 +116,7 @@ jobs:
         run: npm run build
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
-      - name: Media library and migration E2E
+      - name: Media library, migration and visible exam media E2E
         env:
           CI: 'true'
           VITE_API_BASE_URL: http://localhost:8000
@@ -124,4 +124,5 @@ jobs:
           npx playwright test
           tests/e2e/media-library.spec.ts
           tests/e2e/media-migration-workflow.spec.ts
+          tests/e2e/media-exam-visible.spec.ts
           --project=chromium --timeout=30000 --retries=1
