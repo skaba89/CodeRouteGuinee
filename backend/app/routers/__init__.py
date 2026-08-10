@@ -31,3 +31,28 @@ center_edge.router.include_router(center_edge_install_authorization_guard.router
 # enrichie d'un trousseau de rotation.
 center_edge.router.include_router(center_edge_supply_chain.router)
 center_edge.router.include_router(center_edge_release.router)
+
+# Media Phase 5 : remplace uniquement la lecture candidate des questions de
+# l'examen officiel. Le routeur historique continue de porter score, soumission,
+# timeout, certificats et gardes centre. Le remplacement est fail-closed : si la
+# route historique change ou se duplique, le démarrage échoue au lieu de servir
+# silencieusement le mauvais contrat média.
+from app.routers import exams as exams
+from app.routers import exam_media_guard as exam_media_guard
+
+_exam_question_path = "/exams/{attempt_id}/questions"
+_legacy_question_routes = [
+    route
+    for route in exams.router.routes
+    if getattr(route, "path", None) == _exam_question_path
+    and "GET" in (getattr(route, "methods", set()) or set())
+]
+if len(_legacy_question_routes) != 1:
+    raise RuntimeError(
+        f"Expected exactly one legacy GET {_exam_question_path} route, found {len(_legacy_question_routes)}"
+    )
+
+exams.router.routes[:] = [
+    *exam_media_guard.router.routes,
+    *[route for route in exams.router.routes if route not in _legacy_question_routes],
+]
