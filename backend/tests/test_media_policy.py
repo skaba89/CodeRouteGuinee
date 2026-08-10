@@ -11,6 +11,11 @@ def test_public_https_image_url_is_allowed():
     assert validate_media_url(url, "image") == url
 
 
+def test_public_https_audio_url_is_allowed():
+    url = "https://cdn.coderoute.example/audio/q001-pular.mp3"
+    assert validate_media_url(url, "audio") == url
+
+
 def test_public_http_media_is_rejected():
     with pytest.raises(ValueError, match="HTTPS"):
         validate_media_url("http://cdn.coderoute.example/media/q1.jpg", "image")
@@ -49,6 +54,16 @@ def test_cloudinary_resource_type_must_match_declared_type():
         )
 
 
+def test_cloudinary_audio_is_delivered_through_video_resource_type():
+    url = "https://res.cloudinary.com/demo/video/upload/v1/audio/q1.mp3"
+    assert validate_media_url(url, "audio") == url
+    with pytest.raises(ValueError, match="type déclaré"):
+        validate_media_url(
+            "https://res.cloudinary.com/demo/image/upload/v1/audio/q1.mp3",
+            "audio",
+        )
+
+
 def test_unknown_media_type_is_rejected():
     with pytest.raises(ValueError, match="type de média"):
         validate_media_url("https://cdn.coderoute.example/file.pdf", "document")
@@ -68,3 +83,11 @@ def test_video_upload_policy_limits_duration_and_requires_adaptive_delivery():
     assert policy["adaptive_streaming"] is True
     assert policy["poster_required"] is True
     assert "720p" in policy["delivery_profiles"]
+
+
+def test_audio_upload_policy_is_bounded_and_mobile_friendly():
+    policy = get_media_upload_policy("audio")
+    assert policy["max_bytes"] == 15 * 1024 * 1024
+    assert policy["max_duration_seconds"] == 600
+    assert "audio/mpeg" in policy["accepted_mime_types"]
+    assert "mp3" in policy["delivery_formats"]

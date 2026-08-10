@@ -28,7 +28,11 @@ _PROVIDER_ALIASES = {
 
 
 class MediaStorageError(RuntimeError):
-    pass
+    """Storage provider is unavailable or incorrectly configured."""
+
+
+class MediaStorageValidationError(ValueError):
+    """The requested provider/upload metadata is invalid client input."""
 
 
 @dataclass(frozen=True)
@@ -70,11 +74,14 @@ def _safe_filename(filename: str) -> str:
 
 
 def _validate_content_type(media_type: str, content_type: str) -> dict:
-    policy = get_media_upload_policy(media_type)
+    try:
+        policy = get_media_upload_policy(media_type)
+    except ValueError as exc:
+        raise MediaStorageValidationError(str(exc)) from exc
     normalized = (content_type or "").strip().lower()
     allowed = {str(value).lower() for value in policy.get("accepted_mime_types", [])}
     if normalized not in allowed:
-        raise MediaStorageError(
+        raise MediaStorageValidationError(
             f"MIME {content_type!r} interdit pour {media_type}; types acceptés: {sorted(allowed)}"
         )
     return policy
@@ -171,7 +178,7 @@ def get_media_storage_provider(name: str | None = None) -> MediaStorageProvider:
     requested = (name or os.getenv("MEDIA_STORAGE_PROVIDER", "cloudinary")).strip().lower()
     normalized = _PROVIDER_ALIASES.get(requested)
     if normalized is None:
-        raise MediaStorageError(
+        raise MediaStorageValidationError(
             "MEDIA_STORAGE_PROVIDER doit être cloudinary, s3/aws_s3, r2/cloudflare_r2 ou minio"
         )
     if normalized == "cloudinary":

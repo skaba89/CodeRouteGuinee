@@ -112,6 +112,47 @@ jobs:
             tests/test_go_live_evidence_pack.py \
             tests/test_go_live_evidence_pitr.py
 
+  media-library:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install backend dependencies
+        working-directory: backend
+        run: pip install -q -r requirements.txt
+      - name: Compile media factory
+        working-directory: backend
+        run: >-
+          python -m compileall -q
+          app/models_media.py
+          app/schemas_media.py
+          app/media_policy.py
+          app/media_storage.py
+          app/media_validation.py
+          app/routers/media_library.py
+      - name: Media schema, policy, storage and API regression suite
+        working-directory: backend
+        env:
+          PYTHONPATH: .
+          DATABASE_URL: sqlite+pysqlite:///:memory:
+          AUTO_CREATE_TABLES: 'true'
+          ENVIRONMENT: test
+          SOC_ENABLED: 'false'
+          AUDIT_CHAIN_ENABLED: 'false'
+          EDGE_LEASE_SIGNING_SECRET: coderoute-media-ci-edge-signing-secret-at-least-32-characters
+          EDGE_RELEASE_SIGNING_SECRET: coderoute-media-ci-release-signing-secret-at-least-32-characters
+        run: |
+          pytest -q --tb=short --disable-warnings \
+            tests/test_database_migrations.py \
+            tests/test_media_asset_models.py \
+            tests/test_media_policy.py \
+            tests/test_media_storage.py \
+            tests/test_media_validation.py \
+            tests/test_media_library_api.py
+
   p12-governance:
     runs-on: ubuntu-latest
     steps:
