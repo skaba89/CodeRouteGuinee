@@ -1,0 +1,27 @@
+/* Premium media library — responsive admin shell only. */
+@media (max-width: 860px) {
+  section[data-testid='media-library-page'] {
+    padding: 16px !important;
+  }
+
+  section[data-testid='media-library-page'] > div[style*='grid-template-columns'] {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  section[data-testid='media-library-page'] input,
+  section[data-testid='media-library-page'] select,
+  section[data-testid='media-library-page'] textarea,
+  section[data-testid='media-library-page'] button {
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 520px) {
+  section[data-testid='media-library-page'] [data-testid='media-grid'] {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  section[data-testid='media-library-page'] [data-testid='media-detail-panel'] {
+    padding: 12px !important;
+  }
+}
