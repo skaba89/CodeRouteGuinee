@@ -146,7 +146,6 @@ class MediaAssetUpdate(BaseModel):
 
 class MediaAssetRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-
     id: str
     uuid: str
     media_type: MediaType
@@ -199,7 +198,6 @@ class QuestionMediaLinkCreate(BaseModel):
 
 class QuestionMediaRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-
     id: str
     question_id: str
     media_id: str
@@ -219,6 +217,7 @@ class MediaUploadTargetResponse(BaseModel):
     method: Literal["POST", "PUT"]
     upload_url: str
     storage_key: str | None = None
+    delivery_url: str | None = None
     expires_in_seconds: int | None = None
     fields: dict[str, str | int] = Field(default_factory=dict)
     headers: dict[str, str] = Field(default_factory=dict)

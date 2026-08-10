@@ -57,6 +57,7 @@ jobs:
           tests/e2e/national-governance.spec.ts
           tests/e2e/national-go-live-command-center.spec.ts
           tests/e2e/national-homologation-evidence.spec.ts
+          tests/e2e/media-library.spec.ts
           --project=chromium --timeout=30000 --retries=1
 
   p10-p11-reliability-security:
@@ -123,17 +124,20 @@ jobs:
       - name: Install backend dependencies
         working-directory: backend
         run: pip install -q -r requirements.txt
-      - name: Compile media factory
+      - name: Compile media factory and quality workflow
         working-directory: backend
         run: >-
           python -m compileall -q
           app/models_media.py
           app/schemas_media.py
+          app/schemas_media_review.py
           app/media_policy.py
           app/media_storage.py
           app/media_validation.py
+          app/media_quality.py
           app/routers/media_library.py
-      - name: Media schema, policy, storage and API regression suite
+          app/routers/media_reviews.py
+      - name: Media schema, policy, storage, API and quality regression suite
         working-directory: backend
         env:
           PYTHONPATH: .
@@ -147,11 +151,7 @@ jobs:
         run: |
           pytest -q --tb=short --disable-warnings \
             tests/test_database_migrations.py \
-            tests/test_media_asset_models.py \
-            tests/test_media_policy.py \
-            tests/test_media_storage.py \
-            tests/test_media_validation.py \
-            tests/test_media_library_api.py
+            tests/test_media_*.py
 
   p12-governance:
     runs-on: ubuntu-latest

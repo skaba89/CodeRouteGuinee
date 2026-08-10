@@ -29,18 +29,18 @@ import { AuthSessionProvider } from './authSession';
 import { OfflineBanner } from './components/OfflineBanner';
 import {
   AdminPage, CandidatePage, CenterPage, DrivingSchoolPage,
-  ExamPage, HomePage, InstitutionalDossierPage, MinisterialPage,
+  ExamPage, HomePage, InstitutionalDossierPage, MediaLibraryPage, MinisterialPage,
   ResultsPage, TrainingPage,
 } from './pages';
 
 type AppRoute =
-  | 'home' | 'candidate' | 'center' | 'admin'
+  | 'home' | 'candidate' | 'center' | 'admin' | 'admin/media-library'
   | 'exam' | 'results' | 'dossier' | 'training' | 'school' | 'ministerial'
   | 'elearning' | 'login' | 'register' | 'account';
 
 function getRouteFromHash(): AppRoute {
   const r = window.location.hash.replace('#/', '') as AppRoute;
-  const valid: AppRoute[] = ['candidate','center','admin','exam','results','dossier','training','school','ministerial','elearning','login','register','account'];
+  const valid: AppRoute[] = ['candidate','center','admin','admin/media-library','exam','results','dossier','training','school','ministerial','elearning','login','register','account'];
   return valid.includes(r) ? r : 'home';
 }
 
@@ -49,7 +49,6 @@ function normalizeRole(role: string): UserRole {
   return valid.includes(role as UserRole) ? role as UserRole : 'candidate';
 }
 
-// ── Loading ───────────────────────────────────────────────────────
 function Loading() {
   const [slow, setSlow] = React.useState(false);
   const [verySloww, setVerySlow] = React.useState(false);
@@ -87,7 +86,6 @@ function Loading() {
   );
 }
 
-// ── Accès refusé ──────────────────────────────────────────────────
 function AccessDenied({ role }: { role: UserRole }) {
   return (
     <section className="screen access-denied">
@@ -105,7 +103,6 @@ function AccessDenied({ role }: { role: UserRole }) {
   );
 }
 
-// ── Mon compte ────────────────────────────────────────────────────
 function AccountPage({ currentUser }: { currentUser: AuthUser | null }) {
   const [cur, setCur] = useState('');
   const [nw, setNw] = useState('');
@@ -169,16 +166,13 @@ function AccountPage({ currentUser }: { currentUser: AuthUser | null }) {
           <button type="submit" className="btn-primary" disabled={!cur || nw.length < 12 || !conf}>
             Changer le mot de passe
           </button>
-          {msg && (
-            <p className={msg.includes('succès') ? 'login-status' : 'form-error'}>{msg}</p>
-          )}
+          {msg && <p className={msg.includes('succès') ? 'login-status' : 'form-error'}>{msg}</p>}
         </form>
       </div>
     </section>
   );
 }
 
-// ── Page de connexion ─────────────────────────────────────────────
 function LoginPage({ onLogin }: { onLogin: (email: string, pass: string) => Promise<void> }) {
   const [email, setEmail] = useState('');
   const [pass, setPass] = useState('');
@@ -195,7 +189,6 @@ function LoginPage({ onLogin }: { onLogin: (email: string, pass: string) => Prom
       await onLogin(email, pass);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      // 500 = erreur serveur (probablement DB non configurée)
       if (msg.includes('500') || msg.includes('Erreur interne')) {
         setStatus('Erreur serveur. La base de données démarre. Réessayez dans 30 secondes.');
       } else if (msg.includes('503') || msg.includes('indisponible')) {
@@ -211,19 +204,14 @@ function LoginPage({ onLogin }: { onLogin: (email: string, pass: string) => Prom
 
   return (
     <div className="login-screen">
-
-      {/* Panneau gauche — identité visuelle */}
       <div className="login-visual" aria-hidden="true">
         <div className="login-visual-inner">
           <svg className="login-logo-big" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
             <rect width="80" height="80" rx="20" fill="rgba(255,255,255,.12)"/>
-            <text x="50%" y="54%" dominantBaseline="middle" textAnchor="middle"
-              fill="white" fontSize="32" fontWeight="900" fontFamily="Inter,sans-serif">CR</text>
+            <text x="50%" y="54%" dominantBaseline="middle" textAnchor="middle" fill="white" fontSize="32" fontWeight="900" fontFamily="Inter,sans-serif">CR</text>
           </svg>
           <h2 className="login-visual-title">CodeRoute<br/>Guinée</h2>
-          <p className="login-visual-sub">
-            Plateforme officielle d'examen du code de la route — République de Guinée
-          </p>
+          <p className="login-visual-sub">Plateforme officielle d'examen du code de la route — République de Guinée</p>
           <div className="login-visual-flags">
             <svg width="64" height="44" viewBox="0 0 64 44" style={{borderRadius:6,overflow:'hidden'}}>
               <rect width="21.3" height="44" fill="#CE1126"/>
@@ -235,90 +223,42 @@ function LoginPage({ onLogin }: { onLogin: (email: string, pass: string) => Prom
         </div>
       </div>
 
-      {/* Panneau droit — formulaire */}
       <div className="login-form-panel">
         <div className="login-card">
-
           <div className="login-brand">
             <div className="login-logo">CR</div>
-            <div>
-              <h2 style={{fontSize:20,letterSpacing:'-.02em'}}>Connexion</h2>
-              <p className="login-sub">Plateforme nationale DNTT</p>
-            </div>
+            <div><h2 style={{fontSize:20,letterSpacing:'-.02em'}}>Connexion</h2><p className="login-sub">Plateforme nationale DNTT</p></div>
           </div>
 
           <form className="login-form" onSubmit={handleSubmit}>
             <label>
               Adresse email
-              <input
-                type="email" value={email}
-                onChange={e => setEmail(e.target.value)}
-                placeholder="votre@email.com"
-                autoComplete="email" required
-                autoFocus
-              />
+              <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="votre@email.com" autoComplete="email" required autoFocus />
             </label>
             <label>
               Mot de passe
               <div style={{position:'relative'}}>
-                <input
-                  type={showPass ? 'text' : 'password'}
-                  value={pass}
-                  onChange={e => setPass(e.target.value)}
-                  placeholder="••••••••••••"
-                  autoComplete="current-password" required
-                  style={{paddingRight: 44}}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPass(v => !v)}
-                  style={{
-                    position:'absolute', right:10, top:'50%', transform:'translateY(-50%)',
-                    background:'none', border:'none', color:'var(--muted)', cursor:'pointer',
-                    padding:4, minHeight:'unset', boxShadow:'none',
-                  }}
-                  tabIndex={-1}
-                  aria-label={showPass ? 'Masquer' : 'Afficher'}
-                >
+                <input type={showPass ? 'text' : 'password'} value={pass} onChange={e => setPass(e.target.value)} placeholder="••••••••••••" autoComplete="current-password" required style={{paddingRight: 44}} />
+                <button type="button" onClick={() => setShowPass(v => !v)} style={{ position:'absolute', right:10, top:'50%', transform:'translateY(-50%)', background:'none', border:'none', color:'var(--muted)', cursor:'pointer', padding:4, minHeight:'unset', boxShadow:'none' }} tabIndex={-1} aria-label={showPass ? 'Masquer' : 'Afficher'}>
                   {showPass
                     ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
-                    : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                  }
+                    : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>}
                 </button>
               </div>
             </label>
 
-            {status && (
-              <div className="login-error-box">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-                {status}
-              </div>
-            )}
+            {status && <div className="login-error-box"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>{status}</div>}
 
-            <button
-              type="submit"
-              className="btn-success"
-              style={{width:'100%', minHeight:46, fontSize:14, marginTop:4}}
-              disabled={loading || !email || !pass}
-            >
-              {loading
-                ? <><span className="spinner" style={{width:16,height:16,borderWidth:2}}/> Connexion…</>
-                : 'Se connecter →'
-              }
+            <button type="submit" className="btn-success" style={{width:'100%', minHeight:46, fontSize:14, marginTop:4}} disabled={loading || !email || !pass}>
+              {loading ? <><span className="spinner" style={{width:16,height:16,borderWidth:2}}/> Connexion…</> : 'Se connecter →'}
             </button>
           </form>
 
           <p style={{ textAlign: 'center', fontSize: 13, marginTop: 14, color: 'var(--muted)' }}>
-            Pas encore de compte ?{' '}
-            <a href="#/register" style={{ color: 'var(--guinea-green)', fontWeight: 600 }}>
-              Créer un compte candidat
-            </a>
+            Pas encore de compte ? <a href="#/register" style={{ color: 'var(--guinea-green)', fontWeight: 600 }}>Créer un compte candidat</a>
           </p>
-
           <div className="login-secure-badge">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-            </svg>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
             Connexion chiffrée TLS — Plateforme officielle DNTT
           </div>
         </div>
@@ -327,73 +267,36 @@ function LoginPage({ onLogin }: { onLogin: (email: string, pass: string) => Prom
   );
 }
 
-// ── App ───────────────────────────────────────────────────────────
 export default function App() {
   const [route, setRoute] = useState<AppRoute>(getRouteFromHash());
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const [role, setRole] = useState<UserRole>('candidate');
   const [loading, setLoading] = useState(true);
 
-  // Écouter les changements de hash
   useEffect(() => {
     const onHash = () => setRoute(getRouteFromHash());
     window.addEventListener('hashchange', onHash);
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
 
-  // Sans session : la landing publique s'affiche (plus de redirection forcée).
-  // Seule une session invalide en cours de route déclenche un retour propre.
   const goLoginUnlessPublic = () => { /* la landing gère l'accueil des non-connectés */ };
 
-  // Restaurer la session au démarrage
   useEffect(() => {
     const token = getAccessToken();
     const refresh = getRefreshToken();
+    if (!token && !refresh) { setLoading(false); goLoginUnlessPublic(); return; }
+    if (token && isTokenExpired(token) && !refresh) { logoutUser(); setLoading(false); goLoginUnlessPublic(); return; }
 
-    // Pas de token du tout → login, sauf sur une route publique (ex. inscription)
-    if (!token && !refresh) {
-      setLoading(false);
-      goLoginUnlessPublic();
-      return;
-    }
-
-    // Token expiré ET pas de refresh → login sans appel réseau
-    if (token && isTokenExpired(token) && !refresh) {
-      logoutUser();
-      setLoading(false);
-      goLoginUnlessPublic();
-      return;
-    }
-
-    // Timeout 30s pour le cold start Render/Neon
-    const timeout = setTimeout(() => {
-      setLoading(false);
-      goLoginUnlessPublic();
-    }, 30_000);
-
+    const timeout = setTimeout(() => { setLoading(false); goLoginUnlessPublic(); }, 30_000);
     getCurrentUser()
-      .then(u => {
-        setCurrentUser(u);
-        setRole(normalizeRole(u.role));
-      })
-      .catch(() => {
-        logoutUser();
-        goLoginUnlessPublic();
-      })
-      .finally(() => {
-        clearTimeout(timeout);
-        setLoading(false);
-      });
-
+      .then(u => { setCurrentUser(u); setRole(normalizeRole(u.role)); })
+      .catch(() => { logoutUser(); goLoginUnlessPublic(); })
+      .finally(() => { clearTimeout(timeout); setLoading(false); });
     return () => clearTimeout(timeout);
   }, []);
 
-  // Session expirée
   useEffect(() => {
-    function onExpired() {
-      setCurrentUser(null); setRole('candidate');
-      window.location.hash = '#/login';
-    }
+    function onExpired() { setCurrentUser(null); setRole('candidate'); window.location.hash = '#/login'; }
     window.addEventListener('coderoute:session-expired', onExpired);
     return () => window.removeEventListener('coderoute:session-expired', onExpired);
   }, []);
@@ -412,72 +315,61 @@ export default function App() {
     window.location.hash = '#/login';
   }
 
-  // Navigation filtrée par rôle réel
   const visibleNav = navigationItems.filter(n => n.roles.includes(role));
   const curHref = route === 'home' ? '#/' : `#/${route}`;
   const hasAccess = canAccessRoute(role, curHref);
   const isLoggedIn = Boolean(currentUser);
 
-  // Page courante
   let page: React.ReactElement;
   const handleRegistered = async () => {
-    // Le token est déjà stocké par RegisterPage — charger la session et rediriger
     try {
       const u = await getCurrentUser();
       setCurrentUser(u);
       setRole(normalizeRole(u.role));
-      // Après inscription : directement vers la prise de rendez-vous
       window.location.hash = '#/candidate';
-    } catch {
-      window.location.hash = '#/login';
-    }
+    } catch { window.location.hash = '#/login'; }
   };
 
   if (loading) {
     page = <Loading />;
   } else if (!isLoggedIn) {
-    // Visiteur public : landing par défaut, login/register sur demande
     page = route === 'register' ? <RegisterPage onRegistered={handleRegistered} />
-         : route === 'login'    ? <LoginPage onLogin={handleLogin} />
+         : route === 'login' ? <LoginPage onLogin={handleLogin} />
          : <LandingPage />;
   } else if (route === 'login' || route === 'register') {
-    page = <HomePage />;  // déjà connecté : retour à l'accueil interne
+    page = <HomePage />;
   } else if (!hasAccess) {
     page = <AccessDenied role={role} />;
   } else {
     const pageMap: Record<AppRoute, React.ReactElement> = {
-      home:        <HomePage />,
-      elearning:   <ELearningPage />,
-      training:    <TrainingPage />,
-      candidate:   <CandidatePage />,
-      center:      <CenterPage />,
-      school:      <DrivingSchoolPage />,
+      home: <HomePage />,
+      elearning: <ELearningPage />,
+      training: <TrainingPage />,
+      candidate: <CandidatePage />,
+      center: <CenterPage />,
+      school: <DrivingSchoolPage />,
       ministerial: <MinisterialPage />,
-      admin:       <AdminPage />,
-      dossier:     <InstitutionalDossierPage />,
-      exam:        <ExamPage />,
-      results:     <ResultsPage />,
-      account:     <AccountPage currentUser={currentUser} />,
-      login:       <LoginPage onLogin={handleLogin} />,
-      register:    <HomePage />,
+      admin: <AdminPage />,
+      'admin/media-library': <MediaLibraryPage />,
+      dossier: <InstitutionalDossierPage />,
+      exam: <ExamPage />,
+      results: <ResultsPage />,
+      account: <AccountPage currentUser={currentUser} />,
+      login: <LoginPage onLogin={handleLogin} />,
+      register: <HomePage />,
     };
     page = pageMap[route] ?? (
       <section className="screen access-denied">
         <div style={{ color: 'var(--muted)', marginBottom: 12 }}>
-          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-          </svg>
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
         </div>
         <h2>Page introuvable</h2>
         <p style={{ color: 'var(--muted)', fontSize: 14, marginTop: 8 }}>Cette page n'existe pas.</p>
-        <a href="#/" className="btn-primary" style={{ marginTop: 20, display: 'inline-flex', alignItems: 'center', gap: 6, textDecoration: 'none', padding: '0 18px', height: 38, borderRadius: 10 }}>
-          ← Retour à l'accueil
-        </a>
+        <a href="#/" className="btn-primary" style={{ marginTop: 20, display: 'inline-flex', alignItems: 'center', gap: 6, textDecoration: 'none', padding: '0 18px', height: 38, borderRadius: 10 }}>← Retour à l'accueil</a>
       </section>
     );
   }
 
-  // Topbar — uniquement si connecté
   const showTopbar = isLoggedIn && route !== 'login' && !loading;
 
   return (
@@ -485,36 +377,31 @@ export default function App() {
       <OfflineBanner />
       {showTopbar && (
         <header className="topbar">
-          {/* Brand */}
           <a href="#/" className="brand">
             <div className="brand-logo">CR</div>
-            <div className="brand-text">
-              <strong>CodeRoute Guinée</strong>
-              <small>Plateforme DNTT</small>
-            </div>
+            <div className="brand-text"><strong>CodeRoute Guinée</strong><small>Plateforme DNTT</small></div>
           </a>
 
-          {/* Navigation principale */}
           <nav className="nav-links" role="navigation" aria-label="Navigation principale">
             {visibleNav.map(item => {
               const r = item.href.replace('#/', '') || 'home';
               const label = t(`nav.${r}`) !== `nav.${r}` ? t(`nav.${r}`) : item.label;
               const NAV_ICONS: Record<string, React.ReactElement> = {
-                home:        <IconHome size={14} />,
-                training:    <IconTarget size={14} />,
-                elearning:   <IconBook size={14} />,
-                candidate:   <IconUser size={14} />,
-                center:      <IconBuilding size={14} />,
-                school:      <IconGraduate size={14} />,
+                home: <IconHome size={14} />,
+                training: <IconTarget size={14} />,
+                elearning: <IconBook size={14} />,
+                candidate: <IconUser size={14} />,
+                center: <IconBuilding size={14} />,
+                school: <IconGraduate size={14} />,
                 ministerial: <IconLandmark size={14} />,
-                admin:       <IconDashboard size={14} />,
-                dossier:     <IconClipboard size={14} />,
-                results:     <IconBarChart size={14} />,
-                exam:        <IconTarget size={14} />,
+                admin: <IconDashboard size={14} />,
+                'admin/media-library': <IconSettings size={14} />,
+                dossier: <IconClipboard size={14} />,
+                results: <IconBarChart size={14} />,
+                exam: <IconTarget size={14} />,
               };
               return (
-                <a key={item.href} href={item.href} className={route === r ? 'active' : ''}
-                   onClick={() => { if (isAudioLocale(getLocale())) announce(label); }}>
+                <a key={item.href} href={item.href} className={route === r ? 'active' : ''} onClick={() => { if (isAudioLocale(getLocale())) announce(label); }}>
                   {NAV_ICONS[r] && <span className="nav-icon" aria-hidden="true">{NAV_ICONS[r]}</span>}
                   <span>{label}</span>
                 </a>
@@ -522,23 +409,14 @@ export default function App() {
             })}
           </nav>
 
-          {/* Contrôles droite */}
           <div className="topbar-actions">
             <LocaleSwitcher />
             <ThemeToggle compact />
             <div className="topbar-user">
-              <div className="topbar-avatar">
-                {(currentUser?.full_name?.[0] ?? 'A').toUpperCase()}
-              </div>
-              <span className="topbar-username">
-                {currentUser?.full_name?.split(' ')[0] ?? 'Agent'}
-              </span>
+              <div className="topbar-avatar">{(currentUser?.full_name?.[0] ?? 'A').toUpperCase()}</div>
+              <span className="topbar-username">{currentUser?.full_name?.split(' ')[0] ?? 'Agent'}</span>
               <button type="button" className="topbar-logout" onClick={handleLogout} title="Déconnexion">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-                  <polyline points="16 17 21 12 16 7"/>
-                  <line x1="21" y1="12" x2="9" y2="12"/>
-                </svg>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
               </button>
             </div>
           </div>
