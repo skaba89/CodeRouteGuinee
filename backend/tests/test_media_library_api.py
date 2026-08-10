@@ -11,7 +11,7 @@ from app.db.session import SessionLocal, init_db
 from app.main import app
 from app.models_media import MediaAsset, QuestionMedia
 from app.models_question import Question
-from tests.conftest import get_auth_headers
+from conftest import get_auth_headers
 
 
 @pytest.fixture(autouse=True)
