@@ -1,0 +1,121 @@
+name: Media Migration Readiness
+
+on:
+  pull_request:
+    paths:
+      - 'backend/app/media_*.py'
+      - 'backend/app/models_media.py'
+      - 'backend/app/schemas_media*.py'
+      - 'backend/app/routers/media_*.py'
+      - 'backend/app/routers/__init__.py'
+      - 'backend/tests/test_media_*.py'
+      - 'frontend/src/**/Media*.tsx'
+      - 'frontend/src/media*.ts'
+      - 'frontend/src/pages/media-library*.tsx'
+      - 'frontend/tests/e2e/media-*.spec.ts'
+      - '.github/workflows/media-migration-readiness.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'backend/app/media_*.py'
+      - 'backend/app/models_media.py'
+      - 'backend/app/schemas_media*.py'
+      - 'backend/app/routers/media_*.py'
+      - 'backend/app/routers/__init__.py'
+      - 'backend/tests/test_media_*.py'
+      - 'frontend/src/**/Media*.tsx'
+      - 'frontend/src/media*.ts'
+      - 'frontend/src/pages/media-library*.tsx'
+      - 'frontend/tests/e2e/media-*.spec.ts'
+      - '.github/workflows/media-migration-readiness.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: media-migration-readiness-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend-media-contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install backend dependencies
+        working-directory: backend
+        run: pip install -q -r requirements.txt
+      - name: Compile normalized media runtime and migration modules
+        working-directory: backend
+        run: |
+          python -m compileall -q \
+            app/models_media.py \
+            app/schemas_media.py \
+            app/schemas_media_review.py \
+            app/schemas_media_migration.py \
+            app/media_policy.py \
+            app/media_storage.py \
+            app/media_validation.py \
+            app/media_quality.py \
+            app/exam_media_resolver.py \
+            app/routers/media_library.py \
+            app/routers/media_reviews.py \
+            app/routers/media_migration_progress.py \
+            app/routers/media_migration_queue.py \
+            app/routers/media_migration_plan.py \
+            app/routers/media_link_guard.py \
+            app/routers/exam_media_guard.py \
+            app/routers/__init__.py
+      - name: Run all media regression contracts
+        working-directory: backend
+        env:
+          PYTHONPATH: .
+          DATABASE_URL: sqlite+pysqlite:///:memory:
+          AUTO_CREATE_TABLES: 'true'
+          ENVIRONMENT: test
+          SOC_ENABLED: 'false'
+          AUDIT_CHAIN_ENABLED: 'false'
+          EDGE_LEASE_SIGNING_SECRET: coderoute-media-readiness-edge-signing-secret-at-least-32-characters
+          EDGE_RELEASE_SIGNING_SECRET: coderoute-media-readiness-release-signing-secret-at-least-32-characters
+        run: |
+          pytest -q --tb=short --disable-warnings \
+            tests/test_database_migrations.py \
+            tests/test_media_*.py
+
+  frontend-media-migration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Reject high/critical npm vulnerabilities
+        run: npm run audit:security
+      - name: Typecheck migration workbenches
+        run: npm run typecheck
+      - name: Production build
+        run: npm run build
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Media library and migration E2E
+        env:
+          CI: 'true'
+          VITE_API_BASE_URL: http://localhost:8000
+        run: >-
+          npx playwright test
+          tests/e2e/media-library.spec.ts
+          tests/e2e/media-migration-workflow.spec.ts
+          --project=chromium --timeout=30000 --retries=1
