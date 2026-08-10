@@ -26,8 +26,10 @@ def test_metadata_registers_all_production_tables() -> None:
         "exam_review_decisions",
         "exam_sessions",
         "institutional_authorizations",
+        "media_assets",
         "payments",
         "question_governance_decisions",
+        "question_media",
         "questions",
         "users",
     }
@@ -44,9 +46,58 @@ def test_alembic_initial_migration_is_available() -> None:
     assert (backend_root / "alembic" / "versions" / "20260619_0003_explicit_ddl_and_rate_limit_table.py").exists()
     assert (backend_root / "alembic" / "versions" / "20260620_0004_session_capacity_rules.py").exists()
     assert (backend_root / "alembic" / "versions" / "20260623_0005_payment_external_reference.py").exists()
+    assert (backend_root / "alembic" / "versions" / "20260810_0015_media_asset_architecture.py").exists()
 
 
 def test_question_metadata_includes_multimedia_fields() -> None:
+    question_columns = set(Base.metadata.tables["questions"].columns.keys())
+    assert {"media_type", "media_url", "media_alt"}.issubset(question_columns)
+
+
+def test_media_metadata_is_additive_and_normalized() -> None:
+    media_columns = set(Base.metadata.tables["media_assets"].columns.keys())
+    assert {
+        "id",
+        "uuid",
+        "media_type",
+        "usage_type",
+        "storage_provider",
+        "storage_key",
+        "public_url",
+        "secure_url",
+        "mime_type",
+        "width",
+        "height",
+        "duration_seconds",
+        "file_size_bytes",
+        "checksum_sha256",
+        "poster_media_id",
+        "fallback_media_id",
+        "theme",
+        "subtheme",
+        "country_code",
+        "regulatory_scope",
+        "source_type",
+        "source_reference",
+        "license_type",
+        "license_reference",
+        "license_expiration_date",
+        "copyright_owner",
+        "quality_status",
+        "regulatory_status",
+        "regulatory_authority_reference",
+        "validated_by",
+        "validated_at",
+        "created_by",
+        "created_at",
+        "updated_at",
+        "archived_at",
+    }.issubset(media_columns)
+
+    link_columns = set(Base.metadata.tables["question_media"].columns.keys())
+    assert {"id", "question_id", "media_id", "role", "display_order", "created_at"}.issubset(link_columns)
+
+    # Legacy fields deliberately remain during the migration window.
     question_columns = set(Base.metadata.tables["questions"].columns.keys())
     assert {"media_type", "media_url", "media_alt"}.issubset(question_columns)
 
@@ -68,11 +119,20 @@ def test_alembic_upgrade_head_from_empty_sqlite_database(tmp_path, monkeypatch) 
     try:
         tables = set(inspector.get_table_names())
         assert set(Base.metadata.tables).issubset(tables)
+        assert {"media_assets", "question_media"}.issubset(tables)
+
         question_columns = {column["name"] for column in inspector.get_columns("questions")}
         assert {"media_type", "media_url", "media_alt"}.issubset(question_columns)
+
+        media_columns = {column["name"] for column in inspector.get_columns("media_assets")}
+        assert {"checksum_sha256", "quality_status", "regulatory_status", "poster_media_id", "fallback_media_id"}.issubset(media_columns)
+
+        question_media_columns = {column["name"] for column in inspector.get_columns("question_media")}
+        assert {"question_id", "media_id", "role", "display_order"}.issubset(question_media_columns)
+
         with engine.connect() as connection:
             version_rows = connection.exec_driver_sql("SELECT version_num FROM alembic_version").fetchall()
-        assert version_rows == [("0014",)]
+        assert version_rows == [("0015",)]
     finally:
         engine.dispose()
         get_settings.cache_clear()
