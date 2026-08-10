@@ -37,9 +37,11 @@ center_edge.router.include_router(center_edge_release.router)
 from app.routers import media_library as media_library
 from app.routers import media_migration_progress as media_migration_progress
 from app.routers import media_migration_queue as media_migration_queue
+from app.routers import media_migration_plan as media_migration_plan
 
 media_library.router.include_router(media_migration_progress.router)
 media_library.router.include_router(media_migration_queue.router)
+media_library.router.include_router(media_migration_plan.router)
 
 # Media Phase 5 : remplace uniquement la lecture candidate des questions de
 # l'examen officiel. Le routeur historique continue de porter score, soumission,
