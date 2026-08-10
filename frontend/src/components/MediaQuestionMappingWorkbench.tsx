@@ -1,4 +1,4 @@
-import { useState, type CSSProperties } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 import { getQuestions, type ExamQuestion } from '../api';
 import { listMediaAssets, type MediaAsset } from '../mediaApi';
 import {
@@ -9,6 +9,8 @@ import {
   type QuestionMediaRole,
 } from '../mediaQuestionApi';
 
+export type MediaMappingQuestionRef = Pick<ExamQuestion, 'id' | 'text' | 'category'>;
+
 function short(value: string, length = 88): string {
   return value.length > length ? `${value.slice(0, length - 1)}…` : value;
 }
@@ -17,10 +19,10 @@ function mediaUrl(asset: MediaAsset): string | null {
   return asset.secure_url || asset.public_url || null;
 }
 
-export function MediaQuestionMappingWorkbench() {
+export function MediaQuestionMappingWorkbench({ focusQuestion }: { focusQuestion?: MediaMappingQuestionRef | null }) {
   const [questionSearch, setQuestionSearch] = useState('');
   const [questions, setQuestions] = useState<ExamQuestion[]>([]);
-  const [selectedQuestion, setSelectedQuestion] = useState<ExamQuestion | null>(null);
+  const [selectedQuestion, setSelectedQuestion] = useState<MediaMappingQuestionRef | null>(null);
   const [mediaSearch, setMediaSearch] = useState('');
   const [assets, setAssets] = useState<MediaAsset[]>([]);
   const [selectedAsset, setSelectedAsset] = useState<MediaAsset | null>(null);
@@ -55,13 +57,18 @@ export function MediaQuestionMappingWorkbench() {
     } finally { setBusy(false); }
   }
 
-  async function selectQuestion(question: ExamQuestion) {
+  async function selectQuestion(question: MediaMappingQuestionRef) {
     setSelectedQuestion(question);
     setSelectedAsset(null);
     setNotice(''); setError('');
     try { setLinks(await listQuestionMedia(question.id)); }
     catch (err) { setError(err instanceof Error ? err.message : 'Associations impossibles à charger'); }
   }
+
+  useEffect(() => {
+    if (!focusQuestion || focusQuestion.id === selectedQuestion?.id) return;
+    void selectQuestion(focusQuestion);
+  }, [focusQuestion, selectedQuestion?.id]);
 
   async function attach() {
     if (!selectedQuestion || !selectedAsset) return;
@@ -111,6 +118,11 @@ export function MediaQuestionMappingWorkbench() {
 
       {error && <div role="alert" style={s.error}>{error}</div>}
       {notice && <div role="status" style={s.success}>{notice}</div>}
+      {focusQuestion && selectedQuestion?.id === focusQuestion.id && (
+        <div style={s.focusNotice} data-testid="mapping-focused-question">
+          Question chargée depuis la file de migration : <strong>{short(focusQuestion.text, 120)}</strong>
+        </div>
+      )}
 
       <div style={s.columns}>
         <div style={s.panel}>
@@ -133,7 +145,7 @@ export function MediaQuestionMappingWorkbench() {
                 <code style={s.code}>{question.id}</code>
               </button>
             ))}
-            {questions.length === 0 && <span style={s.muted}>Lancez une recherche pour sélectionner une question.</span>}
+            {questions.length === 0 && <span style={s.muted}>Lancez une recherche ou utilisez « Traiter cette question » depuis la file de migration.</span>}
           </div>
         </div>
 
@@ -227,6 +239,7 @@ const s: Record<string, CSSProperties> = {
   links: { display: 'grid', gap: 8 },
   linkRow: { display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', padding: 10, borderRadius: 10, background: 'var(--bg)' },
   warning: { margin: 0, padding: 10, borderRadius: 10, background: '#fff7ed', color: '#9a3412', fontSize: 11, lineHeight: 1.5 },
+  focusNotice: { padding: 10, borderRadius: 10, background: '#eff6ff', color: '#1d4ed8', fontSize: 12, lineHeight: 1.5 },
   error: { padding: 12, borderRadius: 10, border: '1px solid var(--danger,#b91c1c)', color: 'var(--danger,#b91c1c)' },
   success: { padding: 12, borderRadius: 10, border: '1px solid var(--success,#15803d)', color: 'var(--success,#15803d)' },
 };
