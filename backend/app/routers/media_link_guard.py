@@ -1,11 +1,13 @@
-"""Concurrency-safe replacement for manual QuestionMedia link creation.
+"""Concurrency-safe and quality-gated manual QuestionMedia link creation.
 
-The historical endpoint already enforced one primary/poster/fallback at the
-application level, but it did not lock the question row. This guard preserves
-the same API contract while serializing manual and batch migrations on the same
-question so concurrent operators cannot create competing primary links.
+Manual linking and transactional batch migration serialize on the same Question
+row. A primary link must also pass the exact full official-exam media gate, so
+the manual UI cannot bypass rights, technical quality, regulatory approval or
+video poster/fallback requirements.
 """
 from __future__ import annotations
+
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
@@ -14,6 +16,7 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.deps import require_roles
+from app.media_quality import evaluate_media_asset
 from app.models_audit import AuditLog
 from app.models_media import MediaAsset, QuestionMedia
 from app.models_question import Question
@@ -21,6 +24,15 @@ from app.models_user import User
 from app.schemas_media import QuestionMediaLinkCreate, QuestionMediaRead
 
 router = APIRouter()
+
+
+def _failed_check_codes(assessment: dict[str, Any]) -> list[str]:
+    checks = assessment.get("checks") if isinstance(assessment.get("checks"), list) else []
+    return [
+        str(check.get("code"))
+        for check in checks
+        if isinstance(check, dict) and not check.get("passed") and check.get("code")
+    ]
 
 
 @router.post(
@@ -50,6 +62,32 @@ def link_question_media_guard(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Média introuvable")
     if asset.archived_at is not None:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Impossible d'associer un média archivé")
+
+    # A normalized primary can affect the official candidate runtime immediately,
+    # including for a question that was already approved before media migration.
+    # Enforce the same gate as the batch migrator and official exam resolver now,
+    # not only on a future Question.validation_status transition.
+    if payload.role == "primary":
+        assessment = evaluate_media_asset(
+            db,
+            asset,
+            require_quality_approval=True,
+            require_regulatory_approval=True,
+            require_exam_usage=True,
+        )
+        if not assessment.get("passed"):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "code": "MEDIA_PRIMARY_NOT_PUBLISHABLE",
+                    "message": "Le média principal ne passe pas le quality gate de l’examen officiel.",
+                    "media_id": asset.id,
+                    "score": assessment.get("score"),
+                    "blocker_codes": _failed_check_codes(assessment),
+                    "blockers": [str(value) for value in assessment.get("blockers", []) if value],
+                    "institutional_validation_inferred": False,
+                },
+            )
 
     if payload.role in {"primary", "poster", "fallback"}:
         occupied = db.scalar(
@@ -95,6 +133,7 @@ def link_question_media_guard(
                 "role": payload.role,
                 "display_order": payload.display_order,
                 "concurrency_guard": "question_row_lock",
+                "official_primary_gate_enforced": payload.role == "primary",
             },
         )
     )
