@@ -15,7 +15,6 @@ from app.core.config import get_settings
 from app.reliability_config import get_reliability_settings
 from app.soc_config import get_soc_settings
 
-# Validation production au démarrage
 try:
     _startup_settings = get_settings()
     _startup_settings.validate_production_secrets()
@@ -60,6 +59,7 @@ from app.routers import (
     health,
     institutional_authorizations,
     media_library,
+    media_reviews,
     metrics,
     national_governance,
     operations,
@@ -81,8 +81,6 @@ from app.routers.tarifs import router_admin as tarifs_admin_router
 from app.routers.tarifs import router_public as tarifs_public_router
 
 settings = get_settings()
-
-# Initialiser le logging structuré puis la barrière SOC de pseudonymisation.
 setup_logging()
 install_soc_log_filter()
 
@@ -96,9 +94,6 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         traces_sample_rate=settings.sentry_sample_rate,
     )
     init_soc_telemetry()
-
-    # init_db() ne fait rien si AUTO_CREATE_TABLES=false (production).
-    # Les migrations sont gérées par Alembic dans le pre-deploy P10.
     try:
         init_db()
     except Exception as e:
@@ -106,9 +101,6 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         logging.getLogger("app.startup").warning(
             "init_db() non-critique ignoré au démarrage: %s", e
         )
-
-    # P11 : avant de servir du trafic, figer les anciennes lignes d'audit et
-    # activer la tête de chaîne HMAC. Si le mode est désactivé, no-op.
     if get_soc_settings().audit_chain_enabled:
         db = SessionLocal()
         try:
@@ -128,15 +120,10 @@ app = FastAPI(
     openapi_url="/openapi.json" if settings.enable_api_docs else None,
 )
 
-# ── Fichiers statiques — audio questions ──────────────────────────────────────
 _static_dir = os.path.join(os.path.dirname(__file__), "..", "static")
 if os.path.isdir(_static_dir):
     app.mount("/static", StaticFiles(directory=_static_dir), name="static")
 
-# ── Middleware — ordre : externe → interne ────────────────────────────────────
-# L'ordre d'enregistrement Starlette est inversé : le dernier ajouté s'exécute
-# en premier. RequestID est donc volontairement ajouté après SOCRequest afin que
-# request.state.request_id soit déjà disponible dans la télémétrie SOC.
 _settings = _get_settings()
 app.add_middleware(ResponseCacheMiddleware, environment=_settings.environment)
 app.add_middleware(ReliabilityMetricsMiddleware)
@@ -144,11 +131,9 @@ app.add_middleware(TimingMiddleware)
 app.add_middleware(SOCRequestMiddleware)
 app.add_middleware(RequestIDMiddleware)
 
-# Compression GZip — essentiel pour les réseaux 3G/Edge en Guinée
 from starlette.middleware.gzip import GZipMiddleware
 app.add_middleware(GZipMiddleware, minimum_size=500)
 
-# Rate limiting global par IP — protection anti-abus à l'échelle nationale
 if _settings.environment.lower() == "production":
     app.add_middleware(GlobalRateLimitMiddleware, max_requests=300, window_seconds=60)
 
@@ -180,7 +165,6 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
 app.add_middleware(SecurityHeadersMiddleware)
 
-# ── Middleware CSRF — actif uniquement en production ──────────────────────────
 if os.environ.get("ENVIRONMENT", "development").lower() == "production":
     from app.csrf import check_csrf as _check_csrf
 
@@ -196,7 +180,6 @@ if os.environ.get("ENVIRONMENT", "development").lower() == "production":
 
 
 def _cors_headers(request: Request) -> dict:
-    """Retourne les headers CORS corrects pour une requête donnée."""
     origin = request.headers.get("origin", "")
     allowed = settings.cors_origin_list
     if origin in allowed or "*" in allowed:
@@ -217,7 +200,6 @@ def _route_template(request: Request) -> str:
 
 @app.exception_handler(Exception)
 async def global_exception_handler(_req: Request, exc: Exception) -> _JSONResponse:
-    """Capture les 500 sans exporter URL/query/identité brute."""
     route = _route_template(_req)
     request_id = getattr(_req.state, "request_id", None)
     capture_monitoring_exception(
@@ -266,6 +248,7 @@ app.include_router(candidate_identity.router, prefix=settings.api_v1_prefix)
 app.include_router(centers.router, prefix=settings.api_v1_prefix)
 app.include_router(questions.router, prefix=settings.api_v1_prefix)
 app.include_router(media_library.router, prefix=settings.api_v1_prefix)
+app.include_router(media_reviews.router, prefix=settings.api_v1_prefix)
 app.include_router(question_governance.router, prefix=settings.api_v1_prefix)
 app.include_router(sessions.router, prefix=settings.api_v1_prefix)
 app.include_router(exams.router, prefix=settings.api_v1_prefix)
