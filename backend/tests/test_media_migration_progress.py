@@ -56,7 +56,7 @@ def test_media_migration_progress_is_mounted_once_under_media_library_router():
     matches = [
         route
         for route in media_library.router.routes
-        if getattr(route, "path", None) == "/migration-progress"
+        if getattr(route, "path", None) == "/media-library/migration-progress"
         and "GET" in (getattr(route, "methods", set()) or set())
     ]
     assert len(matches) == 1

@@ -43,6 +43,29 @@ media_library.router.include_router(media_migration_progress.router)
 media_library.router.include_router(media_migration_queue.router)
 media_library.router.include_router(media_migration_plan.router)
 
+# Le chemin manuel d'association doit partager la même clé de sérialisation
+# (verrou sur Question) que le batch migrator. Le remplacement est fail-closed :
+# si le contrat historique change, le démarrage échoue au lieu de laisser deux
+# implémentations concurrentes actives.
+from app.routers import media_link_guard as media_link_guard
+
+_media_link_path = "/media-library/questions/{question_id}/links"
+_legacy_media_link_routes = [
+    route
+    for route in media_library.router.routes
+    if getattr(route, "path", None) == _media_link_path
+    and "POST" in (getattr(route, "methods", set()) or set())
+]
+if len(_legacy_media_link_routes) != 1:
+    raise RuntimeError(
+        f"Expected exactly one legacy POST {_media_link_path} route, found {len(_legacy_media_link_routes)}"
+    )
+
+media_library.router.routes[:] = [
+    *media_link_guard.router.routes,
+    *[route for route in media_library.router.routes if route not in _legacy_media_link_routes],
+]
+
 # Media Phase 5 : remplace uniquement la lecture candidate des questions de
 # l'examen officiel. Le routeur historique continue de porter score, soumission,
 # timeout, certificats et gardes centre. Le remplacement est fail-closed : si la
