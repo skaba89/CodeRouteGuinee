@@ -12,6 +12,9 @@ on:
       - 'frontend/src/**/Media*.tsx'
       - 'frontend/src/media*.ts'
       - 'frontend/src/pages/media-library*.tsx'
+      - 'frontend/src/pages.tsx'
+      - 'frontend/src/pages/index.ts'
+      - 'frontend/src/App.tsx'
       - 'frontend/tests/e2e/media-*.spec.ts'
       - '.github/workflows/media-migration-readiness.yml'
   push:
@@ -27,6 +30,9 @@ on:
       - 'frontend/src/**/Media*.tsx'
       - 'frontend/src/media*.ts'
       - 'frontend/src/pages/media-library*.tsx'
+      - 'frontend/src/pages.tsx'
+      - 'frontend/src/pages/index.ts'
+      - 'frontend/src/App.tsx'
       - 'frontend/tests/e2e/media-*.spec.ts'
       - '.github/workflows/media-migration-readiness.yml'
   workflow_dispatch:
