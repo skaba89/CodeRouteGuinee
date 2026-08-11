@@ -12,6 +12,7 @@ from app.models_audit import AuditLog
 from app.models_booking import Booking
 from app.models_candidate import Candidate
 from app.models_center import Center
+from app.models_exam_attempt import ExamAttempt
 from app.models_payment import Payment
 from app.models_payment_refund import PaymentRefundRequest
 from app.models_session import ExamSession
@@ -135,7 +136,6 @@ def test_request_and_approval_do_not_mark_money_refunded_before_external_evidenc
         refund_id = requested.json()["id"]
         assert requested.json()["status"] == "requested"
 
-        # Retry réseau : même demande, aucune duplication.
         retry = client.post(
             f"/api/v1/payments/{refs['payment']}/refund",
             headers=candidate_headers,
@@ -156,7 +156,6 @@ def test_request_and_approval_do_not_mark_money_refunded_before_external_evidenc
         assert approved.status_code == 200
         assert approved.json()["status"] == "approved"
 
-    # Ni la demande ni l'approbation ne prétendent que l'argent est revenu.
     db = SessionLocal()
     stored_payment = db.scalar(select(Payment).where(Payment.reference == refs["payment"]))
     stored_booking = db.scalar(select(Booking).where(Booking.reference == refs["booking"]))
@@ -165,7 +164,7 @@ def test_request_and_approval_do_not_mark_money_refunded_before_external_evidenc
     db.close()
 
     with TestClient(app) as client:
-        incomplete = client.post(
+        completed = client.post(
             f"/api/v1/payments/refunds/{refund_id}/complete",
             headers=admin_headers,
             json={
@@ -174,12 +173,11 @@ def test_request_and_approval_do_not_mark_money_refunded_before_external_evidenc
                 "notes": "Remboursement confirmé dans le portail opérateur.",
             },
         )
-        assert incomplete.status_code == 200
-        assert incomplete.json()["status"] == "completed"
-        assert incomplete.json()["provider_refund_reference"] == "RF-12345"
-        assert incomplete.json()["evidence_reference"] == "GED-REFUND-12345"
+        assert completed.status_code == 200
+        assert completed.json()["status"] == "completed"
+        assert completed.json()["provider_refund_reference"] == "RF-12345"
+        assert completed.json()["evidence_reference"] == "GED-REFUND-12345"
 
-        # Replay identique : idempotent.
         replay = client.post(
             f"/api/v1/payments/refunds/{refund_id}/complete",
             headers=admin_headers,
@@ -214,14 +212,12 @@ def test_request_and_approval_do_not_mark_money_refunded_before_external_evidenc
     assert refund is not None and refund.status == "completed"
     completed_audit = db.scalar(
         select(AuditLog)
-        .where(
-            AuditLog.action == "payment.refund_completed",
-            AuditLog.entity_id == refund_id,
-        )
+        .where(AuditLog.action == "payment.refund_completed", AuditLog.entity_id == refund_id)
         .limit(1)
     )
     assert completed_audit is not None
     assert completed_audit.details["completion_mode"] == "operator_attested_external_evidence"
+    assert completed_audit.details["exam_attempt_exists"] is False
     db.close()
 
 
@@ -281,14 +277,14 @@ def test_rejected_refund_leaves_payment_and_booking_untouched() -> None:
     db.close()
 
 
-def test_checked_in_refund_preserves_physical_history_when_completed() -> None:
+def test_checked_in_refund_without_attempt_cancels_future_exam_eligibility() -> None:
     init_db()
     marker = uuid4().hex[:8]
     db = SessionLocal()
     candidate_user, _candidate, booking, payment = _paid_fixture(
-        db, f"checked-{marker}", booking_status="checked_in"
+        db, f"checked-no-attempt-{marker}", booking_status="checked_in"
     )
-    admin = _user(db, "super_admin", f"checked-admin-{marker}")
+    admin = _user(db, "super_admin", f"checked-no-attempt-admin-{marker}")
     candidate_headers = _headers(candidate_user)
     admin_headers = _headers(admin)
     payment_ref = payment.reference
@@ -300,14 +296,70 @@ def test_checked_in_refund_preserves_physical_history_when_completed() -> None:
         requested = client.post(
             f"/api/v1/payments/{payment_ref}/refund",
             headers=candidate_headers,
-            json={"reason": "Remboursement exceptionnel après contrôle d'entrée à instruire."},
+            json={"reason": "Remboursement après scan mais avant création de la tentative."},
+        )
+        refund_id = requested.json()["id"]
+        assert client.post(
+            f"/api/v1/payments/refunds/{refund_id}/decision",
+            headers=admin_headers,
+            json={"decision": "approved", "reason": "Remboursement exceptionnel validé avant examen."},
+        ).status_code == 200
+        assert client.post(
+            f"/api/v1/payments/refunds/{refund_id}/complete",
+            headers=admin_headers,
+            json={
+                "provider_refund_reference": "RF-BEFORE-EXAM-123",
+                "evidence_reference": "GED-BEFORE-EXAM-123",
+                "notes": "Preuve opérateur reçue avant création de la tentative.",
+            },
+        ).status_code == 200
+
+    db = SessionLocal()
+    assert db.scalar(select(Payment).where(Payment.reference == payment_ref)).status == "refunded"
+    stored_booking = db.scalar(select(Booking).where(Booking.reference == booking_ref))
+    assert stored_booking.status == "cancelled"
+    assert stored_booking.cancelled_at is not None
+    assert "Remboursement enregistré" in (stored_booking.notes or "")
+    db.close()
+
+
+def test_checked_in_refund_preserves_exam_history_when_attempt_exists() -> None:
+    init_db()
+    marker = uuid4().hex[:8]
+    db = SessionLocal()
+    candidate_user, candidate, booking, payment = _paid_fixture(
+        db, f"checked-attempt-{marker}", booking_status="checked_in"
+    )
+    db.add(
+        ExamAttempt(
+            candidate_id=candidate.id,
+            session_id=booking.session_id,
+            status="submitted",
+            score=30,
+            passed=False,
+            submitted_at=datetime.now(UTC).replace(tzinfo=None),
+        )
+    )
+    admin = _user(db, "super_admin", f"checked-attempt-admin-{marker}")
+    candidate_headers = _headers(candidate_user)
+    admin_headers = _headers(admin)
+    payment_ref = payment.reference
+    booking_ref = booking.reference
+    db.commit()
+    db.close()
+
+    with TestClient(app) as client:
+        requested = client.post(
+            f"/api/v1/payments/{payment_ref}/refund",
+            headers=candidate_headers,
+            json={"reason": "Remboursement exceptionnel après une tentative déjà enregistrée."},
         )
         assert requested.status_code == 202
         refund_id = requested.json()["id"]
         assert client.post(
             f"/api/v1/payments/refunds/{refund_id}/decision",
             headers=admin_headers,
-            json={"decision": "approved", "reason": "Exception administrative documentée et validée."},
+            json={"decision": "approved", "reason": "Exception administrative documentée après examen."},
         ).status_code == 200
         completed = client.post(
             f"/api/v1/payments/refunds/{refund_id}/complete",
@@ -315,7 +367,7 @@ def test_checked_in_refund_preserves_physical_history_when_completed() -> None:
             json={
                 "provider_refund_reference": "RF-CHECKED-123",
                 "evidence_reference": "GED-CHECKED-123",
-                "notes": "Preuve opérateur archivée après passage au centre.",
+                "notes": "Preuve opérateur archivée après passage à l'examen.",
             },
         )
         assert completed.status_code == 200
@@ -336,7 +388,7 @@ def test_unsettled_or_foreign_payment_cannot_open_refund() -> None:
         db, f"pending-{marker}", payment_status="pending", booking_status="pending_payment"
     )
     attacker = _user(db, "candidate", f"attacker-{marker}")
-    paid_owner, _candidate2, _booking2, paid_payment = _paid_fixture(db, f"foreign-{marker}")
+    _paid_owner, _candidate2, _booking2, paid_payment = _paid_fixture(db, f"foreign-{marker}")
     owner_headers = _headers(owner)
     attacker_headers = _headers(attacker)
     pending_ref = pending_payment.reference
