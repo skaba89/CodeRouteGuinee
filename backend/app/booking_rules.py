@@ -6,7 +6,9 @@ from fastapi import HTTPException, status
 from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
+from app.candidate_eligibility import assert_candidate_can_book
 from app.models_booking import Booking
+from app.models_candidate import Candidate
 from app.models_center import Center
 from app.models_session import ExamSession
 
@@ -17,6 +19,11 @@ _OPERATIONAL_CENTER_STATUSES = {"active", "accredited"}
 def acquire_booking_reference_lock(db: Session) -> None:
     if db.get_bind().dialect.name == "postgresql":
         db.execute(text("SELECT pg_advisory_xact_lock(:lock_id)"), {"lock_id": _BOOKING_REFERENCE_LOCK_ID})
+
+
+def assert_bookable_candidate(candidate: Candidate) -> None:
+    """Garde partagé par les routes booking canoniques et legacy."""
+    assert_candidate_can_book(candidate)
 
 
 def lock_bookable_session(db: Session, session_id: str) -> tuple[ExamSession, Center]:
