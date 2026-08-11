@@ -90,3 +90,10 @@ exams.router.routes[:] = [
     *exam_media_guard.router.routes,
     *[route for route in exams.router.routes if route not in _legacy_question_routes],
 ]
+
+# Paiements : expose une cotation autorisée et calculée côté serveur sans
+# dupliquer le routeur principal dans main.py.
+from app.routers import payments as payments
+from app.routers import payment_quote as payment_quote
+
+payments.router.include_router(payment_quote.router)
