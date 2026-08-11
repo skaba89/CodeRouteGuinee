@@ -6,16 +6,19 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
-from app.deps import get_current_user, require_roles
+from app.deps import require_roles
 from app.models_audit import AuditLog
 from app.models_candidate import Candidate
 from app.models_candidate_followup import CandidateFollowup
 from app.models_exam_attempt import ExamAttempt
 from app.models_user import User
+from app.resource_access import assert_candidate_access
 
 router = APIRouter(prefix="/candidate-submissions", tags=["candidate-submissions"])
 
 STATUSES = {"under_review", "accepted", "rejected", "retake_planned"}
+OPEN_STATUSES = {"submitted", "under_review"}
+FINAL_STATUSES = {"accepted", "rejected", "retake_planned"}
 
 
 class SubmissionCreate(BaseModel):
@@ -56,32 +59,63 @@ def _status(value: str) -> str:
 def create_submission(
     payload: SubmissionCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(
+        require_roles("candidate", "driving_school", "admin", "super_admin")
+    ),
 ) -> CandidateFollowup:
     candidate = db.get(Candidate, payload.candidate_id)
     if not candidate:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Candidate not found")
+
+    # Le candidat_id est une donnée de requête, jamais une preuve de propriété.
+    assert_candidate_access(db, current_user, candidate)
+
     attempt = db.get(ExamAttempt, payload.attempt_id)
     if not attempt:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Exam attempt not found")
     if attempt.candidate_id != candidate.id:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Candidate and attempt mismatch")
 
+    category = payload.category.strip().lower() or "review"
+    existing_open = db.scalar(
+        select(CandidateFollowup.id)
+        .where(
+            CandidateFollowup.candidate_id == candidate.id,
+            CandidateFollowup.attempt_id == attempt.id,
+            CandidateFollowup.category == category,
+            CandidateFollowup.status.in_(OPEN_STATUSES),
+        )
+        .limit(1)
+    )
+    if existing_open:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "CANDIDATE_SUBMISSION_ALREADY_OPEN",
+                "message": "Un recours de cette catégorie est déjà en cours de traitement pour cette tentative.",
+            },
+        )
+
     item = CandidateFollowup(
         candidate_id=candidate.id,
         attempt_id=attempt.id,
-        category=payload.category,
-        message=payload.message,
+        category=category,
+        message=payload.message.strip(),
     )
     db.add(item)
     db.flush()
     db.add(
         AuditLog(
-            actor_id=None,
+            actor_id=current_user.id,
             action="candidate_submission.created",
             entity="candidate_submission",
             entity_id=item.id,
-            details={"candidate_id": candidate.id, "attempt_id": attempt.id, "category": payload.category},
+            details={
+                "candidate_id": candidate.id,
+                "attempt_id": attempt.id,
+                "category": category,
+                "submitted_by_role": current_user.role,
+            },
         )
     )
     db.commit()
@@ -116,13 +150,32 @@ def handle_submission(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("admin", "super_admin")),
 ) -> CandidateFollowup:
-    item = db.get(CandidateFollowup, submission_id)
+    item = db.scalar(
+        select(CandidateFollowup)
+        .where(CandidateFollowup.id == submission_id)
+        .with_for_update()
+    )
     if not item:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Submission not found")
     next_status = _status(payload.status)
     previous_status = item.status
+
+    # Les décisions finales sont stables. Une réouverture devra passer par un
+    # workflow explicite plutôt que par une mutation silencieuse du même dossier.
+    if previous_status in FINAL_STATUSES:
+        if previous_status == next_status:
+            return item
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "CANDIDATE_SUBMISSION_ALREADY_FINAL",
+                "message": "Ce recours a déjà reçu une décision finale.",
+                "current_status": previous_status,
+            },
+        )
+
     item.status = next_status
-    item.admin_response = payload.admin_response
+    item.admin_response = payload.admin_response.strip()
     item.handled_by_id = current_user.id
     item.handled_at = datetime.now(UTC).replace(tzinfo=None)
     db.add(item)
@@ -133,7 +186,12 @@ def handle_submission(
             action=f"candidate_submission.{next_status}",
             entity="candidate_submission",
             entity_id=item.id,
-            details={"candidate_id": item.candidate_id, "attempt_id": item.attempt_id, "previous_status": previous_status, "new_status": next_status},
+            details={
+                "candidate_id": item.candidate_id,
+                "attempt_id": item.attempt_id,
+                "previous_status": previous_status,
+                "new_status": next_status,
+            },
         )
     )
     db.commit()
