@@ -12,6 +12,7 @@ from app.db.session import get_db
 from app.deps import get_current_user, require_roles
 from app.models_audit import AuditLog
 from app.models_booking import Booking
+from app.models_exam_attempt import ExamAttempt
 from app.models_payment import Payment
 from app.models_payment_refund import PaymentRefundRequest
 from app.models_user import User
@@ -318,6 +319,17 @@ def complete_refund(
     if booking is None:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Réservation du remboursement introuvable")
 
+    attempt_exists = bool(
+        db.scalar(
+            select(ExamAttempt.id)
+            .where(
+                ExamAttempt.candidate_id == booking.candidate_id,
+                ExamAttempt.session_id == booking.session_id,
+            )
+            .limit(1)
+        )
+    )
+
     now = datetime.now(UTC).replace(tzinfo=None)
     previous_booking_status = booking.status
     item.status = "completed"
@@ -327,11 +339,17 @@ def complete_refund(
     item.completed_at = now
     payment.status = "refunded"
 
-    # Une place non consommée peut être libérée. Après check-in, on préserve le
-    # statut historique du passage et on n'efface jamais l'événement physique.
-    if booking.status in {"confirmed", "pending_payment", "paid"}:
+    # Si aucune tentative n'existe encore, le remboursement retire toute
+    # éligibilité au démarrage d'examen, même après un scan physique. L'audit
+    # d'entrée conserve la preuve historique du check-in. Une tentative déjà
+    # créée est en revanche un historique d'examen qui ne doit pas être effacé.
+    if not attempt_exists and booking.status in {"confirmed", "pending_payment", "paid", "checked_in"}:
         booking.status = "cancelled"
         booking.cancelled_at = now
+    elif booking.status in {"confirmed", "pending_payment", "paid"}:
+        booking.status = "cancelled"
+        booking.cancelled_at = now
+
     booking.notes = (
         (booking.notes or "")
         + f" | Remboursement enregistré {item.id} — preuve {evidence_reference}"
@@ -355,6 +373,7 @@ def complete_refund(
                 "evidence_reference": evidence_reference,
                 "booking_status_before": previous_booking_status,
                 "booking_status_after": booking.status,
+                "exam_attempt_exists": attempt_exists,
                 "completion_mode": "operator_attested_external_evidence",
             },
         )
