@@ -133,16 +133,38 @@ from app.official_exam_attempt_service import create_media_safe_exam_attempt
 
 exams._create_exam_attempt = create_media_safe_exam_attempt
 
-# Paiements : expose une cotation autorisée et calculée côté serveur sans
-# dupliquer le routeur principal dans main.py. Le dispatcher historique est
-# remplacé en mémoire par une version fail-closed afin qu'aucun futur appel
-# direct ne puisse transformer un provider inconnu en sandbox accepté.
+# Paiements : cotation serveur + dispatcher fail-closed. POST /payments est
+# remplacé par une façade idempotente qui utilise la réservation comme clé
+# métier, persiste les checkout URLs asynchrones et refuse un second débit sur
+# un état paid/checked_in incohérent.
 from app.routers import payments as payments
 from app.routers import payment_quote as payment_quote
+from app.routers import payment_create_guard as payment_create_guard
 from app.payment_provider_dispatcher import dispatch_mobile_money_payment
 
 payments.router.include_router(payment_quote.router)
 payments.simulate_mobile_money_payment = dispatch_mobile_money_payment
+
+_payment_create_path = "/payments"
+_legacy_payment_create_routes = [
+    route
+    for route in payments.router.routes
+    if getattr(route, "path", None) == _payment_create_path
+    and "POST" in (getattr(route, "methods", set()) or set())
+]
+if len(_legacy_payment_create_routes) != 1:
+    raise RuntimeError(
+        f"Expected exactly one legacy POST {_payment_create_path} route, found {len(_legacy_payment_create_routes)}"
+    )
+
+payments.router.routes[:] = [
+    *payment_create_guard.router.routes,
+    *[
+        route
+        for route in payments.router.routes
+        if route not in _legacy_payment_create_routes
+    ],
+]
 
 # Compatibilité réservation : les anciens clients peuvent encore appeler
 # /registration/availability et /registration/book. Ces deux routes historiques
