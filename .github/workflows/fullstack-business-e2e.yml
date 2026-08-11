@@ -87,7 +87,7 @@ jobs:
           import os
           engine = create_engine(os.environ['DATABASE_URL'])
           tables = set(inspect(engine).get_table_names())
-          required = {'users','candidates','centers','exam_sessions','bookings','payments','audit_logs','alembic_version'}
+          required = {'users','candidates','centers','exam_sessions','bookings','payments','payment_refund_requests','audit_logs','alembic_version'}
           missing = sorted(required - tables)
           if missing:
               raise SystemExit(f'Missing migrated tables: {missing}')
@@ -108,6 +108,7 @@ jobs:
           tests/test_official_exam_runtime_e2e.py
           tests/test_payment_provider_dispatcher.py
           tests/test_payment_idempotency_lifecycle.py
+          tests/test_payment_refund_workflow.py
           tests/test_candidate_creation_concurrency.py
           tests/test_candidate_self_service_authorization.py
           tests/test_candidate_exam_eligibility.py
