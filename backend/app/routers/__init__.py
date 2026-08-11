@@ -136,3 +136,16 @@ registration.router.routes[:] = [
         if route not in _legacy_registration_booking_routes
     ],
 ]
+
+# Création candidat : toutes les routes qui fabriquent une référence GN-CODE-*
+# partagent désormais le même advisory lock PostgreSQL. L'inscription publique
+# et auto-école utilisent aussi le même contrôle identité/téléphone normalisé.
+from app.routers import candidates as candidates
+from app.candidate_creation_rules import (
+    assert_candidate_identity_phone_unique,
+    build_candidate_reference_locked,
+)
+
+candidates.build_candidate_reference = build_candidate_reference_locked
+registration.build_candidate_reference = build_candidate_reference_locked
+registration._check_duplicates = assert_candidate_identity_phone_unique
