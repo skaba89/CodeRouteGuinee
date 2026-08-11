@@ -97,7 +97,7 @@ def test_official_exam_requires_checkin_registered_station_trace_and_server_scor
         email=candidate_user.email,
         permit_category="B",
         user_id=candidate_user.id,
-        status="registered",
+        status="verified",
         attempt_count=0,
     )
     db.add(candidate)
