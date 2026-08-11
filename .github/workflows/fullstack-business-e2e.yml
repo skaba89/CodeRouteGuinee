@@ -106,6 +106,7 @@ jobs:
           tests/test_multicenter_business_invariants.py
           tests/test_registration_booking_compatibility.py
           tests/test_official_exam_runtime_e2e.py
+          tests/test_payment_provider_dispatcher.py
 
       - name: Reset PostgreSQL database after invariant tests
         working-directory: backend
