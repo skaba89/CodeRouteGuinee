@@ -96,6 +96,8 @@ jobs:
 
       - name: Run critical business invariants on PostgreSQL
         working-directory: backend
+        env:
+          PYTHONPATH: .
         run: >-
           pytest -q --tb=short --disable-warnings
           tests/test_auth_security_invariants.py
@@ -127,6 +129,8 @@ jobs:
 
       - name: Re-apply migrations and seed browser journey
         working-directory: backend
+        env:
+          PYTHONPATH: .
         run: |
           alembic upgrade head
           python scripts/seed_fullstack_e2e.py
