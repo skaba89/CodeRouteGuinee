@@ -12,12 +12,22 @@ from app.deps import get_current_user, require_roles
 from app.models_audit import AuditLog
 from app.models_user import User
 from app.schemas import PasswordChangeRequest, Token, UserCreate, UserRead
-from app.security import create_access_token, create_refresh_token, decode_refresh_token, get_password_hash, verify_password
+from app.security import (
+    create_2fa_challenge_token,
+    create_access_token,
+    create_refresh_token,
+    decode_2fa_challenge_token,
+    decode_refresh_token,
+    get_password_hash,
+    verify_password,
+)
 from app.two_factor import activate_2fa, check_2fa, disable_2fa, is_2fa_enabled, setup_2fa
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 settings = get_settings()
-PRIVILEGED_ROLES = {"admin", "super_admin"}
+# Les comptes centre ont accès à des données et opérations institutionnelles :
+# ils ne doivent jamais être auto-provisionnés publiquement en production.
+PRIVILEGED_ROLES = {"admin", "super_admin", "center"}
 login_rate_limiter = LoginRateLimiter(
     max_attempts=settings.login_rate_limit_attempts,
     window_seconds=settings.login_rate_limit_window_seconds,
@@ -55,12 +65,22 @@ def register(
     existing = db.scalar(select(User).where(User.email == payload.email.lower()))
     if existing:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered")
-    if (
-        payload.role in PRIVILEGED_ROLES
-        and settings.admin_registration_token
-        and x_admin_registration_token != settings.admin_registration_token
-    ):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Privileged role registration requires bootstrap authorization")
+
+    if payload.role in PRIVILEGED_ROLES:
+        # En production le démarrage exige désormais ADMIN_REGISTRATION_TOKEN.
+        # En développement/test sans token configuré, on conserve la
+        # compatibilité des fixtures historiques.
+        if settings.is_production and not settings.admin_registration_token:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Privileged registration is disabled until ADMIN_REGISTRATION_TOKEN is configured",
+            )
+        if settings.admin_registration_token and x_admin_registration_token != settings.admin_registration_token:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Privileged role registration requires bootstrap authorization",
+            )
+
     user = User(
         email=payload.email.lower(),
         full_name=payload.full_name,
@@ -90,7 +110,6 @@ def login(
         audit_auth_event(db, "auth.login_failed", form.username, request, user)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
 
-    # Compte désactivé ou en attente de validation (ex. auto-école) → refus
     if not user.is_active:
         audit_auth_event(db, "auth.login_inactive", form.username, request, user)
         raise HTTPException(
@@ -101,16 +120,12 @@ def login(
     login_rate_limiter.reset(key, db)
     audit_auth_event(db, "auth.login_success", form.username, request, user)
 
-    # Vérifier si le 2FA est activé pour cet utilisateur
-    from app.two_factor import is_2fa_enabled
-    tfa_enabled = is_2fa_enabled(str(user.id), db)
-
-    if tfa_enabled:
-        # Retourner un token partiel — le frontend doit envoyer le code 2FA
-        # via POST /auth/2fa/check?user_id=... avant d'obtenir le vrai token
-        partial_token = create_access_token(user.id, user.role, expires_minutes=5)
+    if is_2fa_enabled(str(user.id), db):
+        # Challenge non autorisant : `decode_access_token` le refuse. Le
+        # frontend l'envoie uniquement à /auth/2fa/check.
+        challenge_token = create_2fa_challenge_token(user.id, user.role, expires_minutes=5)
         return Token(
-            access_token=partial_token,
+            access_token=challenge_token,
             refresh_token="",
             requires_2fa=True,
             user_id=str(user.id),
@@ -164,17 +179,9 @@ class RefreshRequest(BaseModel):
     refresh_token: str
 
 
-
-
-
 @router.get("/csrf-token", tags=["auth"])
 def get_csrf_token(response: Response) -> dict:
-    """
-    Génère et retourne un token CSRF.
-    Le token est aussi posé en cookie (X-CSRF-Token).
-    Le frontend doit appeler cet endpoint au démarrage et inclure
-    le token dans le header X-CSRF-Token de toutes les requêtes mutatives.
-    """
+    """Génère le token CSRF double-submit utilisé par les requêtes mutatives."""
     token = generate_csrf_token()
     set_csrf_cookie(response, token)
     return {"csrf_token": token, "header_name": "X-CSRF-Token"}
@@ -204,11 +211,6 @@ def setup_two_factor(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("admin", "super_admin", "center", "candidate")),
 ) -> dict:
-    """
-    Initialise la configuration 2FA pour l'utilisateur connecté.
-    Retourne un QR code URI à scanner dans Google Authenticator.
-    Le 2FA n'est PAS encore activé — il faut appeler /2fa/verify avec le premier code.
-    """
     return setup_2fa(str(current_user.id), current_user.email, db)
 
 
@@ -218,10 +220,6 @@ def verify_and_activate_2fa(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("admin", "super_admin", "center", "candidate")),
 ) -> dict:
-    """
-    Vérifie le code TOTP et active le 2FA si correct.
-    Payload : {"code": "123456"}
-    """
     code = payload.get("code", "")
     if not code:
         raise HTTPException(status_code=400, detail="Code TOTP requis")
@@ -238,35 +236,44 @@ def check_two_factor(
     payload: dict,
     user_id: str,
     request: Request,
+    authorization: str | None = Header(default=None),
     db: Session = Depends(get_db),
 ) -> dict:
-    """
-    Vérifie le code 2FA lors du login.
-    Retourne un vrai access_token + refresh_token (pas juste valid=True).
-    """
-    from sqlalchemy import select as _select
+    """Finalise le login uniquement avec le challenge émis avant le TOTP."""
+    scheme, _, raw_token = (authorization or "").partition(" ")
+    challenge = decode_2fa_challenge_token(raw_token) if scheme.lower() == "bearer" and raw_token else None
+    if not challenge or str(challenge.get("sub")) != str(user_id):
+        raise HTTPException(status_code=401, detail="Challenge 2FA invalide ou expiré")
+
+    user = db.scalar(select(User).where(User.id == user_id))
+    if not user or not user.is_active:
+        raise HTTPException(status_code=401, detail="Utilisateur introuvable ou inactif")
+
+    key = login_rate_limit_key(request, user.email)
+    if login_rate_limiter.is_blocked(key, db):
+        audit_auth_event(db, "auth.2fa_blocked", user.email, request, user)
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Too many 2FA attempts")
+
     code = payload.get("code", "")
     if not code:
         raise HTTPException(status_code=400, detail="Code 2FA requis")
 
     ok = check_2fa(user_id, code, db)
     if not ok:
+        login_rate_limiter.register_failure(key, db)
+        audit_auth_event(db, "auth.2fa_failed", user.email, request, user)
         raise HTTPException(status_code=401, detail="Code 2FA invalide")
 
-    # Charger l'utilisateur pour émettre les vrais tokens
-    user = db.scalar(_select(User).where(User.id == user_id))
-    if not user or not user.is_active:
-        raise HTTPException(status_code=401, detail="Utilisateur introuvable ou inactif")
-
-    access_token  = create_access_token(user.id, user.role)
+    login_rate_limiter.reset(key, db)
+    access_token = create_access_token(user.id, user.role)
     refresh_token = create_refresh_token(user.id)
     audit_auth_event(db, "auth.2fa_success", str(user.email), request, user)
 
     return {
-        "access_token":  access_token,
+        "access_token": access_token,
         "refresh_token": refresh_token,
-        "token_type":    "bearer",
-        "requires_2fa":  False,
+        "token_type": "bearer",
+        "requires_2fa": False,
     }
 
 
@@ -275,7 +282,6 @@ def disable_two_factor(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("admin", "super_admin", "center", "candidate")),
 ) -> dict:
-    """Désactive le 2FA pour l'utilisateur connecté."""
     disable_2fa(str(current_user.id), db)
     return {"disabled": True}
 
@@ -285,7 +291,5 @@ def get_2fa_status(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("admin", "super_admin", "center", "candidate")),
 ) -> dict:
-    """Retourne si le 2FA est activé pour l'utilisateur connecté."""
     enabled = is_2fa_enabled(str(current_user.id), db)
     return {"enabled": enabled, "user_id": str(current_user.id)}
-
