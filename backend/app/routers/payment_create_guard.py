@@ -24,6 +24,7 @@ from app.payment_rules import (
     synchronize_booking_from_payment,
 )
 from app.payment_service import build_payment_reference, build_receipt_number
+from app.routers import payment_refunds
 from app.routers import payments as legacy_payments
 from app.routers.payments import PaymentIn
 
@@ -192,3 +193,24 @@ def create_payment_idempotent(
     _notify_payment_best_effort(db, booking, payment)
 
     return _payment_payload(payment, message=provider_result.message)
+
+
+# Le remboursement historique marquait immédiatement `Payment.status=refunded`
+# puis demandait d'effectuer le vrai remboursement Mobile Money manuellement.
+# On retire cette route avant l'agrégation et on la remplace par le workflow
+# requested -> approved/rejected -> completed avec preuve externe.
+_legacy_refund_path = "/payments/{reference}/refund"
+_legacy_refund_routes = [
+    route
+    for route in legacy_payments.router.routes
+    if getattr(route, "path", None) == _legacy_refund_path
+    and "POST" in (getattr(route, "methods", set()) or set())
+]
+if len(_legacy_refund_routes) != 1:
+    raise RuntimeError(
+        f"Expected exactly one legacy POST {_legacy_refund_path} route, found {len(_legacy_refund_routes)}"
+    )
+legacy_payments.router.routes[:] = [
+    route for route in legacy_payments.router.routes if route not in _legacy_refund_routes
+]
+router.routes.extend(payment_refunds.router.routes)
