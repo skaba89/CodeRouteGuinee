@@ -40,7 +40,7 @@ test('candidate logs in, books a real slot, gets server quote and pays', async (
   await expect(quote).toContainText('GNF');
   await expect(quote).not.toContainText('250');
 
-  await page.getByPlaceholder('+224 6XX XX XX XX XX').fill('+224622000099');
+  await page.getByPlaceholder('+224 6XX XX XX XX').fill('+224622000099');
   const payButton = page.getByRole('button', { name: /Payer.*150.*000.*GNF/ });
   await expect(payButton).toBeEnabled();
   await payButton.click();
