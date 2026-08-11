@@ -181,3 +181,30 @@ from app.candidate_creation_rules import (
 candidates.build_candidate_reference = build_candidate_reference_locked
 registration.build_candidate_reference = build_candidate_reference_locked
 registration._check_duplicates = assert_candidate_identity_phone_unique
+
+# Mise à jour candidat : le PATCH historique acceptait n'importe quelle chaîne
+# comme statut. La façade contrôlée conserve les champs profil mais réserve
+# `verified` au workflow d'identité et exige un motif pour les changements
+# administratifs registered/suspended.
+from app.routers import candidate_update_guard as candidate_update_guard
+
+_candidate_update_path = "/candidates/{candidate_id}"
+_legacy_candidate_update_routes = [
+    route
+    for route in candidates.router.routes
+    if getattr(route, "path", None) == _candidate_update_path
+    and "PATCH" in (getattr(route, "methods", set()) or set())
+]
+if len(_legacy_candidate_update_routes) != 1:
+    raise RuntimeError(
+        f"Expected exactly one legacy PATCH {_candidate_update_path} route, found {len(_legacy_candidate_update_routes)}"
+    )
+
+candidates.router.routes[:] = [
+    *candidate_update_guard.router.routes,
+    *[
+        route
+        for route in candidates.router.routes
+        if route not in _legacy_candidate_update_routes
+    ],
+]
