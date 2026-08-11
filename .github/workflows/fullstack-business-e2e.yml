@@ -113,6 +113,7 @@ jobs:
           tests/test_exam_start_eligibility_guard.py
           tests/test_candidate_status_state_machine.py
           tests/test_general_candidate_appeals.py
+          tests/test_official_media_bank_gate.py
 
       - name: Reset PostgreSQL database after invariant tests
         working-directory: backend
