@@ -32,6 +32,8 @@ _PRODUCTION_PROVIDERS = {"orange_money", "mtn_money", "wave", "paydunya"}
 _SANDBOX_PROVIDERS = _PRODUCTION_PROVIDERS | {"celcom_money", "sandbox"}
 _LEGACY_AMOUNT_SENTINEL_GNF = 250_000
 _PAYMENT_REFERENCE_LOCK_ID = 2026081101
+_PAYMENT_STARTABLE_BOOKING_STATUSES = {"confirmed", "pending_payment"}
+_PAYMENT_SETTLED_BOOKING_STATUSES = {"paid", "checked_in"}
 
 
 def normalize_payment_provider(provider: str) -> str:
@@ -105,6 +107,66 @@ def assert_payment_booking_access(db: Session, current_user: User, booking: Book
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cette réservation appartient à un autre centre.")
 
     raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Accès paiement refusé.")
+
+
+def assert_booking_can_start_payment(db: Session, booking: Booking) -> None:
+    """Refuse tout nouveau débit sur un état de réservation terminal/incohérent.
+
+    Un paiement `paid`/`pending` déjà persisté est traité avant ce garde par le
+    routeur et renvoyé idempotemment. Cette fonction couvre le cas de dérive de
+    données où la réservation indique déjà un état réglé/consommé mais la ligne
+    de paiement correspondante est absente ou non ouverte.
+    """
+    booking_status = (booking.status or "").strip().lower()
+    if booking_status == "cancelled":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "BOOKING_CANCELLED_NOT_PAYABLE",
+                "message": "Cette réservation est annulée et ne peut plus être payée.",
+                "booking_reference": booking.reference,
+            },
+        )
+    if booking_status in _PAYMENT_SETTLED_BOOKING_STATUSES:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "BOOKING_ALREADY_SETTLED",
+                "message": "Cette réservation est déjà réglée ou a déjà passé le contrôle d'entrée. Aucun nouveau débit ne sera lancé.",
+                "booking_reference": booking.reference,
+                "booking_status": booking_status,
+                "payment_reference": booking.payment_reference,
+            },
+        )
+    if booking_status not in _PAYMENT_STARTABLE_BOOKING_STATUSES:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "BOOKING_NOT_PAYABLE",
+                "message": "L'état actuel de la réservation ne permet pas de lancer un paiement.",
+                "booking_reference": booking.reference,
+                "booking_status": booking_status,
+            },
+        )
+
+    session = db.get(ExamSession, booking.session_id)
+    if session is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "PAYMENT_SESSION_MISSING",
+                "message": "La session liée à cette réservation est introuvable. Aucun débit n'a été lancé.",
+            },
+        )
+    if (session.status or "").strip().lower() in {"cancelled", "archived"}:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "PAYMENT_SESSION_NOT_ACTIVE",
+                "message": "La session liée à cette réservation n'accepte plus de nouveaux paiements.",
+                "session_status": session.status,
+            },
+        )
 
 
 def resolve_authoritative_amount(db: Session, booking: Booking) -> int:

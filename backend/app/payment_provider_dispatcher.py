@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import uuid
 from datetime import UTC, datetime
+from urllib.parse import urlparse
 
 from app.mobile_money import (
     ProviderResult,
@@ -98,6 +99,31 @@ def _celcom_money_payment_safe(phone: str, amount_gnf: int) -> ProviderResult:
         )
 
 
+def _normalize_paydunya_checkout(result: ProviderResult) -> ProviderResult:
+    """Adapte l'implémentation historique PayDunya au contrat checkout_url.
+
+    L'ancien provider mettait l'URL dans `message`. On l'extrait uniquement si
+    elle est HTTPS afin de pouvoir la persister et la restituer sur un retry,
+    sans exposer une chaîne arbitraire comme lien cliquable.
+    """
+    if result.checkout_url or result.status != "pending":
+        return result
+    marker = "URL:"
+    if marker not in result.message:
+        return result
+    candidate = result.message.split(marker, 1)[1].strip()
+    parsed = urlparse(candidate)
+    if parsed.scheme != "https" or not parsed.netloc:
+        return result
+    return ProviderResult(
+        provider=result.provider,
+        status=result.status,
+        external_reference=result.external_reference,
+        message="Paiement PayDunya initié — en attente de confirmation",
+        checkout_url=candidate,
+    )
+
+
 def dispatch_mobile_money_payment(provider: str, phone: str, amount_gnf: int) -> ProviderResult:
     """Dispatcher applicatif fail-closed.
 
@@ -126,7 +152,7 @@ def dispatch_mobile_money_payment(provider: str, phone: str, amount_gnf: int) ->
         if normalized == "wave":
             return _wave_payment(phone, amount_gnf)
         if normalized == "paydunya":
-            return _paydunya_payment(phone, amount_gnf)
+            return _normalize_paydunya_checkout(_paydunya_payment(phone, amount_gnf))
     except Exception as exc:
         try:
             from app.monitoring import capture_exception
