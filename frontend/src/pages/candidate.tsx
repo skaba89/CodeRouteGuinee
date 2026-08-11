@@ -39,7 +39,7 @@ import {
   updateInstitutionalUserRole, updateInstitutionalUserStatus,
   resetInstitutionalUserPassword,
   validateEntry, reportCenterIncident, getCenterIncidents, resolveCenterIncident,
-  createPayment, getConvocationPdfUrl, openConvocationPdf, verifyExamCertificate,
+  getConvocationPdfUrl, openConvocationPdf, verifyExamCertificate,
   getMyCandidateProfile, getMyBookings, type MyBooking,
   downloadExamCertificatePdf, getExamResults,
   startExamFromBooking, submitExamAttempt, getExamLiveStatus,
@@ -65,6 +65,7 @@ import {
   createCenterStation,
   getExamCertificatePdfUrl,
 } from '../api';
+import { createServerPricedPayment, getPaymentQuote, type PaymentQuote } from '../paymentQuote';
 import { DEMO_QUESTIONS } from '../pages/examQuestions';
 
 // ── Helpers ───────────────────────────────────────────────────────
@@ -89,7 +90,8 @@ export function CandidatePage() {
   const [bookRef, setBookRef] = useState('');
   const [provider, setProvider] = useState('orange_money');
   const [phone, setPhone] = useState('+224620000000');
-  const [amount] = useState(250_000);
+  const [quote, setQuote] = useState<PaymentQuote | null>(null);
+  const [quoteLoading, setQuoteLoading] = useState(false);
   const [paying, setPaying] = useState(false);
   const [payResult, setPayResult] = useState<PaymentResult | null>(null);
   const [payErr, setPayErr] = useState<string | null>(null);
@@ -98,7 +100,6 @@ export function CandidatePage() {
   const [myBookings, setMyBookings] = useState<MyBooking[]>([]);
   const [myBookingsLoaded, setMyBookingsLoaded] = useState(false);
 
-  // Charger les réservations du candidat connecté
   useEffect(() => {
     if (currentUser?.role === 'candidate' && !myBookingsLoaded) {
       getMyBookings()
@@ -106,6 +107,21 @@ export function CandidatePage() {
         .catch(() => setMyBookingsLoaded(true));
     }
   }, [currentUser, myBookingsLoaded]);
+
+  useEffect(() => {
+    const reference = bookRef.trim();
+    setQuote(null);
+    if (!reference || !canAct) return;
+    const timer = window.setTimeout(() => {
+      setQuoteLoading(true);
+      getPaymentQuote(reference)
+        .then(setQuote)
+        .catch(() => setQuote(null))
+        .finally(() => setQuoteLoading(false));
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [bookRef, canAct]);
+
   const [cert, setCert] = useState<ExamCertificateVerification | null>(null);
   const [certErr, setCertErr] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
@@ -113,11 +129,12 @@ export function CandidatePage() {
   async function handlePay(e: FormEvent) {
     e.preventDefault();
     if (!bookRef.trim()) { setPayErr('Saisissez votre référence de réservation.'); return; }
+    if (!quote) { setPayErr('Le tarif serveur doit être chargé avant le paiement.'); return; }
     setPaying(true); setPayErr(null); setPayResult(null);
     try {
-      const r = await createPayment({ booking_reference: bookRef, amount_gnf: amount, provider, phone });
+      const r = await createServerPricedPayment({ booking_reference: bookRef.trim(), provider, phone });
       setPayResult(r);
-      // Pour Wave : ouvrir l'URL de checkout dans un nouvel onglet / deep link
+      setQuote(current => current ? { ...current, amount_gnf: r.amount_gnf } : current);
       if (r.checkout_url && provider === 'wave') {
         window.open(r.checkout_url, '_blank', 'noopener,noreferrer');
       }
@@ -146,7 +163,6 @@ export function CandidatePage() {
         <p>Suivez votre parcours, payez et téléchargez votre convocation.</p>
       </div>
 
-      {/* Réservations du candidat pilote */}
       {myBookings.length > 0 && (
         <div className="card" style={{ marginBottom: 20 }}>
           <div className="card-header"><span className="card-title">Mes réservations</span></div>
@@ -172,7 +188,6 @@ export function CandidatePage() {
         </div>
       )}
 
-      {/* Prendre rendez-vous — candidat connecté */}
       {currentUser?.role === 'candidate' && (
         <BookingWizard
           hasActiveBooking={myBookings.some(b => b.status !== 'cancelled')}
@@ -180,7 +195,6 @@ export function CandidatePage() {
         />
       )}
 
-      {/* Étapes */}
       <div className="steps">
         {[
           { n: 1, label: 'Inscription', sub: 'Profil enregistré' },
@@ -196,12 +210,10 @@ export function CandidatePage() {
       </div>
 
       <div className="g2">
-        {/* Paiement Mobile Money */}
         <div className="card">
           <div className="card-header"><span className="card-title">Paiement</span></div>
           <div className="alert aw" style={{ marginBottom: 14 }}>
-            <strong>Phase pilote</strong> — Le paiement s'effectue en espèces auprès de l'agent DNTT du centre.
-            Mobile Money sera activé pour le déploiement national.
+            <strong>Tarif sécurisé</strong> — le montant affiché est calculé par le serveur à partir de votre réservation, de la catégorie et de la tentative. Le navigateur ne peut pas fixer le prix.
           </div>
           {!canAct && (
             <div className="alert ai" style={{ marginBottom: 14 }}>
@@ -231,26 +243,28 @@ export function CandidatePage() {
               </div>
             </div>
             <label>Numéro de téléphone<input value={phone} onChange={e => setPhone(e.target.value)} placeholder="+224 6XX XXX XXX" /></label>
-            <div style={{ background: 'var(--bg)', borderRadius: 'var(--r)', padding: '12px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: 13, color: 'var(--muted)' }}>Montant</span>
-              <strong style={{ fontSize: 18, fontWeight: 800 }}>{fmtGNF(amount)}</strong>
+            <div data-testid="server-payment-quote" style={{ background: 'var(--bg)', borderRadius: 'var(--r)', padding: '12px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: 13, color: 'var(--muted)' }}>Montant serveur</span>
+              <strong style={{ fontSize: 18, fontWeight: 800 }}>
+                {quote ? fmtGNF(quote.amount_gnf) : quoteLoading ? 'Calcul…' : bookRef ? 'Tarif indisponible' : '—'}
+              </strong>
             </div>
+            {quote && <p style={{ fontSize: 11, color: 'var(--muted)', margin: 0 }}>Catégorie {quote.permit_category ?? '—'} · tentative {quote.attempt_number ?? '—'} · source serveur</p>}
             {payErr && <p className="form-error">{payErr}</p>}
             {payResult && (
               <div className="alert as">
-                 Paiement <strong>{payResult.status === 'paid' ? 'confirmé' : payResult.status}</strong> — Réf. {payResult.reference}
+                 Paiement <strong>{payResult.status === 'paid' ? 'confirmé' : payResult.status}</strong> — Réf. {payResult.reference} · {fmtGNF(payResult.amount_gnf)}
                 {payResult.checkout_url && (
                   <span> — <a href={payResult.checkout_url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--blue-dark, #004085)', fontWeight: 600 }}>Finaliser Wave →</a></span>
                 )}
               </div>
             )}
-            <button type="submit" className="btn-success btn-block" disabled={paying}>
-              {paying ? 'Traitement…' : `Payer ${fmtGNF(amount)}`}
+            <button type="submit" className="btn-success btn-block" disabled={paying || quoteLoading || !quote}>
+              {paying ? 'Traitement…' : quote ? `Payer ${fmtGNF(quote.amount_gnf)}` : 'Charger le tarif pour payer'}
             </button>
           </form>
         </div>
 
-        {/* Convocation */}
         <div className="card">
           <div className="card-header"><span className="card-title"> Convocation & Documents</span></div>
           <div style={{ display: 'grid', gap: 12 }}>
@@ -272,7 +286,6 @@ export function CandidatePage() {
           </div>
         </div>
 
-        {/* Vérification certificat */}
         <div className="card">
           <div className="card-header"><span className="card-title">Vérifier un certificat</span></div>
           <form onSubmit={handleVerify} style={{ display: 'grid', gap: 12 }}>
@@ -299,26 +312,20 @@ export function CandidatePage() {
           </form>
         </div>
 
-        {/* Infos pratiques */}
         <div className="card">
           <div className="card-header"><span className="card-title">Infos pratiques</span></div>
           <ul style={{ paddingLeft: 18, display: 'grid', gap: 8, fontSize: 13, color: 'var(--ink2)' }}>
             <li>Présentez-vous <strong>30 minutes avant</strong> la session</li>
             <li>Apportez votre <strong>pièce d'identité originale</strong></li>
             <li>Présentez la convocation PDF (QR code) à l'entrée</li>
-            <li>Seuil d'admission : <strong>35/40</strong> (87,5 %)</li>
-            <li>Durée : <strong>30 minutes</strong> — 40 questions tirées aléatoirement</li>
+            <li>Paramètre actuel d'admission : <strong>35/40</strong> (à homologuer institutionnellement)</li>
+            <li>Paramètre actuel : <strong>30 minutes</strong> — 40 questions tirées aléatoirement</li>
           </ul>
         </div>
       </div>
     </section>
   );
 }
-
-// ══════════════════════════════════════════════════════════════════
-// CENTER PAGE — Espace centre d'examen
-// ══════════════════════════════════════════════════════════════════
-
 
 // ── Prendre rendez-vous : centre → session disponible → réservation ─────────
 function BookingWizard({ hasActiveBooking, onBooked }: {
@@ -379,8 +386,7 @@ function BookingWizard({ hasActiveBooking, onBooked }: {
         <p style={{ fontSize: 13, color: 'var(--muted)', margin: '8px 0 4px' }}>Code de vérification (à présenter à l'entrée)</p>
         <p style={{ fontFamily: 'monospace', fontSize: 18, fontWeight: 800, letterSpacing: '.12em' }}>{result.verification_code}</p>
         <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 12 }}>
-          Notez ces informations, puis réglez les frais d'examen ci-dessous
-          ou en espèces au centre le jour J (phase pilote).
+          Notez ces informations. Le tarif applicable est calculé par le serveur avant paiement.
         </p>
         <PostBookingActions reference={result.reference} />
       </div>
@@ -450,28 +456,33 @@ function BookingWizard({ hasActiveBooking, onBooked }: {
 }
 
 
-// ── Après réservation : payer (Mobile Money sandbox) + convocation PDF ──────
 function PostBookingActions({ reference }: { reference: string }) {
   const [provider, setProvider] = useState('orange_money');
   const [phone, setPhone] = useState('');
+  const [quote, setQuote] = useState<PaymentQuote | null>(null);
   const [paying, setPaying] = useState(false);
   const [paid, setPaid] = useState<string | null>(null);
   const [payErr, setPayErr] = useState<string | null>(null);
 
+  useEffect(() => {
+    getPaymentQuote(reference)
+      .then(setQuote)
+      .catch(() => setPayErr('Tarif serveur indisponible. Réessayez avant de payer.'));
+  }, [reference]);
+
   async function pay() {
-    if (paying || phone.trim().length < 8) return;
+    if (paying || phone.trim().length < 8 || !quote) return;
     setPaying(true); setPayErr(null);
     try {
-      const r = await createPayment({
+      const r = await createServerPricedPayment({
         booking_reference: reference,
-        amount_gnf: 250000,
         provider,
         phone: phone.trim(),
       });
       if (r.status === 'paid') {
         setPaid(r.receipt_number ?? r.reference ?? 'OK');
       } else {
-        setPayErr(r.message ?? 'Paiement refusé par l\'opérateur.');
+        setPayErr(r.message ?? 'Paiement en attente ou refusé par l\'opérateur.');
       }
     } catch (e) {
       setPayErr(e instanceof Error ? e.message : 'Paiement impossible.');
@@ -488,25 +499,28 @@ function PostBookingActions({ reference }: { reference: string }) {
         </div>
       ) : (
         <>
-          <p style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>Payer les frais d'examen (250 000 GNF)</p>
+          <p data-testid="post-booking-server-quote" style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>
+            Frais d'examen : {quote ? fmtGNF(quote.amount_gnf) : 'calcul du tarif serveur…'}
+          </p>
           <div className="form-pair-grid" style={{ marginBottom: 10 }}>
             <label>Opérateur
               <select value={provider} onChange={e => setProvider(e.target.value)}>
                 <option value="orange_money">Orange Money</option>
-                <option value="mtn_momo">MTN MoMo</option>
+                <option value="mtn_money">MTN Money</option>
                 <option value="wave">Wave</option>
+                <option value="paydunya">PayDunya</option>
               </select>
             </label>
             <label>Numéro Mobile Money
               <input value={phone} onChange={e => setPhone(e.target.value)} placeholder="+224 6XX XX XX XX" autoComplete="off" />
             </label>
           </div>
-          <button className="btn-primary btn-block" onClick={pay} disabled={paying || phone.trim().length < 8}>
-            {paying ? 'Paiement en cours…' : 'Payer maintenant'}
+          <button className="btn-primary btn-block" onClick={pay} disabled={paying || phone.trim().length < 8 || !quote}>
+            {paying ? 'Paiement en cours…' : quote ? `Payer ${fmtGNF(quote.amount_gnf)}` : 'Chargement du tarif…'}
           </button>
           {payErr && <div className="alert ae" style={{ marginTop: 10 }}>{payErr}</div>}
           <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 8 }}>
-            Ou réglez en espèces auprès de l'agent DNTT au centre, le jour de l'examen.
+            Tout règlement hors ligne doit être enregistré par le centre avant le contrôle d'entrée.
           </p>
         </>
       )}
