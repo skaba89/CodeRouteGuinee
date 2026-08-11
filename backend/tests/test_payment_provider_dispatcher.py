@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+from app import payment_provider_dispatcher as dispatcher
+from app.mobile_money import ProviderResult
 from app.payment_provider_dispatcher import dispatch_mobile_money_payment
 from app.routers import payments
 
@@ -69,3 +71,43 @@ def test_celcom_network_failure_returns_failed_result_with_reference(monkeypatch
     assert result.status == "failed"
     assert result.external_reference.startswith("ERR-CELCOM-")
     assert "network down" in result.message
+
+
+def test_paydunya_legacy_message_is_normalized_to_https_checkout_url(monkeypatch) -> None:
+    monkeypatch.setenv("MOBILE_MONEY_MODE", "production")
+
+    monkeypatch.setattr(
+        dispatcher,
+        "_paydunya_payment",
+        lambda phone, amount: ProviderResult(
+            provider="paydunya",
+            status="pending",
+            external_reference="PD-TOKEN-123",
+            message="Paiement PayDunya initié — URL: https://paydunya.test/invoice/PD-TOKEN-123",
+        ),
+    )
+    result = dispatcher.dispatch_mobile_money_payment(
+        "paydunya", "+224622000099", 150_000
+    )
+    assert result.status == "pending"
+    assert result.checkout_url == "https://paydunya.test/invoice/PD-TOKEN-123"
+    assert "URL:" not in result.message
+
+
+def test_paydunya_non_https_message_is_never_promoted_to_checkout_url(monkeypatch) -> None:
+    monkeypatch.setenv("MOBILE_MONEY_MODE", "production")
+    monkeypatch.setattr(
+        dispatcher,
+        "_paydunya_payment",
+        lambda phone, amount: ProviderResult(
+            provider="paydunya",
+            status="pending",
+            external_reference="PD-TOKEN-HTTP",
+            message="Paiement PayDunya initié — URL: http://unsafe.example/invoice/PD-TOKEN-HTTP",
+        ),
+    )
+    result = dispatcher.dispatch_mobile_money_payment(
+        "paydunya", "+224622000099", 150_000
+    )
+    assert result.status == "pending"
+    assert result.checkout_url == ""
