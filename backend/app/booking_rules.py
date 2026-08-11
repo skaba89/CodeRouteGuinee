@@ -40,6 +40,17 @@ def lock_bookable_session(db: Session, session_id: str) -> tuple[ExamSession, Ce
 
 
 def assert_no_active_booking(db: Session, candidate_id: str) -> None:
+    # Tous les chemins de création (admin, self-service et compatibilité legacy)
+    # passent déjà par cet invariant. On y place donc aussi le contrôle d'état
+    # candidat afin qu'aucune route secondaire ne puisse contourner une suspension.
+    candidate = db.get(Candidate, candidate_id)
+    if candidate is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"code": "BOOKING_CANDIDATE_MISSING", "message": "Candidat introuvable."},
+        )
+    assert_bookable_candidate(candidate)
+
     now = datetime.now(UTC).replace(tzinfo=None)
     active = db.scalar(
         select(Booking)
