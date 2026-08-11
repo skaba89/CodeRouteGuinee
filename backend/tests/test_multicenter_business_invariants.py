@@ -4,7 +4,6 @@ from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
-from sqlalchemy import select
 
 from app.db.session import SessionLocal, init_db
 from app.main import app
@@ -70,7 +69,7 @@ def _create_candidate(db, marker: str, *, user: User | None = None) -> Candidate
         first_name="Mamadou",
         last_name="Diallo",
         identity_number=f"ID-{marker}",
-        phone=f"+22462{marker[-7:].replace('-', '0')[:7]}",
+        phone="+224622000099",
         email=user.email if user else None,
         permit_category="B",
         user_id=user.id if user else None,
@@ -102,25 +101,23 @@ def test_center_cannot_read_or_operate_other_center_resources() -> None:
     center_a = _create_center(db, f"A-{marker}", prefecture=f"PREF-{marker}", commune=f"COM-A-{marker}")
     center_b = _create_center(db, f"B-{marker}", prefecture=f"PREF-{marker}", commune=f"COM-B-{marker}")
     user_a = _create_user(db, "center", center_id=center_a.id)
+    headers = _headers(user_a)
     session_a = _create_session(db, center_a, f"A-{marker}", starts)
     session_b = _create_session(db, center_b, f"B-{marker}", starts + timedelta(hours=3))
     candidate_a = _create_candidate(db, f"A-{marker}")
     candidate_b = _create_candidate(db, f"B-{marker}")
     booking_a = _create_booking(db, candidate_a, session_a, f"A-{marker}")
     booking_b = _create_booking(db, candidate_b, session_b, f"B-{marker}")
-    db.commit()
     refs = {
-        "user": user_a,
         "session_b": session_b.id,
         "candidate_b": candidate_b.id,
         "booking_a": booking_a.reference,
         "booking_b": booking_b.reference,
     }
-    db.expunge_all()
+    db.commit()
     db.close()
 
     with TestClient(app) as client:
-        headers = _headers(refs["user"])
         listed = client.get("/api/v1/bookings", headers=headers)
         assert listed.status_code == 200
         listed_refs = {item["reference"] for item in listed.json()["items"]}
@@ -139,6 +136,7 @@ def test_candidate_can_cancel_unpaid_booking_then_rebook() -> None:
     db = SessionLocal()
     center = _create_center(db, marker, prefecture=f"PREF-{marker}", commune=f"COM-{marker}")
     candidate_user = _create_user(db, "candidate")
+    headers = _headers(candidate_user)
     candidate = _create_candidate(db, marker, user=candidate_user)
     first = _create_session(
         db,
@@ -153,11 +151,9 @@ def test_candidate_can_cancel_unpaid_booking_then_rebook() -> None:
         datetime.now(UTC).replace(tzinfo=None) + timedelta(days=8),
     )
     booking = _create_booking(db, candidate, first, marker)
-    db.commit()
-    headers = _headers(candidate_user)
     booking_ref = booking.reference
     second_id = second.id
-    db.expunge_all()
+    db.commit()
     db.close()
 
     with TestClient(app) as client:
@@ -177,6 +173,7 @@ def test_session_cancellation_releases_linked_bookings_and_records_cancel_time()
     db = SessionLocal()
     center = _create_center(db, marker, prefecture=f"PREF-{marker}", commune=f"COM-{marker}")
     admin = _create_user(db, "super_admin")
+    headers = _headers(admin)
     session = _create_session(
         db,
         center,
@@ -185,11 +182,9 @@ def test_session_cancellation_releases_linked_bookings_and_records_cancel_time()
     )
     candidate = _create_candidate(db, marker)
     booking = _create_booking(db, candidate, session, marker)
-    db.commit()
-    headers = _headers(admin)
     session_id = session.id
     booking_id = booking.id
-    db.expunge_all()
+    db.commit()
     db.close()
 
     with TestClient(app) as client:
@@ -213,12 +208,11 @@ def test_commune_stats_count_distinct_centers_not_sessions() -> None:
     db = SessionLocal()
     center = _create_center(db, marker, prefecture=prefecture, commune=commune)
     admin = _create_user(db, "super_admin")
+    headers = _headers(admin)
     base = datetime.now(UTC).replace(tzinfo=None) + timedelta(days=10)
     _create_session(db, center, f"1-{marker}", base)
     _create_session(db, center, f"2-{marker}", base + timedelta(days=1))
     db.commit()
-    headers = _headers(admin)
-    db.expunge_all()
     db.close()
 
     with TestClient(app) as client:
