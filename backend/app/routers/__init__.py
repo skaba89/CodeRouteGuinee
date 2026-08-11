@@ -38,10 +38,12 @@ from app.routers import media_library as media_library
 from app.routers import media_migration_progress as media_migration_progress
 from app.routers import media_migration_queue as media_migration_queue
 from app.routers import media_migration_plan as media_migration_plan
+from app.routers import media_official_readiness as media_official_readiness
 
 media_library.router.include_router(media_migration_progress.router)
 media_library.router.include_router(media_migration_queue.router)
 media_library.router.include_router(media_migration_plan.router)
+media_library.router.include_router(media_official_readiness.router)
 
 # Le chemin manuel d'association doit partager la même clé de sérialisation
 # (verrou sur Question) que le batch migrator. Le remplacement est fail-closed :
@@ -122,6 +124,14 @@ exams.router.routes[:] = [
         if route not in _legacy_exam_start_routes
     ],
 ]
+
+# Nouvelle tentative officielle : le moteur historique conserve tout son contrat,
+# mais sa fonction de création est remplacée par une implémentation qui filtre la
+# banque sur le média réellement publiable. Une question normalisée devenue
+# invalide ne peut donc pas retomber silencieusement vers un ancien média legacy.
+from app.official_exam_attempt_service import create_media_safe_exam_attempt
+
+exams._create_exam_attempt = create_media_safe_exam_attempt
 
 # Paiements : expose une cotation autorisée et calculée côté serveur sans
 # dupliquer le routeur principal dans main.py. Le dispatcher historique est
