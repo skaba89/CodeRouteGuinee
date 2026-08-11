@@ -19,24 +19,26 @@ router = APIRouter(prefix="/candidate-submissions", tags=["candidate-submissions
 STATUSES = {"under_review", "accepted", "rejected", "retake_planned"}
 OPEN_STATUSES = {"submitted", "under_review"}
 FINAL_STATUSES = {"accepted", "rejected", "retake_planned"}
+CATEGORIES = {"exam_result", "payment", "booking", "center_incident", "other", "review"}
+ATTEMPT_REQUIRED_CATEGORIES = {"exam_result", "review"}
 
 
 class SubmissionCreate(BaseModel):
     candidate_id: str
-    attempt_id: str
+    attempt_id: str | None = None
     category: str = "review"
-    message: str = Field(min_length=10)
+    message: str = Field(min_length=10, max_length=5000)
 
 
 class SubmissionHandle(BaseModel):
     status: str
-    admin_response: str = Field(min_length=5)
+    admin_response: str = Field(min_length=5, max_length=5000)
 
 
 class SubmissionRead(BaseModel):
     id: str
     candidate_id: str
-    attempt_id: str
+    attempt_id: str | None = None
     category: str
     status: str
     message: str
@@ -55,6 +57,20 @@ def _status(value: str) -> str:
     return value
 
 
+def _category(value: str) -> str:
+    normalized = (value or "review").strip().lower()
+    if normalized not in CATEGORIES:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={
+                "code": "CANDIDATE_SUBMISSION_CATEGORY_UNSUPPORTED",
+                "message": "Cette catégorie de recours n'est pas supportée.",
+                "category": normalized,
+            },
+        )
+    return normalized
+
+
 @router.post("", response_model=SubmissionRead, status_code=status.HTTP_201_CREATED)
 def create_submission(
     payload: SubmissionCreate,
@@ -70,18 +86,32 @@ def create_submission(
     # Le candidat_id est une donnée de requête, jamais une preuve de propriété.
     assert_candidate_access(db, current_user, candidate)
 
-    attempt = db.get(ExamAttempt, payload.attempt_id)
-    if not attempt:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Exam attempt not found")
-    if attempt.candidate_id != candidate.id:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Candidate and attempt mismatch")
+    category = _category(payload.category)
+    attempt_id = (payload.attempt_id or "").strip() or None
 
-    category = payload.category.strip().lower() or "review"
+    if category in ATTEMPT_REQUIRED_CATEGORIES and attempt_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={
+                "code": "CANDIDATE_SUBMISSION_ATTEMPT_REQUIRED",
+                "message": "Un recours sur le résultat d'examen doit référencer la tentative concernée.",
+                "category": category,
+            },
+        )
+
+    attempt: ExamAttempt | None = None
+    if attempt_id is not None:
+        attempt = db.get(ExamAttempt, attempt_id)
+        if not attempt:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Exam attempt not found")
+        if attempt.candidate_id != candidate.id:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Candidate and attempt mismatch")
+
     existing_open = db.scalar(
         select(CandidateFollowup.id)
         .where(
             CandidateFollowup.candidate_id == candidate.id,
-            CandidateFollowup.attempt_id == attempt.id,
+            CandidateFollowup.attempt_id == attempt_id,
             CandidateFollowup.category == category,
             CandidateFollowup.status.in_(OPEN_STATUSES),
         )
@@ -92,13 +122,13 @@ def create_submission(
             status_code=status.HTTP_409_CONFLICT,
             detail={
                 "code": "CANDIDATE_SUBMISSION_ALREADY_OPEN",
-                "message": "Un recours de cette catégorie est déjà en cours de traitement pour cette tentative.",
+                "message": "Un recours de cette catégorie est déjà en cours de traitement pour ce dossier.",
             },
         )
 
     item = CandidateFollowup(
         candidate_id=candidate.id,
-        attempt_id=attempt.id,
+        attempt_id=attempt.id if attempt else None,
         category=category,
         message=payload.message.strip(),
     )
@@ -112,7 +142,7 @@ def create_submission(
             entity_id=item.id,
             details={
                 "candidate_id": candidate.id,
-                "attempt_id": attempt.id,
+                "attempt_id": item.attempt_id,
                 "category": category,
                 "submitted_by_role": current_user.role,
             },
@@ -159,6 +189,15 @@ def handle_submission(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Submission not found")
     next_status = _status(payload.status)
     previous_status = item.status
+
+    if next_status == "retake_planned" and item.attempt_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "RETAKE_REQUIRES_EXAM_ATTEMPT",
+                "message": "Un rattrapage ne peut être planifié que pour un recours rattaché à une tentative d'examen.",
+            },
+        )
 
     # Les décisions finales sont stables. Une réouverture devra passer par un
     # workflow explicite plutôt que par une mutation silencieuse du même dossier.
