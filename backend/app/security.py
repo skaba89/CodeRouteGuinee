@@ -8,6 +8,7 @@ from app.core.config import get_settings
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 settings = get_settings()
 
+
 def _get_refresh_expire_days() -> int:
     from app.core.config import get_settings
     return get_settings().refresh_token_expire_days
@@ -27,6 +28,18 @@ def create_access_token(subject: str, role: str, expires_minutes: int | None = N
     return jwt.encode(payload, settings.secret_key, algorithm=settings.algorithm)
 
 
+def create_2fa_challenge_token(subject: str, role: str, expires_minutes: int = 5) -> str:
+    """Jeton court uniquement destiné à terminer le challenge 2FA.
+
+    Sa valeur `type=2fa_challenge` est volontairement refusée par
+    `decode_access_token`, de sorte qu'un utilisateur n'ayant pas encore fourni
+    son TOTP ne puisse appeler aucun endpoint authentifié.
+    """
+    expire = datetime.now(UTC) + timedelta(minutes=expires_minutes)
+    payload = {"sub": subject, "role": role, "exp": expire, "type": "2fa_challenge"}
+    return jwt.encode(payload, settings.secret_key, algorithm=settings.algorithm)
+
+
 def create_refresh_token(subject: str) -> str:
     expire = datetime.now(UTC) + timedelta(days=_get_refresh_expire_days())
     payload = {"sub": subject, "exp": expire, "type": "refresh"}
@@ -36,7 +49,19 @@ def create_refresh_token(subject: str) -> str:
 def decode_access_token(token: str) -> dict | None:
     try:
         payload = jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
+        # Les anciens JWT sans type restent tolérés pendant la fenêtre de
+        # migration. Les challenges 2FA et refresh sont toujours refusés.
         if payload.get("type") not in ("access", None):
+            return None
+        return payload
+    except JWTError:
+        return None
+
+
+def decode_2fa_challenge_token(token: str) -> dict | None:
+    try:
+        payload = jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
+        if payload.get("type") != "2fa_challenge" or not payload.get("sub"):
             return None
         return payload
     except JWTError:
