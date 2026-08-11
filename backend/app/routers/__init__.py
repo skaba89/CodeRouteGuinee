@@ -92,11 +92,15 @@ exams.router.routes[:] = [
 ]
 
 # Paiements : expose une cotation autorisée et calculée côté serveur sans
-# dupliquer le routeur principal dans main.py.
+# dupliquer le routeur principal dans main.py. Le dispatcher historique est
+# remplacé en mémoire par une version fail-closed afin qu'aucun futur appel
+# direct ne puisse transformer un provider inconnu en sandbox accepté.
 from app.routers import payments as payments
 from app.routers import payment_quote as payment_quote
+from app.payment_provider_dispatcher import dispatch_mobile_money_payment
 
 payments.router.include_router(payment_quote.router)
+payments.simulate_mobile_money_payment = dispatch_mobile_money_payment
 
 # Compatibilité réservation : les anciens clients peuvent encore appeler
 # /registration/availability et /registration/book. Ces deux routes historiques
