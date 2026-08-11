@@ -1,6 +1,8 @@
 import csv
 import io
+import json
 from datetime import UTC, datetime
+from decimal import Decimal, InvalidOperation
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from pydantic import BaseModel, Field
@@ -16,17 +18,33 @@ from app.models_candidate import Candidate
 from app.models_payment import Payment
 from app.models_user import User
 from app.payment_recap import summarize_payments
+from app.payment_rules import (
+    acquire_payment_reference_lock,
+    assert_payment_amount,
+    assert_payment_booking_access,
+    center_payment_query,
+    normalize_payment_provider,
+    resolve_authoritative_amount,
+    synchronize_booking_from_payment,
+)
 from app.payment_service import build_payment_reference, build_receipt_number
+from app.payment_webhook_security import (
+    parse_paydunya_payload,
+    verify_paydunya_hash,
+    verify_wave_signature,
+)
 from app.sentry import capture_exception as _sentry_cap
 
 router = APIRouter(prefix="/payments", tags=["payments"])
 
 
 class PaymentIn(BaseModel):
-    booking_reference: str
-    amount_gnf: int = 250000
-    provider: str = "sandbox"
-    phone: str
+    booking_reference: str = Field(min_length=3, max_length=80)
+    # Compatibilité : les anciennes UI envoient 250000 comme sentinelle. Le
+    # serveur ne fait jamais confiance à ce montant et recalcule le tarif.
+    amount_gnf: int | None = Field(default=None, gt=0, le=5_000_000)
+    provider: str = Field(default="sandbox", min_length=2, max_length=80)
+    phone: str = Field(min_length=5, max_length=50)
 
 
 class OfficialPaymentImportRow(BaseModel):
@@ -55,11 +73,15 @@ class OfficialPaymentImportResult(BaseModel):
     references: list[str]
 
 
+class RefundRequest(BaseModel):
+    reason: str = Field(default="Non spécifié", max_length=500)
+
+
 def _filtered_payments_query(
     provider: str | None = None,
     payment_status: str | None = None,
-    date_from: datetime | None = None,
-    date_to: datetime | None = None,
+    date_from: datetime | str | None = None,
+    date_to: datetime | str | None = None,
 ) -> Select[tuple[Payment]]:
     query = select(Payment)
     if provider:
@@ -73,13 +95,49 @@ def _filtered_payments_query(
     return query
 
 
+def _payment_amount_matches(payment: Payment, raw_amount: object) -> bool:
+    if raw_amount in (None, ""):
+        return True
+    try:
+        return Decimal(str(raw_amount)) == Decimal(payment.amount_gnf)
+    except (InvalidOperation, TypeError, ValueError):
+        return False
+
+
+def _audit_webhook(db: Session, action: str, payment: Payment, extra: dict | None = None) -> None:
+    details = {
+        "payment_reference": payment.reference,
+        "booking_reference": payment.booking_reference,
+        "provider": payment.provider,
+        "status": payment.status,
+        "external_reference": payment.external_reference,
+    }
+    if extra:
+        details.update(extra)
+    db.add(
+        AuditLog(
+            actor_id=None,
+            action=action,
+            entity="payment",
+            entity_id=payment.reference,
+            details=details,
+        )
+    )
+
+
 @router.post("", status_code=status.HTTP_201_CREATED)
 def create_payment(
     payload: PaymentIn,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> dict:
-    booking = db.scalar(select(Booking).where(Booking.reference == payload.booking_reference))
+    # Verrouille la réservation avant le contrôle d'idempotence afin que deux
+    # doubles-clics concurrents ne puissent pas lancer deux débits provider.
+    booking = db.scalar(
+        select(Booking)
+        .where(Booking.reference == payload.booking_reference.strip())
+        .with_for_update()
+    )
     if not booking:
         db.add(
             AuditLog(
@@ -87,67 +145,63 @@ def create_payment(
                 action="payment.failed",
                 entity="payment",
                 entity_id=payload.booking_reference,
-                details={"reason": "booking_not_found", "booking_reference": payload.booking_reference, "amount_gnf": payload.amount_gnf, "provider": payload.provider},            )
+                details={
+                    "reason": "booking_not_found",
+                    "booking_reference": payload.booking_reference,
+                    "requested_amount_gnf": payload.amount_gnf,
+                    "provider": payload.provider,
+                },
+            )
         )
         db.commit()
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Booking not found")
 
-    # ── Garde d'idempotence universelle (protection anti double-paiement) ──
-    # S'applique à TOUS les utilisateurs (candidat, admin) AVANT tout appel
-    # au provider : un booking déjà réglé ne peut jamais être payé deux fois
-    # (double-clic, relance réseau, requêtes concurrentes). Sans cette garde,
-    # un citoyen pourrait être débité plusieurs fois.
-    already_paid = db.scalar(
+    assert_payment_booking_access(db, current_user, booking)
+    if booking.status == "cancelled":
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Cette réservation est annulée.")
+
+    existing_open_payment = db.scalar(
         select(Payment).where(
-            Payment.booking_reference == payload.booking_reference,
-            Payment.status == "paid",
+            Payment.booking_reference == booking.reference,
+            Payment.status.in_(["paid", "pending"]),
         )
     )
-    if already_paid:
-        # Réponse idempotente : on renvoie le paiement existant (200-like via 409
-        # explicite) plutôt que d'en créer un second.
+    if existing_open_payment:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Un paiement a déjà été enregistré pour cette réservation.",
+            detail={
+                "code": "PAYMENT_ALREADY_EXISTS",
+                "message": "Un paiement payé ou en attente existe déjà pour cette réservation.",
+                "payment_reference": existing_open_payment.reference,
+                "payment_status": existing_open_payment.status,
+            },
         )
 
-    # Résoudre le montant via tarifs dynamiques si non spécifié
-    try:
-        from app.models_candidate import Candidate as _Cand
-        from app.tarifs import get_tarif_for_candidate
-        _cand = db.get(_Cand, booking.candidate_id)
-        _cat  = getattr(_cand, "permit_category", "B") if _cand else "B"
-        # Utiliser attempt_count réel pour les tarifs réinscription/rattrapage
-        _attempts = getattr(_cand, "attempt_count", 0) or 0
-        resolved_amount = get_tarif_for_candidate(_cat, attempt_number=_attempts + 1)
-    except Exception as _tarif_exc:
-        _sentry_cap(_tarif_exc, context={'endpoint': 'tarif_resolution'})
-        resolved_amount = payload.amount_gnf
-    final_amount = payload.amount_gnf if payload.amount_gnf != 250000 else resolved_amount
+    authoritative_amount = resolve_authoritative_amount(db, booking)
+    assert_payment_amount(payload.amount_gnf, authoritative_amount)
+    provider = normalize_payment_provider(payload.provider)
 
-    provider_result = simulate_mobile_money_payment(payload.provider, payload.phone, final_amount)
+    provider_result = simulate_mobile_money_payment(provider, payload.phone, authoritative_amount)
+
+    acquire_payment_reference_lock(db)
     reference = build_payment_reference((db.scalar(select(func.count(Payment.id))) or 0) + 1)
-    from datetime import UTC
-    from datetime import datetime as _dt
     payment = Payment(
         reference=reference,
-        booking_reference=payload.booking_reference,
-        amount_gnf=final_amount,
+        booking_reference=booking.reference,
+        amount_gnf=authoritative_amount,
         provider=provider_result.provider,
-        phone=payload.phone,
+        phone=payload.phone.strip(),
         status=provider_result.status,
         receipt_number=build_receipt_number(reference),
         external_reference=provider_result.external_reference,
-        paid_at=_dt.now(UTC).replace(tzinfo=None) if provider_result.status == "paid" else None,
+        paid_at=datetime.now(UTC).replace(tzinfo=None) if provider_result.status == "paid" else None,
     )
     db.add(payment)
-
-    # Paiement réussi → la réservation passe à 'paid' (trace du parcours)
-    if provider_result.status == "paid" and booking.status in ("pending_payment", "confirmed"):
-        booking.status = "paid"
-        booking.payment_reference = reference
+    db.flush()
+    synchronize_booking_from_payment(db, payment)
 
     from app.audit_chain import append_audit
+
     append_audit(
         db,
         actor_id=current_user.id,
@@ -155,8 +209,9 @@ def create_payment(
         entity="payment",
         entity_id=reference,
         details={
-            "booking_reference": payload.booking_reference,
-            "amount_gnf": payload.amount_gnf,
+            "booking_reference": booking.reference,
+            "amount_gnf": authoritative_amount,
+            "requested_amount_gnf": payload.amount_gnf,
             "provider": provider_result.provider,
             "status": provider_result.status,
             "receipt_number": payment.receipt_number,
@@ -166,24 +221,23 @@ def create_payment(
     db.commit()
     db.refresh(payment)
 
-    # Email de confirmation de paiement — best effort
+    # Notifications non bloquantes : le reçu doit afficher le montant réellement
+    # décidé par le serveur, jamais la valeur envoyée par le navigateur.
     try:
-        booking = db.scalar(select(Booking).where(Booking.reference == payload.booking_reference))
-        if booking:
-            candidate = db.scalar(select(Candidate).where(Candidate.id == booking.candidate_id))
-            if candidate and candidate.email:
-                from app.email_service import send_payment_confirmation
-                send_payment_confirmation(
-                    to_email          = candidate.email,
-                    candidate_name    = f"{candidate.first_name} {candidate.last_name}",
-                    booking_reference = payload.booking_reference,
-                    amount_gnf        = payload.amount_gnf,
-                    provider          = provider_result.provider,
-                    receipt_number    = payment.receipt_number,
-                )
+        candidate = db.get(Candidate, booking.candidate_id)
+        if candidate and candidate.email:
+            from app.email_service import send_payment_confirmation
+
+            send_payment_confirmation(
+                to_email=candidate.email,
+                candidate_name=f"{candidate.first_name} {candidate.last_name}",
+                booking_reference=booking.reference,
+                amount_gnf=payment.amount_gnf,
+                provider=provider_result.provider,
+                receipt_number=payment.receipt_number,
+            )
     except Exception as _email_exc:
-        _sentry_cap(_email_exc, context={'endpoint': 'payment_email'})
-        pass  # Email non bloquant
+        _sentry_cap(_email_exc, context={"endpoint": "payment_email"})
 
     return {
         "id": payment.id,
@@ -196,7 +250,6 @@ def create_payment(
         "external_reference": payment.external_reference,
         "paid_at": payment.paid_at.isoformat() if payment.paid_at else None,
         "message": provider_result.message,
-        # URL de paiement Wave (vide pour les autres providers)
         "checkout_url": provider_result.checkout_url,
     }
 
@@ -206,7 +259,10 @@ def get_payment_summary(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("admin", "super_admin", "center")),
 ) -> dict:
-    payments = db.scalars(select(Payment)).all()
+    if current_user.role == "center":
+        payments = db.scalars(center_payment_query(current_user.center_id or "")).all()
+    else:
+        payments = db.scalars(select(Payment)).all()
     return summarize_payments(payments)
 
 
@@ -256,10 +312,13 @@ def get_admin_payment_list(
     q = _filtered_payments_query(provider, payment_status, date_from, date_to)
     if search:
         from sqlalchemy import or_
-        q = q.where(or_(
-            Payment.receipt_number.ilike(f"%{search}%"),
-            Payment.booking_reference.ilike(f"%{search}%"),
-        ))
+
+        q = q.where(
+            or_(
+                Payment.receipt_number.ilike(f"%{search}%"),
+                Payment.booking_reference.ilike(f"%{search}%"),
+            )
+        )
     total = db.scalar(select(func.count()).select_from(q.subquery()))
     items = db.scalars(q.order_by(Payment.created_at.desc()).offset(offset).limit(limit)).all()
     return {
@@ -268,15 +327,15 @@ def get_admin_payment_list(
         "offset": offset,
         "items": [
             {
-                "id": p.id,
-                "booking_reference": p.booking_reference,
-                "receipt_number": p.receipt_number,
-                "amount_gnf": p.amount_gnf,
-                "provider": p.provider,
-                "status": p.status,
-                "created_at": p.created_at.isoformat(),
+                "id": item.id,
+                "booking_reference": item.booking_reference,
+                "receipt_number": item.receipt_number,
+                "amount_gnf": item.amount_gnf,
+                "provider": item.provider,
+                "status": item.status,
+                "created_at": item.created_at.isoformat(),
             }
-            for p in items
+            for item in items
         ],
     }
 
@@ -290,20 +349,24 @@ def export_admin_payments_csv(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("admin", "super_admin")),
 ) -> Response:
-    payments = db.scalars(_filtered_payments_query(provider, payment_status, date_from, date_to).order_by(Payment.created_at.desc())).all()
+    payments = db.scalars(
+        _filtered_payments_query(provider, payment_status, date_from, date_to).order_by(Payment.created_at.desc())
+    ).all()
     output = io.StringIO()
     writer = csv.writer(output, delimiter=";")
     writer.writerow(["reference", "booking_reference", "amount_gnf", "provider", "status", "receipt_number", "created_at"])
     for payment in payments:
-        writer.writerow([
-            payment.reference,
-            payment.booking_reference,
-            payment.amount_gnf,
-            payment.provider,
-            payment.status,
-            payment.receipt_number,
-            payment.created_at.isoformat() if payment.created_at else "",
-        ])
+        writer.writerow(
+            [
+                payment.reference,
+                payment.booking_reference,
+                payment.amount_gnf,
+                payment.provider,
+                payment.status,
+                payment.receipt_number,
+                payment.created_at.isoformat() if payment.created_at else "",
+            ]
+        )
     db.add(
         AuditLog(
             actor_id=current_user.id,
@@ -340,12 +403,20 @@ def import_official_payments(
             detail={"message": "Duplicate payment receipts in import payload", "receipt_numbers": duplicate_receipts},
         )
 
+    normalized_statuses = {row.status.strip().lower() for row in payload.payments}
+    unsupported_statuses = sorted(normalized_statuses - {"paid", "pending", "failed", "refunded", "confirmed"})
+    if unsupported_statuses:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={"message": "Unsupported payment status", "statuses": unsupported_statuses},
+        )
+
     booking_references = [row.booking_reference.strip() for row in payload.payments]
-    existing_bookings = {
-        booking.reference
+    bookings = {
+        booking.reference: booking
         for booking in db.scalars(select(Booking).where(Booking.reference.in_(booking_references))).all()
     }
-    missing_bookings = sorted({reference for reference in booking_references if reference not in existing_bookings})
+    missing_bookings = sorted({reference for reference in booking_references if reference not in bookings})
     if missing_bookings:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -367,6 +438,7 @@ def import_official_payments(
             references=[existing_payments[receipt].reference for receipt in existing_receipts],
         )
 
+    acquire_payment_reference_lock(db)
     created = 0
     updated = 0
     references: list[str] = []
@@ -389,8 +461,11 @@ def import_official_payments(
         payment.receipt_number = receipt_number
         if row.created_at:
             payment.created_at = row.created_at
+        if payment.status == "paid" and payment.paid_at is None:
+            payment.paid_at = row.created_at or datetime.now(UTC).replace(tzinfo=None)
         db.add(payment)
         db.flush()
+        synchronize_booking_from_payment(db, payment)
         references.append(payment.reference)
 
     db.add(
@@ -410,7 +485,14 @@ def import_official_payments(
         )
     )
     db.commit()
-    return OfficialPaymentImportResult(dry_run=False, imported=len(references), created=created, updated=updated, skipped=0, references=references)
+    return OfficialPaymentImportResult(
+        dry_run=False,
+        imported=len(references),
+        created=created,
+        updated=updated,
+        skipped=0,
+        references=references,
+    )
 
 
 @router.get("/{reference}")
@@ -422,6 +504,12 @@ def get_payment(
     payment = db.scalar(select(Payment).where(Payment.reference == reference))
     if not payment:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Payment not found")
+    booking = db.scalar(select(Booking).where(Booking.reference == payment.booking_reference))
+    if booking is None:
+        if current_user.role not in {"admin", "super_admin"}:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Accès paiement refusé.")
+    else:
+        assert_payment_booking_access(db, current_user, booking)
     return {
         "reference": payment.reference,
         "booking_reference": payment.booking_reference,
@@ -432,90 +520,80 @@ def get_payment(
     }
 
 
-# ── Webhooks Mobile Money (Mois 10–12) ────────────────────────────────────
+# ── Webhooks Mobile Money ────────────────────────────────────────────────────
 
 @router.post("/webhook/wave", status_code=200, tags=["payments"])
 async def wave_webhook(request: Request, db: Session = Depends(get_db)) -> dict:
-    """
-    Webhook Wave Mobile Money.
-    Wave notifie le backend quand un paiement est confirmé.
-    Sécurité : vérification de la signature HMAC-SHA256.
-    """
-    import hashlib
-    import hmac
-    import os
-
     body = await request.body()
-    signature = request.headers.get("Wave-Signature", "")
-    secret = os.environ.get("WAVE_WEBHOOK_SECRET", "")
+    verify_wave_signature(body, request.headers.get("Wave-Signature", ""))
 
-    if secret:
-        expected = hmac.new(
-            secret.encode(), body, hashlib.sha256
-        ).hexdigest()
-        if not hmac.compare_digest(f"sha256={expected}", signature):
-            from fastapi import HTTPException
-            raise HTTPException(status_code=401, detail="Signature Wave invalide")
-
-    import json
     try:
-        data = json.loads(body)
-    except json.JSONDecodeError:
-        return {"status": "ignored", "reason": "invalid_json"}
+        payload = json.loads(body)
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Payload Wave invalide")
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Payload Wave invalide")
 
-    checkout_id = data.get("id", "")
-    payment_status = data.get("payment_status", "")
+    event_data = payload.get("data") if isinstance(payload.get("data"), dict) else payload
+    checkout_id = str(event_data.get("id") or payload.get("id") or "")
+    payment_status = str(event_data.get("payment_status") or payload.get("payment_status") or "").lower()
 
-    if payment_status == "succeeded":
-        # Mettre à jour le statut du paiement en base
-        from app.models_payment import Payment
-        payment = db.scalar(select(Payment).where(
-            Payment.external_reference == checkout_id
-        ))
-        if payment and payment.status == "pending":
-            payment.status = "paid"
-            payment.paid_at = datetime.now(UTC).replace(tzinfo=None)
-            db.commit()
-            return {"status": "processed", "payment_id": str(payment.id)}
+    if payment_status == "succeeded" and checkout_id:
+        payment = db.scalar(select(Payment).where(Payment.external_reference == checkout_id).with_for_update())
+        if payment:
+            if payment.provider != "wave":
+                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Provider du paiement incohérent")
+            if not _payment_amount_matches(payment, event_data.get("amount")):
+                _audit_webhook(db, "payment.webhook_amount_mismatch", payment, {"source": "wave"})
+                db.commit()
+                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Montant Wave incohérent")
+            if payment.status == "pending":
+                payment.status = "paid"
+                payment.paid_at = datetime.now(UTC).replace(tzinfo=None)
+                db.add(payment)
+                synchronize_booking_from_payment(db, payment)
+                _audit_webhook(db, "payment.webhook.wave", payment)
+                db.commit()
+            return {"status": "processed", "payment_id": str(payment.id), "payment_status": payment.status}
 
-    return {"status": "received", "checkout_id": checkout_id}
+    return {"status": "received", "checkout_id": checkout_id, "payment_status": payment_status}
 
 
 @router.post("/webhook/paydunya", status_code=200, tags=["payments"])
 async def paydunya_webhook(request: Request, db: Session = Depends(get_db)) -> dict:
-    """
-    Webhook PayDunya.
-    PayDunya notifie le statut du checkout (succès, annulation, erreur).
-    """
-    import json
     body = await request.body()
-    try:
-        data = json.loads(body)
-    except json.JSONDecodeError:
-        return {"status": "ignored", "reason": "invalid_json"}
+    payload = parse_paydunya_payload(body, request.headers.get("content-type", ""))
+    if not payload:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Payload PayDunya invalide")
+    verify_paydunya_hash(payload)
 
-    token = data.get("data", {}).get("invoice", {}).get("token", "")
-    status = data.get("data", {}).get("status", "")
+    data = payload.get("data") if isinstance(payload.get("data"), dict) else {}
+    invoice = data.get("invoice") if isinstance(data.get("invoice"), dict) else {}
+    token = str(invoice.get("token") or data.get("token") or "")
+    payment_status = str(data.get("status") or "").lower()
 
-    if status == "completed":
-        from app.models_payment import Payment
-        payment = db.scalar(select(Payment).where(
-            Payment.external_reference == token
-        ))
-        if payment and payment.status == "pending":
-            payment.status = "paid"
-            payment.paid_at = datetime.now(UTC).replace(tzinfo=None)
-            db.commit()
-            return {"status": "processed", "token": token}
+    if payment_status == "completed" and token:
+        payment = db.scalar(select(Payment).where(Payment.external_reference == token).with_for_update())
+        if payment:
+            if payment.provider != "paydunya":
+                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Provider du paiement incohérent")
+            if not _payment_amount_matches(payment, invoice.get("total_amount")):
+                _audit_webhook(db, "payment.webhook_amount_mismatch", payment, {"source": "paydunya"})
+                db.commit()
+                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Montant PayDunya incohérent")
+            if payment.status == "pending":
+                payment.status = "paid"
+                payment.paid_at = datetime.now(UTC).replace(tzinfo=None)
+                db.add(payment)
+                synchronize_booking_from_payment(db, payment)
+                _audit_webhook(db, "payment.webhook.paydunya", payment)
+                db.commit()
+            return {"status": "processed", "token": token, "payment_status": payment.status}
 
-    return {"status": "received", "token": token, "payment_status": status}
+    return {"status": "received", "token": token, "payment_status": payment_status}
 
 
 # ── Remboursements ────────────────────────────────────────────────────────────
-
-class RefundRequest(BaseModel):
-    reason: str = "Non spécifié"
-
 
 @router.post("/{reference}/refund", tags=["payments"])
 def refund_payment(
@@ -524,60 +602,57 @@ def refund_payment(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("super_admin")),
 ) -> dict:
-    """
-    Marque un paiement comme remboursé (super_admin uniquement).
-    Le remboursement mobile money réel doit être effectué manuellement
-    par un opérateur habilité DNTT.
-
-    Règles :
-      - Statut actuel doit être 'paid' ou 'confirmed'
-      - Une raison est obligatoire pour l'audit
-      - Action irréversible depuis l'API (modifier en base si nécessaire)
-    """
-    payment = db.scalar(select(Payment).where(Payment.reference == reference))
+    payment = db.scalar(select(Payment).where(Payment.reference == reference).with_for_update())
     if not payment:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
-                            detail="Paiement introuvable")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Paiement introuvable")
 
     if payment.status not in ("paid", "confirmed"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Remboursement impossible : statut actuel '{payment.status}' "
-                   f"(doit être 'paid' ou 'confirmed')",
+            detail=(
+                f"Remboursement impossible : statut actuel '{payment.status}' "
+                "(doit être 'paid' ou 'confirmed')"
+            ),
         )
 
     reason = payload.reason.strip() or "Non spécifié"
-
-    # Mettre à jour le statut
+    now = datetime.now(UTC).replace(tzinfo=None)
     payment.status = "refunded"
-    db.flush()
+    db.add(payment)
 
-    # Mettre à jour la réservation associée
-    booking = db.scalar(select(Booking).where(Booking.reference == payment.booking_reference))
+    booking = db.scalar(select(Booking).where(Booking.reference == payment.booking_reference).with_for_update())
     if booking:
         booking.status = "cancelled"
-        booking.notes  = f"Remboursé — {reason}"
-        db.flush()
+        booking.cancelled_at = now
+        booking.notes = f"Remboursé — {reason}"
+        db.add(booking)
 
-    # Audit log
-    db.add(AuditLog(
-        actor_id  = current_user.id,
-        action    = "payment_refunded",
-        entity    = "payment",
-        entity_id = reference,
-        details   = f"Remboursement {payment.amount_gnf:,} GNF par {current_user.email} — {reason}",
-    ))
+    db.add(
+        AuditLog(
+            actor_id=current_user.id,
+            action="payment_refunded",
+            entity="payment",
+            entity_id=reference,
+            details={
+                "amount_gnf": payment.amount_gnf,
+                "booking_reference": payment.booking_reference,
+                "reason": reason,
+                "refunded_by": current_user.email,
+                "refunded_at": now.isoformat(),
+                "provider_refund": "manual_required",
+            },
+        )
+    )
     db.commit()
 
     return {
-        "reference":  reference,
-        "status":     "refunded",
+        "reference": reference,
+        "status": "refunded",
         "amount_gnf": payment.amount_gnf,
-        "reason":     reason,
+        "reason": reason,
         "refunded_by": current_user.email,
         "message": (
-            "Paiement marqué comme remboursé. "
-            "Le remboursement Mobile Money doit être effectué manuellement "
-            "par l'opérateur DNTT habilité."
+            "Paiement marqué comme remboursé. Le remboursement Mobile Money doit être effectué "
+            "manuellement par l'opérateur DNTT habilité."
         ),
     }
