@@ -19,6 +19,14 @@ def test_unknown_provider_never_becomes_paid_sandbox(monkeypatch) -> None:
     assert result.external_reference.startswith("ERR-")
 
 
+def test_empty_provider_never_becomes_paid_sandbox(monkeypatch) -> None:
+    monkeypatch.setenv("MOBILE_MONEY_MODE", "sandbox")
+    result = dispatch_mobile_money_payment("", "+224622000099", 150_000)
+    assert result.status == "failed"
+    assert result.provider == "unknown"
+    assert result.external_reference.startswith("ERR-")
+
+
 def test_sandbox_provider_is_refused_in_production(monkeypatch) -> None:
     monkeypatch.setenv("MOBILE_MONEY_MODE", "production")
     result = dispatch_mobile_money_payment("sandbox", "+224622000099", 150_000)
