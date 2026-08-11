@@ -4,6 +4,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
+from app.candidate_eligibility import assert_candidate_can_pay
 from app.core.config import get_settings
 from app.models_booking import Booking
 from app.models_candidate import Candidate
@@ -113,6 +114,12 @@ def resolve_authoritative_amount(db: Session, booking: Booking) -> int:
             status_code=status.HTTP_409_CONFLICT,
             detail={"code": "PAYMENT_CANDIDATE_MISSING", "message": "Candidat de la réservation introuvable."},
         )
+
+    # La cotation et le débit partagent le même helper. En plaçant le garde ici,
+    # un dossier suspendu ne peut ni obtenir un nouveau tarif de paiement, ni
+    # déclencher un appel provider via une ancienne version du frontend.
+    assert_candidate_can_pay(candidate)
+
     try:
         attempt_number = (candidate.attempt_count or 0) + 1
         amount = int(get_tarif_for_candidate(candidate.permit_category or "B", attempt_number=attempt_number))
