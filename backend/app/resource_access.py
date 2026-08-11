@@ -12,6 +12,14 @@ from app.models_user import User
 _ADMIN_ROLES = {"admin", "super_admin"}
 
 
+def assert_center_access(current_user: User, center_id: str) -> None:
+    if current_user.role in _ADMIN_ROLES:
+        return
+    if current_user.role == "center" and current_user.center_id and current_user.center_id == center_id:
+        return
+    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Ce centre ne correspond pas à votre affectation.")
+
+
 def assert_session_access(current_user: User, session: ExamSession) -> None:
     if current_user.role in _ADMIN_ROLES:
         return
