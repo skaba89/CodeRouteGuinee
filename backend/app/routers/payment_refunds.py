@@ -17,7 +17,7 @@ from app.models_payment_refund import PaymentRefundRequest
 from app.models_user import User
 from app.payment_rules import assert_payment_booking_access
 
-router = APIRouter(tags=["payments"])
+router = APIRouter(prefix="/payments", tags=["payments"])
 
 _OPEN_REFUND_STATUSES = {"requested", "approved"}
 _FINAL_REFUND_STATUSES = {"rejected", "completed"}
@@ -91,9 +91,7 @@ def request_refund(
     if payment is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Paiement introuvable")
 
-    booking = db.scalar(
-        select(Booking).where(Booking.reference == payment.booking_reference)
-    )
+    booking = db.scalar(select(Booking).where(Booking.reference == payment.booking_reference))
     if booking is None:
         if current_user.role not in {"admin", "super_admin"}:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Accès paiement refusé.")
@@ -191,11 +189,7 @@ def list_refunds(
     query = select(PaymentRefundRequest)
     if refund_status:
         query = query.where(PaymentRefundRequest.status == refund_status.strip().lower())
-    return list(
-        db.scalars(
-            query.order_by(PaymentRefundRequest.requested_at.desc()).limit(limit)
-        ).all()
-    )
+    return list(db.scalars(query.order_by(PaymentRefundRequest.requested_at.desc()).limit(limit)).all())
 
 
 @router.get("/refunds/{refund_id}", response_model=RefundRead)
@@ -288,10 +282,7 @@ def complete_refund(
     evidence_reference = payload.evidence_reference.strip()
 
     if item.status == "completed":
-        if (
-            item.provider_refund_reference == provider_reference
-            and item.evidence_reference == evidence_reference
-        ):
+        if item.provider_refund_reference == provider_reference and item.evidence_reference == evidence_reference:
             return item
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -310,9 +301,7 @@ def complete_refund(
             },
         )
 
-    payment = db.scalar(
-        select(Payment).where(Payment.id == item.payment_id).with_for_update()
-    )
+    payment = db.scalar(select(Payment).where(Payment.id == item.payment_id).with_for_update())
     if payment is None:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Paiement du remboursement introuvable")
     if payment.status != "paid":
