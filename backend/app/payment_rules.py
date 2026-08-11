@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from fastapi import HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
@@ -29,6 +29,8 @@ _PROVIDER_ALIASES = {
 }
 _PRODUCTION_PROVIDERS = {"orange_money", "mtn_money", "wave", "paydunya"}
 _SANDBOX_PROVIDERS = _PRODUCTION_PROVIDERS | {"celcom_money", "sandbox"}
+_LEGACY_AMOUNT_SENTINEL_GNF = 250_000
+_PAYMENT_REFERENCE_LOCK_ID = 2026081101
 
 
 def normalize_payment_provider(provider: str) -> str:
@@ -58,6 +60,17 @@ def normalize_payment_provider(provider: str) -> str:
             },
         )
     return normalized
+
+
+def acquire_payment_reference_lock(db: Session) -> None:
+    """Sérialise la génération GN-PAY-* sur PostgreSQL.
+
+    SQLite reste no-op pour les tests. Le verrou transactionnel évite que deux
+    paiements de réservations différentes calculent le même `count + 1`.
+    """
+    bind = db.get_bind()
+    if bind.dialect.name == "postgresql":
+        db.execute(text("SELECT pg_advisory_xact_lock(:lock_id)"), {"lock_id": _PAYMENT_REFERENCE_LOCK_ID})
 
 
 def booking_candidate(db: Session, booking: Booking) -> Candidate | None:
@@ -119,10 +132,12 @@ def resolve_authoritative_amount(db: Session, booking: Booking) -> int:
 def assert_payment_amount(requested_amount: int | None, authoritative_amount: int) -> None:
     """Le prix serveur est la seule source de vérité.
 
-    Un montant fourni par une ancienne UI reste accepté uniquement s'il est
-    exactement égal au tarif courant. Une UI moderne peut omettre le champ.
+    `250000` est conservé comme sentinelle de compatibilité pour les anciennes
+    versions du frontend : cette valeur est ignorée et le tarif serveur est
+    quand même débité. Toute autre valeur fournie doit correspondre exactement
+    au tarif courant.
     """
-    if requested_amount is None:
+    if requested_amount is None or int(requested_amount) == _LEGACY_AMOUNT_SENTINEL_GNF:
         return
     if int(requested_amount) != int(authoritative_amount):
         raise HTTPException(
@@ -144,7 +159,7 @@ def synchronize_booking_from_payment(db: Session, payment: Payment) -> Booking |
         return None
     if payment.status != "paid":
         return booking
-    if booking.status in {"cancelled"}:
+    if booking.status == "cancelled":
         return booking
 
     # `checked_in` est conservé si une confirmation provider arrive tardivement.
@@ -155,7 +170,7 @@ def synchronize_booking_from_payment(db: Session, payment: Payment) -> Booking |
     return booking
 
 
-def center_payment_query(db: Session, center_id: str):
+def center_payment_query(center_id: str):
     """Query des paiements appartenant à un centre, utilisée pour les agrégats."""
     if not center_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Agent centre non affecté à un centre.")
