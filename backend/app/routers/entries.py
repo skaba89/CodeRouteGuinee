@@ -3,6 +3,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.candidate_eligibility import assert_candidate_ready_for_official_exam
 from app.db.session import get_db
 from app.deps import require_roles
 from app.entry_service import build_entry_denied, build_entry_success
@@ -13,6 +14,7 @@ from app.exam_center_gate import (
 )
 from app.models_audit import AuditLog
 from app.models_booking import Booking
+from app.models_candidate import Candidate
 from app.models_session import ExamSession
 from app.models_user import User
 
@@ -150,6 +152,26 @@ def validate_entry(
             extra={"booking_status": booking.status, "session_id": session.id},
         )
 
+    candidate = db.get(Candidate, booking.candidate_id)
+    if not candidate:
+        return _deny_entry(
+            db,
+            payload,
+            current_user,
+            "candidate_not_found",
+            extra={"candidate_id": booking.candidate_id, "session_id": session.id},
+        )
+
+    # Le contrôle physique ne se réduit pas au QR et au paiement : le dossier
+    # doit aussi être éligible. Le refus est renvoyé comme résultat de scan
+    # structuré afin que l'agent centre voie la cause sans transformer le scan
+    # attendu en erreur technique HTTP.
+    try:
+        assert_candidate_ready_for_official_exam(candidate)
+    except HTTPException as exc:
+        reason, detail = _gate_reason(exc)
+        return _deny_entry(db, payload, current_user, reason, extra=detail)
+
     try:
         window = assert_checkin_window(session)
     except HTTPException as exc:
@@ -168,6 +190,7 @@ def validate_entry(
         extra={
             "booking_id": booking.id,
             "candidate_id": booking.candidate_id,
+            "candidate_status": candidate.status,
             "session_id": session.id,
             "center_id": center.id,
             "window_opens_at": window.opens_at.isoformat(),
