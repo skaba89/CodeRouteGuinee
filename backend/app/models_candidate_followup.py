@@ -16,7 +16,7 @@ class CandidateFollowup(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     candidate_id: Mapped[str] = mapped_column(ForeignKey("candidates.id"), nullable=False, index=True)
-    attempt_id: Mapped[str] = mapped_column(ForeignKey("exam_attempts.id"), nullable=False, index=True)
+    attempt_id: Mapped[str | None] = mapped_column(ForeignKey("exam_attempts.id"), nullable=True, index=True)
     category: Mapped[str] = mapped_column(String(60), default="review", nullable=False)
     status: Mapped[str] = mapped_column(String(40), default="submitted", nullable=False)
     message: Mapped[str] = mapped_column(Text, nullable=False)
