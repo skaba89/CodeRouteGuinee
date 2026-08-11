@@ -95,8 +95,12 @@ exams.router.routes[:] = [
 # dupliquer le routeur principal dans main.py.
 from app.routers import payments as payments
 from app.routers import payment_quote as payment_quote
+from app.payment_provider_dispatcher import dispatch_mobile_money_payment
 
 payments.router.include_router(payment_quote.router)
+# Défense en profondeur : le routeur historique conserve son nom global pour
+# compatibilité, mais chaque débit passe désormais par le dispatcher fail-closed.
+payments.simulate_mobile_money_payment = dispatch_mobile_money_payment
 
 # Compatibilité réservation : les anciens clients peuvent encore appeler
 # /registration/availability et /registration/book. Ces deux routes historiques
