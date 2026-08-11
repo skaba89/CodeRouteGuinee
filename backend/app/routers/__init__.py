@@ -91,6 +91,38 @@ exams.router.routes[:] = [
     *[route for route in exams.router.routes if route not in _legacy_question_routes],
 ]
 
+# Éligibilité examen : les deux points de démarrage historiques sont remplacés
+# par une façade qui revalide le dossier candidat. Le reste du moteur d'examen
+# (trace, station, scoring, incident, certificat) reste strictement inchangé.
+from app.routers import exam_start_eligibility_guard as exam_start_eligibility_guard
+
+_exam_start_guard_specs = (
+    ("/exams/start", "POST"),
+    ("/exams/start-from-booking", "POST"),
+)
+_legacy_exam_start_routes = []
+for _path, _method in _exam_start_guard_specs:
+    _matches = [
+        route
+        for route in exams.router.routes
+        if getattr(route, "path", None) == _path
+        and _method in (getattr(route, "methods", set()) or set())
+    ]
+    if len(_matches) != 1:
+        raise RuntimeError(
+            f"Expected exactly one legacy {_method} {_path} route, found {len(_matches)}"
+        )
+    _legacy_exam_start_routes.extend(_matches)
+
+exams.router.routes[:] = [
+    *exam_start_eligibility_guard.router.routes,
+    *[
+        route
+        for route in exams.router.routes
+        if route not in _legacy_exam_start_routes
+    ],
+]
+
 # Paiements : expose une cotation autorisée et calculée côté serveur sans
 # dupliquer le routeur principal dans main.py. Le dispatcher historique est
 # remplacé en mémoire par une version fail-closed afin qu'aucun futur appel
