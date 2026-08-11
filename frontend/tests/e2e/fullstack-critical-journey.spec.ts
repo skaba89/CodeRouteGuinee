@@ -21,7 +21,11 @@ test('candidate logs in, books a real slot, gets server quote and pays', async (
 
   const centerSelect = page.getByLabel("Choisissez votre centre d'examen");
   await expect(centerSelect).toBeVisible();
-  await centerSelect.selectOption({ label: new RegExp(CENTER) });
+  const seededOption = centerSelect.locator('option').filter({ hasText: CENTER });
+  await expect(seededOption).toHaveCount(1);
+  const centerValue = await seededOption.getAttribute('value');
+  expect(centerValue).toBeTruthy();
+  await centerSelect.selectOption(centerValue!);
 
   const reserve = page.getByRole('button', { name: 'Réserver' }).first();
   await expect(reserve).toBeEnabled();
@@ -36,7 +40,7 @@ test('candidate logs in, books a real slot, gets server quote and pays', async (
   await expect(quote).toContainText('GNF');
   await expect(quote).not.toContainText('250');
 
-  await page.getByPlaceholder('+224 6XX XX XX XX').fill('+224622000099');
+  await page.getByPlaceholder('+224 6XX XX XX XX XX').fill('+224622000099');
   const payButton = page.getByRole('button', { name: /Payer.*150.*000.*GNF/ });
   await expect(payButton).toBeEnabled();
   await payButton.click();
