@@ -107,6 +107,7 @@ jobs:
           tests/test_registration_booking_compatibility.py
           tests/test_official_exam_runtime_e2e.py
           tests/test_payment_provider_dispatcher.py
+          tests/test_payment_idempotency_lifecycle.py
           tests/test_candidate_creation_concurrency.py
           tests/test_candidate_self_service_authorization.py
           tests/test_candidate_exam_eligibility.py
