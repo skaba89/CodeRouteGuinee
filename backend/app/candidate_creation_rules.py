@@ -12,7 +12,7 @@ _CANDIDATE_REFERENCE_LOCK_ID = 2026081104
 
 
 def acquire_candidate_reference_lock(db: Session) -> None:
-    """Sérialise GN-CODE-* sur PostgreSQL dans toute création candidat."""
+    """Sérialise les invariants de création candidat sur PostgreSQL."""
     if db.get_bind().dialect.name == "postgresql":
         db.execute(
             text("SELECT pg_advisory_xact_lock(:lock_id)"),
@@ -27,6 +27,10 @@ def build_candidate_reference_locked(db: Session) -> str:
 
 
 def assert_candidate_identity_phone_unique(db: Session, identity_number: str, phone: str) -> None:
+    # Le contrôle de doublon et l'allocation GN-CODE partagent le même verrou.
+    # Deux inscriptions simultanées avec la même identité ne peuvent donc pas
+    # franchir toutes les deux la lecture "aucun doublon" avant insertion.
+    acquire_candidate_reference_lock(db)
     normalized_identity = (identity_number or "").strip().upper()
     normalized_phone = (phone or "").strip()
     duplicate = db.scalar(
