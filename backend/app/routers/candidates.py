@@ -11,6 +11,7 @@ from app.deps import require_roles
 from app.models_audit import AuditLog
 from app.models_candidate import Candidate
 from app.models_user import User
+from app.resource_access import assert_candidate_access
 from app.schemas import CandidateCreate, CandidateOfficialImportRequest, CandidateOfficialImportResult, CandidateRead, CandidateUpdate
 
 router = APIRouter(prefix="/candidates", tags=["candidates"])
@@ -30,14 +31,20 @@ def list_candidates(
     current_user: User = Depends(require_roles("admin", "super_admin", "center")),
 ) -> list[Candidate]:
     q = select(Candidate).order_by(Candidate.created_at.desc())
-    # Agent de centre : restreindre aux candidats ayant des réservations dans son centre
-    if current_user.role == "center" and hasattr(current_user, "center_id") and current_user.center_id:
-        from app.models_booking import Booking as _Booking
-        from app.models_session import ExamSession as _ES
-        center_candidate_ids = select(_Booking.candidate_id).join(
-            _ES, _Booking.session_id == _ES.id
-        ).where(_ES.center_id == current_user.center_id).distinct()
-        q = q.where(Candidate.id.in_(center_candidate_ids))
+    if current_user.role == "center":
+        if not current_user.center_id:
+            q = q.where(Candidate.id == "__no_center__")
+        else:
+            from app.models_booking import Booking as _Booking
+            from app.models_session import ExamSession as _ES
+
+            center_candidate_ids = (
+                select(_Booking.candidate_id)
+                .join(_ES, _Booking.session_id == _ES.id)
+                .where(_ES.center_id == current_user.center_id)
+                .distinct()
+            )
+            q = q.where(Candidate.id.in_(center_candidate_ids))
     if search:
         term = f"%{search.strip()}%"
         q = q.where(
@@ -59,17 +66,9 @@ def get_my_candidate_profile(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("candidate", "admin", "super_admin")),
 ) -> Candidate | None:
-    """
-    Retourne le profil candidat associé à l'email de l'utilisateur connecté.
-    Utilisé par les candidats pour accéder à leurs propres données.
-    """
-    candidate = db.scalar(
-        select(Candidate).where(Candidate.email == current_user.email)
-    )
-    if not candidate:
-        # Essayer par numéro d'identité si l'email est dans le champ phone
-        # (certains candidats enregistrés avant l'ajout du champ email)
-        return None
+    candidate = db.scalar(select(Candidate).where(Candidate.user_id == current_user.id))
+    if not candidate and current_user.email:
+        candidate = db.scalar(select(Candidate).where(Candidate.email == current_user.email))
     return candidate
 
 
@@ -79,7 +78,16 @@ def create_candidate(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("admin", "super_admin")),
 ) -> Candidate:
-    candidate = Candidate(reference=build_candidate_reference(db), **payload.model_dump())
+    identity_number = payload.identity_number.strip().upper()
+    duplicate = db.scalar(select(Candidate.id).where(func.upper(Candidate.identity_number) == identity_number))
+    if duplicate:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Un candidat existe déjà avec ce numéro d'identité")
+
+    data = payload.model_dump()
+    data["identity_number"] = identity_number
+    if data.get("email"):
+        data["email"] = str(data["email"]).strip().lower()
+    candidate = Candidate(reference=build_candidate_reference(db), **data)
     db.add(candidate)
     db.flush()
     db.add(
@@ -104,24 +112,18 @@ def export_candidates_csv(
     permit_category: str | None = Query(default=None),
     city: str | None = Query(default=None),
 ) -> Response:
-    """
-    Export CSV de tous les candidats pour le reporting DNTT.
-    Filtres optionnels : status, permit_category, city.
-    """
-    from sqlalchemy import select as _select
-    query = _select(Candidate)
+    query = select(Candidate)
     if status_filter:
         query = query.where(Candidate.status == status_filter)
     if permit_category:
         query = query.where(Candidate.permit_category == permit_category)
     if city:
-        query = query.where(Candidate.city == city) if hasattr(Candidate, 'city') else query
+        query = query.where(Candidate.city == city)
 
-    # Limite de sécurité pour éviter les OOM avec de gros volumes
-    MAX_EXPORT_ROWS = 5_000
-    total_rows = db.scalar(__import__("sqlalchemy").select(__import__("sqlalchemy").func.count()).select_from(query.subquery())) or 0
+    max_export_rows = 5_000
+    total_rows = db.scalar(select(func.count()).select_from(query.subquery())) or 0
     candidates = db.scalars(
-        query.order_by(Candidate.last_name, Candidate.first_name).limit(MAX_EXPORT_ROWS)
+        query.order_by(Candidate.last_name, Candidate.first_name).limit(max_export_rows)
     ).all()
 
     output = io.StringIO()
@@ -137,23 +139,22 @@ def export_candidates_csv(
             cand.first_name,
             cand.identity_number,
             cand.phone,
-            getattr(cand, "email", "") or "",
+            cand.email or "",
             cand.permit_category,
             cand.status,
             cand.created_at.strftime("%Y-%m-%d") if cand.created_at else "",
         ])
 
-    content = output.getvalue()
     headers = {
         "Content-Disposition": "attachment; filename=candidats_coderoute.csv",
-        "X-Total-Count":   str(total_rows),
+        "X-Total-Count": str(total_rows),
         "X-Exported-Count": str(len(candidates)),
-        "X-Max-Rows":       str(MAX_EXPORT_ROWS),
+        "X-Max-Rows": str(max_export_rows),
     }
-    if total_rows > MAX_EXPORT_ROWS:
+    if total_rows > max_export_rows:
         headers["X-Truncated"] = "true"
     return Response(
-        content=content.encode("utf-8-sig"),   # BOM pour Excel
+        content=output.getvalue().encode("utf-8-sig"),
         media_type="text/csv; charset=utf-8-sig",
         headers=headers,
     )
@@ -165,10 +166,10 @@ def get_candidate(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("admin", "super_admin", "center")),
 ) -> CandidateRead:
-    """Récupère un candidat par son ID."""
     cand = db.get(Candidate, candidate_id)
     if not cand:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Candidat introuvable")
+    assert_candidate_access(db, current_user, cand)
     return CandidateRead.model_validate(cand)
 
 
@@ -179,7 +180,6 @@ def update_candidate(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("admin", "super_admin")),
 ) -> CandidateRead:
-    """Met à jour les données d'un candidat."""
     cand = db.get(Candidate, candidate_id)
     if not cand:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Candidat introuvable")
@@ -189,8 +189,6 @@ def update_candidate(
     db.commit()
     db.refresh(cand)
     return CandidateRead.model_validate(cand)
-
-
 
 
 @router.post("/import-official", response_model=CandidateOfficialImportResult)
@@ -208,8 +206,10 @@ def import_official_candidates(
         )
 
     existing_candidates = {
-        candidate.identity_number.upper(): candidate
-        for candidate in db.scalars(select(Candidate).where(Candidate.identity_number.in_(normalized_identities))).all()
+        candidate.identity_number.strip().upper(): candidate
+        for candidate in db.scalars(
+            select(Candidate).where(func.upper(Candidate.identity_number).in_(normalized_identities))
+        ).all()
     }
     if payload.dry_run:
         existing_ids = [identity for identity in normalized_identities if identity in existing_candidates]
