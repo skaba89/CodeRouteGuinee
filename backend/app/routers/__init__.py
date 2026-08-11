@@ -97,3 +97,38 @@ from app.routers import payments as payments
 from app.routers import payment_quote as payment_quote
 
 payments.router.include_router(payment_quote.router)
+
+# Compatibilité réservation : les anciens clients peuvent encore appeler
+# /registration/availability et /registration/book. Ces deux routes historiques
+# sont remplacées par une façade qui applique exactement les invariants
+# transactionnels de /bookings/self. Le remplacement est fail-closed pour éviter
+# qu'une évolution future laisse deux implémentations concurrentes actives.
+from app.routers import registration as registration
+from app.routers import registration_booking_guard as registration_booking_guard
+
+_registration_guard_specs = (
+    ("/registration/availability", "GET"),
+    ("/registration/book", "POST"),
+)
+_legacy_registration_booking_routes = []
+for _path, _method in _registration_guard_specs:
+    _matches = [
+        route
+        for route in registration.router.routes
+        if getattr(route, "path", None) == _path
+        and _method in (getattr(route, "methods", set()) or set())
+    ]
+    if len(_matches) != 1:
+        raise RuntimeError(
+            f"Expected exactly one legacy {_method} {_path} route, found {len(_matches)}"
+        )
+    _legacy_registration_booking_routes.extend(_matches)
+
+registration.router.routes[:] = [
+    *registration_booking_guard.router.routes,
+    *[
+        route
+        for route in registration.router.routes
+        if route not in _legacy_registration_booking_routes
+    ],
+]
