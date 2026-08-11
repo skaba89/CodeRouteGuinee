@@ -5,7 +5,7 @@ on:
     paths:
       - 'backend/**'
       - 'frontend/src/**'
-      - 'frontend/tests/e2e/fullstack-critical-journey.spec.ts'
+      - 'frontend/tests/e2e/**'
       - 'frontend/playwright.config.ts'
       - '.github/workflows/fullstack-business-e2e.yml'
   push:
@@ -13,7 +13,7 @@ on:
     paths:
       - 'backend/**'
       - 'frontend/src/**'
-      - 'frontend/tests/e2e/fullstack-critical-journey.spec.ts'
+      - 'frontend/tests/e2e/**'
       - 'frontend/playwright.config.ts'
       - '.github/workflows/fullstack-business-e2e.yml'
   workflow_dispatch:
@@ -181,13 +181,14 @@ jobs:
         working-directory: frontend
         run: npx playwright install --with-deps chromium
 
-      - name: Real browser candidate booking and payment journey
+      - name: Frontend API error contract and real browser candidate journey
         working-directory: frontend
         env:
           CI: 'true'
           VITE_API_BASE_URL: http://127.0.0.1:8000
         run: >-
           npx playwright test
+          tests/e2e/api-error-contract.spec.ts
           tests/e2e/fullstack-critical-journey.spec.ts
           --project=chromium --timeout=45000 --retries=1
 

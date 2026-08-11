@@ -1,3 +1,5 @@
+import { buildApiError } from './apiError';
+
 function normalizeApiBaseUrl(value: string): string {
   return value.replace(/\/api\/v1\/?$/, '').replace(/\/$/, '');
 }
@@ -105,6 +107,35 @@ async function refreshOnce(): Promise<boolean> {
   return _refreshPromise;
 }
 
+/**
+ * Les helpers historiques de api.ts attendent encore `detail` sous forme de
+ * chaîne. Les nouveaux endpoints backend utilisent à juste titre des erreurs
+ * structurées `{detail: {code, message, ...}}`. Pour les appels authentifiés,
+ * on normalise uniquement les réponses en échec afin de préserver le vrai
+ * message métier sans modifier le contrat des réponses de succès.
+ */
+async function normalizeAuthenticatedErrorResponse(response: Response): Promise<Response> {
+  if (response.ok) return response;
+
+  const error = await buildApiError(response.clone());
+  const headers = new Headers(response.headers);
+  headers.delete('content-length');
+  headers.set('content-type', 'application/json');
+
+  return new Response(
+    JSON.stringify({
+      detail: error.message,
+      ...(error.code ? { code: error.code } : {}),
+      ...(error.validationErrors.length > 0 ? { errors: error.validationErrors } : {}),
+    }),
+    {
+      status: response.status,
+      statusText: response.statusText,
+      headers,
+    },
+  );
+}
+
 // ── Fetch avec retry automatique sur 401 ──────────────────────────────────
 
 async function fetchWithAuth(input: RequestInfo, init?: RequestInit): Promise<Response> {
@@ -122,25 +153,26 @@ async function fetchWithAuth(input: RequestInfo, init?: RequestInit): Promise<Re
     const refreshed = await refreshOnce();
     if (refreshed) {
       // Renouvellement réussi → rejouer la requête avec le nouveau token
-      return fetch(input, {
+      const retried = await fetch(input, {
         ...init,
         credentials: 'include',
         headers: { ...getAuthHeaders(), ...init?.headers },
       });
+      return normalizeAuthenticatedErrorResponse(retried);
     }
     // Refresh échoué → déconnexion automatique
     clearTokens();
     window.dispatchEvent(new CustomEvent('coderoute:session-expired'));
   }
 
-  return response;
+  return normalizeAuthenticatedErrorResponse(response);
 }
 
 // ── Helpers JSON ──────────────────────────────────────────────────────────
 
 async function readJson<T>(response: Response): Promise<T> {
   if (!response.ok) {
-    throw new Error(`API error ${response.status}`);
+    throw await buildApiError(response);
   }
   if (response.status === 204) {
     return undefined as T;
@@ -187,8 +219,7 @@ export async function verify2FA(userId: string, partialToken: string, code: stri
     body: JSON.stringify({ code }),
   });
   if (!r.ok) {
-    const err = await r.json().catch(() => ({}));
-    throw new Error(err.detail ?? 'Code 2FA invalide');
+    throw await buildApiError(r);
   }
   const data = await r.json();
   // Le backend retourne maintenant les vrais access_token + refresh_token
@@ -241,8 +272,7 @@ export async function changePassword(currentPassword: string, newPassword: strin
   });
 
   if (!response.ok) {
-    const payload = await response.json().catch(() => ({}));
-    throw new Error(payload.detail ?? `Erreur ${response.status}`);
+    throw await buildApiError(response);
   }
 }
 
