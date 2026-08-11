@@ -1,7 +1,7 @@
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import DateTime, Integer, String
+from sqlalchemy import DateTime, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -23,5 +23,9 @@ class Payment(Base):
     status: Mapped[str] = mapped_column(String(50), default="paid", nullable=False)
     receipt_number: Mapped[str] = mapped_column(String(100), unique=True, index=True, nullable=False)
     external_reference: Mapped[str | None] = mapped_column(String(200), nullable=True, index=True)
+    # Wave/PayDunya peuvent nécessiter une redirection après l'initiation. La
+    # persistance rend un retry réseau idempotent : le client récupère la même
+    # session au lieu de déclencher un second débit.
+    checkout_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     paid_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC).replace(tzinfo=None), nullable=False)
