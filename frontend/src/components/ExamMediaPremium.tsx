@@ -3,6 +3,7 @@ import { MediaBlock as LegacyMediaBlock } from '../pages/shared-exam-components-
 
 const OFFICIAL_ATTEMPT_KEY = 'coderoute:official-exam:active-attempt';
 const GUINEA_MEDIA_BASE = '/media/exam/guinea';
+const GUINEA_MEDIA_VERSION = '20260812-1';
 
 type DemoMediaOverride = {
   mediaType: 'image' | 'video';
@@ -10,6 +11,10 @@ type DemoMediaOverride = {
   poster?: string;
   fallback?: string;
 };
+
+function demoAsset(filename: string): string {
+  return `${GUINEA_MEDIA_BASE}/${filename}?v=${GUINEA_MEDIA_VERSION}`;
+}
 
 function normalizeLabel(value?: string): string {
   return (value ?? '')
@@ -33,20 +38,20 @@ function resolveGuineaDemoMedia(media?: string, alt?: string): DemoMediaOverride
   const label = normalizeLabel(alt);
 
   if (key === 'stop' && label.includes('stop')) {
-    return { mediaType: 'image', url: `${GUINEA_MEDIA_BASE}/stop-conakry.webp` };
+    return { mediaType: 'image', url: demoAsset('stop-conakry.webp') };
   }
   if (key === 'give_way' && (label.includes('cedez') || label.includes('passage'))) {
-    return { mediaType: 'image', url: `${GUINEA_MEDIA_BASE}/yield-roundabout-conakry.webp` };
+    return { mediaType: 'image', url: demoAsset('yield-roundabout-conakry.webp') };
   }
   if (key === 'no_entry' && (label.includes('sens interdit') || label.includes('interdit'))) {
-    return { mediaType: 'image', url: `${GUINEA_MEDIA_BASE}/no-entry-conakry.webp` };
+    return { mediaType: 'image', url: demoAsset('no-entry-conakry.webp') };
   }
   if (key === 'roundabout' && (label.includes('giratoire') || label.includes('rond-point') || label.includes('rond point'))) {
     return {
       mediaType: 'video',
-      url: `${GUINEA_MEDIA_BASE}/roundabout-approach-demo.mp4`,
-      poster: `${GUINEA_MEDIA_BASE}/yield-roundabout-conakry.webp`,
-      fallback: `${GUINEA_MEDIA_BASE}/yield-roundabout-conakry.webp`,
+      url: demoAsset('roundabout-approach-demo.mp4'),
+      poster: demoAsset('yield-roundabout-conakry.webp'),
+      fallback: demoAsset('yield-roundabout-conakry.webp'),
     };
   }
   return null;
@@ -127,7 +132,7 @@ export function VideoPlayer({ url, poster, fallbackUrl, alt }: { url: string; po
           </video>
         ) : fallbackUrl ? (
           <div role="alert" style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', background: '#000' }}>
-            <img src={fallbackUrl} alt={alt ?? 'Image de secours de la situation routière'} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+            <img data-testid="exam-media-video-fallback" src={fallbackUrl} alt={alt ?? 'Image de secours de la situation routière'} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
             <div style={{ position: 'absolute', left: 10, right: 10, bottom: 10, display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', color: '#fff', padding: '7px 10px', borderRadius: 9, background: 'rgba(0,0,0,.68)', fontSize: 11.5 }}>
               <span>Vidéo indisponible — image de secours affichée.</span>
               <button type="button" className="secondary-button btn-sm" onClick={retry}>Réessayer</button>
