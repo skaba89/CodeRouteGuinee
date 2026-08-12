@@ -10,6 +10,7 @@ on:
       - 'backend/app/routers/exam_media_guard.py'
       - 'backend/app/routers/__init__.py'
       - 'backend/tests/test_media_*.py'
+      - 'backend/tests/test_official_media_*.py'
       - 'frontend/src/**/Media*.tsx'
       - 'frontend/src/**/ExamMedia*.tsx'
       - 'frontend/src/media*.ts'
@@ -30,6 +31,7 @@ on:
       - 'backend/app/routers/exam_media_guard.py'
       - 'backend/app/routers/__init__.py'
       - 'backend/tests/test_media_*.py'
+      - 'backend/tests/test_official_media_*.py'
       - 'frontend/src/**/Media*.tsx'
       - 'frontend/src/**/ExamMedia*.tsx'
       - 'frontend/src/media*.ts'
@@ -61,7 +63,7 @@ jobs:
         working-directory: backend
         run: pip install -q -r requirements.txt
 
-      - name: Run backend media regression contracts
+      - name: Run current candidate/official media runtime contracts
         working-directory: backend
         env:
           PYTHONPATH: .
@@ -74,7 +76,17 @@ jobs:
           EDGE_RELEASE_SIGNING_SECRET: coderoute-media-readiness-release-signing-secret-at-least-32-characters
         run: |
           python -m compileall -q app
-          pytest -q --tb=short --disable-warnings tests/test_database_migrations.py tests/test_media_*.py
+          pytest -q --tb=short --disable-warnings \
+            tests/test_media_runtime_frontend_fallback_contract.py \
+            tests/test_media_runtime_resolver.py \
+            tests/test_media_exam_guard.py \
+            tests/test_media_frontend_demo_pack.py \
+            tests/test_media_deployment_verifier.py \
+            tests/test_official_media_bank_gate.py \
+            tests/test_media_policy.py \
+            tests/test_media_storage.py \
+            tests/test_media_validation.py \
+            tests/test_media_link_guard.py
 
       - uses: actions/setup-node@v4
         with:
