@@ -7,9 +7,14 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'icons/*.png'],
+      includeAssets: [
+        'favicon.ico',
+        'icons/*.png',
+        'media/exam/guinea/*.webp',
+        'media/exam/guinea/manifest.json',
+      ],
       workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,webp,woff2}'],
         cleanupOutdatedCaches: true,
         navigateFallback: '/offline.html',
         navigateFallbackDenylist: [/\/api\//, /\/docs(?:\/|$)/, /\/openapi(?:\/|$)/],
@@ -36,6 +41,24 @@ export default defineConfig({
               expiration: {
                 maxEntries: 120,
                 maxAgeSeconds: 7 * 24 * 3600,
+                purgeOnQuotaError: true,
+              },
+            },
+          },
+          {
+            // Les images du pack d'entraînement guinéen sont publiques et ne
+            // contiennent ni réponse ni PII. Les conserver localement évite
+            // qu'une reprise réseau rende une question blanche. Les vidéos ne
+            // sont volontairement pas mises en cache ici afin de préserver les
+            // Range Requests et le budget data mobile.
+            urlPattern: /\/media\/exam\/guinea\/.*\.webp(?:\?.*)?$/,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'guinea-exam-images-v2',
+              cacheableResponse: { statuses: [0, 200] },
+              expiration: {
+                maxEntries: 40,
+                maxAgeSeconds: 30 * 24 * 3600,
                 purgeOnQuotaError: true,
               },
             },
