@@ -109,12 +109,18 @@ def test_exam_scoring_certificate_and_public_verification_end_to_end() -> None:
         assert submitted_attempt["score"] == 40
         assert submitted_attempt["passed"] is True
 
+        # Une répétition réseau de la même soumission est idempotente : elle
+        # restitue le résultat déjà enregistré au lieu de créer un second verdict.
         duplicate_submit_response = client.post(
             f"/api/v1/exams/{attempt['id']}/submit",
             headers=authority_headers,
             json={"answers": answers},
         )
-        assert duplicate_submit_response.status_code == 409
+        assert duplicate_submit_response.status_code == 200
+        duplicate_submit = duplicate_submit_response.json()
+        assert duplicate_submit["status"] == "submitted"
+        assert duplicate_submit["score"] == 40
+        assert duplicate_submit["passed"] is True
 
         certificate_response = client.get(
             f"/api/v1/exams/{attempt['id']}/certificate.pdf",
