@@ -7,6 +7,7 @@ on:
       - 'backend/app/models_media.py'
       - 'backend/app/schemas_media*.py'
       - 'backend/app/routers/media_*.py'
+      - 'backend/app/routers/exam_media_guard.py'
       - 'backend/app/routers/__init__.py'
       - 'backend/tests/test_media_*.py'
       - 'frontend/src/**/Media*.tsx'
@@ -14,21 +15,19 @@ on:
       - 'frontend/src/media*.ts'
       - 'frontend/src/pages/exam.tsx'
       - 'frontend/src/pages/media-library*.tsx'
-      - 'frontend/src/pages.tsx'
-      - 'frontend/src/pages/index.ts'
-      - 'frontend/src/App.tsx'
       - 'frontend/vite.config.ts'
       - 'frontend/public/media/exam/guinea/**'
       - 'frontend/tests/e2e/media-*.spec.ts'
       - '.github/workflows/media-migration-readiness.yml'
   push:
     branches:
-      - main
+      - '**'
     paths:
       - 'backend/app/media_*.py'
       - 'backend/app/models_media.py'
       - 'backend/app/schemas_media*.py'
       - 'backend/app/routers/media_*.py'
+      - 'backend/app/routers/exam_media_guard.py'
       - 'backend/app/routers/__init__.py'
       - 'backend/tests/test_media_*.py'
       - 'frontend/src/**/Media*.tsx'
@@ -36,9 +35,6 @@ on:
       - 'frontend/src/media*.ts'
       - 'frontend/src/pages/exam.tsx'
       - 'frontend/src/pages/media-library*.tsx'
-      - 'frontend/src/pages.tsx'
-      - 'frontend/src/pages/index.ts'
-      - 'frontend/src/App.tsx'
       - 'frontend/vite.config.ts'
       - 'frontend/public/media/exam/guinea/**'
       - 'frontend/tests/e2e/media-*.spec.ts'
@@ -48,44 +44,24 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: media-migration-readiness-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
-
 jobs:
-  backend-media-contracts:
+  media-contracts:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
       - name: Install backend dependencies
         working-directory: backend
         run: pip install -q -r requirements.txt
-      - name: Compile normalized media runtime and migration modules
-        working-directory: backend
-        run: |
-          python -m compileall -q \
-            app/models_media.py \
-            app/schemas_media.py \
-            app/schemas_media_review.py \
-            app/schemas_media_migration.py \
-            app/media_policy.py \
-            app/media_storage.py \
-            app/media_validation.py \
-            app/media_quality.py \
-            app/exam_media_resolver.py \
-            app/routers/media_library.py \
-            app/routers/media_reviews.py \
-            app/routers/media_migration_progress.py \
-            app/routers/media_migration_queue.py \
-            app/routers/media_migration_plan.py \
-            app/routers/media_link_guard.py \
-            app/routers/exam_media_guard.py \
-            app/routers/__init__.py
-      - name: Run all media regression contracts
+
+      - name: Run backend media regression contracts
         working-directory: backend
         env:
           PYTHONPATH: .
@@ -97,34 +73,32 @@ jobs:
           EDGE_LEASE_SIGNING_SECRET: coderoute-media-readiness-edge-signing-secret-at-least-32-characters
           EDGE_RELEASE_SIGNING_SECRET: coderoute-media-readiness-release-signing-secret-at-least-32-characters
         run: |
-          pytest -q --tb=short --disable-warnings \
-            tests/test_database_migrations.py \
-            tests/test_media_*.py
+          python -m compileall -q app
+          pytest -q --tb=short --disable-warnings tests/test_database_migrations.py tests/test_media_*.py
 
-  frontend-media-migration:
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
-    defaults:
-      run:
-        working-directory: frontend
-    steps:
-      - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
           cache: npm
           cache-dependency-path: frontend/package-lock.json
-      - name: Install locked dependencies
+
+      - name: Install locked frontend dependencies
+        working-directory: frontend
         run: npm ci
-      - name: Reject high/critical npm vulnerabilities
-        run: npm run audit:security
-      - name: Typecheck migration workbenches
-        run: npm run typecheck
-      - name: Production build
-        run: npm run build
+
+      - name: Audit, typecheck and production build
+        working-directory: frontend
+        run: |
+          npm run audit:security
+          npm run typecheck
+          npm run build
+
       - name: Install Chromium
+        working-directory: frontend
         run: npx playwright install --with-deps chromium
-      - name: Media library, migration and visible exam media E2E
+
+      - name: Media library, migration and candidate media E2E
+        working-directory: frontend
         env:
           CI: 'true'
           VITE_API_BASE_URL: http://localhost:8000
