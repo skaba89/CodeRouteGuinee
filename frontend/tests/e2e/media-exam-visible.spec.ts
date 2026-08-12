@@ -1,6 +1,33 @@
 import { existsSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
+
+const NON_EXPIRED_TEST_JWT = 'eyJhbGciOiJub25lIn0.eyJleHAiOjQxMDI0NDQ4MDB9.signature';
+
+async function openExamAsCandidate(page: Page): Promise<void> {
+  await page.route('**/api/v1/auth/me', async route => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        id: 'candidate-media-e2e',
+        email: 'candidate.media@coderoute.test',
+        full_name: 'Candidat Media E2E',
+        role: 'candidate',
+        is_active: true,
+        center_id: null,
+      }),
+    });
+  });
+
+  await page.addInitScript(({ token }) => {
+    window.localStorage.setItem('coderoute-auth-token', token);
+    window.sessionStorage.removeItem('coderoute:official-exam:active-attempt');
+  }, { token: NON_EXPIRED_TEST_JWT });
+
+  await page.goto('/#/exam');
+  await expect(page.getByRole('button', { name: /commencer un examen blanc/i })).toBeVisible();
+}
 
 test('production build contains the Guinea candidate image and video assets', async () => {
   const dist = resolve(process.cwd(), 'dist', 'media', 'exam', 'guinea');
@@ -23,11 +50,7 @@ test('production build contains the Guinea candidate image and video assets', as
 });
 
 test('examen blanc paints the Guinea STOP image with a real visible viewport', async ({ page }) => {
-  await page.addInitScript(() => {
-    window.sessionStorage.removeItem('coderoute:official-exam:active-attempt');
-  });
-
-  await page.goto('/#/exam');
+  await openExamAsCandidate(page);
   await page.getByRole('button', { name: /commencer un examen blanc/i }).click();
 
   const frame = page.getByTestId('exam-media-image-frame');
@@ -63,11 +86,7 @@ test('examen blanc paints the Guinea STOP image with a real visible viewport', a
 });
 
 test('examen blanc serves the Guinea roundabout video and paints its fallback on playback failure', async ({ page }) => {
-  await page.addInitScript(() => {
-    window.sessionStorage.removeItem('coderoute:official-exam:active-attempt');
-  });
-
-  await page.goto('/#/exam');
+  await openExamAsCandidate(page);
   await page.getByRole('button', { name: /commencer un examen blanc/i }).click();
 
   const next = page.getByRole('button', { name: /suivante/i }).first();
