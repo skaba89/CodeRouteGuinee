@@ -42,19 +42,12 @@ class TestSeedFull:
         finally:
             db.close()
 
-    def test_seed_guard_exists_and_callable(self):
-        """_guard doit être importable et appelable en environnement de dev."""
-        import os
-
+    def test_seed_guard_exists_and_callable(self, monkeypatch):
+        """Le seed non-dev exige l'override explicite réservé aux bases jetables."""
         from app.seed_full import _guard
-        # En dev, _guard ne lève pas d'exception
-        with __import__('unittest.mock', fromlist=['patch']).patch.dict(
-            os.environ, {'ENVIRONMENT': 'development'}
-        ):
-            try:
-                _guard()  # ne doit pas lever en dev
-            except SystemExit:
-                pass  # acceptable si guard bloque en test
+
+        monkeypatch.setenv("ALLOW_DEMO_SEED_NON_DEV", "true")
+        _guard()
 
     def test_seed_centers_function(self):
         """seed_centers ne doit pas lever d'exception."""
