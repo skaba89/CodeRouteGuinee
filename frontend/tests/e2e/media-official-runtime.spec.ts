@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 const ATTEMPT_ID = 'attempt-media-official-001';
 const VIDEO_URL = '/media/exam/guinea/roundabout-approach-demo.mp4?v=official-runtime';
@@ -30,7 +30,7 @@ const QUESTION = {
   audio_url: null,
 };
 
-async function mockAuthenticatedCandidate(page: Parameters<typeof test>[0] extends never ? never : any) {
+async function mockAuthenticatedCandidate(page: Page) {
   await page.addInitScript(() => {
     const payload = btoa(JSON.stringify({ exp: 4_102_444_800 }));
     window.localStorage.setItem('coderoute-auth-token', `e30.${payload}.sig`);
@@ -38,8 +38,8 @@ async function mockAuthenticatedCandidate(page: Parameters<typeof test>[0] exten
     window.sessionStorage.removeItem('coderoute:official-exam:active-attempt');
   });
 
-  await page.route('**/api/v1/auth/me', (route: any) => route.fulfill({ json: CANDIDATE }));
-  await page.route('**/api/v1/auth/csrf-token', (route: any) => route.fulfill({ json: { csrf_token: 'csrf-media-official' } }));
+  await page.route('**/api/v1/auth/me', route => route.fulfill({ json: CANDIDATE }));
+  await page.route('**/api/v1/auth/csrf-token', route => route.fulfill({ json: { csrf_token: 'csrf-media-official' } }));
 }
 
 test('examen officiel utilise le poster et le fallback validés par le backend', async ({ page }) => {
