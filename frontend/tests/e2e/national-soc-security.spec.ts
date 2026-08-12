@@ -96,7 +96,7 @@ test('DNTT admin sees P11 dormant SOC and blocked national go-live without citiz
   const panel = page.getByTestId('national-security-operations');
   await expect(panel).toBeVisible();
   await expect(panel.getByText('SOC national — Security Operations')).toBeVisible();
-  await expect(panel.getByText('Non activé')).toBeVisible();
+  await expect(panel.getByText('Non activé', { exact: true })).toBeVisible();
   await expect(panel.getByText('P11 est livré mais volontairement dormant.', { exact: false })).toBeVisible();
   await expect(panel.getByText('OFF', { exact: true })).toBeVisible();
   const gate = page.getByTestId('security-go-live-gate');
