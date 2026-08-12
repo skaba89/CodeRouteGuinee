@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 const runtime = {
   exam_duration_minutes: 30,
@@ -36,7 +36,7 @@ function policy() {
   };
 }
 
-async function common(page: Parameters<typeof test>[0] extends never ? never : any) {
+async function common(page: Page) {
   await page.addInitScript(() => {
     const payload = btoa(JSON.stringify({ exp: 4_102_444_800 }));
     window.localStorage.setItem('coderoute-auth-token', `e30.${payload}.sig`);
