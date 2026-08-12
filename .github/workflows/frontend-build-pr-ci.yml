@@ -26,6 +26,11 @@ on:
 permissions:
   contents: read
 
+# Keep only the newest run for a given PR or branch.
+concurrency:
+  group: frontend-edge-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   frontend-build:
     runs-on: ubuntu-latest

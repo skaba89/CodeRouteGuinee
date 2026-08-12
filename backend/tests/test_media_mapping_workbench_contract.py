@@ -43,5 +43,5 @@ def test_media_library_composition_is_additive_and_preserves_existing_core_page(
 
     assert "MediaLibraryPage as MediaLibraryCore" in composed
     assert "<MediaLibraryCore />" in composed
-    assert "<MediaQuestionMappingWorkbench />" in composed
+    assert "<MediaQuestionMappingWorkbench focusQuestion={focusedQuestion} />" in composed
     assert "export { MediaLibraryPage } from './media-library-v2';" in index

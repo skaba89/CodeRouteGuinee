@@ -10,14 +10,14 @@ E2E = ROOT / "frontend" / "tests" / "e2e" / "media-migration-workflow.spec.ts"
 def test_media_migration_readiness_compiles_all_runtime_and_migration_modules():
     source = WORKFLOW.read_text(encoding="utf-8")
     for marker in (
-        "app/exam_media_resolver.py",
-        "app/routers/exam_media_guard.py",
-        "app/routers/media_migration_progress.py",
-        "app/routers/media_migration_queue.py",
-        "app/routers/media_migration_plan.py",
-        "app/routers/media_link_guard.py",
-        "app/schemas_media_migration.py",
-        "tests/test_media_*.py",
+        "python -m compileall -q app",
+        "tests/test_media_runtime_resolver.py",
+        "tests/test_media_exam_guard.py",
+        "tests/test_official_media_bank_gate.py",
+        "tests/test_media_policy.py",
+        "tests/test_media_storage.py",
+        "tests/test_media_validation.py",
+        "tests/test_media_link_guard.py",
     ):
         assert marker in source, marker
 

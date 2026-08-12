@@ -30,7 +30,7 @@ jobs:
         working-directory: backend
         env:
           PYTHONPATH: .
-          DATABASE_URL: sqlite+pysqlite:///:memory:
+          DATABASE_URL: 'sqlite+pysqlite:///:memory:'
           AUTO_CREATE_TABLES: 'true'
           ENVIRONMENT: test
           EDGE_LEASE_SIGNING_SECRET: coderoute-p10-pr-edge-signing-secret-at-least-32-characters

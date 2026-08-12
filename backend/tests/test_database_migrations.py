@@ -1,11 +1,13 @@
+import os
+import subprocess
+import sys
 from pathlib import Path
 
 from alembic.config import Config
+from alembic.script import ScriptDirectory
 from sqlalchemy import create_engine, inspect
 
-from alembic import command
 from app import models  # noqa: F401
-from app.core.config import get_settings
 from app.db.base import Base
 
 
@@ -102,24 +104,50 @@ def test_media_metadata_is_additive_and_normalized() -> None:
     assert {"media_type", "media_url", "media_alt"}.issubset(question_columns)
 
 
-def test_alembic_upgrade_head_from_empty_sqlite_database(tmp_path, monkeypatch) -> None:
+def test_alembic_upgrade_head_from_empty_sqlite_database(tmp_path) -> None:
+    """Exercise the migration chain in a clean interpreter, like a real deploy.
+
+    Pytest collects many application modules in one process. Some of those
+    modules register newer SQLAlchemy models in the global ``Base.metadata``;
+    the historic 0001 migration uses that metadata, so running Alembic in the
+    same process can incorrectly pre-create tables introduced by later
+    revisions. A subprocess keeps this empty-database test isolated from test
+    collection side effects.
+    """
     backend_root = Path(__file__).resolve().parents[1]
     database_path = tmp_path / "coderoute-empty.db"
     database_url = f"sqlite:///{database_path.as_posix()}"
-    monkeypatch.setenv("DATABASE_URL", database_url)
-    get_settings.cache_clear()
+
+    env = os.environ.copy()
+    env.update(
+        {
+            "DATABASE_URL": database_url,
+            "ALEMBIC_DATABASE_URL": database_url,
+            "AUTO_CREATE_TABLES": "false",
+            "ENVIRONMENT": "test",
+        }
+    )
+    migrated = subprocess.run(
+        [sys.executable, "-m", "alembic", "-c", "alembic.ini", "upgrade", "head"],
+        cwd=backend_root,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert migrated.returncode == 0, f"{migrated.stdout}\n{migrated.stderr}"
 
     config = Config(str(backend_root / "alembic.ini"))
     config.set_main_option("script_location", str(backend_root / "alembic"))
-
-    command.upgrade(config, "head")
+    expected_head = ScriptDirectory.from_config(config).get_current_head()
+    assert expected_head is not None
 
     engine = create_engine(database_url)
     inspector = inspect(engine)
     try:
         tables = set(inspector.get_table_names())
         assert set(Base.metadata.tables).issubset(tables)
-        assert {"media_assets", "question_media"}.issubset(tables)
+        assert {"media_assets", "question_media", "payment_refund_requests"}.issubset(tables)
 
         question_columns = {column["name"] for column in inspector.get_columns("questions")}
         assert {"media_type", "media_url", "media_alt"}.issubset(question_columns)
@@ -132,7 +160,6 @@ def test_alembic_upgrade_head_from_empty_sqlite_database(tmp_path, monkeypatch) 
 
         with engine.connect() as connection:
             version_rows = connection.exec_driver_sql("SELECT version_num FROM alembic_version").fetchall()
-        assert version_rows == [("0015",)]
+        assert version_rows == [(expected_head,)]
     finally:
         engine.dispose()
-        get_settings.cache_clear()

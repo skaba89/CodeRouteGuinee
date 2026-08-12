@@ -53,7 +53,7 @@ def _semantic_status(text: str, media: str | None) -> tuple[str | None, str | No
 
     rules = [
         (("passage à niveau" in t), ("rail" in m or "train" in m), "passage à niveau sans scène ferroviaire"),
-        (("verglas" in t), ("slipper" in m or "ice" in m or "verglas" in m), "verglas représenté par une scène sans chaussée glissante"),
+        (("verglas" in t or "verglac" in t), ("slipper" in m or "ice" in m or "verglas" in m), "verglas représenté par une scène sans chaussée glissante"),
         (("pluie" in t or "brouillard" in t), ("rain" in m or "fog" in m or "weather" in m), "météo dégradée sans scène météo dédiée"),
         (("somnolence" in t or "fatigue" in t), ("night" in m or "fatigue" in m or "drows" in m), "fatigue/somnolence sans média dédié"),
         (("feu orange" in t), ("traffic_light_orange" in m), "feu orange avec visuel non orange"),
