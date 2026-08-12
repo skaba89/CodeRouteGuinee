@@ -1,3 +1,4 @@
+import path from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 
 const ATTEMPT_ID = 'attempt-media-official-001';
@@ -137,6 +138,16 @@ test('examen officiel normalise une vidéo Cloudinary MOV/WebM pour le navigateu
     id: 'q-official-cloudinary-video-1',
     media_url: cloudinaryOriginal,
   };
+
+  // The browser must exercise the transformed Cloudinary URL without making
+  // this E2E depend on an external/fictitious Cloudinary asset. Serve the
+  // versioned six-second MP4 fixture under that transformed URL so a real
+  // HTMLVideoElement can load and remain mounted deterministically.
+  const localVideoPath = path.resolve(process.cwd(), 'public/media/exam/guinea/roundabout-approach-demo.mp4');
+  await page.route(cloudinaryPlayable, route => route.fulfill({
+    path: localVideoPath,
+    contentType: 'video/mp4',
+  }));
 
   await mockAuthenticatedCandidate(page);
   await mockOfficialExam(page, cloudinaryQuestion, 'attempt-media-cloudinary-001');
