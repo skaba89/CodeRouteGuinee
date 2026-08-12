@@ -32,7 +32,6 @@ from app.db.session import SessionLocal, init_db
 from app.logging_config import setup_logging
 from app.middleware import GlobalRateLimitMiddleware, RequestIDMiddleware, ResponseCacheMiddleware, TimingMiddleware
 from app.monitoring import capture_exception as capture_monitoring_exception
-from app.monitoring import init_sentry
 from app.reliability_metrics import ReliabilityMetricsMiddleware
 from app.soc_logging import install_soc_log_filter
 from app.soc_telemetry import SOCRequestMiddleware, init_soc_telemetry
@@ -52,6 +51,7 @@ from app.routers import (
     device_sessions,
     documents,
     entries,
+    exam_media_questions,
     exam_monitoring,
     exam_question_traces,
     exam_reviews,
@@ -254,6 +254,26 @@ async def validation_exception_handler(_req: Request, exc: _ValidationError) -> 
         headers=_cors_headers(_req),
     )
 
+
+def _install_media_aware_exam_questions_route() -> None:
+    """Replace only the candidate question GET route, preserving its public URL."""
+    replacement = next(
+        route
+        for route in exam_media_questions.router.routes
+        if getattr(route, "path", None) == "/exams/{attempt_id}/questions"
+        and "GET" in (getattr(route, "methods", None) or set())
+    )
+    for index, route in enumerate(exams.router.routes):
+        if (
+            getattr(route, "path", None) == "/exams/{attempt_id}/questions"
+            and "GET" in (getattr(route, "methods", None) or set())
+        ):
+            exams.router.routes[index] = replacement
+            return
+    raise RuntimeError("Exam questions route not found")
+
+
+_install_media_aware_exam_questions_route()
 
 app.include_router(metrics.router)
 app.include_router(audio.router, prefix=settings.api_v1_prefix)
