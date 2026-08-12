@@ -1,4 +1,26 @@
+import { existsSync, statSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { expect, test } from '@playwright/test';
+
+test('production build contains the Guinea candidate image and video assets', async () => {
+  const dist = resolve(process.cwd(), 'dist', 'media', 'exam', 'guinea');
+  if (!existsSync(dist)) {
+    test.skip(true, 'dist/ absent: this contract is enforced by CI after npm run build');
+  }
+
+  const required = [
+    'manifest.json',
+    'stop-conakry.webp',
+    'yield-roundabout-conakry.webp',
+    'no-entry-conakry.webp',
+    'roundabout-approach-demo.mp4',
+  ];
+  for (const filename of required) {
+    const path = resolve(dist, filename);
+    expect(existsSync(path), `${filename} must be copied into the Vite production build`).toBe(true);
+    expect(statSync(path).size, `${filename} must not be empty`).toBeGreaterThan(128);
+  }
+});
 
 test('examen blanc paints the Guinea STOP image with a real visible viewport', async ({ page }) => {
   await page.addInitScript(() => {
