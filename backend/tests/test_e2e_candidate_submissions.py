@@ -5,6 +5,7 @@ from fastapi.testclient import TestClient
 
 from app.db.session import init_db
 from app.main import app
+from tests.conftest import get_admin_headers, seed_media_ready_official_bank, verify_candidate_identity
 
 
 def _auth_headers(client: TestClient, role: str) -> dict[str, str]:
@@ -37,8 +38,9 @@ def test_candidate_submission_lifecycle_and_admin_handling() -> None:
     suffix = uuid4().hex[:8]
 
     with TestClient(app) as client:
+        super_headers = get_admin_headers(client)
         admin_headers = _auth_headers(client, "admin")
-        center_headers = _auth_headers(client, "center")
+        seed_media_ready_official_bank(client, super_headers, marker=f"submission-{suffix}")
 
         center_response = client.post(
             "/api/v1/centers",
@@ -80,13 +82,14 @@ def test_candidate_submission_lifecycle_and_admin_handling() -> None:
         )
         assert candidate_response.status_code == 201
         candidate = candidate_response.json()
+        verify_candidate_identity(client, candidate["id"], admin_headers, marker=f"submission-{suffix}")
 
         attempt_response = client.post(
             "/api/v1/exams/start",
-            headers=center_headers,
+            headers=admin_headers,
             json={"candidate_id": candidate["id"], "session_id": session["id"]},
         )
-        assert attempt_response.status_code == 201
+        assert attempt_response.status_code == 201, attempt_response.text
         attempt = attempt_response.json()
 
         submission_response = client.post(
