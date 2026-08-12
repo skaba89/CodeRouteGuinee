@@ -8,27 +8,31 @@ from app.routers.health import _build_configuration_check
 
 
 def test_health_liveness_does_not_depend_on_external_services() -> None:
-    client = TestClient(app)
-    for path in ("/health", "/health/live"):
-        response = client.get(path)
-        assert response.status_code == 200
-        assert response.json()["status"] == "ok"
-        assert "runtime" in response.json()
+    with TestClient(app) as client:
+        for path in ("/health", "/health/live"):
+            response = client.get(path)
+            assert response.status_code == 200
+            assert response.json()["status"] == "ok"
+            assert "runtime" in response.json()
 
 
 def test_readiness_reports_database_schema_migrations_and_shared_state() -> None:
-    client = TestClient(app)
-    response = client.get("/health/readiness")
-    assert response.status_code == 200
-    body = response.json()
-    assert body["status"] == "ready"
-    assert body["blocking_checks"] == []
-    assert body["checks"]["configuration"]["status"] in {"ok", "warning"}
-    assert body["checks"]["database"]["status"] == "ok"
-    assert body["checks"]["schema"]["status"] == "ok"
-    assert "users" in body["checks"]["schema"]["critical_tables"]
-    assert body["checks"]["migrations"]["status"] in {"ok", "warning"}
-    assert body["checks"]["shared_state"]["status"] in {"ok", "disabled", "degraded"}
+    # Le context manager exécute le lifespan FastAPI et donc init_db(). Sans lui,
+    # un SQLite :memory: neuf ne contient logiquement aucune table et readiness
+    # doit répondre 503. Le test doit valider l'application démarrée, pas un
+    # objet ASGI avant son startup.
+    with TestClient(app) as client:
+        response = client.get("/health/readiness")
+        assert response.status_code == 200
+        body = response.json()
+        assert body["status"] == "ready"
+        assert body["blocking_checks"] == []
+        assert body["checks"]["configuration"]["status"] in {"ok", "warning"}
+        assert body["checks"]["database"]["status"] == "ok"
+        assert body["checks"]["schema"]["status"] == "ok"
+        assert "users" in body["checks"]["schema"]["critical_tables"]
+        assert body["checks"]["migrations"]["status"] in {"ok", "warning"}
+        assert body["checks"]["shared_state"]["status"] in {"ok", "disabled", "degraded"}
 
 
 def test_readiness_stays_200_when_reconstructible_shared_state_is_degraded(monkeypatch) -> None:
@@ -42,13 +46,13 @@ def test_readiness_stays_200_when_reconstructible_shared_state_is_degraded(monke
             "detail": "ConnectionError",
         },
     )
-    client = TestClient(app)
-    response = client.get("/health/readiness")
-    assert response.status_code == 200
-    body = response.json()
-    assert body["status"] == "ready"
-    assert "shared_state" not in body["blocking_checks"]
-    assert body["checks"]["shared_state"]["status"] == "degraded"
+    with TestClient(app) as client:
+        response = client.get("/health/readiness")
+        assert response.status_code == 200
+        body = response.json()
+        assert body["status"] == "ready"
+        assert "shared_state" not in body["blocking_checks"]
+        assert body["checks"]["shared_state"]["status"] == "degraded"
 
 
 def test_readiness_returns_503_when_required_shared_state_is_unavailable(monkeypatch) -> None:
@@ -62,12 +66,12 @@ def test_readiness_returns_503_when_required_shared_state_is_unavailable(monkeyp
             "detail": "ConnectionError",
         },
     )
-    client = TestClient(app)
-    response = client.get("/health/readiness")
-    assert response.status_code == 503
-    body = response.json()
-    assert body["status"] == "not_ready"
-    assert "shared_state" in body["blocking_checks"]
+    with TestClient(app) as client:
+        response = client.get("/health/readiness")
+        assert response.status_code == 503
+        body = response.json()
+        assert body["status"] == "not_ready"
+        assert "shared_state" in body["blocking_checks"]
 
 
 def test_production_configuration_check_rejects_unsafe_defaults() -> None:

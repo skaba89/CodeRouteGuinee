@@ -5,6 +5,7 @@ from fastapi.testclient import TestClient
 
 from app.db.session import init_db
 from app.main import app
+from tests.conftest import seed_media_ready_official_bank, verify_candidate_identity
 
 
 def _auth_headers(client: TestClient, role: str) -> dict[str, str]:
@@ -38,23 +39,11 @@ def test_exam_question_trace_is_created_and_used_for_scoring() -> None:
 
     with TestClient(app) as client:
         admin_headers = _auth_headers(client, "admin")
-        center_headers = _auth_headers(client, "center")
+        super_headers = _auth_headers(client, "super_admin")
 
-        created_questions = []
-        for index in range(3):
-            response = client.post(
-                "/api/v1/questions",
-                headers=admin_headers,
-                json={
-                    "category": "signalisation",
-                    "text": f"Question trace {suffix} {index}",
-                    "options": ["A", "B", "C"],
-                    "correct_answer": "A",
-                    "explanation": "Reponse A",
-                },
-            )
-            assert response.status_code == 201
-            created_questions.append(response.json())
+        # La trace officielle doit être testée sur une banque réellement
+        # publiable : 40 questions approuvées avec médias candidat exploitables.
+        seed_media_ready_official_bank(client, super_headers, marker=f"trace-{suffix}")
 
         center_response = client.post(
             "/api/v1/centers",
@@ -96,13 +85,21 @@ def test_exam_question_trace_is_created_and_used_for_scoring() -> None:
         )
         assert candidate_response.status_code == 201
         candidate = candidate_response.json()
+        verify_candidate_identity(
+            client,
+            candidate["id"],
+            admin_headers,
+            marker=f"trace-{suffix}",
+        )
 
+        # /exams/start est désormais l'override administratif explicite.
+        # Les agents centre doivent utiliser start-from-booking.
         start_response = client.post(
             "/api/v1/exams/start",
-            headers=center_headers,
+            headers=admin_headers,
             json={"candidate_id": candidate["id"], "session_id": session["id"]},
         )
-        assert start_response.status_code == 201
+        assert start_response.status_code == 201, start_response.text
         attempt = start_response.json()
 
         trace_response = client.get(
@@ -112,28 +109,28 @@ def test_exam_question_trace_is_created_and_used_for_scoring() -> None:
         assert trace_response.status_code == 200
         trace = trace_response.json()
         assert trace["attempt_id"] == attempt["id"]
-        assert trace["question_count"] >= 3
+        assert trace["question_count"] == 40
         assert trace["bank_hash"]
-        assert "official-" in trace["version_label"] or "active-bank-" in trace["version_label"] or trace["version_label"].startswith("bank-")
+        assert "official-" in trace["version_label"]
         assert len(trace["question_ids"]) == trace["question_count"]
-        # Les 3 questions créées peuvent ne pas être dans les 40 sélectionnées
-        # (sélection aléatoire par catégorie). On vérifie juste que les question_ids
-        # proviennent bien de la banque active.
-        assert len(trace["question_ids"]) > 0  # Au moins une question sélectionnée
 
-        # Récupérer les bonnes réponses depuis la DB (bypass pagination API)
+        # Récupérer les bonnes réponses depuis la DB (bypass pagination API).
         from sqlalchemy import select as _select
 
         from app.db.session import SessionLocal as _SL
         from app.models_question import Question as _Q
+
         _db = _SL()
         _all_q = _db.scalars(_select(_Q).where(_Q.is_active)).all()
         active_answer_key = {q.id: q.correct_answer for q in _all_q}
         _db.close()
-        answers = {question_id: active_answer_key.get(question_id, "A") for question_id in trace["question_ids"]}
+        answers = {
+            question_id: active_answer_key[question_id]
+            for question_id in trace["question_ids"]
+        }
         submit_response = client.post(
             f"/api/v1/exams/{attempt['id']}/submit",
-            headers=center_headers,
+            headers=admin_headers,
             json={"answers": answers},
         )
         assert submit_response.status_code == 200

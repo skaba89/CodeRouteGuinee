@@ -5,6 +5,7 @@ from fastapi.testclient import TestClient
 
 from app.db.session import init_db
 from app.main import app
+from tests.conftest import get_admin_headers, seed_media_ready_official_bank, verify_candidate_identity
 
 
 def _auth_headers(client: TestClient, role: str) -> dict[str, str]:
@@ -37,7 +38,7 @@ def _create_candidate(client: TestClient, suffix: str, index: int, headers: dict
     response = client.post(
         "/api/v1/candidates",
         headers=headers,
-            json={
+        json={
             "first_name": f"Candidat{index}",
             "last_name": f"Device-{suffix}",
             "identity_number": f"ID-DEV-{suffix}-{index}",
@@ -49,13 +50,40 @@ def _create_candidate(client: TestClient, suffix: str, index: int, headers: dict
     return response.json()
 
 
+def _pay_and_check_in(client: TestClient, booking: dict, center: dict, headers: dict, phone: str) -> None:
+    payment = client.post(
+        "/api/v1/payments",
+        headers=headers,
+        json={
+            "booking_reference": booking["reference"],
+            "amount_gnf": 250000,
+            "provider": "sandbox",
+            "phone": phone,
+        },
+    )
+    assert payment.status_code in {200, 201}, payment.text
+
+    entry = client.post(
+        "/api/v1/entries/validate",
+        headers=headers,
+        json={
+            "reference": booking["reference"],
+            "verification_code": booking["verification_code"],
+            "center_code": center["code"],
+        },
+    )
+    assert entry.status_code == 200, entry.text
+    assert entry.json()["allowed"] is True
+
+
 def test_device_session_duplicate_detection_end_to_end() -> None:
     suffix = uuid4().hex[:8]
     device_key = f"CENTER-PC-{suffix}-01"
 
     with TestClient(app) as client:
+        super_headers = get_admin_headers(client)
         admin_headers = _auth_headers(client, "admin")
-        center_headers = _auth_headers(client, "center")
+        seed_media_ready_official_bank(client, super_headers, marker=f"device-{suffix}")
 
         center_response = client.post(
             "/api/v1/centers",
@@ -86,26 +114,28 @@ def test_device_session_duplicate_detection_end_to_end() -> None:
 
         candidate_one = _create_candidate(client, suffix, 1, admin_headers)
         candidate_two = _create_candidate(client, suffix, 2, admin_headers)
+        verify_candidate_identity(client, candidate_one["id"], admin_headers, marker=f"device-{suffix}-1")
+        verify_candidate_identity(client, candidate_two["id"], admin_headers, marker=f"device-{suffix}-2")
 
         attempt_one_response = client.post(
             "/api/v1/exams/start",
-            headers=center_headers,
+            headers=admin_headers,
             json={"candidate_id": candidate_one["id"], "session_id": session["id"]},
         )
-        assert attempt_one_response.status_code == 201
+        assert attempt_one_response.status_code == 201, attempt_one_response.text
         attempt_one = attempt_one_response.json()
 
         attempt_two_response = client.post(
             "/api/v1/exams/start",
-            headers=center_headers,
+            headers=admin_headers,
             json={"candidate_id": candidate_two["id"], "session_id": session["id"]},
         )
-        assert attempt_two_response.status_code == 201
+        assert attempt_two_response.status_code == 201, attempt_two_response.text
         attempt_two = attempt_two_response.json()
 
         first_heartbeat_response = client.post(
             "/api/v1/device-sessions/heartbeat",
-            headers=center_headers,
+            headers=admin_headers,
             json={
                 "center_id": center["id"],
                 "session_id": session["id"],
@@ -122,7 +152,7 @@ def test_device_session_duplicate_detection_end_to_end() -> None:
 
         second_heartbeat_response = client.post(
             "/api/v1/device-sessions/heartbeat",
-            headers=center_headers,
+            headers=admin_headers,
             json={
                 "center_id": center["id"],
                 "session_id": session["id"],
@@ -161,9 +191,9 @@ def test_start_exam_from_booking_registers_device_session_and_duplicate_alert() 
     device_key = f"EXAM-START-{suffix}-01"
 
     with TestClient(app) as client:
+        super_headers = get_admin_headers(client)
         admin_headers = _auth_headers(client, "admin")
-        center_headers = _auth_headers(client, "center")
-        headers = admin_headers
+        seed_media_ready_official_bank(client, super_headers, marker=f"device-start-{suffix}")
 
         center_response = client.post(
             "/api/v1/centers",
@@ -185,7 +215,7 @@ def test_start_exam_from_booking_registers_device_session_and_duplicate_alert() 
             headers=admin_headers,
             json={
                 "center_id": center["id"],
-                "starts_at": (datetime.now(UTC) + timedelta(days=5)).isoformat(),
+                "starts_at": (datetime.now(UTC) + timedelta(minutes=5)).isoformat(),
                 "capacity": 20,
             },
         )
@@ -194,35 +224,48 @@ def test_start_exam_from_booking_registers_device_session_and_duplicate_alert() 
 
         candidate_one = _create_candidate(client, suffix, 11, admin_headers)
         candidate_two = _create_candidate(client, suffix, 12, admin_headers)
+        verify_candidate_identity(client, candidate_one["id"], admin_headers, marker=f"device-start-{suffix}-11")
+        verify_candidate_identity(client, candidate_two["id"], admin_headers, marker=f"device-start-{suffix}-12")
 
-        booking_one_response = client.post("/api/v1/bookings", headers=headers, json={"candidate_id": candidate_one["id"], "session_id": session["id"]})
-        booking_two_response = client.post("/api/v1/bookings", headers=headers, json={"candidate_id": candidate_two["id"], "session_id": session["id"]})
+        booking_one_response = client.post(
+            "/api/v1/bookings",
+            headers=admin_headers,
+            json={"candidate_id": candidate_one["id"], "session_id": session["id"]},
+        )
+        booking_two_response = client.post(
+            "/api/v1/bookings",
+            headers=admin_headers,
+            json={"candidate_id": candidate_two["id"], "session_id": session["id"]},
+        )
         assert booking_one_response.status_code == 201
         assert booking_two_response.status_code == 201
         booking_one = booking_one_response.json()
         booking_two = booking_two_response.json()
 
+        _pay_and_check_in(client, booking_one, center, admin_headers, "+224623991100")
+        _pay_and_check_in(client, booking_two, center, admin_headers, "+224623991200")
+
         first_attempt_response = client.post(
             "/api/v1/exams/start-from-booking",
-            headers=center_headers,
+            headers=admin_headers,
             json={
                 "booking_reference": booking_one["reference"],
                 "device_key": device_key,
                 "device_label": "Poste officiel 01",
             },
         )
-        assert first_attempt_response.status_code == 201
+        assert first_attempt_response.status_code == 201, first_attempt_response.text
 
         second_attempt_response = client.post(
             "/api/v1/exams/start-from-booking",
-            headers=center_headers,
+            headers=admin_headers,
             json={
                 "booking_reference": booking_two["reference"],
                 "device_key": device_key,
                 "device_label": "Poste officiel 01",
             },
         )
-        assert second_attempt_response.status_code == 201
+        assert second_attempt_response.status_code == 201, second_attempt_response.text
 
         alerts_response = client.get(
             f"/api/v1/device-sessions/alerts?session_id={session['id']}",
@@ -230,11 +273,18 @@ def test_start_exam_from_booking_registers_device_session_and_duplicate_alert() 
         )
         assert alerts_response.status_code == 200
         alerts = alerts_response.json()
-        assert any(alert["device_key"] == device_key and alert["risk_reason"] == "same_device_key_used_for_multiple_attempts" for alert in alerts)
+        assert any(
+            alert["device_key"] == device_key
+            and alert["risk_reason"] == "same_device_key_used_for_multiple_attempts"
+            for alert in alerts
+        )
 
         audit_response = client.get(
             "/api/v1/supervision/audit-logs?action=exam.device_session_suspicious&limit=25",
             headers=admin_headers,
         )
         assert audit_response.status_code == 200
-        assert any(log["details"]["device_key"] == device_key for log in audit_response.json()["items"])
+        assert any(
+            log["details"]["device_key"] == device_key
+            for log in audit_response.json()["items"]
+        )

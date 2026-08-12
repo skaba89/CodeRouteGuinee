@@ -95,6 +95,6 @@ test('DNTT sees homologation eligible when policy and operational evidence are a
   await expect(page.getByTestId('national-go-live-status')).toHaveText('Éligible au dossier');
   await expect(panel.getByText('Conforme')).toBeVisible();
   await expect(panel.getByText('40 Q · seuil 35')).toBeVisible();
-  await expect(panel.getByText('DNTT-POLICY-OFFICIAL_EXAM_CATEGORY_B-2026.1')).toBeVisible();
+  await expect(panel.locator('strong').filter({ hasText: /^DNTT-POLICY-OFFICIAL_EXAM_CATEGORY_B-2026\.1$/ })).toBeVisible();
   await expect(panel.getByText('PITR fournisseur')).toBeVisible();
 });

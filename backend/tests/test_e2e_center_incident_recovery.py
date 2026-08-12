@@ -2,13 +2,13 @@ from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
-from sqlalchemy import delete, select
+from sqlalchemy import select
 
 from app.db.session import SessionLocal, init_db
 from app.main import app
 from app.models_exam_question_trace import ExamQuestionTrace
 from app.models_question import Question
-from app.question_bank_gn import QUESTIONS_GN
+from tests.conftest import seed_media_ready_official_bank, verify_candidate_identity
 
 
 def _auth_headers(client: TestClient, role: str) -> dict[str, str]:
@@ -35,33 +35,6 @@ def _auth_headers(client: TestClient, role: str) -> dict[str, str]:
     assert login_response.status_code == 200
     token = login_response.json()["access_token"]
     return {"Authorization": f"Bearer {token}"}
-
-
-def _seed_approved_official_bank(client: TestClient, admin_headers: dict[str, str], super_headers: dict[str, str]) -> None:
-    # Isolation : retirer la banque résiduelle des autres tests.
-    with SessionLocal() as db:
-        db.execute(delete(Question))
-        db.commit()
-
-    for index, row in enumerate(QUESTIONS_GN):
-        create_response = client.post(
-            "/api/v1/questions",
-            headers=admin_headers,
-            json={
-                "category": row["category"],
-                "text": f"{row['text']} [incident-e2e-{index}]",
-                "options": row["options"],
-                "correct_answer": row["correct_answer"],
-                "explanation": row.get("explanation", "Réponse de test incident"),
-            },
-        )
-        assert create_response.status_code == 201
-        question_id = create_response.json()["id"]
-        approve_response = client.post(
-            f"/api/v1/questions/{question_id}/approve",
-            headers=super_headers,
-        )
-        assert approve_response.status_code == 200
 
 
 def test_center_incident_blocks_attempt_and_creates_traced_official_retake() -> None:
@@ -98,7 +71,11 @@ def test_center_incident_blocks_attempt_and_creates_traced_official_retake() -> 
         assert session_response.status_code == 201
         session = session_response.json()
 
-        _seed_approved_official_bank(client, admin_headers, super_headers)
+        seed_media_ready_official_bank(
+            client,
+            super_headers,
+            marker=f"incident-{suffix}",
+        )
 
         candidate_response = client.post(
             "/api/v1/candidates",
@@ -113,6 +90,12 @@ def test_center_incident_blocks_attempt_and_creates_traced_official_retake() -> 
         )
         assert candidate_response.status_code == 201
         candidate = candidate_response.json()
+        verify_candidate_identity(
+            client,
+            candidate["id"],
+            admin_headers,
+            marker=f"incident-{suffix}",
+        )
 
         # L'admin national peut lancer la tentative sans dépendre de l'affectation
         # d'un compte centre : le test vise ici le workflow d'incident/rattrapage.
@@ -121,13 +104,15 @@ def test_center_incident_blocks_attempt_and_creates_traced_official_retake() -> 
             headers=admin_headers,
             json={"candidate_id": candidate["id"], "session_id": session["id"]},
         )
-        assert start_response.status_code == 201
+        assert start_response.status_code == 201, start_response.text
         initial_attempt = start_response.json()
         assert initial_attempt["status"] == "started"
 
         with SessionLocal() as db:
             initial_trace = db.scalar(
-                select(ExamQuestionTrace).where(ExamQuestionTrace.attempt_id == initial_attempt["id"])
+                select(ExamQuestionTrace).where(
+                    ExamQuestionTrace.attempt_id == initial_attempt["id"]
+                )
             )
             assert initial_trace is not None
             assert initial_trace.question_count == 40
@@ -165,7 +150,7 @@ def test_center_incident_blocks_attempt_and_creates_traced_official_retake() -> 
                 "allow_retake": True,
             },
         )
-        assert resolve_response.status_code == 200
+        assert resolve_response.status_code == 200, resolve_response.text
         resolved_incident = resolve_response.json()
         assert resolved_incident["status"] == "resolved"
         assert resolved_incident["new_attempt_id"]
@@ -174,7 +159,9 @@ def test_center_incident_blocks_attempt_and_creates_traced_official_retake() -> 
         new_attempt_id = resolved_incident["new_attempt_id"]
         with SessionLocal() as db:
             new_trace = db.scalar(
-                select(ExamQuestionTrace).where(ExamQuestionTrace.attempt_id == new_attempt_id)
+                select(ExamQuestionTrace).where(
+                    ExamQuestionTrace.attempt_id == new_attempt_id
+                )
             )
             assert new_trace is not None
             assert new_trace.question_count == 40
@@ -191,11 +178,26 @@ def test_center_incident_blocks_attempt_and_creates_traced_official_retake() -> 
         exam_questions = q_resp.json()["questions"]
         assert len(exam_questions) == 40
 
-        def _first_opt_ci(question: dict) -> str:
-            options = question.get("options", [])
-            return options[0] if isinstance(options, list) and options else "A"
+        # La réussite du rattrapage doit utiliser la vraie clé de correction de
+        # la trace, pas supposer que la première option est toujours correcte.
+        with SessionLocal() as db:
+            trace = db.scalar(
+                select(ExamQuestionTrace).where(
+                    ExamQuestionTrace.attempt_id == new_attempt_id
+                )
+            )
+            assert trace is not None
+            answer_key = {
+                question.id: question.correct_answer
+                for question in db.scalars(
+                    select(Question).where(Question.id.in_(trace.question_ids))
+                ).all()
+            }
+            answers = {
+                question_id: answer_key[question_id]
+                for question_id in trace.question_ids
+            }
 
-        answers = {question["id"]: _first_opt_ci(question) for question in exam_questions}
         submit_response = client.post(
             f"/api/v1/exams/{new_attempt_id}/submit",
             headers=admin_headers,
@@ -212,11 +214,17 @@ def test_center_incident_blocks_attempt_and_creates_traced_official_retake() -> 
             headers=admin_headers,
         )
         assert incidents_response.status_code == 200
-        assert any(item["id"] == incident["id"] for item in incidents_response.json()["items"])
+        assert any(
+            item["id"] == incident["id"]
+            for item in incidents_response.json()["items"]
+        )
 
         audit_response = client.get(
             "/api/v1/supervision/audit-logs?action=center_incident.resolved&limit=25",
             headers=admin_headers,
         )
         assert audit_response.status_code == 200
-        assert any(log["entity_id"] == incident["id"] for log in audit_response.json()["items"])
+        assert any(
+            log["entity_id"] == incident["id"]
+            for log in audit_response.json()["items"]
+        )

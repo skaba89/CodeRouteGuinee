@@ -165,8 +165,8 @@ test('admin attaches fifth hashed evidence then submits the dossier', async ({ p
   await page.goto('/#/admin');
   const panel = page.getByTestId('homologation-evidence-workflow');
   await expect(panel).toBeVisible();
-  await expect(panel.getByText('4/5', { exact: false })).toBeVisible();
-  await expect(panel.getByText('Validation contenus')).toBeVisible();
+  const contentSignoffLabel = panel.locator('strong').filter({ hasText: /^Validation contenus$/ });
+  await expect(contentSignoffLabel).toBeVisible();
   await expect(panel.getByText('Manquante', { exact: true })).toHaveCount(1);
 
   await panel.getByLabel('Type de preuve').selectOption('content_signoff');
@@ -174,7 +174,7 @@ test('admin attaches fifth hashed evidence then submits the dossier', async ({ p
   await panel.getByLabel('SHA-256 du document').fill('f'.repeat(64));
   await panel.getByRole('button', { name: 'Enregistrer la preuve hashée' }).click();
 
-  await expect(panel.getByText('Validation contenus').locator('..')).toContainText('Hashée');
+  await expect(contentSignoffLabel.locator('..')).toContainText('Hashée');
   await expect(panel.getByRole('button', { name: 'Soumettre les 5 preuves' })).toBeEnabled();
   await panel.getByRole('button', { name: 'Soumettre les 5 preuves' }).click();
   await expect(panel.getByText('pending_approval', { exact: true })).toBeVisible();

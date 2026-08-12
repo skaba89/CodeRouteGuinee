@@ -646,18 +646,17 @@ class TestPaymentsRouter:
         # normalize_provider() retourne "sandbox" pour les providers inconnus
         assert r.status_code in (201, 400, 422)
 
-    def test_admin_can_create_multiple_payments(self):
-        """Un admin peut créer plusieurs paiements pour le même booking."""
+    def test_admin_duplicate_payment_is_idempotent(self):
+        """Un même paiement admin rejoué est idempotent : le premier crée, le second réutilise."""
         _, booking_ref, phone = _setup_payment_fixtures()
         with TestClient(app) as client:
             h = self._headers(client)
             payload = {"booking_reference": booking_ref,
                        "amount_gnf": 150_000, "provider": "wave", "phone": phone}
             r1 = client.post("/api/v1/payments", headers=h, json=payload)
-            # Admin peut créer un 2e paiement (pas de 409 pour admin)
             r2 = client.post("/api/v1/payments", headers=h, json=payload)
         assert r1.status_code == 201
-        assert r2.status_code in (201, 409)  # comportement selon la politique admin
+        assert r2.status_code == 200
 
     def test_list_payments_as_admin(self):
         with TestClient(app) as client:

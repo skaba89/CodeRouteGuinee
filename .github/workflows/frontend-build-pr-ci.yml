@@ -111,7 +111,7 @@ jobs:
         working-directory: backend
         env:
           PYTHONPATH: .
-          DATABASE_URL: sqlite+pysqlite:///:memory:
+          DATABASE_URL: 'sqlite+pysqlite:///:memory:'
           AUTO_CREATE_TABLES: 'true'
           ENVIRONMENT: test
           SOC_ENABLED: 'false'
