@@ -1,10 +1,14 @@
-import path from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 
 const ATTEMPT_ID = 'attempt-media-official-001';
 const VIDEO_URL = '/media/exam/guinea/roundabout-approach-demo.mp4?v=official-runtime';
 const POSTER_URL = '/media/exam/guinea/stop-conakry.webp?v=official-poster';
 const FALLBACK_URL = '/media/exam/guinea/no-entry-conakry.webp?v=official-fallback';
+
+// Tiny valid H.264/MP4 fixture generated only for the browser-delivery contract.
+// Keeping the payload inline makes this test independent from external
+// Cloudinary availability and from the demo media pack's playback semantics.
+const INLINE_MP4_BASE64 = 'AAAAIGZ0eXBpc29tAAACAGlzb21pc28yYXZjMW1wNDEAAAOMbW9vdgAAAGxtdmhkAAAAAAAAAAAAAAAAAAAD6AAAARgAAQAAAQAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgAAArd0cmFrAAAAXHRraGQAAAADAAAAAAAAAAAAAAABAAAAAAAAARgAAAAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAABAAAAAABAAAAAQAAAAAAAkZWR0cwAAABxlbHN0AAAAAAAAAAEAAAEYAAAEAAABAAAAAAIvbWRpYQAAACBtZGhkAAAAAAAAAAAAAAAAAAAyAAAADgBVxAAAAAAALWhkbHIAAAAAAAAAAHZpZGUAAAAAAAAAAAAAAABWaWRlb0hhbmRsZXIAAAAB2m1pbmYAAAAUdm1oZAAAAAEAAAAAAAAAAAAAACRkaW5mAAAAHGRyZWYAAAAAAAAAAQAAAAx1cmwgAAAAAQAAAZpzdGJsAAAAvnN0c2QAAAAAAAAAAQAAAK5hdmMxAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAABAAEABIAAAASAAAAAAAAAABFUxhdmM2MS4xOS4xMDEgbGlieDI2NAAAAAAAAAAAAAAAGP//AAAANGF2Y0MBZAAK/+EAF2dkAAqs2V7ARAAAAwAEAAADAMg8SJZYAQAGaOvjyyLA/fj4AAAAABBwYXNwAAAAAQAAAAEAAAAUYnRydAAAAAAAAFfVAAAAAAAAABhzdHRzAAAAAAAAAAEAAAAHAAACAAAAABRzdHNzAAAAAAAAAAEAAAABAAAASGN0dHMAAAAAAAAABwAAAAEAAAQAAAAAAQAACgAAAAABAAAEAAAAAAEAAAAAAAAAAQAAAgAAAAABAAAGAAAAAAEAAAIAAAAAHHN0c2MAAAAAAAAAAQAAAAEAAAAHAAAAAQAAADBzdHN6AAAAAAAAAAAAAAAHAAACxQAAAAwAAAAMAAAADAAAAAwAAAASAAAADAAAABRzdGNvAAAAAAAAAAEAAAO8AAAAYXVkdGEAAABZbWV0YQAAAAAAAAAhaGRscgAAAAAAAAAAbWRpcmFwcGwAAAAAAAAAAAAAAAAsaWxzdAAAACSpdG9vAAAAHGRhdGEAAAABAAAAAExhdmY2MS43LjEwMwAAAAhmcmVlAAADG21kYXQAAAKuBgX//6rcRem95tlIt5Ys2CDZI+7veDI2NCAtIGNvcmUgMTY0IHIzMTA4IDMxZTE5ZjkgLSBILjI2NC9NUEVHLTQgQVZDIGNvZGVjIC0gQ29weWxlZnQgMjAwMy0yMDIzIC0gaHR0cDovL3d3dy52aWRlb2xhbi5vcmcveDI2NC5odG1sIC0gb3B0aW9uczogY2FiYWM9MSByZWY9MyBkZWJsb2NrPTE6MDowIGFuYWx5c2U9MHgzOjB4MTEzIG1lPWhleCBzdWJtZT03IHBzeT0xIHBzeV9yZD0xLjAwOjAuMDAgbWl4ZWRfcmVmPTEgbWVfcmFuZ2U9MTYgY2hyb21hX21lPTEgdHJlbGxpcz0xIDh4OGRjdD0xIGNxbT0wIGRlYWR6b25lPTIxLDExIGZhc3RfcHNraXA9MSBjaHJvbWFfcXBfb2Zmc2V0PS0yIHRocmVhZHM9MSBsb29rYWhlYWRfdGhyZWFkcz0xIHNsaWNlZF90aHJlYWRzPTAgbnI9MCBkZWNpbWF0ZT0xIGludGVybGFjZWQ9MCBibHVyYXlfY29tcGF0PTAgY29uc3RyYWluZWRfaW50cmE9MCBiZnJhbWVzPTMgYl9weXJhbWlkPTIgYl9hZGFwdD0xIGJfYmlhcz0wIGRpcmVjdD0xIHdlaWdodGI9MSBvcGVuX2dvcD0wIHdlaWdodHA9MiBrZXlpbnQ9MjUwIGtleWludF9taW49MjUgc2NlbmVjdXQ9NDAgaW50cmFfcmVmcmVzaD0wIHJjX2xvb2thaGVhZD00MCByYz1jcmYgbWJ0cmVlPTEgY3JmPTIzLjAgcWNvbXA9MC42MCBxcG1pbj0wIHFwbWF4PTY5IHFwc3RlcD00IGlwX3JhdGlvPTEuNDAgYXE9MToxLjAwAIAAAAAPZYiEADf//vbw/gU2VgTBAAAACEGaJGxDP/7gAAAACEGeQniF/8GBAAAACAGeYXRCv8SAAAAACAGeY2pCv8SBAAAADkGaZkmoQWiZTBTwr/7BAAAACAGehWpCv8SB';
 
 const CANDIDATE = {
   id: 'candidate-media-official',
@@ -139,15 +143,21 @@ test('examen officiel normalise une vidéo Cloudinary MOV/WebM pour le navigateu
     media_url: cloudinaryOriginal,
   };
 
-  // The browser must exercise the transformed Cloudinary URL without making
-  // this E2E depend on an external/fictitious Cloudinary asset. Serve the
-  // versioned six-second MP4 fixture under that transformed URL so a real
-  // HTMLVideoElement can load and remain mounted deterministically.
-  const localVideoPath = path.resolve(process.cwd(), 'public/media/exam/guinea/roundabout-approach-demo.mp4');
-  await page.route(cloudinaryPlayable, route => route.fulfill({
-    path: localVideoPath,
-    contentType: 'video/mp4',
-  }));
+  let transformedRequestSeen = false;
+  await page.route('https://res.cloudinary.com/**', route => {
+    if (route.request().url() !== cloudinaryPlayable) {
+      return route.abort();
+    }
+    transformedRequestSeen = true;
+    return route.fulfill({
+      body: Buffer.from(INLINE_MP4_BASE64, 'base64'),
+      contentType: 'video/mp4',
+      headers: {
+        'Accept-Ranges': 'bytes',
+        'Cache-Control': 'no-store',
+      },
+    });
+  });
 
   await mockAuthenticatedCandidate(page);
   await mockOfficialExam(page, cloudinaryQuestion, 'attempt-media-cloudinary-001');
@@ -157,4 +167,5 @@ test('examen officiel normalise une vidéo Cloudinary MOV/WebM pour le navigateu
   await expect(video).toBeVisible();
   await expect(video).toHaveAttribute('src', cloudinaryPlayable);
   await expect(video).toHaveAttribute('poster', POSTER_URL);
+  await expect.poll(() => transformedRequestSeen).toBe(true);
 });
