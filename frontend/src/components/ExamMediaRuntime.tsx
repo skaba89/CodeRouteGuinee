@@ -10,21 +10,45 @@ function deriveCloudinaryPoster(url: string): string | undefined {
   }
 }
 
+function isPlayableUrl(url: string): boolean {
+  return /^https?:\/\//i.test(url) || url.startsWith('/media/');
+}
+
+export type ExamMediaRuntimeProps = {
+  mediaType?: string;
+  media?: string;
+  alt?: string;
+  poster?: string;
+  fallback?: string;
+};
+
 /**
  * Runtime media facade used by exam screens.
  *
- * Cloudinary is the configured production media provider today. When an
- * official video URL comes from Cloudinary, its derived poster is also used as
- * a last-resort image fallback. Demo/legacy media continue through the existing
- * premium resolver unchanged.
+ * The backend already returns the validated poster/fallback attached to a
+ * normalized official video. Those URLs are now authoritative when supplied
+ * by ExamPage. Cloudinary poster derivation is retained only as a compatibility
+ * fallback for older API payloads. Demo/legacy symbolic media continue through
+ * ExamMediaPremium unchanged.
  */
-export function MediaBlock({ mediaType, media, alt }: { mediaType?: string; media?: string; alt?: string }) {
-  if (mediaType === 'video' && media && /^https?:\/\//i.test(media)) {
-    const poster = deriveCloudinaryPoster(media);
-    if (poster) {
-      return <VideoPlayer url={media} poster={poster} fallbackUrl={poster} alt={alt} />;
+export function MediaBlock({ mediaType, media, alt, poster, fallback }: ExamMediaRuntimeProps) {
+  if (mediaType === 'video' && media && isPlayableUrl(media)) {
+    const derivedPoster = /^https?:\/\//i.test(media) ? deriveCloudinaryPoster(media) : undefined;
+    const effectivePoster = poster || derivedPoster;
+    const effectiveFallback = fallback || effectivePoster;
+
+    if (effectivePoster || effectiveFallback) {
+      return (
+        <VideoPlayer
+          url={media}
+          poster={effectivePoster}
+          fallbackUrl={effectiveFallback}
+          alt={alt}
+        />
+      );
     }
   }
+
   return <PremiumMediaBlock mediaType={mediaType} media={media} alt={alt} />;
 }
 
