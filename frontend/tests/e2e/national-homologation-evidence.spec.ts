@@ -165,7 +165,7 @@ test('admin attaches fifth hashed evidence then submits the dossier', async ({ p
   await page.goto('/#/admin');
   const panel = page.getByTestId('homologation-evidence-workflow');
   await expect(panel).toBeVisible();
-  const contentSignoffLabel = panel.locator('span').filter({ hasText: /^Validation contenus$/ });
+  const contentSignoffLabel = panel.getByText('Validation contenus', { exact: true }).last();
   await expect(contentSignoffLabel).toBeVisible();
   await expect(panel.getByText('Manquante', { exact: true })).toHaveCount(1);
 
