@@ -7,7 +7,7 @@ from app.db.session import SessionLocal, init_db
 from app.main import app
 from app.models_center import Center
 from app.models_session import ExamSession
-from tests.conftest import get_admin_headers
+from tests.conftest import get_admin_headers, verify_candidate_identity
 
 
 def _seed_center_and_session() -> tuple[str, str, str]:
@@ -64,6 +64,12 @@ def test_candidate_booking_payment_convocation_and_entry_flow() -> None:
         )
         assert candidate_response.status_code == 201
         candidate = candidate_response.json()
+        verify_candidate_identity(
+            client,
+            candidate["id"],
+            admin_headers,
+            marker=f"booking-{suffix}",
+        )
 
         booking_response = client.post(
             "/api/v1/bookings",
