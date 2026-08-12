@@ -45,6 +45,16 @@ type DisplayResult = {
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'offline';
 
+type ExamQuestionWithMediaRuntime = ExamQuestion & {
+  media_poster_url?: string | null;
+  media_fallback_url?: string | null;
+};
+
+type ExamDisplayQuestion = QData & {
+  mediaPoster?: string;
+  mediaFallback?: string;
+};
+
 const ACTIVE_ATTEMPT_KEY = 'coderoute:official-exam:active-attempt';
 const answerStorageKey = (attemptId: string) => `coderoute:official-exam:answers:${attemptId}`;
 
@@ -123,6 +133,23 @@ function fromApiAnswers(apiAnswers: Record<string, string>, questions: QData[]):
   return restored;
 }
 
+function toDisplayQuestion(question: ExamQuestion, index: number): ExamDisplayQuestion {
+  const runtimeQuestion = question as ExamQuestionWithMediaRuntime;
+  return {
+    id: question.id,
+    text: question.text,
+    options: question.options,
+    number: index + 1,
+    category: question.category,
+    media: question.media_url ?? undefined,
+    mediaType: (question.media_type ?? undefined) as 'sign' | 'scene' | 'image' | 'video' | undefined,
+    mediaAlt: question.media_alt ?? undefined,
+    mediaPoster: runtimeQuestion.media_poster_url ?? undefined,
+    mediaFallback: runtimeQuestion.media_fallback_url ?? undefined,
+    audioUrl: question.audio_url ?? undefined,
+  };
+}
+
 async function getServerAnswerSnapshot(attemptId: string): Promise<Record<string, string>> {
   try {
     const payload = await getPrivateJson<{ answers: Record<string, string> }>(
@@ -161,18 +188,8 @@ export function ExamPage({ locale }: Props) {
   const isMobile = useIsMobile();
 
   const [liveQuestions, setLiveQuestions] = useState<ExamQuestion[] | null>(null);
-  const questions: QData[] = (liveQuestions ?? []).length > 0
-    ? liveQuestions!.map((question, index) => ({
-        id: question.id,
-        text: question.text,
-        options: question.options,
-        number: index + 1,
-        category: question.category,
-        media: question.media_url ?? undefined,
-        mediaType: (question.media_type ?? undefined) as 'sign' | 'scene' | 'image' | 'video' | undefined,
-        mediaAlt: question.media_alt ?? undefined,
-        audioUrl: question.audio_url ?? undefined,
-      }))
+  const questions: ExamDisplayQuestion[] = (liveQuestions ?? []).length > 0
+    ? liveQuestions!.map(toDisplayQuestion)
     : DEMO_QUESTIONS.map((question: ExamQuestionData) => ({
         id: question.id,
         text: question.text,
@@ -266,12 +283,7 @@ export function ExamPage({ locale }: Props) {
         if (cancelled) return;
         setAttemptId(storedAttemptId);
         setLiveQuestions(response.questions);
-        const questionView: QData[] = response.questions.map((question, index) => ({
-          id: question.id, text: question.text, options: question.options, number: index + 1,
-          category: question.category, media: question.media_url ?? undefined,
-          mediaType: question.media_type ?? undefined, mediaAlt: question.media_alt ?? undefined,
-          audioUrl: question.audio_url ?? undefined,
-        }));
+        const questionView: ExamDisplayQuestion[] = response.questions.map(toDisplayQuestion);
         const restoredAnswers = {
           ...fromApiAnswers(serverSnapshot, questionView),
           ...readStoredAnswers(storedAttemptId),
@@ -475,12 +487,7 @@ export function ExamPage({ locale }: Props) {
       window.sessionStorage.setItem(ACTIVE_ATTEMPT_KEY, attempt.id);
       setAttemptId(attempt.id);
       setLiveQuestions(questionsResponse.questions);
-      const questionView: QData[] = questionsResponse.questions.map((question, index) => ({
-        id: question.id, text: question.text, options: question.options, number: index + 1,
-        category: question.category, media: question.media_url ?? undefined,
-        mediaType: question.media_type ?? undefined, mediaAlt: question.media_alt ?? undefined,
-        audioUrl: question.audio_url ?? undefined,
-      }));
+      const questionView: ExamDisplayQuestion[] = questionsResponse.questions.map(toDisplayQuestion);
       const restoredAnswers = fromApiAnswers(serverSnapshot, questionView);
       setAnswers(restoredAnswers);
       persistStoredAnswers(attempt.id, restoredAnswers);
@@ -716,7 +723,7 @@ export function ExamPage({ locale }: Props) {
                   <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.07em' }}>{q.mediaType === 'sign' ? 'Panneau de signalisation' : q.mediaType === 'video' ? 'Vidéo pédagogique' : q.mediaType === 'image' ? 'Photo réelle' : 'Situation de conduite'}</span>
                   <span style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--muted)' }}>Question {idx + 1}</span>
                 </div>
-                <div style={{ padding: q.mediaType === 'scene' ? 0 : '20px 16px 16px' }}><MediaBlock mediaType={q.mediaType} media={q.media} alt={q.mediaAlt}/></div>
+                <div style={{ padding: q.mediaType === 'scene' ? 0 : '20px 16px 16px' }}><MediaBlock mediaType={q.mediaType} media={q.media} alt={q.mediaAlt} poster={q.mediaPoster} fallback={q.mediaFallback}/></div>
               </div>
             </div>
           )}
