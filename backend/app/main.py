@@ -32,6 +32,7 @@ from app.db.session import SessionLocal, init_db
 from app.logging_config import setup_logging
 from app.middleware import GlobalRateLimitMiddleware, RequestIDMiddleware, ResponseCacheMiddleware, TimingMiddleware
 from app.monitoring import capture_exception as capture_monitoring_exception
+from app.monitoring import init_sentry
 from app.reliability_metrics import ReliabilityMetricsMiddleware
 from app.soc_logging import install_soc_log_filter
 from app.soc_telemetry import SOCRequestMiddleware, init_soc_telemetry
