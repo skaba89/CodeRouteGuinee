@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 
 from app.db.session import init_db
 from app.main import app
-from tests.conftest import get_admin_headers, get_center_headers
+from tests.conftest import get_admin_headers, seed_media_ready_official_bank, verify_candidate_identity
 
 
 def _auth_headers(client: TestClient, role: str) -> dict[str, str]:
@@ -55,10 +55,9 @@ def test_national_antifraud_dashboard_aggregates_risk_signals() -> None:
     device_key = f"AF-PC-{suffix}-01"
 
     with TestClient(app) as client:
-        admin_headers = get_admin_headers(client)
-        center_headers = get_center_headers(client)
+        super_headers = get_admin_headers(client)
         admin_headers = _auth_headers(client, "admin")
-        center_headers = _auth_headers(client, "center")
+        seed_media_ready_official_bank(client, super_headers, marker=f"antifraud-{suffix}")
 
         center_response = client.post(
             "/api/v1/centers",
@@ -89,26 +88,28 @@ def test_national_antifraud_dashboard_aggregates_risk_signals() -> None:
 
         candidate_one = _create_candidate(client, suffix, 1, admin_headers)
         candidate_two = _create_candidate(client, suffix, 2, admin_headers)
+        verify_candidate_identity(client, candidate_one["id"], admin_headers, marker=f"af-{suffix}-1")
+        verify_candidate_identity(client, candidate_two["id"], admin_headers, marker=f"af-{suffix}-2")
 
         attempt_one_response = client.post(
             "/api/v1/exams/start",
-            headers=center_headers,
+            headers=admin_headers,
             json={"candidate_id": candidate_one["id"], "session_id": session["id"]},
         )
-        assert attempt_one_response.status_code == 201
+        assert attempt_one_response.status_code == 201, attempt_one_response.text
         attempt_one = attempt_one_response.json()
 
         attempt_two_response = client.post(
             "/api/v1/exams/start",
-            headers=center_headers,
+            headers=admin_headers,
             json={"candidate_id": candidate_two["id"], "session_id": session["id"]},
         )
-        assert attempt_two_response.status_code == 201
+        assert attempt_two_response.status_code == 201, attempt_two_response.text
         attempt_two = attempt_two_response.json()
 
         incident_response = client.post(
             "/api/v1/center-incidents",
-            headers=center_headers,
+            headers=admin_headers,
             json={
                 "center_id": center["id"],
                 "session_id": session["id"],
@@ -122,7 +123,7 @@ def test_national_antifraud_dashboard_aggregates_risk_signals() -> None:
 
         first_device_response = client.post(
             "/api/v1/device-sessions/heartbeat",
-            headers=center_headers,
+            headers=admin_headers,
             json={
                 "center_id": center["id"],
                 "session_id": session["id"],
@@ -135,7 +136,7 @@ def test_national_antifraud_dashboard_aggregates_risk_signals() -> None:
 
         second_device_response = client.post(
             "/api/v1/device-sessions/heartbeat",
-            headers=center_headers,
+            headers=admin_headers,
             json={
                 "center_id": center["id"],
                 "session_id": session["id"],
@@ -149,7 +150,7 @@ def test_national_antifraud_dashboard_aggregates_risk_signals() -> None:
 
         monitoring_response = client.post(
             "/api/v1/exam-monitoring/events",
-            headers=center_headers,
+            headers=admin_headers,
             json={
                 "attempt_id": attempt_one["id"],
                 "event_type": "tab_switch",
@@ -180,7 +181,7 @@ def test_national_antifraud_dashboard_aggregates_risk_signals() -> None:
         assert risk_center["open_incidents"] >= 1
         assert risk_center["suspicious_devices"] >= 2
         assert risk_center["monitoring_risk_score"] >= 7
-        assert risk_center["total_risk_score"] >= 10  # >= 1 incident(5) + 1 high event(7) = 12 min
+        assert risk_center["total_risk_score"] >= 10
         assert risk_center["status"] in {"manual_review", "critical_review"}
 
         public_dashboard_response = client.get("/api/v1/dashboard", headers=admin_headers)
