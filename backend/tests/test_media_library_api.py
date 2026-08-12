@@ -161,6 +161,19 @@ def test_question_media_link_is_additive_and_does_not_touch_legacy_fields():
         headers = get_auth_headers(client, "admin")
         asset = client.post("/api/v1/media-library/assets", headers=headers, json=_asset_payload()).json()
 
+        # This test exercises additive linking, not the review workflow. Stage a
+        # fully publishable primary asset explicitly so the official fail-closed
+        # gate remains active and is not bypassed by the fixture.
+        with SessionLocal() as db:
+            persisted = db.get(MediaAsset, asset["id"])
+            assert persisted is not None
+            persisted.quality_status = "validated"
+            persisted.regulatory_status = "validated"
+            persisted.regulatory_authority_reference = "DNTT-MEDIA-LINK-TEST"
+            persisted.validated_by = asset["created_by"]
+            persisted.validated_at = datetime.now(UTC).replace(tzinfo=None)
+            db.commit()
+
         linked = client.post(
             f"/api/v1/media-library/questions/{question_id}/links",
             headers=headers,

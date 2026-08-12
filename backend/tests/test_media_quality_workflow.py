@@ -112,7 +112,13 @@ def test_generated_or_legacy_primary_media_never_passes_official_exam_gate():
             asset.source_type = source_type
             db.add(asset)
             db.flush()
-            result = evaluate_media_asset(db, asset, require_quality_approval=True, require_regulatory_approval=True)
+            result = evaluate_media_asset(
+                db,
+                asset,
+                require_quality_approval=True,
+                require_regulatory_approval=True,
+                require_exam_usage=True,
+            )
             assert result["passed"] is False
             assert any("SOURCE_TRACEABLE" in blocker for blocker in result["blockers"])
         db.rollback()
@@ -148,11 +154,23 @@ def test_exam_video_requires_six_to_twenty_seconds_and_validated_poster_fallback
         )
         db.add(video)
         db.commit()
-        assert evaluate_media_asset(db, video, require_quality_approval=True, require_regulatory_approval=True)["passed"] is True
+        assert evaluate_media_asset(
+            db,
+            video,
+            require_quality_approval=True,
+            require_regulatory_approval=True,
+            require_exam_usage=True,
+        )["passed"] is True
 
         video.duration_seconds = 25
         db.commit()
-        invalid = evaluate_media_asset(db, video, require_quality_approval=True, require_regulatory_approval=True)
+        invalid = evaluate_media_asset(
+            db,
+            video,
+            require_quality_approval=True,
+            require_regulatory_approval=True,
+            require_exam_usage=True,
+        )
         assert invalid["passed"] is False
         assert any("EXAM_VIDEO_DURATION" in blocker for blocker in invalid["blockers"])
 

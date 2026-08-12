@@ -30,6 +30,6 @@ def test_media_progress_panel_is_operator_triggered_and_does_not_auto_fetch():
 def test_media_library_composes_progress_before_mapping_and_video_tools():
     source = COMPOSED.read_text(encoding="utf-8")
     progress = source.index("<MediaMigrationProgressPanel />")
-    mapping = source.index("<MediaQuestionMappingWorkbench />")
+    mapping = source.index("<MediaQuestionMappingWorkbench focusQuestion={focusedQuestion} />")
     video = source.index("<MediaVideoSupportWorkbench />")
     assert progress < mapping < video
