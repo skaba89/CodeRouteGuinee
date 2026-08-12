@@ -7,12 +7,14 @@ RUNTIME = ROOT / "frontend" / "src" / "components" / "ExamMediaRuntime.tsx"
 PUBLIC_API = ROOT / "frontend" / "src" / "pages" / "shared-exam-components.tsx"
 
 
-def test_exam_runtime_uses_cloudinary_poster_as_mobile_video_fallback():
+def test_exam_runtime_prefers_explicit_fallback_and_keeps_cloudinary_compatibility():
     source = RUNTIME.read_text(encoding="utf-8")
     assert "res.cloudinary.com" in source
     assert "/video/upload/" in source
-    assert "fallbackUrl={poster}" in source
-    assert "poster={poster}" in source
+    assert "const effectivePoster = poster || derivedPoster" in source
+    assert "const effectiveFallback = fallback || effectivePoster" in source
+    assert "fallbackUrl={effectiveFallback}" in source
+    assert "poster={effectivePoster}" in source
     assert "PremiumMediaBlock" in source
 
 
