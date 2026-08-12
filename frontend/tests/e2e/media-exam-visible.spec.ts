@@ -61,6 +61,9 @@ test('examen blanc paints the Guinea STOP image with a real visible viewport', a
   await expect(viewport).toBeVisible();
   await expect(image).toBeVisible();
   await expect(image).toHaveAttribute('src', /\/media\/exam\/guinea\/stop-conakry\.webp\?v=20260812-1$/);
+  // PremiumImage fades in for 160 ms; wait for the painted steady state rather
+  // than sampling the CSS transition mid-frame.
+  await expect(image).toHaveCSS('opacity', '1');
 
   const mediaState = await image.evaluate((node: HTMLImageElement) => {
     const style = window.getComputedStyle(node);
@@ -82,7 +85,7 @@ test('examen blanc paints the Guinea STOP image with a real visible viewport', a
   expect(mediaState.height).toBeGreaterThan(200);
   expect(mediaState.display).not.toBe('none');
   expect(mediaState.visibility).toBe('visible');
-  expect(mediaState.opacity).toBeGreaterThan(0.99);
+  expect(mediaState.opacity).toBe(1);
 });
 
 test('examen blanc serves the Guinea roundabout video and paints its fallback on playback failure', async ({ page }) => {
