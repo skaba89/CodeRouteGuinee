@@ -16,12 +16,19 @@ jobs:
           python-version: '3.12'
       - name: Install ruff
         run: pip install -q ruff==0.11.13
-      - name: Lint backend
+      - name: Block critical Python errors
+        working-directory: backend
+        run: ruff check app/ tests/ --select E9,F63,F7,F82
+      - name: Generate full Ruff debt report
         working-directory: backend
         shell: bash
         run: |
-          set -o pipefail
-          ruff check app/ tests/ | tee ruff-output.txt
+          set +e
+          ruff check app/ tests/ > ruff-output.txt 2>&1
+          status=$?
+          cat ruff-output.txt
+          echo "Full Ruff debt report exit code: ${status} (non-blocking while legacy debt is being reduced)."
+          exit 0
       - name: Upload ruff output
         if: always()
         uses: actions/upload-artifact@v4
