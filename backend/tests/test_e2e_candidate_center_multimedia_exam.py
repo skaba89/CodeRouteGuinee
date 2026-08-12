@@ -5,6 +5,8 @@ from fastapi.testclient import TestClient
 
 from app.db.session import init_db
 from app.main import app
+from app.question_bank_gn import QUESTIONS_GN
+from tests.conftest import get_admin_headers
 
 
 def _admin_headers(client: TestClient) -> dict[str, str]:
@@ -33,8 +35,8 @@ def _admin_headers(client: TestClient) -> dict[str, str]:
 
 
 def _multimedia_questions(suffix: str) -> list[dict]:
-    rows = []
-    for index in range(40):
+    rows: list[dict] = []
+    for index, official in enumerate(QUESTIONS_GN):
         is_video = index % 2 == 1
         media_type = "video" if is_video else "image"
         media_url = (
@@ -44,14 +46,14 @@ def _multimedia_questions(suffix: str) -> list[dict]:
         )
         rows.append(
             {
-                "category": "multimedia-pilote",
-                "text": f"Scenario multimedia officiel {suffix} numero {index:02d}",
-                "options": ["Action securisee", "Action dangereuse", "Aucune action", "Klaxonner"],
-                "correct_answer": "Action securisee",
-                "explanation": "La reponse attendue respecte la conduite preventive.",
+                "category": official["category"],
+                "text": f"{official['text']} [MM-{suffix}-{index:02d}]",
+                "options": official["options"],
+                "correct_answer": official["correct_answer"],
+                "explanation": official.get("explanation") or "La réponse respecte la conduite préventive.",
                 "media_type": media_type,
                 "media_url": media_url,
-                "media_alt": f"Illustration {media_type} du scenario {index:02d}",
+                "media_alt": f"Illustration {media_type} du scénario officiel {index:02d}",
                 "is_active": True,
             }
         )
@@ -65,6 +67,7 @@ def test_candidate_registration_center_booking_and_40_question_multimedia_exam_t
 
     with TestClient(app) as client:
         headers = _admin_headers(client)
+        authority_headers = get_admin_headers(client)
 
         center_payload = {
             "source": "DNTT - centres multimedia pilotes",
@@ -80,16 +83,33 @@ def test_candidate_registration_center_booking_and_40_question_multimedia_exam_t
                 }
             ],
         }
-        assert client.post("/api/v1/centers/import-official", headers=headers, json={**center_payload, "dry_run": True}).json()["created"] == 1
-        center_import = client.post("/api/v1/centers/import-official", headers=headers, json={**center_payload, "dry_run": False})
+        dry_center = client.post(
+            "/api/v1/centers/import-official",
+            headers=headers,
+            json={**center_payload, "dry_run": True},
+        )
+        assert dry_center.status_code == 200
+        assert dry_center.json()["created"] == 1
+        center_import = client.post(
+            "/api/v1/centers/import-official",
+            headers=headers,
+            json={**center_payload, "dry_run": False},
+        )
         assert center_import.status_code == 200
-        from sqlalchemy import select as _sel2
-        from app.db.session import SessionLocal as _SL2
-        from app.models_center import Center as _Ctr2
-        with _SL2() as _db2:
-            _c2 = _db2.scalar(_sel2(_Ctr2).where(_Ctr2.code == center_code))
-            assert _c2 is not None, f"Centre {center_code} non trouvé en base"
-            center = {"id": _c2.id, "code": _c2.code, "name": _c2.name, "capacity": _c2.capacity}
+
+        from sqlalchemy import select as _sel
+        from app.db.session import SessionLocal as _SL
+        from app.models_center import Center as _Center
+
+        with _SL() as db:
+            imported_center = db.scalar(_sel(_Center).where(_Center.code == center_code))
+            assert imported_center is not None, f"Centre {center_code} non trouvé en base"
+            center = {
+                "id": imported_center.id,
+                "code": imported_center.code,
+                "name": imported_center.name,
+                "capacity": imported_center.capacity,
+            }
 
         candidate_payload = {
             "source": "Registre candidats multimedia",
@@ -105,33 +125,73 @@ def test_candidate_registration_center_booking_and_40_question_multimedia_exam_t
                 }
             ],
         }
-        candidate_dry_run = client.post("/api/v1/candidates/import-official", headers=headers, json={**candidate_payload, "dry_run": True})
+        candidate_dry_run = client.post(
+            "/api/v1/candidates/import-official",
+            headers=headers,
+            json={**candidate_payload, "dry_run": True},
+        )
         assert candidate_dry_run.status_code == 200
         assert candidate_dry_run.json()["created"] == 1
-        candidate_import = client.post("/api/v1/candidates/import-official", headers=headers, json={**candidate_payload, "dry_run": False})
+        candidate_import = client.post(
+            "/api/v1/candidates/import-official",
+            headers=headers,
+            json={**candidate_payload, "dry_run": False},
+        )
         assert candidate_import.status_code == 200
         candidate_id = candidate_import.json()["candidate_ids"][0]
         candidate_reference = candidate_import.json()["references"][0]
 
         question_rows = _multimedia_questions(suffix)
+        assert len(question_rows) == 40
         question_payload = {
             "source": "Banque multimedia nationale pilote",
             "reason": "Chargement de 40 questions illustrees",
             "questions": question_rows,
         }
-        question_dry_run = client.post("/api/v1/questions/import-official", headers=headers, json={**question_payload, "dry_run": True})
+        question_dry_run = client.post(
+            "/api/v1/questions/import-official",
+            headers=headers,
+            json={**question_payload, "dry_run": True},
+        )
         assert question_dry_run.status_code == 200
         assert question_dry_run.json()["created"] == 40
-        question_import = client.post("/api/v1/questions/import-official", headers=headers, json={**question_payload, "dry_run": False})
-        assert question_import.status_code == 200
-        assert question_import.json()["imported"] == 40
+        question_import = client.post(
+            "/api/v1/questions/import-official",
+            headers=headers,
+            json={**question_payload, "dry_run": False},
+        )
+        assert question_import.status_code == 200, question_import.text
+        imported = question_import.json()
+        assert imported["imported"] == 40
+        assert len(imported["question_ids"]) == 40
 
-        fetched_questions = client.get("/api/v1/questions", headers=headers, params={"limit": 200}).json()["items"]
-        imported_questions = [question for question in fetched_questions if question["category"] == "multimedia-pilote" and suffix in question["text"]]
+        # L'import conserve sa provenance ; l'autorité DNTT approuve ensuite
+        # explicitement les 40 questions avant qu'elles deviennent examinables.
+        for question_id in imported["question_ids"]:
+            approval = client.post(
+                f"/api/v1/questions/{question_id}/approve",
+                headers=authority_headers,
+            )
+            assert approval.status_code == 200, approval.text
+
+        fetched_questions = client.get(
+            "/api/v1/questions",
+            headers=headers,
+            params={"limit": 200},
+        ).json()["items"]
+        imported_questions = [question for question in fetched_questions if f"MM-{suffix}-" in question["text"]]
         assert len(imported_questions) == 40
         assert sum(1 for question in imported_questions if question["media_type"] == "image") == 20
         assert sum(1 for question in imported_questions if question["media_type"] == "video") == 20
         assert all(question["media_url"] and question["media_alt"] for question in imported_questions)
+        assert all(question["validation_status"] == "approved" for question in imported_questions)
+
+        from app.models_question import Question as _Question
+        with _SL() as db:
+            approved_rows = db.scalars(
+                _sel(_Question).where(_Question.id.in_(imported["question_ids"]))
+            ).all()
+            answer_key = {question.id: question.correct_answer for question in approved_rows}
 
         session_response = client.post(
             "/api/v1/sessions",
@@ -145,11 +205,18 @@ def test_candidate_registration_center_booking_and_40_question_multimedia_exam_t
         assert session_response.status_code == 201
         session = session_response.json()
 
-        booking_response = client.post("/api/v1/bookings", headers=headers, json={"candidate_id": candidate_id, "session_id": session["id"]})
+        booking_response = client.post(
+            "/api/v1/bookings",
+            headers=headers,
+            json={"candidate_id": candidate_id, "session_id": session["id"]},
+        )
         assert booking_response.status_code == 201
         booking = booking_response.json()
 
-        convocation_response = client.get(f"/api/v1/bookings/{booking['reference']}/convocation", headers=headers)
+        convocation_response = client.get(
+            f"/api/v1/bookings/{booking['reference']}/convocation",
+            headers=headers,
+        )
         assert convocation_response.status_code == 200
         assert convocation_response.json()["candidate"]["reference"] == candidate_reference
 
@@ -187,23 +254,30 @@ def test_candidate_registration_center_booking_and_40_question_multimedia_exam_t
                 "device_label": "Poste multimedia 01",
             },
         )
-        assert start_response.status_code == 201
+        assert start_response.status_code == 201, start_response.text
         attempt = start_response.json()
 
-        q_resp = client.get(f"/api/v1/exams/{attempt['id']}/questions", headers=headers)
+        q_resp = client.get(
+            f"/api/v1/exams/{attempt['id']}/questions",
+            headers=headers,
+        )
         assert q_resp.status_code == 200
         exam_qs = q_resp.json()["questions"]
+        assert len(exam_qs) == 40
+        assert sum(1 for question in exam_qs if question["media_type"] == "image") == 20
+        assert sum(1 for question in exam_qs if question["media_type"] == "video") == 20
 
-        def _first_opt_mm(q: dict) -> str:
-            opts = q.get("options", [])
-            return opts[0] if isinstance(opts, list) and opts else "Action securisee"
-        answers = {q["id"]: _first_opt_mm(q) for q in exam_qs}
-        submit_response = client.post(f"/api/v1/exams/{attempt['id']}/submit", headers=headers, json={"answers": answers})
+        answers = {question["id"]: answer_key[question["id"]] for question in exam_qs}
+        submit_response = client.post(
+            f"/api/v1/exams/{attempt['id']}/submit",
+            headers=headers,
+            json={"answers": answers},
+        )
         assert submit_response.status_code == 200
         submitted_attempt = submit_response.json()
         assert submitted_attempt["status"] == "submitted"
         assert submitted_attempt["passed"] is True
-        assert submitted_attempt["score"] >= 40
+        assert submitted_attempt["score"] == 40
 
         certificate = client.get(f"/api/v1/exams/{attempt['id']}/certificate/verify")
         assert certificate.status_code == 200
@@ -215,6 +289,13 @@ def test_candidate_registration_center_booking_and_40_question_multimedia_exam_t
         assert exam_summary.status_code == 200
         assert exam_summary.json()["submitted_attempts"] >= 1
 
-        audit_response = client.get("/api/v1/supervision/audit-logs?action=exam.question_trace_created&limit=25", headers=headers)
+        audit_response = client.get(
+            "/api/v1/supervision/audit-logs?action=exam.question_trace_created&limit=25",
+            headers=headers,
+        )
         assert audit_response.status_code == 200
-        assert any(log["details"]["attempt_id"] == attempt["id"] and log["details"]["question_count"] >= 40 for log in audit_response.json()["items"])
+        assert any(
+            log["details"]["attempt_id"] == attempt["id"]
+            and log["details"]["question_count"] == 40
+            for log in audit_response.json()["items"]
+        )
