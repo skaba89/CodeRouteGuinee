@@ -56,17 +56,14 @@ class TestDBSessionPool:
         gen = get_db()
         db = next(gen)
         sessions_created.append(db)
-        # Simuler une exception dans le bloc with
         try:
             raise RuntimeError("test exception")
         except RuntimeError:
             pass
-        # Fermer manuellement (le finally du générateur)
         try:
             gen.close()
         except Exception:
             pass
-        # La session ne doit pas être utilisable après fermeture
         assert len(sessions_created) == 1
 
     def test_session_executes_simple_query(self):
@@ -81,7 +78,6 @@ class TestDBSessionPool:
 
     def test_init_db_creates_tables(self):
         """init_db doit créer les tables sans erreur."""
-        # Ne doit pas lever d'exception
         init_db()
 
     def test_pg_pool_env_vars_read_correctly(self):
@@ -115,7 +111,6 @@ class TestDBSessionPool:
     def test_engine_pool_pre_ping_configured(self):
         """Le pool pre-ping doit être activé pour détecter les connexions mortes."""
         from app.db.session import engine
-        # pool_pre_ping est une propriété de l'engine
         assert engine is not None
 
     def test_session_local_autocommit_off(self):
@@ -124,7 +119,6 @@ class TestDBSessionPool:
         try:
             assert not db.autocommit  # type: ignore[attr-defined]
         except AttributeError:
-            # SQLAlchemy 2.x — la session n'a pas d'attribut autocommit direct
             pass
         finally:
             db.close()
@@ -133,7 +127,6 @@ class TestDBSessionPool:
         """autoflush doit être désactivé pour le contrôle explicite."""
         db = SessionLocal()
         try:
-            # En SQLAlchemy 2.x, on vérifie via les bind_args
             assert db is not None
         finally:
             db.close()
@@ -169,7 +162,6 @@ class TestDevFormatter:
         fmt = self._formatter()
         record = self._make_record("msg")
         result = fmt.format(record)
-        # Format HH:MM:SS
         import re
         assert re.search(r"\d{2}:\d{2}:\d{2}", result)
 
@@ -226,7 +218,6 @@ class TestDevFormatter:
         with patch.dict(os.environ, {"ENVIRONMENT": "development"}):
             setup_logging(level="DEBUG")
             root = logging.getLogger()
-            # Vérifier qu'il y a au moins un handler
             assert len(root.handlers) > 0
 
     def test_get_logger_returns_named_logger(self):
@@ -241,7 +232,6 @@ class TestDevFormatter:
         setup_logging()
         for name in ("sqlalchemy.engine", "passlib", "httpx"):
             lvl = logging.getLogger(name).level
-            # Peut être WARNING (30) ou hérité (0), mais ne doit pas être DEBUG (10)
             assert lvl != logging.DEBUG
 
 
@@ -268,7 +258,6 @@ class TestRequestLogger:
     def test_non_http_scope_passes_through(self):
         """Les scopes non-HTTP (websocket, lifespan) doivent passer directement."""
         import asyncio
-
         from app.logging_config import RequestLogger
 
         called = []
@@ -287,7 +276,6 @@ class TestRequestLogger:
     def test_http_request_logged(self):
         """Les requêtes HTTP doivent être loguées."""
         import asyncio
-
         from app.logging_config import RequestLogger
 
         log_calls = []
@@ -297,8 +285,6 @@ class TestRequestLogger:
             await send({"type": "http.response.body", "body": b"{}"})
 
         rl = RequestLogger(mock_app)
-
-        # Remplacer le logger pour capturer les appels
         rl.log = MagicMock()
         rl.log.info = lambda msg, **kw: log_calls.append(("info", msg))
         rl.log.warning = lambda msg, **kw: log_calls.append(("warn", msg))
@@ -322,7 +308,6 @@ class TestRequestLogger:
     def test_health_endpoint_not_logged(self):
         """Les health checks ne doivent pas être loggués (réduire le bruit)."""
         import asyncio
-
         from app.logging_config import RequestLogger
 
         log_calls = []
@@ -344,13 +329,11 @@ class TestRequestLogger:
             pass
 
         asyncio.get_event_loop().run_until_complete(rl(scope, receive, send))
-        # /health ne doit PAS être loggué
         assert not any("/health" in str(c) for c in log_calls)
 
     def test_error_status_logged_as_warning(self):
         """Les statuts >= 400 doivent être loggués en WARNING."""
         import asyncio
-
         from app.logging_config import RequestLogger
 
         warn_calls = []
@@ -373,7 +356,7 @@ class TestRequestLogger:
             pass
 
         asyncio.get_event_loop().run_until_complete(rl(scope, noop_receive, noop_send))
-        assert len(warn_calls) >= 0   # au moins tenté
+        assert len(warn_calls) >= 0
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -454,7 +437,6 @@ class TestMobileMoneyHTTPX:
         from app.mobile_money import _orange_money_payment
 
         with patch.dict(os.environ, {}, clear=True):
-            # Enlever toutes les vars Orange Money
             env = {k: v for k, v in os.environ.items()
                    if "ORANGE_MONEY" not in k}
             with patch.dict(os.environ, env, clear=True):
@@ -473,7 +455,6 @@ class TestMobileMoneyHTTPX:
         pay_response.json.return_value = {"pay_token": "PAY-TIMEOUT"}
         pay_response.raise_for_status = MagicMock()
 
-        # Statut toujours PENDING (jamais SUCCESSFULL ni FAILED)
         status_response = MagicMock()
         status_response.ok = True
         status_response.json.return_value = {"status": "PENDING"}
@@ -483,7 +464,6 @@ class TestMobileMoneyHTTPX:
             "ORANGE_MONEY_MERCHANT_CODE": "m",
         }):
             with patch("httpx.post", side_effect=[token_response, pay_response]):
-                # Timeout immédiat : simuler 30s passées en patchant time.time
                 original_time = time.time
 
                 call_count = [0]
@@ -491,10 +471,10 @@ class TestMobileMoneyHTTPX:
                     call_count[0] += 1
                     if call_count[0] <= 2:
                         return original_time()
-                    return original_time() + 31  # dépasse la deadline
+                    return original_time() + 31
 
                 with patch("time.time", side_effect=fast_time):
-                    with patch("time.sleep"):  # ne pas vraiment dormir
+                    with patch("time.sleep"):
                         with patch("httpx.get", return_value=status_response):
                             result = _orange_money_payment("+224620000001", 150_000)
 
@@ -520,9 +500,9 @@ class TestMobileMoneyHTTPX:
 
         with patch.dict(os.environ, {
             "MTN_MONEY_SUBSCRIPTION_KEY": "sub-key",
-            "MTN_MONEY_API_USER_ID":       "api-user",
-            "MTN_MONEY_API_KEY":           "api-key",
-            "MTN_MONEY_ENVIRONMENT":       "sandbox",
+            "MTN_MONEY_API_USER_ID": "api-user",
+            "MTN_MONEY_API_KEY": "api-key",
+            "MTN_MONEY_ENVIRONMENT": "sandbox",
         }):
             with patch("httpx.post", side_effect=[token_response, request_response]):
                 with patch("httpx.get", return_value=status_response):
@@ -548,7 +528,6 @@ class TestMobileMoneyHTTPX:
                if not any(p in k for p in ("ORANGE_MONEY", "MTN_MOMO", "WAVE"))}
         with patch.dict(os.environ, env, clear=True):
             result = simulate_mobile_money_payment("orange_money", "+224620000001", 150_000)
-        # Sandbox retourne toujours un résultat valide
         assert result.status in ("paid", "failed", "pending")
 
 
@@ -558,8 +537,6 @@ class TestMobileMoneyHTTPX:
 
 def _create_pending_payment(booking_ref: str, ext_ref: str) -> str:
     """Crée un paiement en statut pending en base. Retourne son ID."""
-    # Payment n'a pas de colonne external_reference dans ce schéma
-    # Les webhooks retourneront "received" si le paiement n'est pas trouvé
     return "mock-pay-id"
 
 
@@ -569,10 +546,8 @@ class TestPaymentsWebhooks:
     def _admin_headers(self, client):
         return get_admin_headers(client)
 
-    # ── Wave webhook ──────────────────────────────────────────────
-
     def test_wave_webhook_updates_payment_to_paid(self):
-        """Un webhook Wave succeeded doit passer le paiement à paid."""
+        """Un webhook Wave non réussi mais valide doit être accepté."""
         ext_ref = f"wave-checkout-{uuid.uuid4().hex[:8]}"
         booking_ref = f"GN-BK-WH-{uuid.uuid4().hex[:6]}"
         _create_pending_payment(booking_ref, ext_ref)
@@ -589,17 +564,16 @@ class TestPaymentsWebhooks:
         data = r.json()
         assert data["status"] in ("processed", "received", "ok")
 
-    def test_wave_webhook_invalid_json_returns_ignored(self):
-        """Un webhook Wave avec JSON invalide doit retourner status=ignored."""
+    def test_wave_webhook_invalid_json_is_rejected(self):
+        """Un webhook Wave avec JSON invalide doit échouer en 400 fail-closed."""
         with TestClient(app) as client:
             r = client.post(
                 "/api/v1/payments/webhook/wave",
                 content=b"not json at all",
                 headers={"Content-Type": "application/json"},
             )
-        assert r.status_code == 200
-        assert r.json()["status"] == "ignored"
-        assert "invalid_json" in r.json().get("reason", "")
+        assert r.status_code == 400
+        assert "Payload Wave invalide" in str(r.json().get("detail", ""))
 
     def test_wave_webhook_non_succeeded_status_returns_received(self):
         """Un webhook Wave avec statut non-succeeded doit retourner received."""
@@ -614,10 +588,16 @@ class TestPaymentsWebhooks:
         assert r.json()["status"] == "received"
 
     def test_wave_webhook_hmac_valid_signature_accepted(self):
-        """Un webhook Wave avec signature HMAC valide doit être accepté (pas 401)."""
+        """Une signature Wave horodatée valide doit être acceptée."""
         secret = "wave-secret-test-123"
         payload = json.dumps({"id": "chk-valid", "payment_status": "failed"}).encode()
-        sig = "sha256=" + hmac.new(secret.encode(), payload, hashlib.sha256).hexdigest()
+        timestamp = int(time.time())
+        digest = hmac.new(
+            secret.encode(),
+            str(timestamp).encode() + payload,
+            hashlib.sha256,
+        ).hexdigest()
+        signature = f"t={timestamp},v1={digest}"
 
         with patch.dict(os.environ, {"WAVE_WEBHOOK_SECRET": secret}):
             with TestClient(app) as client:
@@ -626,11 +606,11 @@ class TestPaymentsWebhooks:
                     content=payload,
                     headers={
                         "Content-Type": "application/json",
-                        "Wave-Signature": sig,
+                        "Wave-Signature": signature,
                     },
                 )
-        # Signature valide → pas 401 (peut être 200 ou 500 selon le modèle DB)
-        assert r.status_code != 401
+        assert r.status_code == 200
+        assert r.json()["status"] == "received"
 
     def test_wave_webhook_hmac_invalid_signature_rejected(self):
         """Un webhook Wave avec signature HMAC invalide doit retourner 401."""
@@ -650,7 +630,7 @@ class TestPaymentsWebhooks:
         assert r.status_code == 401
 
     def test_wave_webhook_no_secret_skips_signature_check(self):
-        """Sans WAVE_WEBHOOK_SECRET, aucune signature n'est vérifiée → pas 401."""
+        """Sans WAVE_WEBHOOK_SECRET, aucune signature n'est vérifiée hors production."""
         payload = json.dumps({"id": "chk-nosec", "payment_status": "failed"}).encode()
         env = {k: v for k, v in os.environ.items() if k != "WAVE_WEBHOOK_SECRET"}
         with patch.dict(os.environ, env, clear=True):
@@ -662,10 +642,8 @@ class TestPaymentsWebhooks:
                 )
         assert r.status_code != 401
 
-    # ── PayDunya webhook ──────────────────────────────────────────
-
     def test_paydunya_webhook_completed_updates_payment(self):
-        """Un webhook PayDunya completed doit retourner 200."""
+        """Un webhook PayDunya valide non final doit retourner 200."""
         token = f"pd-token-{uuid.uuid4().hex[:8]}"
         payload = json.dumps({
             "data": {"invoice": {"token": token}, "status": "pending"}
@@ -679,16 +657,16 @@ class TestPaymentsWebhooks:
             )
         assert r.status_code == 200
 
-    def test_paydunya_webhook_invalid_json_returns_ignored(self):
-        """Un webhook PayDunya avec JSON invalide doit retourner status=ignored."""
+    def test_paydunya_webhook_invalid_json_is_rejected(self):
+        """Un webhook PayDunya avec JSON invalide doit échouer en 400 fail-closed."""
         with TestClient(app) as client:
             r = client.post(
                 "/api/v1/payments/webhook/paydunya",
                 content=b"not json",
                 headers={"Content-Type": "application/json"},
             )
-        assert r.status_code == 200
-        assert r.json()["status"] == "ignored"
+        assert r.status_code == 400
+        assert "Payload PayDunya invalide" in str(r.json().get("detail", ""))
 
     def test_paydunya_webhook_non_completed_status(self):
         """Un webhook PayDunya avec statut non-completed doit retourner received."""
@@ -707,9 +685,7 @@ class TestPaymentsWebhooks:
         assert data["payment_status"] == "cancelled"
 
     def test_paydunya_webhook_missing_token(self):
-        """Un webhook PayDunya sans token : status=completed avec token vide."""
-        # Quand token = "" → query Payment.external_reference == "" → aucun résultat
-        # → retourne received ou échoue selon le modèle
+        """Un webhook PayDunya sans token non final reste reçu sans effet."""
         payload = json.dumps({"data": {"invoice": {}, "status": "cancelled"}}).encode()
         with TestClient(app) as client:
             r = client.post(
@@ -717,7 +693,8 @@ class TestPaymentsWebhooks:
                 content=payload,
                 headers={"Content-Type": "application/json"},
             )
-        assert r.status_code in (200, 500)
+        assert r.status_code == 200
+        assert r.json()["status"] == "received"
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -820,11 +797,9 @@ class TestLoginRateLimiterWithDB:
         limiter = LoginRateLimiter(max_attempts=5, window_seconds=300)
         key = f"test-ip-{uuid.uuid4().hex}"
 
-        # Mock une DB qui plante
         mock_db = MagicMock(spec=Session)
         mock_db.execute.side_effect = Exception("DB connection failed")
 
-        # Ne doit pas lever d'exception
         result = limiter.is_blocked(key, mock_db)
         assert isinstance(result, bool)
 
@@ -834,36 +809,31 @@ class TestLoginRateLimiterWithDB:
         email = f"brute-{suffix}@test.com"
 
         with TestClient(app) as client:
-            # Faire 6 tentatives échouées (max=5)
             for _ in range(6):
                 client.post("/api/v1/auth/login", data={
                     "username": email,
                     "password": "wrongpassword",
                 })
-            # La 7ème doit être bloquée
             r = client.post("/api/v1/auth/login", data={
                 "username": email,
                 "password": "wrongpassword",
             })
-        # 401 si pas encore bloqué, 429 si bloqué
         assert r.status_code in (401, 429)
 
     def test_ensure_table_creates_login_rate_limit_table(self):
         """_ensure_table doit créer la table login_rate_limit si elle n'existe pas."""
         from app.auth_guard import LoginRateLimiter
-        # Reset le flag pour forcer la création
         LoginRateLimiter._table_ensured = False
         limiter = LoginRateLimiter(max_attempts=5, window_seconds=300)
         db = self._db()
         try:
             limiter._ensure_table(db)
-            # La table doit exister maintenant
             result = db.execute(
                 text("SELECT COUNT(*) FROM login_rate_limit")
             ).fetchone()
             assert result is not None
         except Exception:
-            pass  # SQLite peut ne pas supporter toutes les syntaxes PG
+            pass
         finally:
             db.close()
             LoginRateLimiter._table_ensured = False
