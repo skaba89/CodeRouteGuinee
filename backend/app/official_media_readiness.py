@@ -248,9 +248,11 @@ def build_official_media_bank_readiness(
     return _build_readiness_from_assessments(questions, assessments)
 
 
-def runtime_ready_official_questions(
+def _ready_official_questions(
     db: Session,
     questions: list[Question],
+    *,
+    strict: bool,
 ) -> tuple[list[Question], dict]:
     # The assessment is intentionally computed once. New exam creation may run
     # over hundreds or thousands of approved questions, so duplicating the
@@ -258,7 +260,24 @@ def runtime_ready_official_questions(
     assessments = assess_official_question_media_batch(db, questions)
     by_id = {item.question_id: item for item in assessments}
     eligible = [
-        question for question in questions if by_id[question.id].runtime_ready
+        question
+        for question in questions
+        if (by_id[question.id].strict_ready if strict else by_id[question.id].runtime_ready)
     ]
     readiness = _build_readiness_from_assessments(questions, assessments)
     return eligible, readiness
+
+
+def runtime_ready_official_questions(
+    db: Session,
+    questions: list[Question],
+) -> tuple[list[Question], dict]:
+    return _ready_official_questions(db, questions, strict=False)
+
+
+def strict_ready_official_questions(
+    db: Session,
+    questions: list[Question],
+) -> tuple[list[Question], dict]:
+    """Return only normalized questions ready for a national strict exam."""
+    return _ready_official_questions(db, questions, strict=True)
