@@ -20,7 +20,11 @@ from app.models_audit import AuditLog
 from app.models_exam_attempt import ExamAttempt
 from app.models_exam_question_trace import ExamQuestionTrace
 from app.models_question import Question
-from app.official_media_readiness import runtime_ready_official_questions
+from app.official_media_policy import official_media_strict_mode_enabled
+from app.official_media_readiness import (
+    runtime_ready_official_questions,
+    strict_ready_official_questions,
+)
 
 
 def create_media_safe_exam_attempt(
@@ -38,19 +42,34 @@ def create_media_safe_exam_attempt(
             )
         ).all()
     )
-    eligible, media_readiness = runtime_ready_official_questions(db, approved)
+
+    strict_mode = official_media_strict_mode_enabled()
+    if strict_mode:
+        eligible, media_readiness = strict_ready_official_questions(db, approved)
+        readiness_mode = "strict_normalized_regulatory"
+    else:
+        eligible, media_readiness = runtime_ready_official_questions(db, approved)
+        readiness_mode = "runtime_compatibility"
 
     if len(eligible) < EXAM_QUESTIONS_TOTAL:
+        message = (
+            "La banque officielle ne contient pas assez de questions avec un média normalisé et homologué."
+            if strict_mode
+            else "La banque officielle ne contient pas assez de questions avec un média candidat exploitable."
+        )
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail={
                 "code": "OFFICIAL_MEDIA_BANK_NOT_READY",
-                "message": "La banque officielle ne contient pas assez de questions avec un média candidat exploitable.",
+                "message": message,
                 "approved_questions": len(approved),
-                "runtime_ready_questions": len(eligible),
+                "runtime_ready_questions": media_readiness["runtime_ready_questions"],
+                "strict_ready_questions": media_readiness["strict_ready_questions"],
                 "required_questions": EXAM_QUESTIONS_TOTAL,
                 "blocked_questions_total": media_readiness["blocked_questions_total"],
                 "legacy_migration_required": media_readiness["legacy_migration_required"],
+                "strict_mode": strict_mode,
+                "media_gate": readiness_mode,
             },
         )
 
@@ -63,7 +82,10 @@ def create_media_safe_exam_attempt(
                 "message": "La banque média-compatible ne permet pas de constituer un examen officiel complet.",
                 "selected_questions": len(selected),
                 "required_questions": EXAM_QUESTIONS_TOTAL,
-                "runtime_ready_questions": len(eligible),
+                "runtime_ready_questions": media_readiness["runtime_ready_questions"],
+                "strict_ready_questions": media_readiness["strict_ready_questions"],
+                "strict_mode": strict_mode,
+                "media_gate": readiness_mode,
             },
         )
 
@@ -81,7 +103,11 @@ def create_media_safe_exam_attempt(
         question_count=len(question_ids),
         bank_hash=bank_hash,
         version_label=f"{version_label}|sel-{selection_hash[:12]}",
-        selection_mode="official_category_distribution_media_safe",
+        selection_mode=(
+            "official_category_distribution_media_strict"
+            if strict_mode
+            else "official_category_distribution_media_safe"
+        ),
     )
     db.add(trace)
     db.add(
@@ -98,10 +124,12 @@ def create_media_safe_exam_attempt(
                 "bank_hash": bank_hash,
                 "version_label": trace.version_label,
                 "approved_bank_size": len(approved),
-                "runtime_ready_bank_size": len(eligible),
+                "runtime_ready_bank_size": media_readiness["runtime_ready_questions"],
                 "strict_ready_bank_size": media_readiness["strict_ready_questions"],
+                "eligible_bank_size": len(eligible),
                 "legacy_migration_required": media_readiness["legacy_migration_required"],
-                "media_gate": "runtime_compatibility_with_strict_readiness_tracking",
+                "strict_mode": strict_mode,
+                "media_gate": readiness_mode,
             },
         )
     )
