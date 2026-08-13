@@ -1,4 +1,4 @@
-"""Readiness nationale v2 — preuves opérationnelles pour un déploiement public.
+"""Readiness nationale v3 — preuves opérationnelles pour un déploiement public.
 
 Ce module ne remplace pas les dashboards métier. Il fournit une lecture plus
 stricte, conçue pour un comité de pilotage / homologation : un pilier n'est
@@ -26,6 +26,7 @@ from app.models_exam_question_trace import ExamQuestionTrace
 from app.models_question import Question
 from app.models_session import ExamSession
 from app.models_user import User
+from app.official_media_readiness import build_official_media_bank_readiness
 
 router = APIRouter(prefix="/national-readiness", tags=["national-readiness"])
 
@@ -40,6 +41,34 @@ def _weighted(points: int, factor: float) -> int:
 
 def _group_counts(rows) -> dict[str, int]:
     return {str(key): int(value) for key, value in rows}
+
+
+def _national_rollout_gate(
+    *,
+    score: int,
+    bank_ready: bool,
+    strict_media_ready: bool,
+    has_operational_centers: bool,
+    station_factor: float,
+    submitted_attempts: int,
+    traced_submitted: int,
+    critical_open_total: int,
+) -> bool:
+    """Return whether automated evidence permits national rollout.
+
+    This is a technical gate only. A True result never substitutes for the
+    formal DNTT/Ministry institutional decision documented in the response.
+    """
+    return (
+        score >= 90
+        and bank_ready
+        and strict_media_ready
+        and has_operational_centers
+        and station_factor >= 0.90
+        and submitted_attempts > 0
+        and traced_submitted == submitted_attempts
+        and critical_open_total == 0
+    )
 
 
 @router.get("")
@@ -82,6 +111,12 @@ def get_national_readiness(
         len(eligible) >= EXAM_QUESTIONS_TOTAL
         and all(item["sufficient"] for item in category_coverage.values())
     )
+
+    # Le pilote peut rester runtime-compatible pendant la migration, mais le
+    # rollout national exige une banque normalisée ayant passé le gate média
+    # strict (qualité, droits, usage examen et validation réglementaire).
+    media_readiness = build_official_media_bank_readiness(db, eligible)
+    strict_media_ready = bool(media_readiness["strict_exam_constructible"])
 
     # ── Centres et postes ─────────────────────────────────────────────────
     centers = list(db.scalars(select(Center).order_by(Center.code)).all())
@@ -164,7 +199,7 @@ def get_national_readiness(
         "official_question_bank": {
             "weight": 25,
             "score": _weighted(25, bank_factor),
-            "ready": bank_ready,
+            "ready": bank_ready and strict_media_ready,
         },
         "operational_centers": {
             "weight": 15,
@@ -207,6 +242,8 @@ def get_national_readiness(
     blockers: list[str] = []
     if not bank_ready:
         blockers.append("official_question_bank_not_ready")
+    if not strict_media_ready:
+        blockers.append("official_media_bank_not_strict_ready")
     if not operational_centers:
         blockers.append("no_operational_exam_center")
     if operational_centers and centers_with_stations < len(operational_centers):
@@ -280,19 +317,20 @@ def get_national_readiness(
             "blockers": center_blockers,
         })
 
-    national_rollout_allowed = (
-        score >= 90
-        and bank_ready
-        and bool(operational_centers)
-        and station_factor >= 0.90
-        and submitted_attempts > 0
-        and traced_submitted == submitted_attempts
-        and critical_open_total == 0
+    national_rollout_allowed = _national_rollout_gate(
+        score=score,
+        bank_ready=bank_ready,
+        strict_media_ready=strict_media_ready,
+        has_operational_centers=bool(operational_centers),
+        station_factor=station_factor,
+        submitted_attempts=submitted_attempts,
+        traced_submitted=traced_submitted,
+        critical_open_total=critical_open_total,
     )
 
     return {
         "generated_at": now.isoformat(),
-        "version": "national-readiness-v2",
+        "version": "national-readiness-v3",
         "score": score,
         "status": status_label,
         "national_rollout_allowed": national_rollout_allowed,
@@ -304,6 +342,15 @@ def get_national_readiness(
             "required": EXAM_QUESTIONS_TOTAL,
             "ready": bank_ready,
             "category_coverage": category_coverage,
+            "media": {
+                "runtime_ready_questions": media_readiness["runtime_ready_questions"],
+                "strict_ready_questions": media_readiness["strict_ready_questions"],
+                "runtime_exam_constructible": media_readiness["runtime_exam_constructible"],
+                "strict_exam_constructible": media_readiness["strict_exam_constructible"],
+                "legacy_migration_required": media_readiness["legacy_migration_required"],
+                "blocked_questions_total": media_readiness["blocked_questions_total"],
+                "counts_by_mode": media_readiness["counts_by_mode"],
+            },
         },
         "centers": {
             "total": len(centers),
