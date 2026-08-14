@@ -84,6 +84,8 @@ jobs:
             test_file: tests/test_health.py
           - name: deploy-preflight
             test_file: tests/test_deploy_preflight.py
+          - name: render-deployment-fingerprint
+            test_file: tests/test_render_deployment_fingerprint.py
           - name: postgres-backup-tooling
             test_file: tests/test_postgres_backup_script.py
           - name: operations-summary

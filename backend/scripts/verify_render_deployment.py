@@ -4,6 +4,9 @@
 Read-only and credential-free: the script calls only /health/live and
 /health/readiness, compares Render's RENDER_GIT_COMMIT fingerprint exposed by the
 API with an expected full SHA, and can persist a privacy-safe JSON receipt.
+
+Transient network failures are retried with a bounded policy. Permanent client
+errors remain fail-fast and a persistent outage still fails the verification.
 """
 from __future__ import annotations
 
@@ -12,6 +15,8 @@ import json
 import os
 import re
 import sys
+import time
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -21,6 +26,9 @@ from urllib.request import Request, urlopen
 
 _SHA40 = re.compile(r"^[0-9a-fA-F]{40}$")
 DEFAULT_TIMEOUT_SECONDS = 15.0
+DEFAULT_ATTEMPTS = 3
+DEFAULT_RETRY_DELAY_SECONDS = 2.0
+RETRYABLE_HTTP_STATUSES = frozenset({408, 425, 429, 500, 502, 503, 504})
 
 
 def utc_now() -> datetime:
@@ -50,6 +58,11 @@ def _origin(raw: str) -> str:
 
 
 def request_json(base_url: str, path: str, timeout: float) -> tuple[int | None, dict[str, Any] | None, str | None]:
+    """Perform one read-only JSON request.
+
+    Retry orchestration intentionally lives in ``request_json_with_retry`` so
+    this primitive stays deterministic and easy to test.
+    """
     request = Request(
         urljoin(base_url + "/", path.lstrip("/")),
         headers={"Accept": "application/json", "User-Agent": "CodeRoute-Render-Fingerprint/1.0"},
@@ -70,6 +83,44 @@ def request_json(base_url: str, path: str, timeout: float) -> tuple[int | None, 
         return int(exc.code), None, f"HTTP {int(exc.code)}"
     except (URLError, TimeoutError, OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
         return None, None, exc.__class__.__name__
+
+
+def _is_retryable(status_code: int | None) -> bool:
+    return status_code is None or status_code in RETRYABLE_HTTP_STATUSES
+
+
+def request_json_with_retry(
+    base_url: str,
+    path: str,
+    timeout: float,
+    *,
+    attempts: int = DEFAULT_ATTEMPTS,
+    retry_delay: float = DEFAULT_RETRY_DELAY_SECONDS,
+    sleep_fn: Callable[[float], None] = time.sleep,
+) -> tuple[int | None, dict[str, Any] | None, str | None, int]:
+    """Request JSON with bounded retries for transient failures only.
+
+    Returns the final HTTP status/payload/error plus the number of attempts used.
+    A permanent 4xx fails immediately; network errors and selected transient HTTP
+    statuses are retried until ``attempts`` is exhausted.
+    """
+    if attempts < 1:
+        raise ValueError("attempts doit être >= 1")
+    if retry_delay < 0:
+        raise ValueError("retry_delay doit être >= 0")
+
+    last_status: int | None = None
+    last_payload: dict[str, Any] | None = None
+    last_error: str | None = None
+
+    for attempt_number in range(1, attempts + 1):
+        last_status, last_payload, last_error = request_json(base_url, path, timeout)
+        if not _is_retryable(last_status) or attempt_number == attempts:
+            return last_status, last_payload, last_error, attempt_number
+        if retry_delay > 0:
+            sleep_fn(retry_delay)
+
+    return last_status, last_payload, last_error, attempts
 
 
 def evaluate_runtime(
@@ -140,9 +191,23 @@ def build_receipt(
     expected_commit: str,
     expected_repo_slug: str | None,
     timeout: float,
+    attempts: int = DEFAULT_ATTEMPTS,
+    retry_delay: float = DEFAULT_RETRY_DELAY_SECONDS,
 ) -> dict[str, Any]:
-    live_status, live, live_error = request_json(base_url, "/health/live", timeout)
-    ready_status, readiness, ready_error = request_json(base_url, "/health/readiness", timeout)
+    live_status, live, live_error, live_attempts = request_json_with_retry(
+        base_url,
+        "/health/live",
+        timeout,
+        attempts=attempts,
+        retry_delay=retry_delay,
+    )
+    ready_status, readiness, ready_error, ready_attempts = request_json_with_retry(
+        base_url,
+        "/health/readiness",
+        timeout,
+        attempts=attempts,
+        retry_delay=retry_delay,
+    )
     assessment = evaluate_runtime(
         live,
         readiness,
@@ -160,9 +225,14 @@ def build_receipt(
         "schema": "coderoute_render_deployment_receipt_v1",
         "generated_at": utc_now().isoformat(),
         "target_origin": _origin(base_url),
+        "retry_policy": {
+            "attempts": attempts,
+            "retry_delay_seconds": retry_delay,
+            "retryable_http_statuses": sorted(RETRYABLE_HTTP_STATUSES),
+        },
         "http": {
-            "health_live": {"status_code": live_status, "error": live_error},
-            "health_readiness": {"status_code": ready_status, "error": ready_error},
+            "health_live": {"status_code": live_status, "error": live_error, "attempts_used": live_attempts},
+            "health_readiness": {"status_code": ready_status, "error": ready_error, "attempts_used": ready_attempts},
         },
         "assessment": assessment,
     }
@@ -175,6 +245,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--expected-repo-slug", default=os.getenv("CODEROUTE_EXPECTED_REPO_SLUG", "skaba89/CodeRouteGuinee"))
     parser.add_argument("--receipt", default="")
     parser.add_argument("--timeout", type=float, default=DEFAULT_TIMEOUT_SECONDS)
+    parser.add_argument("--attempts", type=int, default=DEFAULT_ATTEMPTS)
+    parser.add_argument("--retry-delay", type=float, default=DEFAULT_RETRY_DELAY_SECONDS)
     parser.add_argument("--allow-http", action="store_true")
     return parser.parse_args(argv)
 
@@ -183,6 +255,12 @@ def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     if args.timeout <= 0 or args.timeout > 120:
         print("ERROR: --timeout doit être > 0 et <= 120 secondes", file=sys.stderr)
+        return 2
+    if args.attempts < 1 or args.attempts > 10:
+        print("ERROR: --attempts doit être compris entre 1 et 10", file=sys.stderr)
+        return 2
+    if args.retry_delay < 0 or args.retry_delay > 30:
+        print("ERROR: --retry-delay doit être compris entre 0 et 30 secondes", file=sys.stderr)
         return 2
     try:
         base_url = safe_base_url(args.base_url, allow_http=bool(args.allow_http))
@@ -193,6 +271,8 @@ def main(argv: list[str] | None = None) -> int:
             expected_commit=args.expected_commit.strip(),
             expected_repo_slug=(args.expected_repo_slug or "").strip() or None,
             timeout=float(args.timeout),
+            attempts=int(args.attempts),
+            retry_delay=float(args.retry_delay),
         )
     except ValueError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
