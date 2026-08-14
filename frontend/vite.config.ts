@@ -46,16 +46,19 @@ export default defineConfig({
             },
           },
           {
-            // Les images du pack d'entraînement guinéen sont publiques et ne
-            // contiennent ni réponse ni PII. Les conserver localement évite
-            // qu'une reprise réseau rende une question blanche. Les vidéos ne
-            // sont volontairement pas mises en cache ici afin de préserver les
-            // Range Requests et le budget data mobile.
+            // Les images du pack d'entraînement guinéen sont petites et
+            // critiques pour la compréhension d'une question. NetworkFirst
+            // évite qu'un ancien cache Safari/PWA conserve indéfiniment une
+            // réponse invalide après un redéploiement, tout en gardant un
+            // fallback hors ligne lorsque le réseau n'est pas disponible.
+            // Les vidéos ne sont volontairement pas mises en cache ici afin
+            // de préserver les Range Requests et le budget data mobile.
             urlPattern: /\/media\/exam\/guinea\/.*\.webp(?:\?.*)?$/,
-            handler: 'CacheFirst',
+            handler: 'NetworkFirst',
             options: {
-              cacheName: 'guinea-exam-images-v2',
-              cacheableResponse: { statuses: [0, 200] },
+              cacheName: 'guinea-exam-images-v3',
+              networkTimeoutSeconds: 5,
+              cacheableResponse: { statuses: [200] },
               expiration: {
                 maxEntries: 40,
                 maxAgeSeconds: 30 * 24 * 3600,
