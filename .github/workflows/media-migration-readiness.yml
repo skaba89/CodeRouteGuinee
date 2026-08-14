@@ -22,7 +22,7 @@ on:
       - '.github/workflows/media-migration-readiness.yml'
   push:
     branches:
-      - '**'
+      - main
     paths:
       - 'backend/app/media_*.py'
       - 'backend/app/models_media.py'
@@ -45,6 +45,10 @@ on:
 
 permissions:
   contents: read
+
+concurrency:
+  group: media-migration-readiness-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   media-contracts:
