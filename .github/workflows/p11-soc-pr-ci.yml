@@ -23,6 +23,10 @@ on:
       - '.github/workflows/p11-soc-pr-ci.yml'
   workflow_dispatch:
 
+concurrency:
+  group: p11-soc-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   p11-backend-security:
     runs-on: ubuntu-latest
