@@ -20,7 +20,7 @@ import { type Locale } from '../i18n';
 import { useAuthSession, canUseProtectedActions } from '../authSession';
 import { IconArrowLeft, IconArrowRight, IconCheck, IconClock, IconTarget, IconFileCheck, IconClipboard, IconAlertTriangle } from '../icons';
 import { DEMO_QUESTIONS, type ExamQuestionData } from './examQuestions';
-import { MediaBlock, QGrid } from './shared-exam-components';
+import { MediaBlock } from './shared-exam-components';
 import type { QData } from './shared-exam-components';
 
 interface Props { user?: AuthUser | null; locale?: Locale; onLocaleChange?: (l: Locale) => void; }
@@ -133,6 +133,13 @@ function fromApiAnswers(apiAnswers: Record<string, string>, questions: QData[]):
   return restored;
 }
 
+function firstUnansweredIndex(answers: Record<number, string>, questionCount: number): number {
+  for (let index = 0; index < questionCount; index += 1) {
+    if (answers[index] === undefined) return index;
+  }
+  return -1;
+}
+
 function toDisplayQuestion(question: ExamQuestion, index: number): ExamDisplayQuestion {
   const runtimeQuestion = question as ExamQuestionWithMediaRuntime;
   return {
@@ -230,6 +237,7 @@ export function ExamPage({ locale }: Props) {
 
   const q = questions[idx];
   const answered = Object.keys(answers).length;
+  const currentAnswered = answers[idx] !== undefined;
   const audioEnabled = isAudioLocale(locale as Locale);
   const isOfficialExam = attemptId !== null;
 
@@ -289,6 +297,8 @@ export function ExamPage({ locale }: Props) {
           ...readStoredAnswers(storedAttemptId),
         };
         setAnswers(restoredAnswers);
+        const resumeIndex = firstUnansweredIndex(restoredAnswers, questionView.length);
+        setIdx(resumeIndex === -1 ? Math.max(0, questionView.length - 1) : resumeIndex);
         persistStoredAnswers(storedAttemptId, restoredAnswers);
         latestAutosaveSnapshot.current = restoredAnswers;
         autosaveQueue.current = Promise.resolve();
@@ -369,8 +379,20 @@ export function ExamPage({ locale }: Props) {
   useEffect(() => {
     if (phase !== 'running') return;
     const handler = (event: KeyboardEvent) => {
-      if (event.key === 'ArrowRight') setIdx(index => Math.min(questions.length - 1, index + 1));
-      if (event.key === 'ArrowLeft') setIdx(index => Math.max(0, index - 1));
+      if (event.key === 'ArrowRight') {
+        if (answers[idx] === undefined) {
+          setSubmissionErr(`Répondez à la question ${idx + 1} avant de continuer.`);
+          return;
+        }
+        setSubmissionErr('');
+        setReveal(false);
+        setIdx(index => Math.min(questions.length - 1, index + 1));
+      }
+      if (event.key === 'ArrowLeft') {
+        setSubmissionErr('');
+        setReveal(false);
+        setIdx(index => Math.max(0, index - 1));
+      }
       if (['1','2','3','4'].includes(event.key)) {
         const optionIndex = parseInt(event.key) - 1;
         if (q?.options[optionIndex]) pick(q.options[optionIndex]);
@@ -378,7 +400,7 @@ export function ExamPage({ locale }: Props) {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [phase, idx, q, answers, isOfficialExam]);
+  }, [phase, idx, q, answers, isOfficialExam, questions.length]);
 
   function autosaveOfficialAnswers(nextAnswers: Record<number, string>): Promise<void> {
     if (!attemptId) return Promise.resolve();
@@ -407,6 +429,7 @@ export function ExamPage({ locale }: Props) {
   function pick(opt: string) {
     if (!q) return;
 
+    setSubmissionErr('');
     if (isOfficialExam) {
       const nextAnswers = { ...answers, [idx]: opt };
       setAnswers(nextAnswers);
@@ -420,6 +443,22 @@ export function ExamPage({ locale }: Props) {
     if (audioEnabled) speakFeedback(isCorrect, q.explanation ?? q.expl);
     setAnswers(current => ({ ...current, [idx]: opt }));
     setReveal(true);
+  }
+
+  function goToPreviousQuestion() {
+    setSubmissionErr('');
+    setReveal(false);
+    setIdx(index => Math.max(0, index - 1));
+  }
+
+  function goToNextQuestion() {
+    if (answers[idx] === undefined) {
+      setSubmissionErr(`Répondez à la question ${idx + 1} avant de continuer.`);
+      return;
+    }
+    setSubmissionErr('');
+    setReveal(false);
+    setIdx(index => Math.min(questions.length - 1, index + 1));
   }
 
   function resetExamState() {
@@ -493,7 +532,8 @@ export function ExamPage({ locale }: Props) {
       persistStoredAnswers(attempt.id, restoredAnswers);
       latestAutosaveSnapshot.current = restoredAnswers;
       autosaveQueue.current = Promise.resolve();
-      setIdx(0);
+      const resumeIndex = firstUnansweredIndex(restoredAnswers, questionView.length);
+      setIdx(resumeIndex === -1 ? Math.max(0, questionView.length - 1) : resumeIndex);
       setReveal(false);
       setResult(null);
       setFilter('all');
@@ -513,6 +553,14 @@ export function ExamPage({ locale }: Props) {
   }
 
   async function submitExam() {
+    const firstMissing = firstUnansweredIndex(answers, questions.length);
+    if (firstMissing !== -1) {
+      setSubmissionErr(`Répondez à toutes les questions avant de soumettre. La question ${firstMissing + 1} est encore sans réponse.`);
+      setReveal(false);
+      setIdx(firstMissing);
+      return;
+    }
+
     if (submissionInFlight.current) return;
     submissionInFlight.current = true;
     setSubmitting(true);
@@ -703,7 +751,7 @@ export function ExamPage({ locale }: Props) {
         )}
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600 }}><span style={{ color: 'var(--guinea-green)', fontWeight: 800, fontSize: 16 }}>{idx + 1}</span><span style={{ color: 'var(--muted)' }}>/ {questions.length}</span></div>
+          <div aria-label={`Question ${idx + 1} sur ${questions.length}`} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600 }}><span style={{ color: 'var(--guinea-green)', fontWeight: 800, fontSize: 16 }}>{idx + 1}</span><span style={{ color: 'var(--muted)' }}>/ {questions.length}</span></div>
           <div style={{ flex: 1, height: 6, background: 'var(--border)', borderRadius: 8, overflow: 'hidden', minWidth: 100 }}><div style={{ height: '100%', background: 'linear-gradient(90deg, var(--guinea-green), #009460)', width: `${(idx + 1) / Math.max(1, questions.length) * 100}%` }}/></div>
           <div style={{ padding: '4px 12px', borderRadius: 20, background: catBg, color: catColor, fontSize: 11.5, fontWeight: 700 }}>{q?.category}</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 11px', borderRadius: 10, border: `1px solid ${timerColor}33`, background: timerCritical ? '#FDECEA' : timerUrgent ? '#FDF6E0' : '#E6F3EC', flexShrink: 0 }}>
@@ -755,32 +803,19 @@ export function ExamPage({ locale }: Props) {
 
             {canRevealAnswer && reveal && q?.expl && <div style={{ marginTop: 14, padding: '12px 16px', background: '#E6F3EC', borderLeft: '3px solid var(--guinea-green)', borderRadius: '0 8px 8px 0', fontSize: 13, color: '#006B3F' }}><strong>Explication : </strong>{q.expl}</div>}
 
+            {!currentAnswered && (
+              <div role="status" style={{ marginTop: 14, fontSize: 12.5, color: 'var(--muted)', textAlign: 'center' }}>
+                Sélectionnez une réponse pour continuer vers la question suivante.
+              </div>
+            )}
+
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
-              <button className="secondary-button btn-sm" disabled={idx === 0} onClick={() => { setReveal(false); setIdx(index => Math.max(0, index - 1)); }} style={{ display: 'flex', alignItems: 'center', gap: 5 }}><IconArrowLeft size={15}/> Précédente</button>
+              <button className="secondary-button btn-sm" disabled={idx === 0} onClick={goToPreviousQuestion} style={{ display: 'flex', alignItems: 'center', gap: 5 }}><IconArrowLeft size={15}/> Précédente</button>
               <span style={{ fontSize: 12, color: 'var(--muted)' }}>{answered} / {questions.length} répondues</span>
               {idx < questions.length - 1
-                ? <button className="secondary-button btn-sm" onClick={() => { setReveal(false); setIdx(index => Math.min(questions.length - 1, index + 1)); }} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>Suivante <IconArrowRight size={15}/></button>
-                : <button className="btn-success btn-sm" disabled={submitting} onClick={() => { void submitExam(); }} style={{ display: 'flex', alignItems: 'center', gap: 5 }}><IconCheck size={15}/> {submitting ? 'Soumission…' : 'Soumettre'}</button>}
+                ? <button className="secondary-button btn-sm" disabled={!currentAnswered} aria-disabled={!currentAnswered} onClick={goToNextQuestion} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>Suivante <IconArrowRight size={15}/></button>
+                : <button className="btn-success btn-sm" disabled={submitting || !currentAnswered} onClick={() => { void submitExam(); }} style={{ display: 'flex', alignItems: 'center', gap: 5 }}><IconCheck size={15}/> {submitting ? 'Soumission…' : "Soumettre l'examen"}</button>}
             </div>
-          </div>
-        </div>
-
-        <div style={{ marginTop: 20, padding: 16, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, boxShadow: 'var(--sh-xs)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, gap: 10, flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.07em' }}>Navigation — {answered} / {questions.length} répondues</span>
-            {isOfficialExam && <span style={{ fontSize: 10.5, color: saveState === 'offline' ? '#C0392B' : '#166534' }}>{saveState === 'offline' ? 'Sauvegarde serveur à reprendre' : 'Session sécurisée'}</span>}
-          </div>
-          <QGrid total={questions.length} cur={idx} ans={answers} onSelect={index => { setReveal(false); setIdx(index); }}/>
-          <div style={{ marginTop: 12, display: 'flex', justifyContent: 'flex-end' }}>
-            <button className="btn-success btn-sm" disabled={submitting} onClick={() => {
-              if (answered < questions.length) {
-                setSubmissionErr(`${questions.length - answered} question(s) sans réponse. Vous pouvez les retrouver dans la grille avant de soumettre.`);
-              } else {
-                void submitExam();
-              }
-            }} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-              <IconCheck size={14}/>{submitting ? 'Soumission…' : answered < questions.length ? `Vérifier (${questions.length - answered} restantes)` : "Soumettre l'examen"}
-            </button>
           </div>
         </div>
       </div>
