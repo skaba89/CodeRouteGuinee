@@ -1,0 +1,77 @@
+{
+  "schema_version": 1,
+  "collection": "guinea-realistic-training-media",
+  "governance": {
+    "source_type": "rights_cleared_photography",
+    "quality_status": "TRAINING_CURATED",
+    "regulatory_status": "NOT_REVIEWED",
+    "official_exam_allowed": false,
+    "note": "Real Guinea road photography for training/demo only; not DNTT homologation."
+  },
+  "assets": [
+    {
+      "id": "guinea-road-signs-conakry-coyah",
+      "file": "road-signs-conakry-coyah.webp",
+      "kind": "image",
+      "width": 1280,
+      "height": 720,
+      "bytes": 96732,
+      "sha256": "0643d00b26451ffccf6dabde3fb00ce1724f349069c1f260f59269196feeba91",
+      "source_sha1": "cebf79cde84d3f0b5d98b5c3f32f107c23f298e3",
+      "author": "Aboubacarkhoraa",
+      "source_page": "https://commons.wikimedia.org/wiki/File:Panneaux_de_signalisation_sur_la_route_conakry_Coyah.jpg",
+      "license": "CC BY-SA 4.0",
+      "license_url": "https://creativecommons.org/licenses/by-sa/4.0/",
+      "usage": "training_only",
+      "official_exam_allowed": false
+    },
+    {
+      "id": "guinea-traffic-conakry-boke",
+      "file": "traffic-conakry-boke.webp",
+      "kind": "image",
+      "width": 1280,
+      "height": 720,
+      "bytes": 57754,
+      "sha256": "9ddd04d4bd699900f5fe2557350fdc9e942e0f981622985b26b4026b2dee0fb7",
+      "source_sha1": "e2d0c1378ba6000a8542b3114d45a0dbda174655",
+      "author": "Aboubacarkhoraa",
+      "source_page": "https://commons.wikimedia.org/wiki/File:Camion_et_voiture_sur_la_route_conakry_Bok%C3%A9_01.jpg",
+      "license": "CC BY-SA 4.0",
+      "license_url": "https://creativecommons.org/licenses/by-sa/4.0/",
+      "usage": "training_only",
+      "official_exam_allowed": false
+    },
+    {
+      "id": "guinea-route-coyah",
+      "file": "route-coyah.webp",
+      "kind": "image",
+      "width": 1280,
+      "height": 720,
+      "bytes": 198152,
+      "sha256": "e3f513b6014100b79e263b24ae3a1f9428aa2412de682885806d9f708da633c7",
+      "source_sha1": "f066cf53200d50025e99a214d6262df0a3305dcd",
+      "author": "Sayd224",
+      "source_page": "https://commons.wikimedia.org/wiki/File:Route_de_coyah.jpg",
+      "license": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "usage": "training_only",
+      "official_exam_allowed": false
+    },
+    {
+      "id": "guinea-roundabout-enta",
+      "file": "roundabout-enta-conakry.webp",
+      "kind": "image",
+      "width": 1280,
+      "height": 720,
+      "bytes": 111818,
+      "sha256": "17ff3d647ce43f2c61bf19b9bad341fb0388010dcdd8a360d0580d93985ea873",
+      "source_sha1": "89bb904c267cf9ca44ac1814cc32ad2ec6d56177",
+      "author": "Ousmane Diallo OsmanLeo",
+      "source_page": "https://commons.wikimedia.org/wiki/File:Rond_Point_Enta_March%C3%A9_Conakry.jpg",
+      "license": "CC BY-SA 4.0",
+      "license_url": "https://creativecommons.org/licenses/by-sa/4.0/",
+      "usage": "training_only",
+      "official_exam_allowed": false
+    }
+  ]
+}

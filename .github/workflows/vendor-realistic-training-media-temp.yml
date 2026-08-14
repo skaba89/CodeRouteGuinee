@@ -1,0 +1,68 @@
+name: Temporary Realistic Training Media Vendor
+
+on:
+  push:
+    branches:
+      - feat/realistic-training-media-pack-20260814
+    paths:
+      - 'scripts/vendor_realistic_training_media.py'
+      - 'frontend/public/media/exam/guinea/realistic-sources.json'
+      - '.github/workflows/vendor-realistic-training-media-temp.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  vendor:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/realistic-training-media-pack-20260814
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install image tooling
+        run: python -m pip install --disable-pip-version-check 'Pillow>=10,<12'
+
+      - name: Vendor rights-cleared Guinea training photos
+        run: python scripts/vendor_realistic_training_media.py
+
+      - name: Validate generated pack
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from PIL import Image
+
+          root = Path('frontend/public/media/exam/guinea/realistic')
+          manifest = json.loads((root / 'manifest.json').read_text(encoding='utf-8'))
+          assert manifest['governance']['official_exam_allowed'] is False
+          assert len(manifest['assets']) == 4
+          for asset in manifest['assets']:
+              path = root / asset['file']
+              assert path.exists(), path
+              assert 5_000 < path.stat().st_size < 500_000, path
+              with Image.open(path) as image:
+                  assert image.format == 'WEBP'
+                  assert image.size == (1280, 720)
+              assert asset['official_exam_allowed'] is False
+          assert (root / 'ATTRIBUTION.md').exists()
+          print('realistic training pack validated')
+          PY
+
+      - name: Commit generated derivatives to curation branch
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add frontend/public/media/exam/guinea/realistic/
+          if git diff --cached --quiet; then
+            echo 'No generated media changes.'
+            exit 0
+          fi
+          git commit -m 'feat(media): vendor realistic Guinea training photos'
+          git push origin HEAD:feat/realistic-training-media-pack-20260814
