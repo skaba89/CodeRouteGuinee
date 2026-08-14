@@ -122,6 +122,8 @@ test('examen blanc serves the Guinea roundabout video and paints its fallback on
 
   const next = page.getByRole('button', { name: /suivante/i }).first();
   for (let index = 0; index < 4; index += 1) {
+    await page.keyboard.press('1');
+    await expect(next).toBeEnabled();
     await next.click();
   }
 
