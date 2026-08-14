@@ -198,6 +198,29 @@ test.describe('Examen officiel — résilience runtime', () => {
     await mockAuthenticatedCandidate(page);
   });
 
+  test('force un parcours séquentiel sans grille ni saut vers une question non répondue', async ({ page }) => {
+    await mockOfficialExam(page);
+    await openOfficialExam(page);
+
+    await expect(page.getByLabel('Question 1 sur 2')).toBeVisible();
+    await expect(page.getByText(/Navigation —/)).toHaveCount(0);
+
+    const next = page.getByRole('button', { name: /Suivante/ });
+    await expect(next).toBeDisabled();
+    await expect(page.getByText('Sélectionnez une réponse pour continuer vers la question suivante.')).toBeVisible();
+
+    await page.keyboard.press('ArrowRight');
+    await expect(page.getByText(QUESTIONS[0].text)).toBeVisible();
+    await expect(page.getByText(QUESTIONS[1].text)).toHaveCount(0);
+
+    await page.getByRole('button', { name: /Le véhicule blanc/ }).click();
+    await expect(next).toBeEnabled();
+    await next.click();
+
+    await expect(page.getByLabel('Question 2 sur 2')).toBeVisible();
+    await expect(page.getByText(QUESTIONS[1].text)).toBeVisible();
+  });
+
   test('utilise le temps serveur et autosauvegarde la réponse sans révéler la correction', async ({ page }) => {
     let savedPayload: Record<string, string> | null = null;
     await mockOfficialExam(page, {
@@ -220,7 +243,7 @@ test.describe('Examen officiel — résilience runtime', () => {
     await expect(page.getByText(/Explication :/i)).toHaveCount(0);
   });
 
-  test('reprend la même tentative après refresh avec réponses et temps conservés', async ({ page }) => {
+  test('reprend la même tentative après refresh sur la première question non répondue', async ({ page }) => {
     let starts = 0;
     await mockOfficialExam(page);
     await page.unroute('**/api/v1/exams/start-from-booking');
@@ -231,17 +254,18 @@ test.describe('Examen officiel — résilience runtime', () => {
 
     await openOfficialExam(page);
     await page.getByRole('button', { name: /Le véhicule blanc/ }).click();
-    await expect(page.getByText('Navigation — 1 / 2 répondues')).toBeVisible();
+    await expect(page.getByText('1 / 2 répondues')).toBeVisible();
 
     await page.reload();
 
     await expect(page.getByRole('main', { name: 'Examen officiel en cours' })).toBeVisible();
-    await expect(page.getByText('Navigation — 1 / 2 répondues')).toBeVisible();
+    await expect(page.getByLabel('Question 2 sur 2')).toBeVisible();
+    await expect(page.getByText('1 / 2 répondues')).toBeVisible();
     await expect(page.getByText(/19:5\d/)).toBeVisible();
     expect(starts).toBe(1);
   });
 
-  test('restaure la copie serveur sur un poste sans sessionStorage', async ({ page }) => {
+  test('restaure la copie serveur sur un poste sans sessionStorage et reprend au premier manque', async ({ page }) => {
     await mockOfficialExam(page, {
       savedAnswers: { 'q-priority-1': 'Le véhicule blanc' },
     });
@@ -252,7 +276,11 @@ test.describe('Examen officiel — résilience runtime', () => {
     await page.getByRole('button', { name: "Démarrer l'examen officiel" }).click();
 
     await expect(page.getByRole('main', { name: 'Examen officiel en cours' })).toBeVisible();
-    await expect(page.getByText('Navigation — 1 / 2 répondues')).toBeVisible();
+    await expect(page.getByLabel('Question 2 sur 2')).toBeVisible();
+    await expect(page.getByText('1 / 2 répondues')).toBeVisible();
+
+    await page.getByRole('button', { name: /Précédente/ }).click();
+    await expect(page.getByLabel('Question 1 sur 2')).toBeVisible();
     await expect(page.getByRole('button', { name: /Le véhicule blanc/ })).toHaveCSS('border-color', 'rgb(0, 107, 63)');
   });
 
