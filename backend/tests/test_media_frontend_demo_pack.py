@@ -6,6 +6,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 PACK = ROOT / "frontend" / "public" / "media" / "exam" / "guinea"
 PLAYER = ROOT / "frontend" / "src" / "components" / "ExamMediaPremium.tsx"
+VITE_CONFIG = ROOT / "frontend" / "vite.config.ts"
 
 
 def test_guinea_demo_media_pack_is_small_valid_and_explicitly_not_official():
@@ -51,3 +52,18 @@ def test_guinea_demo_media_injection_is_fail_closed_for_official_attempts():
     assert "no-entry-conakry.webp" in source
     assert "roundabout-approach-demo.mp4" in source
     assert "fallbackUrl={demo.fallback}" in source
+
+
+def test_guinea_demo_images_can_recover_from_stale_mobile_pwa_cache():
+    player_source = PLAYER.read_text(encoding="utf-8")
+    vite_source = VITE_CONFIG.read_text(encoding="utf-8")
+
+    assert "GUINEA_MEDIA_VERSION = '20260814-1'" in player_source
+    assert "withRetryCacheBypass" in player_source
+    assert "retry=${retryKey}" in player_source
+    assert "src={imageUrl}" in player_source
+
+    assert "handler: 'NetworkFirst'" in vite_source
+    assert "cacheName: 'guinea-exam-images-v3'" in vite_source
+    assert "networkTimeoutSeconds: 5" in vite_source
+    assert "cacheableResponse: { statuses: [200] }" in vite_source
