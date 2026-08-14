@@ -118,6 +118,7 @@ def test_exam_question_trace_is_created_and_used_for_scoring() -> None:
         from sqlalchemy import select as _select
 
         from app.db.session import SessionLocal as _SL
+        from app.models_exam_attempt import ExamAttempt as _Attempt
         from app.models_question import Question as _Q
 
         _db = _SL()
@@ -128,12 +129,56 @@ def test_exam_question_trace_is_created_and_used_for_scoring() -> None:
             question_id: active_answer_key[question_id]
             for question_id in trace["question_ids"]
         }
+
+        # Une soumission volontairement incomplète doit rester active et ne
+        # produire ni score ni résultat final, même via un appel direct à l'API.
+        missing_id = trace["question_ids"][-1]
+        partial_answers = {
+            question_id: answer
+            for question_id, answer in answers.items()
+            if question_id != missing_id
+        }
+        incomplete_response = client.post(
+            f"/api/v1/exams/{attempt['id']}/submit",
+            headers=admin_headers,
+            json={"answers": partial_answers},
+        )
+        assert incomplete_response.status_code == 409, incomplete_response.text
+        incomplete_detail = incomplete_response.json()["detail"]
+        assert incomplete_detail["code"] == "EXAM_INCOMPLETE_ANSWERS"
+        assert incomplete_detail["answered_questions"] == 39
+        assert incomplete_detail["required_questions"] == 40
+        assert incomplete_detail["missing_count"] == 1
+        # Ne jamais exposer l'identifiant manquant ni une bonne réponse.
+        assert "question_ids" not in incomplete_detail
+        assert "correct_answer" not in incomplete_detail
+
+        status_response = client.get(
+            f"/api/v1/exams/{attempt['id']}/status",
+            headers=admin_headers,
+        )
+        assert status_response.status_code == 200
+        assert status_response.json()["status"] == "started"
+        assert status_response.json()["score"] is None
+        assert status_response.json()["passed"] is None
+
+        # Simuler la dernière réponse déjà autosauvegardée par le client. La
+        # façade doit fusionner la copie serveur avec le payload final au lieu
+        # d'exiger que le navigateur renvoie inutilement les 40 valeurs.
+        _db = _SL()
+        saved_attempt = _db.get(_Attempt, attempt["id"])
+        assert saved_attempt is not None
+        saved_attempt.answers = {missing_id: answers[missing_id]}
+        _db.add(saved_attempt)
+        _db.commit()
+        _db.close()
+
         submit_response = client.post(
             f"/api/v1/exams/{attempt['id']}/submit",
             headers=admin_headers,
-            json={"answers": answers},
+            json={"answers": partial_answers},
         )
-        assert submit_response.status_code == 200
+        assert submit_response.status_code == 200, submit_response.text
         submitted = submit_response.json()
         assert submitted["status"] == "submitted"
         assert submitted["score"] == trace["question_count"]
@@ -146,3 +191,16 @@ def test_exam_question_trace_is_created_and_used_for_scoring() -> None:
         assert audit_response.status_code == 200
         logs = audit_response.json()["items"]
         assert any(log["details"]["attempt_id"] == attempt["id"] for log in logs)
+
+        incomplete_audit_response = client.get(
+            "/api/v1/supervision/audit-logs?action=exam.incomplete_submission&limit=25",
+            headers=admin_headers,
+        )
+        assert incomplete_audit_response.status_code == 200
+        incomplete_logs = incomplete_audit_response.json()["items"]
+        assert any(
+            log["entity_id"] == attempt["id"]
+            and log["details"]["missing_count"] == 1
+            and log["details"]["required_questions"] == 40
+            for log in incomplete_logs
+        )

@@ -125,6 +125,29 @@ exams.router.routes[:] = [
     ],
 ]
 
+# Soumission manuelle : une tentative active ne peut être finalisée que lorsque
+# chaque question de la trace officielle possède une réponse effective. La
+# façade fusionne la dernière autosauvegarde serveur avec le payload final puis
+# délègue au moteur historique. Le timeout automatique reste totalement séparé.
+from app.routers import exam_submit_completion_guard as exam_submit_completion_guard
+
+_exam_submit_path = "/exams/{attempt_id}/submit"
+_legacy_exam_submit_routes = [
+    route
+    for route in exams.router.routes
+    if getattr(route, "path", None) == _exam_submit_path
+    and "POST" in (getattr(route, "methods", set()) or set())
+]
+if len(_legacy_exam_submit_routes) != 1:
+    raise RuntimeError(
+        f"Expected exactly one legacy POST {_exam_submit_path} route, found {len(_legacy_exam_submit_routes)}"
+    )
+
+exams.router.routes[:] = [
+    *exam_submit_completion_guard.router.routes,
+    *[route for route in exams.router.routes if route not in _legacy_exam_submit_routes],
+]
+
 # Nouvelle tentative officielle : le moteur historique conserve tout son contrat,
 # mais sa fonction de création est remplacée par une implémentation qui filtre la
 # banque sur le média réellement publiable. Une question normalisée devenue
