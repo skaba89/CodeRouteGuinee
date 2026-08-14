@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 
 const NON_EXPIRED_TEST_JWT = 'eyJhbGciOiJub25lIn0.eyJleHAiOjQxMDI0NDQ4MDB9.signature';
+const GUINEA_MEDIA_VERSION = '20260814-1';
 
 async function openExamAsCandidate(page: Page): Promise<void> {
   await page.route('**/api/v1/auth/me', async route => {
@@ -60,7 +61,7 @@ test('examen blanc paints the Guinea STOP image with a real visible viewport', a
   await expect(frame).toBeVisible();
   await expect(viewport).toBeVisible();
   await expect(image).toBeVisible();
-  await expect(image).toHaveAttribute('src', /\/media\/exam\/guinea\/stop-conakry\.webp\?v=20260812-1$/);
+  await expect(image).toHaveAttribute('src', new RegExp(`/media/exam/guinea/stop-conakry\\.webp\\?v=${GUINEA_MEDIA_VERSION}$`));
   // PremiumImage fades in for 160 ms; wait for the painted steady state rather
   // than sampling the CSS transition mid-frame.
   await expect(image).toHaveCSS('opacity', '1');
@@ -88,6 +89,33 @@ test('examen blanc paints the Guinea STOP image with a real visible viewport', a
   expect(mediaState.opacity).toBe(1);
 });
 
+test('examen blanc recovers a STOP image after a first mobile-style load failure', async ({ page }) => {
+  let stopRequests = 0;
+  await page.route('**/media/exam/guinea/stop-conakry.webp**', async route => {
+    stopRequests += 1;
+    if (stopRequests === 1) {
+      await route.abort('failed');
+      return;
+    }
+    await route.continue();
+  });
+
+  await openExamAsCandidate(page);
+  await page.getByRole('button', { name: /commencer un examen blanc/i }).click();
+
+  await expect(page.getByText(/image momentanément indisponible/i)).toBeVisible();
+  await page.getByRole('button', { name: /réessayer/i }).click();
+
+  const image = page.getByTestId('exam-media-image');
+  await expect(image).toHaveAttribute(
+    'src',
+    new RegExp(`/media/exam/guinea/stop-conakry\\.webp\\?v=${GUINEA_MEDIA_VERSION}&retry=1$`),
+  );
+  await expect(image).toBeVisible();
+  await expect(image).toHaveCSS('opacity', '1');
+  await expect.poll(() => stopRequests).toBeGreaterThanOrEqual(2);
+});
+
 test('examen blanc serves the Guinea roundabout video and paints its fallback on playback failure', async ({ page }) => {
   await openExamAsCandidate(page);
   await page.getByRole('button', { name: /commencer un examen blanc/i }).click();
@@ -101,12 +129,12 @@ test('examen blanc serves the Guinea roundabout video and paints its fallback on
   const video = page.getByTestId('exam-media-video');
   await expect(videoFrame).toBeVisible();
   await expect(video).toBeVisible();
-  await expect(video).toHaveAttribute('src', /\/media\/exam\/guinea\/roundabout-approach-demo\.mp4\?v=20260812-1$/);
-  await expect(video).toHaveAttribute('poster', /\/media\/exam\/guinea\/yield-roundabout-conakry\.webp\?v=20260812-1$/);
+  await expect(video).toHaveAttribute('src', new RegExp(`/media/exam/guinea/roundabout-approach-demo\\.mp4\\?v=${GUINEA_MEDIA_VERSION}$`));
+  await expect(video).toHaveAttribute('poster', new RegExp(`/media/exam/guinea/yield-roundabout-conakry\\.webp\\?v=${GUINEA_MEDIA_VERSION}$`));
 
   await video.dispatchEvent('error');
   const fallback = page.getByTestId('exam-media-video-fallback');
   await expect(fallback).toBeVisible();
-  await expect(fallback).toHaveAttribute('src', /\/media\/exam\/guinea\/yield-roundabout-conakry\.webp\?v=20260812-1$/);
+  await expect(fallback).toHaveAttribute('src', new RegExp(`/media/exam/guinea/yield-roundabout-conakry\\.webp\\?v=${GUINEA_MEDIA_VERSION}$`));
   await expect(page.getByText(/vidéo indisponible — image de secours affichée/i)).toBeVisible();
 });

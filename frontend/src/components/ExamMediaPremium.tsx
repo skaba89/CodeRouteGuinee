@@ -3,7 +3,7 @@ import { MediaBlock as LegacyMediaBlock } from '../pages/shared-exam-components-
 
 const OFFICIAL_ATTEMPT_KEY = 'coderoute:official-exam:active-attempt';
 const GUINEA_MEDIA_BASE = '/media/exam/guinea';
-const GUINEA_MEDIA_VERSION = '20260812-1';
+const GUINEA_MEDIA_VERSION = '20260814-1';
 
 type DemoMediaOverride = {
   mediaType: 'image' | 'video';
@@ -14,6 +14,12 @@ type DemoMediaOverride = {
 
 function demoAsset(filename: string): string {
   return `${GUINEA_MEDIA_BASE}/${filename}?v=${GUINEA_MEDIA_VERSION}`;
+}
+
+function withRetryCacheBypass(url: string, retryKey: number): string {
+  if (retryKey <= 0) return url;
+  const separator = url.includes('?') ? '&' : '?';
+  return `${url}${separator}retry=${retryKey}`;
 }
 
 function normalizeLabel(value?: string): string {
@@ -168,6 +174,7 @@ function PremiumImage({ url, alt }: { url: string; alt?: string }) {
   const frameRef = useRef<HTMLDivElement | null>(null);
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [retryKey, setRetryKey] = useState(0);
+  const imageUrl = withRetryCacheBypass(url, retryKey);
 
   function retry() {
     setState('loading');
@@ -185,9 +192,9 @@ function PremiumImage({ url, alt }: { url: string; alt?: string }) {
 
         {state !== 'error' ? (
           <img
-            key={`${url}:${retryKey}`}
+            key={imageUrl}
             data-testid="exam-media-image"
-            src={url}
+            src={imageUrl}
             alt={alt ?? 'Illustration de la question'}
             loading="eager"
             decoding="async"
