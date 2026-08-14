@@ -84,6 +84,8 @@ jobs:
             test_file: tests/test_health.py
           - name: deploy-preflight
             test_file: tests/test_deploy_preflight.py
+          - name: render-deployment-fingerprint
+            test_file: tests/test_render_deployment_fingerprint.py
           - name: postgres-backup-tooling
             test_file: tests/test_postgres_backup_script.py
           - name: operations-summary
@@ -182,7 +184,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: '22'
       - name: Install frontend dependencies
@@ -199,7 +201,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: '22'
       - name: Install frontend dependencies
@@ -248,7 +250,7 @@ jobs:
           - 51 failures: tests/e2e/navigation.spec.ts relies on the removed unauthenticated "mode presentation" and obsolete selectors.
           - 4 failures: tests/e2e/exam-runtime-resilience.spec.ts use stale option/result locators; the remaining runtime scenarios stay blocking.
           - 1 failure: tests/e2e/edge-release-rollout.spec.ts checks a hidden <option> with toBeVisible(); the remaining rollout scenarios stay blocking.
-          - 1 failure: tests/e2e/national-edge-fleet.spec.ts uses a strict locator that now resolves to two valid 1/2 counters; the remaining fleet coverage stays blocking.
+          - 1 failure: tests/e2e/national-edge-fleet.spec.ts uses a strict locator that now resolves to two valid 1/2 counters; the remaining fleet coverage stay blocking.
           - 1 failure: tests/e2e/fullstack-critical-journey.spec.ts requires a real backend and is therefore excluded from this mock-only job. It remains blocking in Fullstack Business E2E with PostgreSQL + FastAPI.
 
           Security policy: do not restore demo/role-switcher bypasses and do not relax official exam eligibility/media guards to satisfy legacy UI tests.
