@@ -75,7 +75,7 @@ jobs:
           python-version: '3.12'
       - name: Install YAML validator
         run: pip install -q PyYAML
-      - name: Validate native Render identity, checks-pass CD and runtime proof automation
+      - name: Validate native Render identity, checks-pass CD and safe post-deploy proof contract
         shell: bash
         run: |
           python - <<'PY'
@@ -127,17 +127,17 @@ jobs:
 
           runtime_workflow = Path('.github/workflows/verify-render-deployment.yml').read_text(encoding='utf-8')
           for marker in (
-              'workflow_run:',
-              '- CI',
-              'github.event.workflow_run.head_sha',
-              "github.event.workflow_run.conclusion == 'success'",
-              'github.event.workflow_run.head_branch',
+              'repository_dispatch:',
+              '- render_deploy_ended',
+              'github.event.client_payload.commit_sha',
+              "github.event.client_payload.status == 'succeeded'",
+              "github.event.client_payload.service_name == 'coderouteguinee-backend'",
               'max_rounds=12',
               'render-deployment-receipt-',
           ):
               assert marker in runtime_workflow, marker
-          assert "branches:\n      - main" in runtime_workflow
+          assert 'workflow_run:' not in runtime_workflow, 'workflow_run would risk a checksPass deploy verification cycle'
           assert 'https://coderouteguinee-backend.onrender.com' in runtime_workflow
 
-          print('Render deployment fingerprint + automatic runtime proof contract: OK')
+          print('Render deployment fingerprint + safe post-deploy dispatch contract: OK')
           PY
