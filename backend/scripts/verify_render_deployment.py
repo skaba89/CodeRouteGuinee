@@ -25,6 +25,7 @@ from urllib.parse import urljoin, urlparse, urlunparse
 from urllib.request import Request, urlopen
 
 _SHA40 = re.compile(r"^[0-9a-fA-F]{40}$")
+_SAFE_CHECK_NAME = re.compile(r"^[A-Za-z0-9_.-]{1,80}$")
 DEFAULT_TIMEOUT_SECONDS = 15.0
 DEFAULT_ATTEMPTS = 3
 DEFAULT_RETRY_DELAY_SECONDS = 2.0
@@ -57,8 +58,19 @@ def _origin(raw: str) -> str:
     return urlunparse((parsed.scheme, f"{parsed.hostname}{port}", "", "", "", ""))
 
 
+def _decode_json_object(raw: bytes, content_type: str) -> dict[str, Any] | None:
+    if "json" not in content_type.lower():
+        return None
+    decoded = json.loads(raw.decode("utf-8"))
+    return decoded if isinstance(decoded, dict) else None
+
+
 def request_json(base_url: str, path: str, timeout: float) -> tuple[int | None, dict[str, Any] | None, str | None]:
     """Perform one read-only JSON request.
+
+    JSON error bodies are preserved for diagnostics. This is particularly useful
+    for ``/health/readiness`` where a deliberate HTTP 503 still carries a
+    privacy-safe body describing which readiness checks are blocking.
 
     Retry orchestration intentionally lives in ``request_json_with_retry`` so
     this primitive stays deterministic and easy to test.
@@ -75,12 +87,21 @@ def request_json(base_url: str, path: str, timeout: float) -> tuple[int | None, 
             content_type = str(response.headers.get("content-type", ""))
         if "json" not in content_type.lower():
             return status_code, None, "unexpected non-JSON response"
-        decoded = json.loads(raw.decode("utf-8"))
-        if not isinstance(decoded, dict):
+        decoded = _decode_json_object(raw, content_type)
+        if decoded is None:
             return status_code, None, "JSON response is not an object"
         return status_code, decoded, None
     except HTTPError as exc:
-        return int(exc.code), None, f"HTTP {int(exc.code)}"
+        status_code = int(exc.code)
+        try:
+            raw = exc.read(500_000)
+            content_type = str(exc.headers.get("content-type", "")) if exc.headers else ""
+            decoded = _decode_json_object(raw, content_type)
+            if decoded is not None:
+                return status_code, decoded, f"HTTP {status_code}"
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+            pass
+        return status_code, None, f"HTTP {status_code}"
     except (URLError, TimeoutError, OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
         return None, None, exc.__class__.__name__
 
@@ -121,6 +142,35 @@ def request_json_with_retry(
             sleep_fn(retry_delay)
 
     return last_status, last_payload, last_error, attempts
+
+
+def _health_http_summary(
+    status_code: int | None,
+    payload: dict[str, Any] | None,
+    error: str | None,
+    attempts_used: int,
+) -> dict[str, Any]:
+    """Return only privacy-safe diagnostics from a public health payload."""
+    summary: dict[str, Any] = {
+        "status_code": status_code,
+        "error": error,
+        "attempts_used": attempts_used,
+    }
+    if not isinstance(payload, dict):
+        return summary
+
+    reported_status = payload.get("status")
+    if isinstance(reported_status, str) and len(reported_status) <= 40:
+        summary["reported_status"] = reported_status
+
+    blockers = payload.get("blocking_checks")
+    if isinstance(blockers, list):
+        safe_blockers = [
+            item for item in blockers
+            if isinstance(item, str) and _SAFE_CHECK_NAME.fullmatch(item)
+        ]
+        summary["blocking_checks"] = safe_blockers[:20]
+    return summary
 
 
 def evaluate_runtime(
@@ -231,8 +281,8 @@ def build_receipt(
             "retryable_http_statuses": sorted(RETRYABLE_HTTP_STATUSES),
         },
         "http": {
-            "health_live": {"status_code": live_status, "error": live_error, "attempts_used": live_attempts},
-            "health_readiness": {"status_code": ready_status, "error": ready_error, "attempts_used": ready_attempts},
+            "health_live": _health_http_summary(live_status, live, live_error, live_attempts),
+            "health_readiness": _health_http_summary(ready_status, readiness, ready_error, ready_attempts),
         },
         "assessment": assessment,
     }
