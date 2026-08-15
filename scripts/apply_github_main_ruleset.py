@@ -20,7 +20,7 @@ DEFAULT_REPOSITORY = "skaba89/CodeRouteGuinee"
 DEFAULT_BRANCH = "main"
 DEFAULT_REQUIRED_CHECK = "release-preflight"
 DEFAULT_RULESET_NAME = "protect-main-release-preflight"
-DEFAULT_API_URL = "https://api.github.com"
+GITHUB_API_URL = "https://api.github.com"
 API_VERSION = "2026-03-10"
 
 
@@ -161,18 +161,17 @@ def ruleset_mismatches(actual: dict[str, Any], expected: dict[str, Any]) -> list
 
 
 class GitHubRulesClient:
-    def __init__(self, *, token: str, api_url: str = DEFAULT_API_URL, timeout: float = 20.0) -> None:
+    def __init__(self, *, token: str, timeout: float = 20.0) -> None:
         token = token.strip()
         if not token:
             raise ValueError("GitHub admin token is required")
         self.token = token
-        self.api_url = api_url.rstrip("/")
         self.timeout = timeout
 
     def request(self, method: str, path: str, payload: dict[str, Any] | None = None) -> Any:
         data = None if payload is None else json.dumps(payload).encode("utf-8")
         request = Request(
-            f"{self.api_url}{path}",
+            f"{GITHUB_API_URL}{path}",
             data=data,
             method=method,
             headers={
@@ -260,7 +259,6 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--required-check", default=DEFAULT_REQUIRED_CHECK)
     parser.add_argument("--ruleset-name", default=DEFAULT_RULESET_NAME)
     parser.add_argument("--token-env", default="GITHUB_ADMIN_TOKEN")
-    parser.add_argument("--api-url", default=os.getenv("GITHUB_API_URL", DEFAULT_API_URL))
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("--dry-run", action="store_true")
     mode.add_argument("--apply", action="store_true")
@@ -294,7 +292,7 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     try:
-        client = GitHubRulesClient(token=token, api_url=args.api_url)
+        client = GitHubRulesClient(token=token)
         if args.apply:
             action, applied = upsert_ruleset(client, repository, payload)
             print(f"Ruleset {action}: id={applied['id']} name={applied.get('name')}")
