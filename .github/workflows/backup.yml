@@ -1,8 +1,11 @@
-name: Backup PostgreSQL
+# CI-only restore rehearsal against an ephemeral GitHub Actions PostgreSQL.
+# This workflow does NOT back up the production database and its GitHub artifact
+# is NOT off-region/PRA evidence. Production/offsite proof is handled separately.
+name: CI PostgreSQL Restore Rehearsal
 
 on:
   schedule:
-    - cron: '0 2 * * *'   # Chaque jour à 02h00 UTC (03h00 Conakry)
+    - cron: '0 2 * * *'   # Chaque jour à 02h00 UTC = 02h00 Conakry
   workflow_dispatch:        # Déclenchement manuel
 
 jobs:
@@ -47,7 +50,7 @@ jobs:
           ENVIRONMENT: development
         run: alembic upgrade head
 
-      - name: Run backup
+      - name: Create rehearsal backup
         env:
           DATABASE_URL: postgresql+psycopg://coderoute:ci-backup-test@localhost:5432/coderoute
           BACKUP_DIR:   /tmp/coderoute-backups
@@ -57,7 +60,7 @@ jobs:
             --retention-days 7 \
             backup
 
-      - name: Verify backup integrity
+      - name: Verify rehearsal backup integrity
         env:
           BACKUP_DIR: /tmp/coderoute-backups
         run: |
@@ -65,7 +68,7 @@ jobs:
             --backup-dir /tmp/coderoute-backups \
             --verify
 
-      - name: Round-trip restore test (prouve que le backup est restaurable)
+      - name: Round-trip restore rehearsal (ephemeral CI database)
         env:
           DATABASE_URL: postgresql+psycopg://coderoute:ci-backup-test@localhost:5432/coderoute
           PGPASSWORD: ci-backup-test
@@ -93,20 +96,20 @@ jobs:
           fi
           echo "✅ Round-trip restore réussi : la donnée détruite a été restaurée à l'identique"
 
-      - name: Upload backup artifact
+      - name: Upload rehearsal artifact (CI evidence only)
         uses: actions/upload-artifact@v4
         with:
           name: db-backup-${{ github.run_id }}
           path: /tmp/coderoute-backups/
           retention-days: 7
 
-  # Job de notification si le backup échoue
+  # Notification si le rehearsal CI échoue. Ce signal ne remplace pas le monitoring PRA de production.
   notify-failure:
     runs-on: ubuntu-latest
     needs: [backup]
     if: failure()
     steps:
-      - name: Backup failure notification
+      - name: Restore rehearsal failure notification
         run: |
-          echo "⚠️ Backup PostgreSQL a échoué le $(date '+%d/%m/%Y à %H:%M')"
+          echo "⚠️ CI PostgreSQL Restore Rehearsal a échoué le $(date '+%d/%m/%Y à %H:%M')"
           echo "Vérifier : https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
