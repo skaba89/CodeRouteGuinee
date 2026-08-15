@@ -1,6 +1,9 @@
 name: Verify Render Deployment
 
 on:
+  repository_dispatch:
+    types:
+      - render_deploy_ended
   workflow_dispatch:
     inputs:
       base_url:
@@ -15,31 +18,62 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: verify-render-${{ github.event_name == 'repository_dispatch' && github.event.client_payload.commit_sha || github.sha }}
+  cancel-in-progress: true
+
 jobs:
   verify-deployed-sha:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'repository_dispatch' &&
+       github.event.client_payload.status == 'succeeded' &&
+       github.event.client_payload.service_name == 'coderouteguinee-backend')
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'repository_dispatch' && github.event.client_payload.commit_sha || github.sha }}
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
-      - name: Verify Render runtime serves this exact main SHA
+      - name: Wait for Render to serve the exact deployed SHA
         working-directory: backend
+        shell: bash
         env:
-          CODEROUTE_API_BASE_URL: ${{ inputs.base_url }}
-          CODEROUTE_EXPECTED_GIT_COMMIT: ${{ github.sha }}
-          CODEROUTE_EXPECTED_REPO_SLUG: ${{ inputs.expected_repo_slug }}
+          CODEROUTE_API_BASE_URL: ${{ github.event_name == 'repository_dispatch' && github.event.client_payload.base_url || inputs.base_url || 'https://coderouteguinee-backend.onrender.com' }}
+          CODEROUTE_EXPECTED_GIT_COMMIT: ${{ github.event_name == 'repository_dispatch' && github.event.client_payload.commit_sha || github.sha }}
+          CODEROUTE_EXPECTED_REPO_SLUG: ${{ github.event_name == 'repository_dispatch' && github.event.client_payload.repo_slug || inputs.expected_repo_slug || 'skaba89/CodeRouteGuinee' }}
         run: |
-          python scripts/verify_render_deployment.py \
-            --receipt ../render-deployment-receipt.json
+          set +e
+          max_rounds=12
+          for round in $(seq 1 "$max_rounds"); do
+            echo "Render verification round ${round}/${max_rounds} for ${CODEROUTE_EXPECTED_GIT_COMMIT}"
+            python scripts/verify_render_deployment.py \
+              --attempts 1 \
+              --retry-delay 0 \
+              --timeout 10 \
+              --receipt ../render-deployment-receipt.json
+            status=$?
+            if [[ "$status" -eq 0 ]]; then
+              echo "Render serves the expected SHA and is ready."
+              exit 0
+            fi
+            if [[ "$round" -lt "$max_rounds" ]]; then
+              echo "Runtime not converged yet; retrying after 30 seconds."
+              sleep 30
+            fi
+          done
+          echo "ERROR: Render did not serve a ready runtime for the expected SHA within the bounded verification window." >&2
+          exit 2
 
       - name: Upload deployment receipt
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: render-deployment-receipt-${{ github.sha }}
+          name: render-deployment-receipt-${{ github.event_name == 'repository_dispatch' && github.event.client_payload.commit_sha || github.sha }}
           path: render-deployment-receipt.json
           if-no-files-found: error
           retention-days: 90
