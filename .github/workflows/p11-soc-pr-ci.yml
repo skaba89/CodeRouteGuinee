@@ -96,7 +96,7 @@ jobs:
 
           render = yaml.safe_load(Path('render.yaml').read_text(encoding='utf-8'))
           services = {item['name']: item for item in render['services']}
-          backend = services['coderoute-backend']
+          backend = services['coderouteguinee-backend']
           env = {item['key']: item for item in backend['envVars'] if 'key' in item}
 
           assert env['SOC_ENABLED']['value'] == 'false'

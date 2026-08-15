@@ -17,7 +17,7 @@ def _live(commit=EXPECTED, repo="skaba89/CodeRouteGuinee"):
             "git_commit": commit,
             "git_branch": "main",
             "git_repo_slug": repo,
-            "render_service_name": "coderoute-backend",
+            "render_service_name": "coderouteguinee-backend",
             "render_instance_id": "srv-instance-1",
         },
     }

@@ -150,15 +150,28 @@ jobs:
 
           data = yaml.safe_load(Path('render.yaml').read_text(encoding='utf-8'))
           services = {service['name']: service for service in data['services']}
-          backend = services['coderoute-backend']
+          backend = services['coderouteguinee-backend']
           backup = services['coderoute-offsite-backup']
-          frontend = services['coderoute-frontend']
+          frontend = services['coderouteguinee-frontend']
           assert backend['healthCheckPath'] == '/health/readiness'
           assert backend['numInstances'] == 2
 
+          backend_url = 'https://coderouteguinee-backend.onrender.com'
+          frontend_url = 'https://coderouteguinee-frontend.onrender.com'
           env = {item['key']: item for item in backend.get('envVars', []) if 'key' in item}
           for native in ('RENDER_GIT_COMMIT', 'RENDER_GIT_BRANCH', 'RENDER_GIT_REPO_SLUG'):
               assert native not in env, f'{native} must be supplied natively by Render'
+          assert env['CORS_ORIGINS']['value'] == frontend_url
+          assert env['ALLOWED_HOSTS']['value'] == 'coderouteguinee-backend.onrender.com'
+
+          backup_env = {item['key']: item for item in backup.get('envVars', []) if 'key' in item}
+          assert backup_env['CODEROUTE_API_BASE_URL']['value'] == backend_url
+          evidence_source = backup_env['RELIABILITY_EVIDENCE_TOKEN']['fromService']
+          assert evidence_source['type'] == 'web'
+          assert evidence_source['name'] == 'coderouteguinee-backend'
+
+          frontend_env = {item['key']: item for item in frontend.get('envVars', []) if 'key' in item}
+          assert frontend_env['VITE_API_BASE_URL']['value'] == backend_url
 
           health = Path('backend/app/routers/health.py').read_text(encoding='utf-8')
           for marker in ('RENDER_GIT_COMMIT', 'git_commit', 'git_repo_slug'):

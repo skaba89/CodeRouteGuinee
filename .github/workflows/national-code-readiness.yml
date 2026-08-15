@@ -210,9 +210,9 @@ jobs:
 
           render = yaml.safe_load(Path('render.yaml').read_text(encoding='utf-8'))
           services = {item['name']: item for item in render['services']}
-          backend = services['coderoute-backend']
+          backend = services['coderouteguinee-backend']
           backup = services['coderoute-offsite-backup']
-          frontend = services['coderoute-frontend']
+          frontend = services['coderouteguinee-frontend']
           env = {item['key']: item for item in backend['envVars'] if 'key' in item}
           backup_env = {item['key']: item for item in backup['envVars'] if 'key' in item}
 
