@@ -35,6 +35,7 @@ from app.models_center import Center
 from app.models_institutional_authorization import InstitutionalAuthorization
 from app.models_question import Question
 from app.models_user import User
+from app.national_media_readiness import build_national_media_readiness, national_media_strict_ready
 
 POLICY_KIND = "coderoute_national_exam_policy_v1"
 DOSSIER_KIND = "coderoute_national_homologation_dossier_v1"
@@ -416,6 +417,7 @@ def _latest_evidence_time(db: Session, action: str) -> datetime | None:
 def build_readiness(db: Session) -> dict:
     policy = active_policy(db)
     checks: list[dict] = []
+    media_readiness: dict | None = None
 
     if policy:
         alignment = compare_policy_to_runtime(policy["document"]["parameters"])
@@ -451,12 +453,22 @@ def build_readiness(db: Session) -> dict:
                 "evidence": {"eligible": len(official), "required": parameters["question_count"], "category_shortfall": missing},
             }
         )
+        media_readiness = build_national_media_readiness(db, official)
+        checks.append(
+            {
+                "code": "official_media_bank",
+                "required": True,
+                "status": "pass" if national_media_strict_ready(media_readiness) else "fail",
+                "evidence": media_readiness,
+            }
+        )
     else:
         checks.extend(
             [
                 {"code": "active_policy", "required": True, "status": "fail", "evidence": None},
                 {"code": "runtime_alignment", "required": True, "status": "fail", "evidence": {"reason": "no_active_policy"}},
                 {"code": "official_question_bank", "required": True, "status": "fail", "evidence": {"reason": "no_active_policy"}},
+                {"code": "official_media_bank", "required": True, "status": "fail", "evidence": {"reason": "no_active_policy"}},
             ]
         )
 
@@ -486,11 +498,16 @@ def build_readiness(db: Session) -> dict:
             }
         )
 
-    blockers = [item["code"] for item in checks if item["required"] and item["status"] != "pass"]
+    blockers = [
+        "official_media_bank_not_strict_ready" if item["code"] == "official_media_bank" else item["code"]
+        for item in checks
+        if item["required"] and item["status"] != "pass"
+    ]
     return {
         "generated_at": now.isoformat(),
         "go_live_allowed": not blockers,
         "active_policy": policy,
+        "official_media_bank": media_readiness,
         "checks": checks,
         "blockers": blockers,
     }

@@ -165,7 +165,14 @@ jobs:
         run: pip install -q -r requirements.txt
       - name: Compile governance modules
         working-directory: backend
-        run: python -m compileall -q app/national_governance.py app/national_governance_evidence.py app/national_governance_guard.py app/routers/national_governance.py
+        run: >-
+          python -m compileall -q
+          app/national_governance.py
+          app/national_governance_evidence.py
+          app/national_governance_guard.py
+          app/national_media_readiness.py
+          app/routers/national_governance.py
+          app/routers/national_readiness.py
       - name: P12 governance and homologation guards
         working-directory: backend
         env:
@@ -182,6 +189,7 @@ jobs:
             tests/test_national_governance.py \
             tests/test_national_homologation.py \
             tests/test_national_readiness_pitr.py \
+            tests/test_national_strict_media_rollout.py \
             tests/test_homologation_evidence_integrity.py
 
   deployment-safety-invariants:

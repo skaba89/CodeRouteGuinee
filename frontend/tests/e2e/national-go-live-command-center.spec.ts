@@ -51,11 +51,32 @@ function security(ready: boolean) {
 }
 
 function governance(ready: boolean) {
-  const codes = ['active_policy', 'runtime_alignment', 'official_question_bank', 'accredited_centers', 'backup_off_region', 'restore_drill', 'pitr_provider', 'api_failover'];
+  const codes = ['active_policy', 'runtime_alignment', 'official_question_bank', 'official_media_bank', 'accredited_centers', 'backup_off_region', 'restore_drill', 'pitr_provider', 'api_failover'];
   return {
     generated_at: new Date().toISOString(), go_live_allowed: ready, active_policy: null,
     blockers: ready ? [] : ['active_policy', 'pitr_provider'],
     checks: codes.map(code => ({ code, required: true, status: ready ? 'pass' : (code === 'active_policy' || code === 'pitr_provider') ? 'fail' : 'pass', evidence: {} })),
+  };
+}
+
+function governanceMediaBlocked() {
+  const payload = governance(true);
+  return {
+    ...payload,
+    go_live_allowed: false,
+    blockers: ['official_media_bank_not_strict_ready'],
+    checks: payload.checks.map(check => check.code === 'official_media_bank' ? {
+      ...check,
+      status: 'fail',
+      evidence: {
+        runtime_ready_questions: 40,
+        strict_ready_questions: 0,
+        runtime_exam_constructible: true,
+        strict_exam_constructible: false,
+        legacy_remaining: 40,
+        institutional_validation_inferred: false,
+      },
+    } : check),
   };
 }
 
@@ -109,6 +130,24 @@ test('all automated gates can be green while institutional sign-off remains mand
   await expect(page.getByTestId('go-live-p12').getByText('PASS')).toBeVisible();
   await expect(page.getByTestId('institutional-signoff-required')).toBeVisible();
   await expect(command.getByText('Homologation accordée')).toHaveCount(0);
+});
+
+test('strict media bank failure blocks P12 without claiming DNTT homologation', async ({ page }) => {
+  await bootstrap(page);
+  await page.route('**/api/v1/operations/reliability', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(reliability(true)) }));
+  await page.route('**/api/v1/operations/security/status', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(security(true)) }));
+  await page.route('**/api/v1/national-governance/readiness', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(governanceMediaBlocked()) }));
+
+  await page.goto('/#/admin');
+
+  const p12 = page.getByTestId('go-live-p12');
+  await expect(page.getByTestId('go-live-p10').getByText('PASS')).toBeVisible();
+  await expect(page.getByTestId('go-live-p11').getByText('PASS')).toBeVisible();
+  await expect(p12.getByText('BLOQUÉ')).toBeVisible();
+  await expect(p12.getByText('Banque média officielle stricte')).toBeVisible();
+  await expect(page.getByTestId('national-automated-readiness')).toContainText('1 blocker');
+  await expect(page.getByTestId('institutional-signoff-required')).toContainText('Décision institutionnelle toujours requise');
+  await expect(page.getByTestId('national-go-live-command-center').getByText('Homologation accordée')).toHaveCount(0);
 });
 
 test('fails closed when one readiness source is unavailable', async ({ page }) => {
