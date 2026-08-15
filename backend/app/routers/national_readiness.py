@@ -26,6 +26,7 @@ from app.models_exam_question_trace import ExamQuestionTrace
 from app.models_question import Question
 from app.models_session import ExamSession
 from app.models_user import User
+from app.national_media_readiness import build_national_media_readiness, national_media_strict_ready
 
 router = APIRouter(prefix="/national-readiness", tags=["national-readiness"])
 
@@ -82,6 +83,10 @@ def get_national_readiness(
         len(eligible) >= EXAM_QUESTIONS_TOTAL
         and all(item["sufficient"] for item in category_coverage.values())
     )
+    media_readiness = build_national_media_readiness(db, eligible)
+    strict_media_ready = national_media_strict_ready(media_readiness)
+    pilot_compatible = bank_ready and bool(media_readiness["runtime_exam_constructible"])
+    national_bank_ready = bank_ready and strict_media_ready
 
     # ── Centres et postes ─────────────────────────────────────────────────
     centers = list(db.scalars(select(Center).order_by(Center.code)).all())
@@ -152,6 +157,8 @@ def get_national_readiness(
     audit_total = int(db.scalar(select(func.count()).select_from(AuditLog)) or 0)
 
     # ── Score national pondéré — 100 points ──────────────────────────────
+    # Le score de la banque conserve la mesure de maturité/pilote existante.
+    # Le rollout national est, lui, strictement bloqué par national_bank_ready.
     center_factor = (len(operational_centers) / len(centers)) if centers else 0.0
     station_factor = (centers_with_stations / len(operational_centers)) if operational_centers else 0.0
     session_factor = (centers_with_upcoming / len(operational_centers)) if operational_centers else 0.0
@@ -164,7 +171,9 @@ def get_national_readiness(
         "official_question_bank": {
             "weight": 25,
             "score": _weighted(25, bank_factor),
-            "ready": bank_ready,
+            "ready": national_bank_ready,
+            "pilot_compatible": pilot_compatible,
+            "strict_media_ready": strict_media_ready,
         },
         "operational_centers": {
             "weight": 15,
@@ -207,6 +216,8 @@ def get_national_readiness(
     blockers: list[str] = []
     if not bank_ready:
         blockers.append("official_question_bank_not_ready")
+    if not strict_media_ready:
+        blockers.append("official_media_bank_not_strict_ready")
     if not operational_centers:
         blockers.append("no_operational_exam_center")
     if operational_centers and centers_with_stations < len(operational_centers):
@@ -282,7 +293,7 @@ def get_national_readiness(
 
     national_rollout_allowed = (
         score >= 90
-        and bank_ready
+        and national_bank_ready
         and bool(operational_centers)
         and station_factor >= 0.90
         and submitted_attempts > 0
@@ -302,8 +313,12 @@ def get_national_readiness(
             "approved_active": len(approved),
             "eligible_after_training_exclusion": len(eligible),
             "required": EXAM_QUESTIONS_TOTAL,
-            "ready": bank_ready,
+            "pedagogical_ready": bank_ready,
+            "pilot_compatible": pilot_compatible,
+            "national_strict_ready": national_bank_ready,
+            "ready": national_bank_ready,
             "category_coverage": category_coverage,
+            "media": media_readiness,
         },
         "centers": {
             "total": len(centers),
