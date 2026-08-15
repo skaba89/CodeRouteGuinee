@@ -14,7 +14,7 @@ services:
 
   # ── Backend FastAPI HA ──────────────────────────────────────────────────
   - type: web
-    name: coderoute-backend
+    name: coderouteguinee-backend
     runtime: docker
     autoDeployTrigger: checksPass
     dockerContext: backend
@@ -249,14 +249,14 @@ services:
       - key: RELIABILITY_EVIDENCE_TOKEN
         fromService:
           type: web
-          name: coderoute-backend
+          name: coderouteguinee-backend
           envVarKey: RELIABILITY_EVIDENCE_TOKEN
       - key: PUBLISH_RELIABILITY_EVIDENCE
         value: "true"
 
   # ── Frontend Vite ────────────────────────────────────────────────────────
   - type: web
-    name: coderoute-frontend
+    name: coderouteguinee-frontend
     runtime: static
     autoDeployTrigger: checksPass
     buildCommand: "cd frontend && npm ci && npm run build"
