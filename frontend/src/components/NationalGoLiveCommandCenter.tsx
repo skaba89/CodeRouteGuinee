@@ -190,6 +190,7 @@ export function NationalGoLiveCommandCenter() {
           .replace('active_policy', 'Politique DNTT active')
           .replace('runtime_alignment', 'Politique alignée au runtime')
           .replace('official_question_bank', 'Banque officielle prête')
+          .replace('official_media_bank', 'Banque média officielle stricte')
           .replace('accredited_centers', 'Centre accrédité disponible')
           .replace('backup_off_region', 'Backup hors région')
           .replace('restore_drill', 'Restore drill')
