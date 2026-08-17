@@ -1,15 +1,16 @@
 import { useRef, useState } from 'react';
-import { MediaBlock as LegacyMediaBlock } from '../pages/shared-exam-components-legacy';
+import { MediaBlock as LegacyMediaBlock, SignSvg } from '../pages/shared-exam-components-legacy';
 
 const OFFICIAL_ATTEMPT_KEY = 'coderoute:official-exam:active-attempt';
 const GUINEA_MEDIA_BASE = '/media/exam/guinea';
-const GUINEA_MEDIA_VERSION = '20260814-1';
+const GUINEA_MEDIA_VERSION = '20260817-1';
 
 type DemoMediaOverride = {
   mediaType: 'image' | 'video';
   url: string;
   poster?: string;
   fallback?: string;
+  fallbackSign?: string;
 };
 
 function demoAsset(filename: string): string {
@@ -44,13 +45,13 @@ function resolveGuineaDemoMedia(media?: string, alt?: string): DemoMediaOverride
   const label = normalizeLabel(alt);
 
   if (key === 'stop' && label.includes('stop')) {
-    return { mediaType: 'image', url: demoAsset('stop-conakry.webp') };
+    return { mediaType: 'image', url: demoAsset('stop-conakry.webp'), fallbackSign: 'stop' };
   }
   if (key === 'give_way' && (label.includes('cedez') || label.includes('passage'))) {
-    return { mediaType: 'image', url: demoAsset('yield-roundabout-conakry.webp') };
+    return { mediaType: 'image', url: demoAsset('yield-roundabout-conakry.webp'), fallbackSign: 'give_way' };
   }
   if (key === 'no_entry' && (label.includes('sens interdit') || label.includes('interdit'))) {
-    return { mediaType: 'image', url: demoAsset('no-entry-conakry.webp') };
+    return { mediaType: 'image', url: demoAsset('no-entry-conakry.webp'), fallbackSign: 'no_entry' };
   }
   if (key === 'roundabout' && (label.includes('giratoire') || label.includes('rond-point') || label.includes('rond point'))) {
     return {
@@ -75,6 +76,53 @@ function deriveCloudinaryPoster(url: string): string | undefined {
     return `${parsed.origin}${nextPath}`;
   } catch {
     return undefined;
+  }
+}
+
+function hasVisiblePixelVariation(image: HTMLImageElement): boolean {
+  try {
+    const resolved = new URL(image.currentSrc || image.src, window.location.href);
+    if (resolved.origin !== window.location.origin || !resolved.pathname.startsWith(`${GUINEA_MEDIA_BASE}/`)) {
+      return true;
+    }
+
+    const canvas = document.createElement('canvas');
+    canvas.width = 32;
+    canvas.height = 18;
+    const context = canvas.getContext('2d', { willReadFrequently: true });
+    if (!context) return true;
+
+    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+    const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+    let opaquePixels = 0;
+    let minLuma = 255;
+    let maxLuma = 0;
+    let chromaticPixels = 0;
+
+    for (let index = 0; index < pixels.length; index += 4) {
+      const red = pixels[index];
+      const green = pixels[index + 1];
+      const blue = pixels[index + 2];
+      const alpha = pixels[index + 3];
+      if (alpha < 32) continue;
+
+      opaquePixels += 1;
+      const luma = Math.round(0.2126 * red + 0.7152 * green + 0.0722 * blue);
+      minLuma = Math.min(minLuma, luma);
+      maxLuma = Math.max(maxLuma, luma);
+      if (Math.max(red, green, blue) - Math.min(red, green, blue) >= 16) {
+        chromaticPixels += 1;
+      }
+    }
+
+    const sampleCount = canvas.width * canvas.height;
+    const enoughOpaqueContent = opaquePixels >= sampleCount * 0.8;
+    const enoughContrast = maxLuma - minLuma >= 18;
+    const enoughSignal = maxLuma >= 48 || chromaticPixels >= 8;
+    return enoughOpaqueContent && enoughContrast && enoughSignal;
+  } catch {
+    // A canvas security/decoding error must not reject unrelated remote media.
+    return true;
   }
 }
 
@@ -170,7 +218,7 @@ export function VideoPlayer({ url, poster, fallbackUrl, alt }: { url: string; po
   );
 }
 
-function PremiumImage({ url, alt }: { url: string; alt?: string }) {
+function PremiumImage({ url, alt, fallbackSign }: { url: string; alt?: string; fallbackSign?: string }) {
   const frameRef = useRef<HTMLDivElement | null>(null);
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [retryKey, setRetryKey] = useState(0);
@@ -199,8 +247,9 @@ function PremiumImage({ url, alt }: { url: string; alt?: string }) {
             loading="eager"
             decoding="async"
             onLoad={(event) => {
-              const { naturalWidth, naturalHeight } = event.currentTarget;
-              if (naturalWidth < 320 || naturalHeight < 180) {
+              const image = event.currentTarget;
+              const { naturalWidth, naturalHeight } = image;
+              if (naturalWidth < 320 || naturalHeight < 180 || !hasVisiblePixelVariation(image)) {
                 setState('error');
                 return;
               }
@@ -221,6 +270,17 @@ function PremiumImage({ url, alt }: { url: string; alt?: string }) {
               transition: 'opacity 160ms ease-out',
             }}
           />
+        ) : fallbackSign ? (
+          <div role="alert" data-testid="exam-media-image-fallback" style={{ position: 'absolute', inset: 0, zIndex: 1, display: 'grid', placeItems: 'center', textAlign: 'center', padding: 20, color: '#fff', background: 'linear-gradient(135deg,#0d2137,#1b3254)' }}>
+            <div style={{ maxWidth: 360 }}>
+              <SignSvg type={fallbackSign} alt={alt} />
+              <div style={{ fontWeight: 800, marginTop: 10, marginBottom: 6 }}>Image indisponible — panneau de secours affiché</div>
+              <div style={{ fontSize: 12, color: 'rgba(255,255,255,.72)', lineHeight: 1.5, marginBottom: 12 }}>
+                Le média photo n'a pas pu être rendu correctement. Le panneau correspondant reste visible pour ne pas rendre la question ambiguë.
+              </div>
+              <button type="button" className="secondary-button btn-sm" onClick={retry}>Réessayer</button>
+            </div>
+          </div>
         ) : (
           <div role="alert" style={{ position: 'absolute', inset: 0, zIndex: 1, display: 'grid', placeItems: 'center', textAlign: 'center', padding: 20, color: '#fff', background: 'linear-gradient(135deg,#0d2137,#1b3254)' }}>
             <div style={{ maxWidth: 360 }}>
@@ -257,7 +317,7 @@ export function MediaBlock({ mediaType, media, alt }: { mediaType?: string; medi
     return <VideoPlayer url={demo.url} poster={demo.poster} fallbackUrl={demo.fallback} alt={alt} />;
   }
   if (demo?.mediaType === 'image') {
-    return <PremiumImage url={demo.url} alt={alt} />;
+    return <PremiumImage url={demo.url} alt={alt} fallbackSign={demo.fallbackSign} />;
   }
 
   if (mediaType === 'video' && isRenderableMediaUrl(media)) {
