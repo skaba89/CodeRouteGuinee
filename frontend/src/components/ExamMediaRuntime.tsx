@@ -49,6 +49,13 @@ function isPlayableUrl(url: string): boolean {
   return /^https?:\/\//i.test(url) || url.startsWith('/media/');
 }
 
+function normalizeLegacySymbolicMedia(mediaType?: string, media?: string): string | undefined {
+  if (mediaType === 'scene' && media === 'situation_overtake_forbidden') {
+    return 'situation_overtake';
+  }
+  return media;
+}
+
 export type ExamMediaRuntimeProps = {
   mediaType?: string;
   media?: string;
@@ -64,7 +71,8 @@ export type ExamMediaRuntimeProps = {
  * normalized official video. Those URLs are authoritative when supplied by
  * ExamPage. Cloudinary poster derivation is retained only as a compatibility
  * fallback for older API payloads. Demo/legacy symbolic media continue through
- * ExamMediaPremium unchanged.
+ * ExamMediaPremium unchanged, except for explicit aliases that repair obsolete
+ * demo keys without weakening official media validation.
  */
 export function MediaBlock({ mediaType, media, alt, poster, fallback }: ExamMediaRuntimeProps) {
   if (mediaType === 'video' && media && isPlayableUrl(media)) {
@@ -85,7 +93,8 @@ export function MediaBlock({ mediaType, media, alt, poster, fallback }: ExamMedi
     }
   }
 
-  return <PremiumMediaBlock mediaType={mediaType} media={media} alt={alt} />;
+  const normalizedMedia = normalizeLegacySymbolicMedia(mediaType, media);
+  return <PremiumMediaBlock mediaType={mediaType} media={normalizedMedia} alt={alt} />;
 }
 
 export { VideoPlayer };
