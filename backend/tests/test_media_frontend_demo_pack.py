@@ -58,12 +58,27 @@ def test_guinea_demo_images_can_recover_from_stale_mobile_pwa_cache():
     player_source = PLAYER.read_text(encoding="utf-8")
     vite_source = VITE_CONFIG.read_text(encoding="utf-8")
 
-    assert "GUINEA_MEDIA_VERSION = '20260814-1'" in player_source
+    assert "GUINEA_MEDIA_VERSION = '20260817-1'" in player_source
     assert "withRetryCacheBypass" in player_source
     assert "retry=${retryKey}" in player_source
     assert "src={imageUrl}" in player_source
 
     assert "handler: 'NetworkFirst'" in vite_source
-    assert "cacheName: 'guinea-exam-images-v3'" in vite_source
+    assert "cacheName: 'guinea-exam-images-v4'" in vite_source
     assert "networkTimeoutSeconds: 5" in vite_source
     assert "cacheableResponse: { statuses: [200] }" in vite_source
+    assert "globIgnores: ['media/exam/guinea/*.webp']" in vite_source
+    assert "'media/exam/guinea/*.webp'," not in vite_source
+
+
+def test_guinea_demo_images_detect_blank_pixels_and_keep_semantic_fallbacks():
+    source = PLAYER.read_text(encoding="utf-8")
+
+    assert "hasVisiblePixelVariation" in source
+    assert "context.drawImage(image" in source
+    assert "maxLuma - minLuma >= 18" in source
+    assert "fallbackSign: 'stop'" in source
+    assert "fallbackSign: 'give_way'" in source
+    assert "fallbackSign: 'no_entry'" in source
+    assert "exam-media-image-fallback" in source
+    assert "Image indisponible — panneau de secours affiché" in source

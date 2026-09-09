@@ -10,11 +10,14 @@ export default defineConfig({
       includeAssets: [
         'favicon.ico',
         'icons/*.png',
-        'media/exam/guinea/*.webp',
         'media/exam/guinea/manifest.json',
       ],
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,webp,woff2}'],
+        // Les WebP d'examen Guinée doivent suivre UNE seule stratégie de cache.
+        // Ils sont exclus du precache afin que NetworkFirst reste réellement
+        // autoritatif après un redéploiement ou une corruption de cache mobile.
+        globIgnores: ['media/exam/guinea/*.webp'],
         cleanupOutdatedCaches: true,
         navigateFallback: '/offline.html',
         navigateFallbackDenylist: [/\/api\//, /\/docs(?:\/|$)/, /\/openapi(?:\/|$)/],
@@ -56,7 +59,7 @@ export default defineConfig({
             urlPattern: /\/media\/exam\/guinea\/.*\.webp(?:\?.*)?$/,
             handler: 'NetworkFirst',
             options: {
-              cacheName: 'guinea-exam-images-v3',
+              cacheName: 'guinea-exam-images-v4',
               networkTimeoutSeconds: 5,
               cacheableResponse: { statuses: [200] },
               expiration: {

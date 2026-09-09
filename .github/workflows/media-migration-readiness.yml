@@ -19,6 +19,7 @@ on:
       - 'frontend/vite.config.ts'
       - 'frontend/public/media/exam/guinea/**'
       - 'frontend/tests/e2e/media-*.spec.ts'
+      - 'frontend/tests/e2e/demo-exam-media-coverage.spec.ts'
       - '.github/workflows/media-migration-readiness.yml'
   push:
     branches:
@@ -40,6 +41,7 @@ on:
       - 'frontend/vite.config.ts'
       - 'frontend/public/media/exam/guinea/**'
       - 'frontend/tests/e2e/media-*.spec.ts'
+      - 'frontend/tests/e2e/demo-exam-media-coverage.spec.ts'
       - '.github/workflows/media-migration-readiness.yml'
   workflow_dispatch:
 
@@ -120,6 +122,7 @@ jobs:
           VITE_API_BASE_URL: http://localhost:8000
         run: >-
           npx playwright test
+          tests/e2e/demo-exam-media-coverage.spec.ts
           tests/e2e/media-library.spec.ts
           tests/e2e/media-migration-workflow.spec.ts
           tests/e2e/media-exam-visible.spec.ts
