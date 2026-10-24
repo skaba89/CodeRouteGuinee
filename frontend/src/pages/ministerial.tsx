@@ -66,6 +66,8 @@ import {
   getExamCertificatePdfUrl,
   getDashboardByCenter,
   type RegionDashboardRow,
+  getCenterAnomalies,
+  type CenterAnomalies,
 } from '../api';
 import { DEMO_QUESTIONS } from '../pages/examQuestions';
 
@@ -92,6 +94,7 @@ export function MinisterialPage() {
   const [readiness, setReadiness] = useState<InstitutionalReadiness | null>(null);
   const [actionCenter, setActionCenter] = useState<InstitutionalActionCenter | null>(null);
   const [regions, setRegions] = useState<RegionDashboardRow[]>([]);
+  const [anomalies, setAnomalies] = useState<CenterAnomalies | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Import candidats
@@ -137,11 +140,13 @@ export function MinisterialPage() {
       getInstitutionalReadiness(),
       getInstitutionalActionCenter(),
       getDashboardByCenter(),
-    ]).then(([op, rd, ac, territory]) => {
+      getCenterAnomalies(),
+    ]).then(([op, rd, ac, territory, watch]) => {
       if (op.status === 'fulfilled') setOpSummary(op.value);
       if (rd.status === 'fulfilled') setReadiness(rd.value);
       if (ac.status === 'fulfilled') setActionCenter(ac.value);
       if (territory.status === 'fulfilled') setRegions(territory.value.regions ?? []);
+      if (watch.status === 'fulfilled') setAnomalies(watch.value);
     }).finally(() => setLoading(false));
   }, [canAdmin]);
 
@@ -287,6 +292,50 @@ export function MinisterialPage() {
                     )}
                   </div>
                 </div>
+              </div>
+
+              {/* Surveillance statistique des centres (taux anormal, éloignement, hors créneau) */}
+              <div className="card" style={{ marginTop: 20 }}>
+                <div className="card-header">
+                  <span className="card-title">🔎 Centres sous contrôle renforcé</span>
+                  {anomalies?.national.pass_rate_pct != null && (
+                    <span style={{ fontSize: 12, color: 'var(--muted)' }}>
+                      Référence nationale : {anomalies.national.pass_rate_pct.toLocaleString('fr-FR')} % de réussite sur {fmt(anomalies.national.exams)} examens (90 jours)
+                    </span>
+                  )}
+                </div>
+                {!anomalies ? (
+                  <div style={{ padding: 16, color: 'var(--muted)', fontSize: 13 }}>Indicateurs de surveillance indisponibles.</div>
+                ) : anomalies.centers.length === 0 ? (
+                  <div style={{ padding: 16, color: 'var(--muted)', fontSize: 13 }}>Aucun centre ne présente d'indicateur atypique.</div>
+                ) : (
+                  <div className="table-wrap">
+                    <table>
+                      <thead><tr><th>Centre</th><th>Région</th><th>Examens</th><th>Réussite</th><th>Signalements</th></tr></thead>
+                      <tbody>
+                        {anomalies.centers.map(center => (
+                          <tr key={center.center_id}>
+                            <td style={{ fontWeight: 600 }}>{center.name}<br /><span style={{ fontSize: 11, color: 'var(--muted)' }}>{center.code}</span></td>
+                            <td>{center.region}</td>
+                            <td>{fmt(center.exams)}</td>
+                            <td>{center.pass_rate_pct.toLocaleString('fr-FR')} %</td>
+                            <td>
+                              {center.alerts.map(alert => (
+                                <div key={alert.code} style={{ fontSize: 12, marginBottom: 4 }}>
+                                  <span className="badge br">{alert.label}</span>{' '}
+                                  <span style={{ color: 'var(--muted)' }}>{alert.detail}</span>
+                                </div>
+                              ))}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+                <p style={{ fontSize: 11.5, color: 'var(--muted)', margin: '10px 0 0' }}>
+                  Indicateurs statistiques, et non preuves de fraude : ils déclenchent un contrôle sur place.
+                </p>
               </div>
             </>
           )}

@@ -204,7 +204,13 @@ def build_convocation_pdf(convocation: dict) -> bytes:
     return buf.getvalue()
 
 
-def build_result_certificate_pdf(candidate: dict, session: dict, center: dict, attempt: dict) -> bytes:
+def build_result_certificate_pdf(
+    candidate: dict,
+    session: dict,
+    center: dict,
+    attempt: dict,
+    verification_url: str | None = None,
+) -> bytes:
     passed = bool(attempt.get("passed"))
     decision = "ADMIS(E)" if passed else "NON ADMIS(E)"
     decision_color = GUINEA_GREEN if passed else GUINEA_RED
@@ -222,6 +228,17 @@ def build_result_certificate_pdf(candidate: dict, session: dict, center: dict, a
     c.setFont("Helvetica-Bold", 18)
     c.drawCentredString(PAGE_W / 2, y - 8.5 * mm, decision)
     y -= 20 * mm
+
+    # QR de vérification publique : un tiers (employeur, forces de l'ordre)
+    # contrôle l'authenticité de l'attestation sans compte ni appel au centre.
+    if verification_url:
+        qr_size = 32 * mm
+        qr_x = PAGE_W - MARGIN - qr_size
+        qr_y = y - qr_size - 2 * mm
+        c.drawImage(_qr_image(verification_url), qr_x, qr_y, qr_size, qr_size)
+        c.setFont("Helvetica", 7)
+        c.setFillColor(MUTED)
+        c.drawCentredString(qr_x + qr_size / 2, qr_y - 3.5 * mm, "Vérifier l'authenticité")
 
     y = _section(c, y, "1", "Identité du candidat")
     y = _row(c, y, "Référence candidat", candidate["reference"])

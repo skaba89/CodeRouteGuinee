@@ -44,6 +44,18 @@ assert sum(CATEGORY_DISTRIBUTION.values()) == EXAM_QUESTIONS_TOTAL, (
     f"La répartition catégorielle doit totaliser {EXAM_QUESTIONS_TOTAL} questions"
 )
 
+# Libellés des thèmes communiqués au candidat avec son résultat (fautes par thème).
+CATEGORY_LABELS: dict[str, str] = {
+    "signalisation": "Signalisation",
+    "priorites": "Règles de priorité",
+    "vitesse": "Vitesse et distances",
+    "depassement": "Dépassement et manœuvres",
+    "securite_passive": "Équipements et sécurité passive",
+    "urgence": "Situations d'urgence",
+    "alcool_drogues": "Alcool, drogues et médicaments",
+    "premiers_secours": "Premiers secours",
+}
+
 
 # ── Isolation de la banque d'entraînement historique ──────────────────────
 

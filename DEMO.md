@@ -159,8 +159,12 @@ pour l'étape suivante.
 3. Répondre aux 40 questions rapidement : touche **1** à **4** puis
    **Suivante**. Comptez environ 2 minutes.
 4. **Soumettre l'examen** → résultat immédiat (score / 40, seuil 35) et
-   correction détaillée de chaque question.
+   **fautes par thème**, sans les bonnes réponses.
 
+> Message : « Comme en France et au Royaume-Uni, les bonnes réponses de
+> l'examen officiel ne sont jamais publiées : la banque nationale reste
+> confidentielle. Le candidat sait quels thèmes réviser. »
+>
 > Le résultat du candidat de démonstration sera vraisemblablement « NON ADMIS »,
 > c'est attendu. L'étape suivante montre un candidat admis.
 
@@ -172,10 +176,19 @@ pour l'étape suivante.
 - Espace candidat → carte **« Vérifier un certificat »** : saisir
   `ATT-GN-CAND-2026-001` → **Vérifier** → « ADMIS — Mamadou Diallo · 38/40 ».
 - Bouton **↓ PDF** de cette même carte → attestation de résultat « ADMIS(E) »
-  (République de Guinée / DNTT, centre Kaloum 1, score 38/40).
+  (République de Guinée / DNTT, centre Kaloum 1, score 38/40), avec un
+  **QR code « Vérifier l'authenticité »**.
+- Ouvrir la cible du QR, sans être connecté (onglet privé ou téléphone sur le
+  même réseau) : `http://localhost:5173/#/verifier/ATT-GN-CAND-2026-001`
+  → « Attestation authentique — ADMIS(E) ». Montrer aussi une référence
+  inventée → « Attestation non reconnue ».
 
-> Message : « Un employeur ou un agent de police peut vérifier l'authenticité
-> d'un résultat. »
+> Message : « Un employeur ou un agent de contrôle scanne le QR et vérifie
+> l'attestation sans compte. Chaque vérification est journalisée. »
+>
+> En production, le QR pointe vers `PUBLIC_APP_URL` (par exemple
+> `https://coderoute.gov.gn`). En démonstration locale, il pointe vers
+> `localhost` : on le montre sur le portable, pas sur un téléphone.
 
 ### 10:30 – 12:30 · Supervision territoriale
 
@@ -188,10 +201,17 @@ nationale — activité par centre ».
    tête de page comme alerte critique.
 2. Filtre **Kankan** : incident de connexion internet ouvert.
 3. Onglet **Paiements** : les paiements en attente ou à rapprocher, l'export
-   CSV et le rapprochement financier.
+   CSV et le rapprochement financier. Les remboursements suivent la règle des
+   quatre yeux : leur auteur ne peut pas les approuver.
+4. **`#/ministerial`**, encart **« Centres sous contrôle renforcé »** : le centre
+   **Siguiri 2** (région de Kankan) est signalé automatiquement, avec
+   95 % de réussite contre 64 % au national, tous ses candidats venus d'une
+   autre région et un examen démarré hors créneau.
 
 > Message : « Un incident déclaré dans un centre de Forêt est visible à
-> Conakry dans la minute. »
+> Conakry dans la minute. Comme en France depuis 2024, les centres au profil
+> statistique atypique sont repérés automatiquement pour un contrôle sur
+> place : c'est un indicateur, pas une accusation. »
 
 ### 12:30 – 14:30 · Le journal d'audit infalsifiable
 
@@ -253,9 +273,17 @@ pour cette étape et reprendre la démonstration en direct à l'étape suivante.
 ## 4. Questions probables et réponses factuelles
 
 - **« La banque de questions est-elle officielle ? »** Non. C'est une banque
-  de démonstration : sa validation est une décision de la DNTT. La plateforme
-  dispose du circuit d'homologation (statut par question, traçabilité de la
-  banque par empreinte SHA-256 à chaque examen).
+  de démonstration de 40 questions : sa validation est une décision de la DNTT.
+  La banque réelle devra compter plusieurs centaines de questions, être importée
+  depuis un support maîtrisé par la DNTT et rester confidentielle, jamais
+  publiée. La plateforme dispose du circuit d'homologation (statut par
+  question, traçabilité de la banque par empreinte SHA-256 à chaque examen).
+- **« Comment vous comparez-vous à la France ? »** Voir
+  `docs/BONNES_PRATIQUES_INTERNATIONALES.md`. Plusieurs pratiques sont déjà en
+  place : résultat par thème sans les bonnes réponses, surveillance
+  statistique des centres, attestation vérifiable par QR. D'autres attendent une
+  décision réglementaire de la DNTT : résultat différé de 24 h, inscriptions
+  closes la veille, plages horaires, durée de validité.
 - **« Les paiements sont-ils réels ? »** Non, ils sont simulés. Les connecteurs
   Orange Money, MTN, Wave et PayDunya existent dans le code. Leur activation
   exige les contrats et les clés des opérateurs.

@@ -17,7 +17,11 @@ from pydantic import BaseModel
 
 from app.deps import get_current_user
 from app.models_user import User
-from app.question_bank_gn import QUESTIONS_200
+from app.question_bank_gn import QUESTIONS_TRAINING_FULL
+
+# Banque d'entraînement uniquement : les questions de la banque officielle ne
+# doivent jamais être publiées avec leurs réponses (confidentialité de l'épreuve).
+TRAINING_BANK = QUESTIONS_TRAINING_FULL
 
 router = APIRouter(prefix="/training", tags=["training"])
 
@@ -49,7 +53,7 @@ def get_training_categories(
 ) -> list[dict]:
     """Liste des catégories avec nombre de questions disponibles."""
     from collections import Counter
-    cat_count = Counter(q["category"] for q in QUESTIONS_200)
+    cat_count = Counter(q["category"] for q in TRAINING_BANK)
     return [
         {"category": cat, "total": count, "display_name": _cat_label(cat)}
         for cat, count in sorted(cat_count.items())
@@ -67,7 +71,7 @@ def get_training_questions(
     Retourne des questions pour l'entraînement.
     Contrairement à l'examen, les bonnes réponses et explications sont incluses.
     """
-    pool = [q for q in QUESTIONS_200 if not category or q["category"] == category]
+    pool = [q for q in TRAINING_BANK if not category or q["category"] == category]
 
     if shuffle:
         pool = random.sample(pool, min(limit, len(pool)))
@@ -98,7 +102,7 @@ def get_mock_exam(
     Les bonnes réponses sont masquées (comme l'examen réel).
     """
 
-    # Tirer 40 questions sur les 200 selon la répartition officielle DNTT
+    # Tirer 40 questions de la banque d'entraînement selon la répartition officielle DNTT
     # (identique à l'examen réel — sauf que c'est côté client, sans DB)
     DIST = {
         "signalisation": 10, "priorites": 6, "vitesse": 5, "depassement": 5,
@@ -106,7 +110,7 @@ def get_mock_exam(
     }
     from collections import defaultdict as _dd
     by_cat = _dd(list)
-    for q in QUESTIONS_200:
+    for q in TRAINING_BANK:
         by_cat[q["category"]].append(q)
 
     questions = []
@@ -115,10 +119,10 @@ def get_mock_exam(
         take = min(count, len(pool_cat))
         questions.extend(random.sample(pool_cat, take))
 
-    # Compléter si manque (ne devrait pas arriver avec 200 questions)
+    # Compléter si une catégorie manque de questions
     if len(questions) < 40:
         already = {q["text"] for q in questions}
-        spare = [q for q in QUESTIONS_200 if q["text"] not in already]
+        spare = [q for q in TRAINING_BANK if q["text"] not in already]
         questions.extend(random.sample(spare, min(40 - len(questions), len(spare))))
 
     random.shuffle(questions)
@@ -154,7 +158,7 @@ def check_answer(
     Vérifie une réponse et retourne l'explication immédiatement.
     Cœur du mode entraînement — feedback pédagogique instantané.
     """
-    pool = [q for q in QUESTIONS_200 if not category or q["category"] == category]
+    pool = [q for q in TRAINING_BANK if not category or q["category"] == category]
 
     if request.question_index >= len(pool):
         return {"error": "Question introuvable"}

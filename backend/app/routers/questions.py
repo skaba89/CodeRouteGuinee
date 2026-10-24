@@ -34,7 +34,10 @@ def list_questions(
     category: str | None = Query(default=None),
     is_active: bool | None = Query(default=True),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("admin", "super_admin", "center")),
+    # La liste expose les bonnes réponses : réservée à l'autorité de la banque.
+    # Un agent de centre n'en a pas besoin et ne doit pas pouvoir la consulter
+    # (fraude par surveillant complice).
+    current_user: User = Depends(require_roles("admin", "super_admin")),
 ) -> list[Question]:
     q = select(Question).order_by(Question.category.asc(), Question.created_at.desc())
     if is_active is not None:

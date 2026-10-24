@@ -8,6 +8,7 @@ import CenterEdgeOperationsPage from './pages/CenterEdgeOperationsPage';
 import { CenterEdgeReleaseLocalPanel } from './components/CenterEdgeReleaseLocalPanel';
 import EdgeExamEntry from './pages/EdgeExamEntry';
 import EdgePendingPage from './pages/EdgePendingPage';
+import { CertificateVerifyPage } from './pages/certificate-verify';
 import { hasPendingEdgeBootstrap } from './edgeExamSession';
 import './examDeviceFetchBridge';
 import './edgeExamFetchBridge';
@@ -22,6 +23,9 @@ function RootSurface() {
     return () => window.removeEventListener('hashchange', onHashChange);
   }, []);
 
+  if (hash.startsWith('#/verifier/')) {
+    return <CertificateVerifyPage attemptId={decodeURIComponent(hash.slice('#/verifier/'.length))} />;
+  }
   if (hash.startsWith('#/center-edge')) return <><CenterEdgeOperationsPage /><CenterEdgeReleaseLocalPanel /></>;
   if (hash.startsWith('#/edge-pending')) return <EdgePendingPage />;
   if (hash === '#/exam' && hasPendingEdgeBootstrap()) return <EdgeExamEntry />;

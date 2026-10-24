@@ -130,6 +130,11 @@ REGION_PASS_RATE = {
 
 PROVIDER_WEIGHTS = (("orange_money", 55), ("mtn_money", 25), ("wave", 15), ("paydunya", 5))
 
+# Centre au profil volontairement anormal, pour montrer la surveillance
+# statistique : réussite quasi systématique, candidats venus de Conakry,
+# un examen démarré hors créneau. Données fictives.
+ANOMALOUS_CENTER_CODE = "CRG-SIGUIR-002"
+
 FIRST_NAMES = (
     "Mamadou", "Fatoumata", "Alpha", "Mariama", "Ibrahima", "Aïssatou", "Ousmane", "Kadiatou",
     "Abdoulaye", "Hawa", "Sékou", "Djénabou", "Mohamed", "Aminata", "Thierno", "Fanta",
@@ -267,8 +272,9 @@ def seed_national_activity(
 
     for center in sorted(centers, key=lambda c: c.code)[:center_limit]:
         region = region_for_prefecture(center.prefecture)
-        pass_rate = REGION_PASS_RATE.get(region, 0.58)
-        n_sessions = 3 if region == "Conakry" else 2
+        anomalous = center.code == ANOMALOUS_CENTER_CODE
+        pass_rate = 0.97 if anomalous else REGION_PASS_RATE.get(region, 0.58)
+        n_sessions = 4 if anomalous else 3 if region == "Conakry" else 2
         days = sorted(rng.sample(range(4, 90), n_sessions), reverse=True)
 
         for day in days:
@@ -286,7 +292,7 @@ def seed_national_activity(
             db.add(session)
             db.flush()
 
-            for _seat in range(max(3, int(rng.randint(5, 12) * scale))):
+            for seat in range(max(3, int(rng.randint(10, 12) if anomalous else rng.randint(5, 12) * scale))):
                 counter += 1
                 first, last = rng.choice(FIRST_NAMES), rng.choice(LAST_NAMES)
                 registered_at = starts_at - timedelta(days=rng.randint(6, 20))
@@ -297,7 +303,7 @@ def seed_national_activity(
                     identity_number=f"GN{rng.randint(10**9, 10**10 - 1)}",
                     phone=_guinean_phone(rng),
                     permit_category="B",
-                    city=center.city,
+                    city="Conakry" if anomalous else center.city,
                     status="registered",
                     registered_by=school.id if region == "Conakry" and rng.random() < 0.3 else None,
                     created_at=registered_at,
@@ -341,6 +347,8 @@ def seed_national_activity(
 
                 passed = rng.random() < pass_rate
                 score = rng.randint(35, 40) if passed else rng.randint(22, 34)
+                # Un examen du centre anormal démarre 2 h après le début de session.
+                started_at = starts_at + timedelta(minutes=125 if anomalous and seat == 0 else 5)
                 attempt = ExamAttempt(
                     candidate_id=candidate.id,
                     session_id=session.id,
@@ -348,8 +356,8 @@ def seed_national_activity(
                     answers=_build_answers(questions, score),
                     score=score,
                     passed=passed,
-                    started_at=starts_at + timedelta(minutes=5),
-                    submitted_at=starts_at + timedelta(minutes=rng.randint(18, 30)),
+                    started_at=started_at,
+                    submitted_at=started_at + timedelta(minutes=rng.randint(13, 25)),
                 )
                 db.add(attempt)
                 db.flush()
