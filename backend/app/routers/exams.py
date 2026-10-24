@@ -30,6 +30,7 @@ from app.models_exam_question_trace import ExamQuestionTrace
 from app.models_question import Question
 from app.models_session import ExamSession
 from app.models_user import User
+from app.core.config import get_settings
 from app.pdf_service import build_result_certificate_pdf
 from app.schemas import ExamAttemptRead, ExamCertificateVerificationRead, ExamStartFromBookingRequest, ExamStartRequest, ExamSubmitRequest
 from app.sentry import capture_exception as _sentry_cap
@@ -812,7 +813,26 @@ def get_exam_results(
         })
 
     candidate = db.get(Candidate, attempt.candidate_id)
-    from app.exam_engine import EXAM_PASS_THRESHOLD
+    from app.exam_engine import CATEGORY_DISTRIBUTION, CATEGORY_LABELS, EXAM_PASS_THRESHOLD
+
+    # Fautes par thème, dans l'ordre de la répartition officielle.
+    order = {name: index for index, name in enumerate(CATEGORY_DISTRIBUTION)}
+    themes: dict[str, dict] = {}
+    for item in items:
+        theme = themes.setdefault(item["category"], {
+            "category": item["category"],
+            "label": CATEGORY_LABELS.get(item["category"], item["category"]),
+            "total": 0,
+            "errors": 0,
+        })
+        theme["total"] += 1
+        theme["errors"] += int(not item["is_correct"])
+
+    # Comme pour l'épreuve théorique en France, le candidat (et l'agent de
+    # centre) reçoit son score et ses fautes par thème, jamais les bonnes
+    # réponses : les publier permettrait de reconstituer la banque officielle.
+    # La correction détaillée reste accessible à l'administration (recours).
+    full_detail = current_user.role in {"admin", "super_admin"}
     return {
         "attempt_id": attempt.id,
         "candidate_name": f"{candidate.first_name} {candidate.last_name}" if candidate else "",
@@ -822,7 +842,9 @@ def get_exam_results(
         "passed": attempt.passed,
         "threshold": EXAM_PASS_THRESHOLD,
         "submitted_at": attempt.submitted_at.isoformat() if attempt.submitted_at else None,
-        "questions": items,
+        "detail_level": "full" if full_detail else "summary",
+        "themes": sorted(themes.values(), key=lambda row: order.get(row["category"], len(order))),
+        "questions": items if full_detail else [],
     }
 
 
@@ -952,6 +974,7 @@ def get_exam_certificate(
             "status": attempt.status,
             "submitted_at": attempt.submitted_at.isoformat() if attempt.submitted_at else None,
         },
+        verification_url=f"{get_settings().public_app_url.rstrip('/')}/#/verifier/{attempt.id}",
     )
     headers = {"Content-Disposition": f"attachment; filename=coderoute-result-{attempt.id}.pdf"}
     return Response(content=pdf, media_type="application/pdf", headers=headers)

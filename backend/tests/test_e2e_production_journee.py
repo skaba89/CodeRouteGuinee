@@ -272,7 +272,8 @@ def test_journee_production_complete(client: TestClient):
 
     # 4.5 — Résultat détaillé + statut
     r = client.get(f"/api/v1/exams/{attempt_id}/results", headers=_auth(cand_tok))
-    assert r.status_code == 200 and len(r.json().get("questions", [])) == 40
+    assert r.status_code == 200 and r.json()["detail_level"] == "summary"
+    assert sum(theme["total"] for theme in r.json()["themes"]) == 40
     r = client.get(f"/api/v1/exams/{attempt_id}/status", headers=_auth(cand_tok))
     assert r.status_code == 200
 

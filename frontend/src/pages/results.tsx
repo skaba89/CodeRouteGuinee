@@ -165,7 +165,29 @@ export function ResultsPage() {
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {result.detail_level === 'summary' && (
+            <div className="card">
+              <div className="card-header"><span className="card-title">Fautes par thème</span></div>
+              <p style={{ fontSize: 12.5, color: 'var(--muted)', margin: '0 0 10px' }}>
+                Les bonnes réponses de l'examen officiel ne sont pas communiquées (confidentialité de la banque nationale).
+              </p>
+              <div className="table-wrap">
+                <table>
+                  <thead><tr><th>Thème</th><th>Questions</th><th>Fautes</th></tr></thead>
+                  <tbody>
+                    {(result.themes ?? []).map(theme => (
+                      <tr key={theme.category}>
+                        <td>{theme.label}</td><td>{theme.total}</td>
+                        <td style={{ fontWeight: 700, color: theme.errors > 0 ? 'var(--red)' : 'var(--green)' }}>{theme.errors}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {result.questions.length > 0 && <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             {(['all','ok','ko'] as const).map(f => (
               <button key={f} type="button"
                 className={filter === f ? 'btn-primary btn-sm' : 'secondary-button btn-sm'}
@@ -175,7 +197,7 @@ export function ResultsPage() {
                   : ` Incorrectes (${result.questions.filter(q => !q.is_correct).length})`}
               </button>
             ))}
-          </div>
+          </div>}
 
           {filtered.map(q => (
             <div key={q.question_id} style={{ background: 'var(--surface, #fff)', border: `1.5px solid ${q.is_correct ? '#86efac' : '#fca5a5'}`, borderRadius: 12, padding: '14px 16px', display: 'grid', gap: 7 }}>

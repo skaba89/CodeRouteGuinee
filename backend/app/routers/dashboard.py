@@ -1,10 +1,11 @@
 from datetime import UTC, datetime, timedelta
 
-from fastapi import APIRouter, Depends, Response
+from fastapi import APIRouter, Depends, Query, Response
 from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.center_anomalies import detect_center_anomalies
 from app.db.session import get_db
 from app.deps import require_roles
 from app.models_audit import AuditLog
@@ -700,6 +701,17 @@ def dashboard_by_center(
         "open_incidents_total": sum(incidents_by_center.values()),
     }
     return {"national": national, "regions": _aggregate_regions(items), "centers": items}
+
+
+@router.get("/center-anomalies", tags=["dashboard"])
+def dashboard_center_anomalies(
+    days: int = Query(default=90, ge=7, le=365),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "super_admin")),
+) -> dict:
+    """Centres à placer sous contrôle renforcé (indicateurs statistiques)."""
+    since = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=days)
+    return detect_center_anomalies(db, since=since)
 
 
 def _aggregate_regions(items: list[dict]) -> list[dict]:

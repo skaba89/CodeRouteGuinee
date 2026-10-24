@@ -744,6 +744,23 @@ export function getDashboardByCenter(): Promise<NationalDashboard> {
   return getPrivateJson<NationalDashboard>('/api/v1/dashboard/by-center');
 }
 
+export type CenterAnomalyAlert = { code: string; label: string; detail: string };
+export type CenterAnomaly = {
+  center_id: string; code: string; name: string; region: string;
+  exams: number; pass_rate_pct: number; z_score: number | null;
+  remote_share_pct: number | null; off_slot_attempts: number;
+  alerts: CenterAnomalyAlert[];
+};
+export type CenterAnomalies = {
+  since: string;
+  national: { exams: number; pass_rate_pct: number | null };
+  thresholds: { min_exams: number; pass_rate_z: number; remote_share_pct: number };
+  centers: CenterAnomaly[];
+};
+export function getCenterAnomalies(days = 90): Promise<CenterAnomalies> {
+  return getPrivateJson<CenterAnomalies>(`/api/v1/dashboard/center-anomalies?days=${days}`);
+}
+
 export type AuditChainVerification = {
   enabled: boolean; valid: boolean; reason: string | null;
   total_entries?: number; head_seq?: number; broken_at_seq?: number | null;
@@ -997,6 +1014,13 @@ export type ExamResultItem = {
   explanation: string;
 };
 
+export type ExamThemeResult = {
+  category: string;
+  label: string;
+  total: number;
+  errors: number;
+};
+
 export type ExamDetailedResult = {
   attempt_id: string;
   candidate_name: string;
@@ -1006,6 +1030,10 @@ export type ExamDetailedResult = {
   passed: boolean;
   threshold: number;
   submitted_at: string;
+  /** `summary` : score et fautes par thème uniquement (candidat, centre). */
+  detail_level?: 'full' | 'summary';
+  themes?: ExamThemeResult[];
+  /** Vide en mode `summary` : les bonnes réponses officielles ne sont pas publiées. */
   questions: ExamResultItem[];
 };
 

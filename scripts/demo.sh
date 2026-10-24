@@ -57,6 +57,9 @@ case "$cmd" in
     ;;
   check)
     require_env
+    # Session dédiée dans 5 min : le démarrage d'examen est ouvert tout de suite,
+    # quelle que soit l'heure de la session live prévue pour la démonstration.
+    docker exec coderoute-backend python -m app.seed_demo_dntt --live-only --live-in 5 >/dev/null
     docker cp "$ROOT/scripts/demo_rehearsal.py" coderoute-backend:/tmp/demo_rehearsal.py
     docker exec coderoute-backend python /tmp/demo_rehearsal.py
     ;;
