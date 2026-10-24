@@ -30,3 +30,10 @@ class AuditLog(Base):
     seq: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
     entry_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
     prev_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
+
+# Le chaînage HMAC est un écouteur SQLAlchemy `before_flush` : il doit être
+# enregistré dans TOUT processus qui écrit le journal (API, seeds, scripts
+# d'import, bootstrap), sinon ces lignes restent non chaînées et la
+# vérification d'intégrité échoue. Import placé après la classe (cycle).
+import app.audit_chain  # noqa: E402,F401
