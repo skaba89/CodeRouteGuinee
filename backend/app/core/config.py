@@ -35,6 +35,9 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
     allowed_hosts: str = "localhost,127.0.0.1,testserver"
     enable_api_docs: bool = True
+    # Adresse publique du frontend : les QR codes des attestations y renvoient
+    # pour une vérification d'authenticité sans connexion.
+    public_app_url: str = "http://localhost:5173"
 
     # ── Portique centre d'examen ─────────────────────────────────────────
     # Paramètres OPÉRATIONNELS, configurables sans modification de code.
