@@ -1,0 +1,14 @@
+# Surcharge « démonstration DNTT » de la stack locale — voir DEMO.md.
+# Toujours lancée via scripts/demo.sh, qui génère .env.demo (non versionné).
+services:
+  backend:
+    environment:
+      ENVIRONMENT: development
+      # Paiements simulés : aucun débit réel, aucun appel opérateur.
+      MOBILE_MONEY_MODE: sandbox
+      # Journal d'audit chaîné HMAC (preuve d'intégrité montrée en démo).
+      AUDIT_CHAIN_ENABLED: "true"
+      AUDIT_CHAIN_HMAC_KEY: ${AUDIT_CHAIN_HMAC_KEY:?lancer scripts/demo.sh init}
+      # Ferme la création publique de comptes admin/super_admin.
+      ADMIN_REGISTRATION_TOKEN: ${ADMIN_REGISTRATION_TOKEN:?lancer scripts/demo.sh init}
+      DEMO_MEDIA_BASE_URL: ${DEMO_MEDIA_BASE_URL:-https://coderouteguinee-frontend.onrender.com/media/exam/guinea/realistic/}

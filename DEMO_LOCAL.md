@@ -1,5 +1,10 @@
 # Demo locale CodeRoute Guinee
 
+> **Obsolète pour une démonstration institutionnelle** : utiliser [`DEMO.md`](DEMO.md)
+> (environnement `scripts/demo.sh`, script DNTT de 15 minutes). Ce guide décrit
+> l'ancien seed `app.seed_demo`, qui n'a pas été revérifié avec les contrôles
+> d'examen actuels (identité, fenêtre horaire, banque média).
+
 Ce guide sert a valider une premiere version presentable en local avant une demonstration.
 
 ## 1. Demarrer le projet
