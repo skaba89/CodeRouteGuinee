@@ -17,6 +17,8 @@ backend/coverage.xml
 backend/.coverage
 frontend/.env.local
 .env
+.env.demo
+.demo-tamper
 *.db
 
 # Dossiers de preuves opérationnelles générés localement.

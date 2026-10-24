@@ -22,6 +22,7 @@ import {
   type UserFilters,
   triggerSeedPilote, getPiloteRoster, type PiloteRosterItem,
   bulkPlanSessions, getUpcomingSessionsByCenter, type BulkPlanResult, type UpcomingSession,
+  verifyAuditChain, type AuditChainVerification,
 } from '../api';
 import { isAudioLocale, speakFeedback, stop as stopAudio } from '../audio';
 import { type Locale } from '../i18n';
@@ -103,6 +104,8 @@ export function AdminPage() {
   const [auditLoading, setAuditLoading] = useState(false);
   const [auditPage, setAuditPage] = useState(0);
   const [auditSearch, setAuditSearch] = useState('');
+  const [auditChain, setAuditChain] = useState<AuditChainVerification | null>(null);
+  const [auditChainLoading, setAuditChainLoading] = useState(false);
   const [users, setUsers] = useState<InstitutionalUser[]>([]);
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -143,6 +146,12 @@ export function AdminPage() {
     }
     if (tab === 'users') getInstitutionalUsers().then(setUsers).catch(() => undefined);
   }, [tab, candPage, candLimit, candSearch]);
+
+  const auditNeedle = auditSearch.trim().toLowerCase();
+  const filteredAuditLogs = auditNeedle
+    ? auditLogs.filter(log =>
+        `${log.action} ${log.entity} ${JSON.stringify(log.details ?? {})}`.toLowerCase().includes(auditNeedle))
+    : auditLogs;
 
   async function handleToggleStatus(userId: string, activate: boolean) {
     try {
@@ -317,13 +326,37 @@ export function AdminPage() {
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               <SearchBar
                 value={auditSearch}
-                onChange={s => setAuditSearch(s)}
+                onChange={s => { setAuditSearch(s); setAuditPage(0); }}
                 placeholder="Filtrer les logs…"
               />
+              <button
+                className="secondary-button btn-sm"
+                disabled={auditChainLoading}
+                onClick={() => {
+                  setAuditChainLoading(true);
+                  verifyAuditChain()
+                    .then(setAuditChain)
+                    .catch(() => setAuditChain({ enabled: true, valid: false, reason: 'unreachable' }))
+                    .finally(() => setAuditChainLoading(false));
+                }}
+              >
+                {auditChainLoading ? 'Vérification…' : "🔒 Vérifier l'intégrité"}
+              </button>
               <button className="secondary-button btn-sm" onClick={() => downloadAuditLogsCsv().catch(() => undefined)}>⬇ CSV</button>
             </div>
           </div>
-          {auditLogs.length === 0 ? (
+          {auditChain && (
+            <div className={`alert ${auditChain.valid ? 'as' : 'ae'}`} role="status" style={{ margin: '0 0 12px' }}>
+              {auditChain.valid
+                ? `Journal intègre : ${fmt(auditChain.total_entries ?? 0)} entrées chaînées, aucune altération détectée.`
+                : !auditChain.enabled
+                  ? "Chaînage d'intégrité désactivé sur cet environnement."
+                  : auditChain.broken_at_seq
+                    ? `Altération détectée à l'entrée n°${auditChain.broken_at_seq} (${auditChain.reason}).`
+                    : `Intégrité non vérifiable (${auditChain.reason}).`}
+            </div>
+          )}
+          {filteredAuditLogs.length === 0 ? (
             <div style={{ textAlign: 'center', padding: 32, color: 'var(--muted)' }}>
               {canAdmin ? 'Aucun log trouvé.' : 'Connectez-vous pour voir les logs.'}
             </div>
@@ -332,7 +365,7 @@ export function AdminPage() {
               <table>
                 <thead><tr><th>Date</th><th>Action</th><th>Entité</th><th>Détails</th></tr></thead>
                 <tbody>
-                  {auditLogs.slice(auditPage * 25, auditPage * 25 + 25).map((log, i) => (
+                  {filteredAuditLogs.slice(auditPage * 25, auditPage * 25 + 25).map((log, i) => (
                     <tr key={i}>
                       <td style={{ whiteSpace: 'nowrap' }}>{fmtDate(log.created_at)}</td>
                       <td><code style={{ fontSize: 11 }}>{log.action}</code></td>
@@ -345,7 +378,7 @@ export function AdminPage() {
                 </tbody>
               </table>
               <Pagination
-                total={auditLogs.length}
+                total={filteredAuditLogs.length}
                 limit={25}
                 offset={auditPage * 25}
                 onPage={(off) => setAuditPage(Math.floor(off / 25))}

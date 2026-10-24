@@ -230,95 +230,111 @@ def _seed_paid_payment() -> tuple[str, str]:
 
 
 class TestRefunds:
+    """Circuit de remboursement : demande → décision admin → preuve opérateur."""
+
+    _REASON = "Annulation administrative de la session"
+
+    def _request(self, c: TestClient, pay_ref: str, headers: dict, reason: str | None = None):
+        return c.post(f"/api/v1/payments/{pay_ref}/refund",
+                      headers=headers, json={"reason": reason or self._REASON})
+
     def test_refund_requires_auth(self):
         pay_ref, _ = _seed_paid_payment()
         with TestClient(app) as c:
             r = c.post(f"/api/v1/payments/{pay_ref}/refund",
-                       json={"reason": "Test sans auth"})
+                       json={"reason": self._REASON})
         assert r.status_code == 401
 
-    def test_refund_requires_super_admin(self):
-        """Un admin simple (role='admin') ne peut pas rembourser."""
-        import uuid as _uuid
+    def test_refund_request_refused_to_unrelated_candidate(self):
+        """Un candidat ne peut pas demander le remboursement du paiement d'un autre."""
+        from tests.conftest import get_candidate_headers
 
-        from app.db.session import SessionLocal as _SL
-        from app.db.session import init_db as _idb
-        from app.models_user import User as _U
-        from app.security import get_password_hash as _ph
-        _idb()
-        suffix = _uuid.uuid4().hex[:8]
-        email  = f"admin-refund-{suffix}@test.com"
-        with _SL() as db:
-            db.add(_U(email=email, full_name="Refund Admin",
-                      password_hash=_ph("Test123!"), role="admin"))
-            db.commit()
         pay_ref, _ = _seed_paid_payment()
         with TestClient(app) as c:
-            tok = c.post("/api/v1/auth/login",
-                         data={"username": email, "password": "Test123!"}).json()["access_token"]
-            r = c.post(f"/api/v1/payments/{pay_ref}/refund",
-                       headers={"Authorization": f"Bearer {tok}"},
-                       json={"reason": "Test admin simple"})
-        assert r.status_code in (401, 403)
+            r = self._request(c, pay_ref, get_candidate_headers(c))
+        assert r.status_code == 403
 
-    def test_refund_paid_payment_succeeds(self):
-        pay_ref, _ = _seed_paid_payment()
+    def test_refund_request_is_pending_until_decision(self):
+        pay_ref, booking_ref = _seed_paid_payment()
         with TestClient(app) as c:
-            h = _super_admin_headers(c)
-            r = c.post(f"/api/v1/payments/{pay_ref}/refund",
-                       headers=h, json={"reason": "Annulation administrative"})
-        assert r.status_code == 200
+            r = self._request(c, pay_ref, _super_admin_headers(c))
+        assert r.status_code == 202, r.text
         data = r.json()
-        assert data["status"] == "refunded"
-        assert data["reference"] == pay_ref
-
-    def test_refund_updates_status_in_db(self):
-        pay_ref, _ = _seed_paid_payment()
-        with TestClient(app) as c:
-            h = _super_admin_headers(c)
-            c.post(f"/api/v1/payments/{pay_ref}/refund",
-                   headers=h, json={"reason": "Test statut DB"})
+        assert data["status"] == "requested"
+        assert data["booking_reference"] == booking_ref
+        assert data["amount_gnf"] == 150_000
         with SessionLocal() as db:
             from sqlalchemy import select as _sel
-            pay = db.scalar(_sel(Payment).where(Payment.reference == pay_ref))
-            assert pay is not None
-            assert pay.status == "refunded"
+            assert db.scalar(_sel(Payment.status).where(Payment.reference == pay_ref)) == "paid"
+
+    def test_refund_full_workflow_marks_payment_refunded(self):
+        pay_ref, booking_ref = _seed_paid_payment()
+        with TestClient(app) as c:
+            h = _super_admin_headers(c)
+            refund = self._request(c, pay_ref, h).json()
+            decision = c.post(f"/api/v1/payments/refunds/{refund['id']}/decision", headers=h,
+                              json={"decision": "approved", "reason": "Session annulée par la DNTT"})
+            assert decision.status_code == 200, decision.text
+            done = c.post(f"/api/v1/payments/refunds/{refund['id']}/complete", headers=h, json={
+                "provider_refund_reference": "OM-REFUND-0001",
+                "evidence_reference": "PV-REMB-2026-001",
+                "notes": "Remboursement Orange Money confirmé par l'opérateur",
+            })
+        assert done.status_code == 200, done.text
+        assert done.json()["status"] == "completed"
+        with SessionLocal() as db:
+            from sqlalchemy import select as _sel
+            assert db.scalar(_sel(Payment.status).where(Payment.reference == pay_ref)) == "refunded"
+            assert db.scalar(_sel(Booking.status).where(Booking.reference == booking_ref)) == "cancelled"
+
+    def test_refund_completion_requires_approval(self):
+        pay_ref, _ = _seed_paid_payment()
+        with TestClient(app) as c:
+            h = _super_admin_headers(c)
+            refund = self._request(c, pay_ref, h).json()
+            r = c.post(f"/api/v1/payments/refunds/{refund['id']}/complete", headers=h, json={
+                "provider_refund_reference": "OM-REFUND-0002",
+                "evidence_reference": "PV-REMB-2026-002",
+                "notes": "Tentative sans approbation préalable",
+            })
+        assert r.status_code == 409
+        assert r.json()["detail"]["code"] == "REFUND_APPROVAL_REQUIRED"
+
+    def test_refund_decision_refused_to_candidate(self):
+        from tests.conftest import get_candidate_headers
+
+        pay_ref, _ = _seed_paid_payment()
+        with TestClient(app) as c:
+            refund = self._request(c, pay_ref, _super_admin_headers(c)).json()
+            r = c.post(f"/api/v1/payments/refunds/{refund['id']}/decision",
+                       headers=get_candidate_headers(c),
+                       json={"decision": "approved", "reason": "Auto-approbation"})
+        assert r.status_code == 403
 
     def test_refund_nonexistent_payment(self):
         with TestClient(app) as c:
-            h = _super_admin_headers(c)
-            r = c.post("/api/v1/payments/PAY-INEXISTANT-XYZ/refund",
-                       headers=h, json={"reason": "Test"})
+            r = self._request(c, "PAY-INEXISTANT-XYZ", _super_admin_headers(c))
         assert r.status_code == 404
 
-    def test_refund_already_refunded_fails(self):
-        """Rembourser deux fois le même paiement doit échouer."""
+    def test_refund_request_is_idempotent_while_open(self):
+        """Une seconde demande renvoie la demande ouverte au lieu d'en créer une autre."""
         pay_ref, _ = _seed_paid_payment()
         with TestClient(app) as c:
             h = _super_admin_headers(c)
-            c.post(f"/api/v1/payments/{pay_ref}/refund",
-                   headers=h, json={"reason": "Premier remboursement"})
-            r = c.post(f"/api/v1/payments/{pay_ref}/refund",
-                       headers=h, json={"reason": "Deuxième tentative"})
-        assert r.status_code == 400
+            first = self._request(c, pay_ref, h)
+            second = self._request(c, pay_ref, h, reason="Deuxième demande identique")
+        assert first.status_code == 202
+        assert second.status_code == 200
+        assert second.json()["id"] == first.json()["id"]
 
-    def test_refund_response_includes_amount(self):
+    def test_refund_reason_is_mandatory(self):
         pay_ref, _ = _seed_paid_payment()
         with TestClient(app) as c:
             h = _super_admin_headers(c)
-            r = c.post(f"/api/v1/payments/{pay_ref}/refund",
-                       headers=h, json={"reason": "Test montant"})
-        assert r.json()["amount_gnf"] == 150_000
-
-    def test_refund_default_reason(self):
-        """Sans raison fournie, la raison par défaut est utilisée."""
-        pay_ref, _ = _seed_paid_payment()
-        with TestClient(app) as c:
-            h = _super_admin_headers(c)
-            r = c.post(f"/api/v1/payments/{pay_ref}/refund",
-                       headers=h, json={})
-        assert r.status_code == 200
-        assert r.json()["reason"] == "Non spécifié"
+            missing = c.post(f"/api/v1/payments/{pay_ref}/refund", headers=h, json={})
+            too_short = self._request(c, pay_ref, h, reason="court")
+        assert missing.status_code == 422
+        assert too_short.status_code == 422
 
 
 # ── CSRF ──────────────────────────────────────────────────────────────────────

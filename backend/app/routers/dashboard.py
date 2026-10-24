@@ -23,6 +23,7 @@ from app.models_session import ExamSession
 from app.models_user import User
 from app.pdf_service import build_institutional_report_pdf
 from app.schemas import DashboardRead
+from app.territory import REGIONS, region_for_prefecture
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
@@ -678,6 +679,7 @@ def dashboard_by_center(
             "name": c.name,
             "city": c.city,
             "prefecture": c.prefecture,
+            "region": region_for_prefecture(c.prefecture),
             "status": c.status,
             "sessions": sessions_by_center.get(c.id, 0),
             "bookings": bookings_by_center.get(c.id, 0),
@@ -697,4 +699,32 @@ def dashboard_by_center(
         "exams_total": sum(passed_by_center.values()) + sum(failed_by_center.values()),
         "open_incidents_total": sum(incidents_by_center.values()),
     }
-    return {"national": national, "centers": items}
+    return {"national": national, "regions": _aggregate_regions(items), "centers": items}
+
+
+def _aggregate_regions(items: list[dict]) -> list[dict]:
+    """Agrège les lignes centre par région administrative (ordre officiel)."""
+    by_region: dict[str, dict] = {}
+    for item in items:
+        row = by_region.setdefault(item["region"], {
+            "region": item["region"],
+            "centers_total": 0,
+            "centers_active": 0,
+            "sessions": 0,
+            "bookings": 0,
+            "exams_passed": 0,
+            "exams_failed": 0,
+            "exams_total": 0,
+            "open_incidents": 0,
+        })
+        row["centers_total"] += 1
+        row["centers_active"] += int(item["status"] in ("active", "accredited"))
+        for key in ("sessions", "bookings", "exams_passed", "exams_failed", "exams_total", "open_incidents"):
+            row[key] += item[key]
+
+    order = {name: index for index, name in enumerate(REGIONS)}
+    regions = sorted(by_region.values(), key=lambda row: order.get(row["region"], len(order)))
+    for row in regions:
+        total = row["exams_total"]
+        row["pass_rate_pct"] = round(row["exams_passed"] / total * 100, 1) if total > 0 else None
+    return regions

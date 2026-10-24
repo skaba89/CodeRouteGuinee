@@ -24,6 +24,7 @@ from app.main import app
 from app.db.session import SessionLocal, init_db
 from app.models_user import User
 from app.security import get_password_hash
+from app.seed_pilote_conakry import CENTRE_PILOTE
 
 
 SUPER_EMAIL = f"pilote-sa-{uuid.uuid4().hex[:8]}@test.gn"
@@ -97,7 +98,7 @@ def test_journee_pilote_complete(client: TestClient):
         json={
             "reference": first["booking_reference"],
             "verification_code": first["verification_code"],
-            "center_code": "DNTT-KAL-01",
+            "center_code": CENTRE_PILOTE["code"],
         },
         headers=_auth(center_token),
     )

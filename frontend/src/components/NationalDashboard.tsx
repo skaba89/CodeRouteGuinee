@@ -121,6 +121,7 @@ export function NationalDashboard() {
   const [fleetLoading, setFleetLoading] = useState(true);
   const [fleetError, setFleetError] = useState('');
   const [sortKey, setSortKey] = useState<keyof CenterDashboardRow>('exams_total');
+  const [regionFilter, setRegionFilter] = useState('all');
   const [fleetFilter, setFleetFilter] = useState<'all' | 'critical' | 'degraded' | 'healthy'>('all');
   const [showNodes, setShowNodes] = useState(false);
 
@@ -165,7 +166,8 @@ export function NationalDashboard() {
   if (!data) return <div className="card"><div className="alert aw">Supervision indisponible.</div></div>;
 
   const n = data.national;
-  const sorted = [...data.centers].sort((a, b) => {
+  const visibleCenters = regionFilter === 'all' ? data.centers : data.centers.filter(c => c.region === regionFilter);
+  const sorted = [...visibleCenters].sort((a, b) => {
     const av = a[sortKey] ?? 0, bv = b[sortKey] ?? 0;
     return typeof av === 'number' && typeof bv === 'number' ? bv - av : String(av).localeCompare(String(bv));
   });
@@ -180,7 +182,20 @@ export function NationalDashboard() {
   return (
     <div style={{ display: 'grid', gap: 20 }}>
       <div className="card">
-        <div className="card-header"><span className="card-title">Supervision nationale — activité par centre</span></div>
+        <div className="card-header">
+          <span className="card-title">Supervision nationale — activité par centre</span>
+          <select
+            aria-label="Filtrer par région"
+            value={regionFilter}
+            onChange={event => setRegionFilter(event.target.value)}
+            style={{ width: 'auto' }}
+          >
+            <option value="all">Toutes les régions</option>
+            {(data.regions ?? []).map(r => (
+              <option key={r.region} value={r.region}>{r.region} ({r.centers_total})</option>
+            ))}
+          </select>
+        </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, padding: '4px 0 16px' }}>
           {kpi('Centres', `${n.centers_active}/${n.centers_total}`, 'var(--guinea-green)')}
           {kpi('Sessions', n.sessions_total)}
@@ -190,12 +205,13 @@ export function NationalDashboard() {
         </div>
         <div className="table-wrap">
           <table>
-            <thead><tr><th>Centre</th><th>Ville</th><th>Statut</th><th onClick={() => setSortKey('sessions')} style={{ cursor: 'pointer' }}>Sessions</th><th onClick={() => setSortKey('bookings')} style={{ cursor: 'pointer' }}>Réserv.</th><th onClick={() => setSortKey('exams_total')} style={{ cursor: 'pointer' }}>Examens</th><th>Réussite</th><th>Incidents</th></tr></thead>
+            <thead><tr><th>Centre</th><th>Région</th><th>Préfecture</th><th>Statut</th><th onClick={() => setSortKey('sessions')} style={{ cursor: 'pointer' }}>Sessions</th><th onClick={() => setSortKey('bookings')} style={{ cursor: 'pointer' }}>Réserv.</th><th onClick={() => setSortKey('exams_total')} style={{ cursor: 'pointer' }}>Examens</th><th>Réussite</th><th>Incidents</th></tr></thead>
             <tbody>
               {sorted.map(c => (
                 <tr key={c.center_id}>
                   <td style={{ fontWeight: 600 }}>{c.name}<br /><span style={{ fontSize: 11, color: 'var(--muted)' }}>{c.code}</span></td>
-                  <td>{c.city}</td>
+                  <td>{c.region}</td>
+                  <td>{c.prefecture ?? c.city}</td>
                   <td><span className={`badge ${c.status === 'active' || c.status === 'accredited' ? 'bg' : 'bgo'}`}>{c.status}</span></td>
                   <td>{c.sessions}</td><td>{c.bookings}</td><td>{c.exams_total}</td>
                   <td>{c.pass_rate_pct === null ? <span style={{ color: 'var(--muted)' }}>—</span> : <span style={{ fontWeight: 700, color: c.pass_rate_pct >= 70 ? 'var(--guinea-green)' : c.pass_rate_pct >= 50 ? '#B8860B' : 'var(--red)' }}>{c.pass_rate_pct}%</span>}</td>

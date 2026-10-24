@@ -136,6 +136,61 @@ def verify_candidate_identity(
     assert decision.status_code == 200, decision.text
 
 
+def prepare_checked_in_booking(
+    client: TestClient,
+    authority_headers: dict[str, str],
+    *,
+    check_in: bool = True,
+) -> dict:
+    """Prépare un candidat prêt à composer, par les endpoints officiels.
+
+    Centre + session imminente (fenêtres d'entrée et d'examen ouvertes) +
+    candidat à l'identité vérifiée + réservation payée + entrée contrôlée au
+    centre. La banque média doit être préparée séparément
+    (``seed_media_ready_official_bank``).
+    """
+    from datetime import UTC, datetime, timedelta
+
+    suffix = uuid4().hex[:8]
+    center = client.post("/api/v1/centers", headers=authority_headers, json={
+        "code": f"CTR-{suffix}", "name": "Centre test", "city": "Conakry",
+        "address": "Dixinn", "capacity": 20, "status": "active",
+    })
+    assert center.status_code == 201, center.text
+    center = center.json()
+    session = client.post("/api/v1/sessions", headers=authority_headers, json={
+        "center_id": center["id"],
+        "starts_at": (datetime.now(UTC) + timedelta(minutes=5)).isoformat(),
+        "capacity": 20,
+    })
+    assert session.status_code == 201, session.text
+    session = session.json()
+    candidate = client.post("/api/v1/candidates", headers=authority_headers, json={
+        "first_name": "Aissatou", "last_name": "Bah", "identity_number": f"GN-{suffix}",
+        "phone": "+224621111111", "permit_category": "B",
+    })
+    assert candidate.status_code == 201, candidate.text
+    candidate = candidate.json()
+    verify_candidate_identity(client, candidate["id"], authority_headers, marker=suffix)
+    booking = client.post("/api/v1/bookings", headers=authority_headers, json={
+        "candidate_id": candidate["id"], "session_id": session["id"],
+    })
+    assert booking.status_code == 201, booking.text
+    booking = booking.json()
+    payment = client.post("/api/v1/payments", headers=authority_headers, json={
+        "booking_reference": booking["reference"], "amount_gnf": 150000,
+        "provider": "orange_money", "phone": "+224621111111",
+    })
+    assert payment.status_code == 201, payment.text
+    if check_in:
+        entry = client.post("/api/v1/entries/validate", headers=authority_headers, json={
+            "reference": booking["reference"], "verification_code": booking["verification_code"],
+            "center_code": center["code"],
+        })
+        assert entry.status_code == 200 and entry.json()["allowed"] is True, entry.text
+    return {"booking": booking, "candidate": candidate, "session": session, "center": center}
+
+
 @pytest.fixture(autouse=True)
 def clean_test_questions(request):
     """

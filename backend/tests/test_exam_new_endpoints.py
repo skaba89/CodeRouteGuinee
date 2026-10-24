@@ -3,132 +3,59 @@ Tests E2E pour les nouveaux endpoints examen :
   GET /exams/{id}/status
   GET /exams/{id}/questions
   GET /exams/{id}/results
-"""
-from datetime import UTC, datetime, timedelta
-from uuid import uuid4
 
+Chaque examen est démarré par le parcours officiel (identité vérifiée,
+réservation payée, entrée contrôlée, banque média homologuée).
+"""
 from fastapi.testclient import TestClient
 
-from app.db.session import SessionLocal, init_db
 from app.main import app
-from app.models_center import Center
-from app.models_session import ExamSession
-from tests.conftest import get_admin_headers, get_center_headers
+from tests.conftest import get_admin_headers, prepare_checked_in_booking, seed_media_ready_official_bank
 
 
-def _seed_center_session_question_base():
-    init_db()
-    db = SessionLocal()
-    suffix = uuid4().hex[:8]
-    try:
-        center = Center(
-            code=f"CTR-ENE-{suffix}",
-            name=f"Centre ENE {suffix}",
-            city="Conakry",
-            address="Test",
-            capacity=10,
-            max_sessions_per_week=3,
-            status="accredited",
-        )
-        db.add(center)
-        db.commit()
-        db.refresh(center)
-        session = ExamSession(
-            reference=f"GN-ENE-{suffix}",
-            center_id=center.id,
-            starts_at=datetime.now(UTC) + timedelta(days=3),
-            capacity=10,
-        )
-        db.add(session)
-        db.commit()
-        db.refresh(session)
-        # Créer au moins 40 questions actives pour pouvoir démarrer un examen
-        import json
+def _started_attempt(client: TestClient) -> tuple[dict, dict[str, str]]:
+    headers = get_admin_headers(client)
+    seed_media_ready_official_bank(client, headers)
+    ready = prepare_checked_in_booking(client, headers)
+    response = client.post("/api/v1/exams/start-from-booking", headers=headers,
+                           json={"booking_reference": ready["booking"]["reference"]})
+    assert response.status_code == 201, response.text
+    return response.json(), headers
 
-        from app.models_question import Question
-        existing_q = db.query(Question).count() if hasattr(db, 'query') else 0
-        from sqlalchemy import func as _func
-        from sqlalchemy import select as _sel
-        existing_q = db.scalar(_sel(_func.count(Question.id))) or 0
-        if existing_q < 40:
-            for i in range(40):
-                q = Question(
-                    category=["signalisation","priorites","vitesse","securite"][i % 4],
-                    text=f"Question de test {i+1} ?",
-                    options=json.dumps(["Option A", "Option B", "Option C", "Option D"]),
-                    correct_answer="Option A",
-                    is_active=True,
-                )
-                db.add(q)
-            db.commit()
-        return center.id, session.id
-    finally:
-        db.close()
+
+def _submit_first_options(client: TestClient, attempt_id: str, headers: dict[str, str]) -> None:
+    questions = client.get(f"/api/v1/exams/{attempt_id}/questions", headers=headers).json()["questions"]
+    submit = client.post(f"/api/v1/exams/{attempt_id}/submit", headers=headers,
+                         json={"answers": {q["id"]: q["options"][0] for q in questions}})
+    assert submit.status_code == 200, submit.text
 
 
 def test_exam_status_endpoint() -> None:
     """GET /exams/{id}/status retourne le statut temps réel."""
-    center_id, session_id = _seed_center_session_question_base()
-    suffix = uuid4().hex[:8]
-
     with TestClient(app) as client:
-        admin_headers = get_admin_headers(client)
-        center_headers = get_center_headers(client)
+        attempt, headers = _started_attempt(client)
 
-        # Créer un candidat
-        cand = client.post("/api/v1/candidates", headers=admin_headers, json={
-            "first_name": "Test", "last_name": f"Status-{suffix}",
-            "identity_number": f"ID-STATUS-{suffix}", "phone": "+224620000001",
-            "permit_category": "B",
-        }).json()
-
-        # Démarrer un examen
-        attempt = client.post("/api/v1/exams/start", headers=center_headers, json={
-            "candidate_id": cand["id"], "session_id": session_id,
-        }).json()
-        assert attempt.get("id"), f"Attempt sans ID: {attempt}"
-
-        # GET /status
-        status_resp = client.get(f"/api/v1/exams/{attempt['id']}/status", headers=admin_headers)
+        status_resp = client.get(f"/api/v1/exams/{attempt['id']}/status", headers=headers)
         assert status_resp.status_code == 200
         status = status_resp.json()
         assert status["attempt_id"] == attempt["id"]
         assert status["status"] == "started"
         assert status["remaining_seconds"] > 0
         assert status["total_seconds"] == 1800  # 30 min
-        assert status["question_count"] > 0
+        assert status["question_count"] == 40
         assert status["expired"] is False
 
 
 def test_exam_questions_endpoint() -> None:
     """GET /exams/{id}/questions retourne les questions sans bonnes réponses."""
-    center_id, session_id = _seed_center_session_question_base()
-    suffix = uuid4().hex[:8]
-
     with TestClient(app) as client:
-        admin_headers = get_admin_headers(client)
-        center_headers = get_center_headers(client)
+        attempt, headers = _started_attempt(client)
 
-        cand = client.post("/api/v1/candidates", headers=admin_headers, json={
-            "first_name": "Test", "last_name": f"Questions-{suffix}",
-            "identity_number": f"ID-QUEST-{suffix}", "phone": "+224620000002",
-            "permit_category": "B",
-        }).json()
-
-        attempt = client.post("/api/v1/exams/start", headers=center_headers, json={
-            "candidate_id": cand["id"], "session_id": session_id,
-        }).json()
-
-        # GET /questions
-        q_resp = client.get(f"/api/v1/exams/{attempt['id']}/questions", headers=admin_headers)
+        q_resp = client.get(f"/api/v1/exams/{attempt['id']}/questions", headers=headers)
         assert q_resp.status_code == 200
-        resp_data = q_resp.json()
-        # Endpoint retourne ExamQuestionsRead avec champ "questions"
-        questions = resp_data["questions"] if isinstance(resp_data, dict) else resp_data
-        assert isinstance(questions, list)
-        assert len(questions) > 0
+        questions = q_resp.json()["questions"]
+        assert len(questions) == 40
 
-        # Vérifier que les bonnes réponses ne sont PAS exposées
         for q in questions:
             assert "correct_answer" not in q or q["correct_answer"] is None, \
                 "La bonne réponse ne doit pas être exposée pendant l'examen"
@@ -140,59 +67,19 @@ def test_exam_questions_endpoint() -> None:
 
 def test_exam_results_endpoint() -> None:
     """GET /exams/{id}/results retourne la correction détaillée après soumission."""
-    center_id, session_id = _seed_center_session_question_base()
-    suffix = uuid4().hex[:8]
-
     with TestClient(app) as client:
-        admin_headers = get_admin_headers(client)
-        center_headers = get_center_headers(client)
+        attempt, headers = _started_attempt(client)
+        _submit_first_options(client, attempt["id"], headers)
 
-        cand = client.post("/api/v1/candidates", headers=admin_headers, json={
-            "first_name": "Test", "last_name": f"Results-{suffix}",
-            "identity_number": f"ID-RES-{suffix}", "phone": "+224620000003",
-            "permit_category": "B",
-        }).json()
-
-        attempt = client.post("/api/v1/exams/start", headers=center_headers, json={
-            "candidate_id": cand["id"], "session_id": session_id,
-        }).json()
-
-        # GET /questions pour récupérer les IDs
-        q_data = client.get(
-            f"/api/v1/exams/{attempt['id']}/questions", headers=admin_headers
-        ).json()
-        questions = q_data["questions"] if isinstance(q_data, dict) else q_data
-
-        # Soumettre les réponses (première option pour chaque question)
-        # options peut être une liste ou une string JSON
-        def _first_option(q: dict) -> str:
-            opts = q.get("options", [])
-            if isinstance(opts, str):
-                import json as _json
-                opts = _json.loads(opts)
-            return opts[0] if opts else "A"
-        answers = {q["id"]: _first_option(q) for q in questions}
-        submit = client.post(
-            f"/api/v1/exams/{attempt['id']}/submit",
-            headers=center_headers,
-            json={"answers": answers},
-        )
-        assert submit.status_code == 200
-
-        # GET /results
-        results_resp = client.get(
-            f"/api/v1/exams/{attempt['id']}/results", headers=admin_headers
-        )
+        results_resp = client.get(f"/api/v1/exams/{attempt['id']}/results", headers=headers)
         assert results_resp.status_code == 200
         results = results_resp.json()
         assert results["attempt_id"] == attempt["id"]
         assert "score" in results
         assert "passed" in results
         assert "threshold" in results
-        assert "questions" in results
-        assert len(results["questions"]) > 0
+        assert len(results["questions"]) == 40
 
-        # Vérifier que chaque question a correct_answer ET explanation
         for q in results["questions"]:
             assert "correct_answer" in q
             assert "given_answer" in q
@@ -202,64 +89,18 @@ def test_exam_results_endpoint() -> None:
 
 def test_exam_results_blocked_before_submission() -> None:
     """GET /results retourne 409 si l'examen n'est pas soumis."""
-    center_id, session_id = _seed_center_session_question_base()
-    suffix = uuid4().hex[:8]
-
     with TestClient(app) as client:
-        admin_headers = get_admin_headers(client)
-        center_headers = get_center_headers(client)
+        attempt, headers = _started_attempt(client)
 
-        cand = client.post("/api/v1/candidates", headers=admin_headers, json={
-            "first_name": "Test", "last_name": f"Block-{suffix}",
-            "identity_number": f"ID-BLK-{suffix}", "phone": "+224620000004",
-            "permit_category": "B",
-        }).json()
-
-        attempt = client.post("/api/v1/exams/start", headers=center_headers, json={
-            "candidate_id": cand["id"], "session_id": session_id,
-        }).json()
-
-        # Tenter de lire les résultats avant soumission
-        r = client.get(f"/api/v1/exams/{attempt['id']}/results", headers=admin_headers)
+        r = client.get(f"/api/v1/exams/{attempt['id']}/results", headers=headers)
         assert r.status_code == 409
 
 
 def test_exam_questions_blocked_after_submission() -> None:
     """GET /questions retourne 409 si l'examen est soumis."""
-    center_id, session_id = _seed_center_session_question_base()
-    suffix = uuid4().hex[:8]
-
     with TestClient(app) as client:
-        admin_headers = get_admin_headers(client)
-        center_headers = get_center_headers(client)
+        attempt, headers = _started_attempt(client)
+        _submit_first_options(client, attempt["id"], headers)
 
-        cand = client.post("/api/v1/candidates", headers=admin_headers, json={
-            "first_name": "Test", "last_name": f"PostSub-{suffix}",
-            "identity_number": f"ID-PSB-{suffix}", "phone": "+224620000005",
-            "permit_category": "B",
-        }).json()
-
-        attempt = client.post("/api/v1/exams/start", headers=center_headers, json={
-            "candidate_id": cand["id"], "session_id": session_id,
-        }).json()
-
-        q_resp3 = client.get(
-            f"/api/v1/exams/{attempt['id']}/questions", headers=admin_headers
-        ).json()
-        questions3 = q_resp3["questions"] if isinstance(q_resp3, dict) else q_resp3
-        def _first_opt3(q: dict) -> str:
-            opts = q.get("options", [])
-            if isinstance(opts, str):
-                import json as _j3
-                opts = _j3.loads(opts)
-            return opts[0] if opts else "A"
-        answers = {q["id"]: _first_opt3(q) for q in questions3}
-        client.post(
-            f"/api/v1/exams/{attempt['id']}/submit",
-            headers=center_headers,
-            json={"answers": answers},
-        )
-
-        # Tenter de lire les questions après soumission
-        r = client.get(f"/api/v1/exams/{attempt['id']}/questions", headers=admin_headers)
+        r = client.get(f"/api/v1/exams/{attempt['id']}/questions", headers=headers)
         assert r.status_code == 409

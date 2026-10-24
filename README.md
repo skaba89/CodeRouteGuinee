@@ -20,6 +20,16 @@ docker compose exec backend python -m app.seed_full
 → **Application** : http://localhost:5173  
 → **API + Swagger** : http://localhost:8000/docs
 
+## Démonstration institutionnelle (DNTT)
+
+Environnement prêt à présenter (comptes par rôle, activité nationale sur
+8 régions, session « en direct », journal d'audit chaîné) et script de 15 minutes :
+voir [`DEMO.md`](DEMO.md).
+
+```bash
+scripts/demo.sh init && scripts/demo.sh up && scripts/demo.sh seed 15 && scripts/demo.sh check
+```
+
 ---
 
 ## Déploiement production
