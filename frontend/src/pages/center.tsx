@@ -108,13 +108,15 @@ export function CenterPage() {
   const [reporting, setReporting] = useState(false);
 
   useEffect(() => {
-    getCenters().then(r => {
-      setCenters(r.items);
-      // Pré-sélectionner le centre de l'agent connecté si disponible
-      if (currentUser?.center_id) {
-        const myCenter = r.items.find((c: { id: string; code: string }) => c.id === currentUser.center_id);
-        if (myCenter) setCenterCode(myCenter.code);
-      }
+    // Tous les centres en une requête (135 au national) : avec la pagination par
+    // défaut (20), le centre de l'agent pouvait être absent de la liste.
+    getCenters({ limit: 200 }).then(r => {
+      // Un agent rattaché n'opère que sur son centre (cloisonnement appliqué par l'API).
+      const myCenter = currentUser?.center_id
+        ? r.items.find((c: { id: string; code: string }) => c.id === currentUser.center_id)
+        : undefined;
+      setCenters(myCenter ? [myCenter] : r.items);
+      if (myCenter) setCenterCode(myCenter.code);
     }).catch(() => undefined);
     getCenterIncidents({ statusFilter: 'open', limit: 10 }).then(r => setIncidents(r.items)).catch(() => undefined);
   }, [currentUser]);

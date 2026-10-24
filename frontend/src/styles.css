@@ -840,6 +840,7 @@ hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
 .alert.aw { background: var(--gold-l);  color: #7a5200;           border-left: 3px solid var(--gold); }
 .alert.ai { background: var(--blue-l);  color: var(--blue);       border-left: 3px solid var(--blue); }
 .alert.as { background: var(--green-l); color: var(--guinea-green); border-left: 3px solid var(--guinea-green); }
+.alert.ae { background: var(--red-l);   color: var(--red);          border-left: 3px solid var(--red); }
 .badge.bb  { background: var(--blue-l);  color: var(--blue); }
 .badge.bgr { background: var(--green-l); color: var(--guinea-green); }
 .badge.br  { background: var(--red-l);   color: var(--red); }

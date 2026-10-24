@@ -1,6 +1,6 @@
 // HomePage — CodeRoute Guinée
 import { type FormEvent, useEffect, useRef, useCallback, useState } from 'react';
-import { getPrivateJson } from '../api';
+import { getMyCandidateProfile, getPrivateJson } from '../api';
 import { AudioModeBanner, LocaleAudioSwitcher, PlayButton, AudioToggle } from '../components/AudioButton';
 import {
   InstitutionalAuthsPanel,
@@ -103,6 +103,14 @@ export function HomePage() {
   const isAdmin = role === 'admin' || role === 'super_admin';
   const isCenter = role === 'center';
   const isCandidate = role === 'candidate';
+
+  // Les formulaires dossier attendent l'identifiant du DOSSIER candidat, pas
+  // celui du compte utilisateur : l'API refuse (404) un id de compte.
+  const [candidateProfileId, setCandidateProfileId] = useState<string | undefined>();
+  useEffect(() => {
+    if (!isCandidate) { setCandidateProfileId(undefined); return; }
+    getMyCandidateProfile().then(profile => setCandidateProfileId(profile?.id)).catch(() => undefined);
+  }, [isCandidate, currentUser?.id]);
 
   return (
     <section className="screen" role="main" aria-label="Contenu principal">
@@ -222,10 +230,12 @@ export function HomePage() {
       </div>
 
       {/* Formulaires dossier candidat */}
-      <div className="g2" style={{ marginTop: 16 }}>
-        <CandidateIdentityForm candidateId={currentUser?.id} />
-        <CandidateRecourseForm candidateId={currentUser?.id} />
-      </div>
+      {candidateProfileId && (
+        <div className="g2" style={{ marginTop: 16 }}>
+          <CandidateIdentityForm candidateId={candidateProfileId} />
+          <CandidateRecourseForm candidateId={candidateProfileId} />
+        </div>
+      )}
 
     </section>
   );

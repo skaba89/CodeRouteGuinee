@@ -87,6 +87,15 @@ export function InstitutionalDossierPage() {
   const [identityPage, setIdentityPage] = useState(0);
   const [submissions, setSubmissions] = useState<CandidateSubmission[]>([]);
   const [submissionsPage, setSubmissionsPage] = useState(0);
+  const [identityError, setIdentityError] = useState<string | null>(null);
+
+  // Statuts acceptés par l'API : verified | rejected | needs_review.
+  function decideIdentity(checkId: string, status: 'verified' | 'rejected', reason: string) {
+    setIdentityError(null);
+    decideCandidateIdentity(checkId, status, reason)
+      .then(() => getCandidateIdentityChecks({ status_filter: 'pending', limit: 25 }).then(setIdentityChecks))
+      .catch(error => setIdentityError(error instanceof Error ? error.message : 'Décision non enregistrée.'));
+  }
 
   useEffect(() => {
     if (!canAdmin) return;
@@ -112,6 +121,7 @@ export function InstitutionalDossierPage() {
             <span className="card-title">🪪 Vérifications d'identité ({identityChecks.length})</span>
             <button className="secondary-button btn-sm" onClick={() => getCandidateIdentityChecks({ status_filter: 'pending', limit: 25 }).then(setIdentityChecks).catch(() => undefined)}>Actualiser</button>
           </div>
+          {identityError && <div className="alert ae" role="alert" style={{ margin: '0 0 12px' }}>{identityError}</div>}
           {identityChecks.length === 0 ? (
             <div style={{ padding: '20px', textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>{canAdmin ? 'Aucune vérification en attente ' : 'Connectez-vous.'}</div>
           ) : (
@@ -124,12 +134,12 @@ export function InstitutionalDossierPage() {
                       <td style={{ fontSize: 12 }}>{c.candidate_id}</td>
                       <td>{c.document_type}</td>
                       <td style={{ fontSize: 11 }}>{c.document_reference}</td>
-                      <td><span className={`badge ${c.status === 'approved' ? 'bg' : c.status === 'pending' ? 'bgo' : 'br'}`}>{c.status}</span></td>
+                      <td><span className={`badge ${c.status === 'verified' ? 'bg' : c.status === 'pending' ? 'bgo' : 'br'}`}>{c.status}</span></td>
                       <td>
                         {c.status === 'pending' && canAdmin && (
                           <div style={{ display: 'flex', gap: 4 }}>
-                            <button className="btn-sm btn-success" onClick={() => decideCandidateIdentity(c.id, 'approved', 'Validé').then(() => getCandidateIdentityChecks({ status_filter: 'pending', limit: 25 }).then(setIdentityChecks).catch(() => undefined)).catch(() => undefined)}></button>
-                            <button className="btn-sm btn-danger" onClick={() => decideCandidateIdentity(c.id, 'rejected', 'Rejeté').then(() => getCandidateIdentityChecks({ status_filter: 'pending', limit: 25 }).then(setIdentityChecks).catch(() => undefined)).catch(() => undefined)}></button>
+                            <button className="btn-sm btn-success" onClick={() => decideIdentity(c.id, 'verified', "Pièce d'identité contrôlée par la DNTT")}>Valider</button>
+                            <button className="btn-sm btn-danger" onClick={() => decideIdentity(c.id, 'rejected', "Pièce d'identité non conforme")}>Rejeter</button>
                           </div>
                         )}
                       </td>

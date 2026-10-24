@@ -64,6 +64,8 @@ import {
   getCenterStations,
   createCenterStation,
   getExamCertificatePdfUrl,
+  getDashboardByCenter,
+  type RegionDashboardRow,
 } from '../api';
 import { DEMO_QUESTIONS } from '../pages/examQuestions';
 
@@ -89,6 +91,7 @@ export function MinisterialPage() {
   const [opSummary, setOpSummary] = useState<OperationsSummary | null>(null);
   const [readiness, setReadiness] = useState<InstitutionalReadiness | null>(null);
   const [actionCenter, setActionCenter] = useState<InstitutionalActionCenter | null>(null);
+  const [regions, setRegions] = useState<RegionDashboardRow[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Import candidats
@@ -133,10 +136,12 @@ export function MinisterialPage() {
       getOperationsSummary(),
       getInstitutionalReadiness(),
       getInstitutionalActionCenter(),
-    ]).then(([op, rd, ac]) => {
+      getDashboardByCenter(),
+    ]).then(([op, rd, ac, territory]) => {
       if (op.status === 'fulfilled') setOpSummary(op.value);
       if (rd.status === 'fulfilled') setReadiness(rd.value);
       if (ac.status === 'fulfilled') setActionCenter(ac.value);
+      if (territory.status === 'fulfilled') setRegions(territory.value.regions ?? []);
     }).finally(() => setLoading(false));
   }, [canAdmin]);
 
@@ -238,35 +243,32 @@ export function MinisterialPage() {
               {opSummary && (
                 <div className="stats-grid" style={{ marginBottom: 20 }}>
                   <div className="stat-card s-blue"><div className="stat-label">Alertes critiques</div><div className="stat-value">{fmt(opSummary.critical_alerts ?? 0)}</div></div>
-                  <div className="stat-card s-green"><div className="stat-label">Candidats aujourd'hui</div><div className="stat-value">{fmt(opSummary.open_incidents ?? 0)}</div></div>
-                  <div className="stat-card s-gold"><div className="stat-label">Taux de réussite</div><div className="stat-value">{opSummary.high_risk_exam_events ?? 0}<span style={{fontSize:16}}>%</span></div></div>
-                  <div className="stat-card s-red"><div className="stat-label">Alertes fraude</div><div className="stat-value">{fmt(opSummary.payment_alerts ?? 0)}</div></div>
+                  <div className="stat-card s-green"><div className="stat-label">Incidents de centre ouverts</div><div className="stat-value">{fmt(opSummary.open_incidents ?? 0)}</div></div>
+                  <div className="stat-card s-gold"><div className="stat-label">Événements d'examen à risque</div><div className="stat-value">{fmt(opSummary.high_risk_exam_events ?? 0)}</div></div>
+                  <div className="stat-card s-red"><div className="stat-label">Alertes paiement</div><div className="stat-value">{fmt(opSummary.payment_alerts ?? 0)}</div></div>
                 </div>
               )}
 
-              {/* Carte du taux de réussite par préfecture — simulé */}
+              {/* Taux de réussite par région administrative — données réelles (/dashboard/by-center) */}
               <div className="g2">
                 <div className="card">
                   <div className="card-header"><span className="card-title">🗺 Taux de réussite par région</span></div>
-                  {[
-                    { region: 'Conakry', taux: 72, candidats: 48320, centres: 12 },
-                    { region: 'Kindia', taux: 68, candidats: 12400, centres: 4 },
-                    { region: 'Labé', taux: 65, candidats: 9800, centres: 3 },
-                    { region: 'Kankan', taux: 61, candidats: 11200, centres: 4 },
-                    { region: 'N\'Zérékoré', taux: 58, candidats: 8900, centres: 3 },
-                    { region: 'Faranah', taux: 55, candidats: 6100, centres: 2 },
-                    { region: 'Mamou', taux: 63, candidats: 7400, centres: 3 },
-                    { region: 'Boké', taux: 60, candidats: 6800, centres: 2 },
-                  ].map(r => (
-                    <div key={r.region} style={{ display:'flex', alignItems:'center', gap:12, padding:'10px 0', borderBottom:'1px solid var(--border)' }}>
-                      <span style={{ fontWeight:600, minWidth:100, fontSize:13 }}>{r.region}</span>
-                      <div style={{ flex:1, height:8, background:'var(--border)', borderRadius:99, overflow:'hidden' }}>
-                        <div style={{ height:'100%', background: r.taux>=70?'var(--green)':r.taux>=60?'var(--gold)':'var(--red)', width:`${r.taux}%`, borderRadius:'inherit' }}/>
+                  {regions.length === 0 ? (
+                    <div style={{ padding: 16, color: 'var(--muted)', fontSize: 13 }}>Aucune donnée régionale disponible.</div>
+                  ) : regions.map(r => {
+                    const rate = r.pass_rate_pct;
+                    const color = rate === null ? 'var(--muted)' : rate >= 70 ? 'var(--green)' : rate >= 60 ? '#b7620a' : 'var(--red)';
+                    return (
+                      <div key={r.region} style={{ display:'flex', alignItems:'center', gap:12, padding:'10px 0', borderBottom:'1px solid var(--border)' }}>
+                        <span style={{ fontWeight:600, minWidth:100, fontSize:13 }}>{r.region}</span>
+                        <div style={{ flex:1, height:8, background:'var(--border)', borderRadius:99, overflow:'hidden' }}>
+                          <div style={{ height:'100%', background: color, width:`${rate ?? 0}%`, borderRadius:'inherit' }}/>
+                        </div>
+                        <span style={{ fontWeight:800, minWidth:44, color, fontSize:13 }}>{rate === null ? '—' : `${rate.toLocaleString('fr-FR')} %`}</span>
+                        <span style={{ fontSize:11, color:'var(--muted)', minWidth:130, textAlign:'right' }}>{fmt(r.exams_total)} examens · {r.centers_active} centres</span>
                       </div>
-                      <span style={{ fontWeight:800, minWidth:36, color: r.taux>=70?'var(--green)':r.taux>=60?'#b7620a':'var(--red)', fontSize:13 }}>{r.taux}%</span>
-                      <span style={{ fontSize:11, color:'var(--muted)', minWidth:80, textAlign:'right' }}>{fmt(r.candidats)} candidats</span>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
 
                 <div className="card">
@@ -281,24 +283,7 @@ export function MinisterialPage() {
                         </div>
                       </div>
                     )) ?? (
-                      <>
-                        {[
-                          { label:'Couverture nationale', val:'8 régions / 33 préfectures', ok:true },
-                          { label:'Uptime plateforme', val:'99,7 % (30 derniers jours)', ok:true },
-                          { label:'Données synchronisées', val:'Temps réel', ok:true },
-                          { label:'Backup dernière exécution', val:'Aujourd\'hui 02h00', ok:true },
-                          { label:'Certification SSL', val:'Valide — expiration dans 89 jours', ok:true },
-                          { label:'Intégration NINA', val:'Non connectée', ok:false },
-                        ].map((item, i) => (
-                          <div key={i} style={{ display:'flex', alignItems:'center', gap:10 }}>
-                            <span>{item.ok ? '' : ''}</span>
-                            <div style={{ flex:1 }}>
-                              <div style={{ fontSize:13, fontWeight:600 }}>{(item as {pillar?:string; label?:string}).pillar ?? (item as {label?:string}).label ?? ""}</div>
-                              <div style={{ fontSize:11, color:'var(--muted)' }}>{item.val}</div>
-                            </div>
-                          </div>
-                        ))}
-                      </>
+                      <div style={{ color: 'var(--muted)', fontSize: 13 }}>Indicateurs de préparation indisponibles.</div>
                     )}
                   </div>
                 </div>

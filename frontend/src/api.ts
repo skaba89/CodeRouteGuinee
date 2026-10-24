@@ -721,7 +721,13 @@ export function getDashboard(): Promise<DashboardData> {
 
 export type CenterDashboardRow = {
   center_id: string; code: string; name: string; city: string;
-  prefecture: string | null; status: string;
+  prefecture: string | null; region: string; status: string;
+  sessions: number; bookings: number;
+  exams_passed: number; exams_failed: number; exams_total: number;
+  pass_rate_pct: number | null; open_incidents: number;
+};
+export type RegionDashboardRow = {
+  region: string; centers_total: number; centers_active: number;
   sessions: number; bookings: number;
   exams_passed: number; exams_failed: number; exams_total: number;
   pass_rate_pct: number | null; open_incidents: number;
@@ -731,10 +737,19 @@ export type NationalDashboard = {
     centers_total: number; centers_active: number; sessions_total: number;
     bookings_total: number; exams_total: number; open_incidents_total: number;
   };
+  regions: RegionDashboardRow[];
   centers: CenterDashboardRow[];
 };
 export function getDashboardByCenter(): Promise<NationalDashboard> {
   return getPrivateJson<NationalDashboard>('/api/v1/dashboard/by-center');
+}
+
+export type AuditChainVerification = {
+  enabled: boolean; valid: boolean; reason: string | null;
+  total_entries?: number; head_seq?: number; broken_at_seq?: number | null;
+};
+export function verifyAuditChain(): Promise<AuditChainVerification> {
+  return getPrivateJson<AuditChainVerification>('/api/v1/admin/ops/audit-chain/verify');
 }
 
 export function getOperationalReadiness(): Promise<OperationalReadiness> {
