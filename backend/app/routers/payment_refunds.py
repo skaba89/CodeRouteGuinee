@@ -221,6 +221,17 @@ def decide_refund(
     item = _locked_refund(db, refund_id)
     decision = payload.decision
 
+    # Séparation des tâches (« quatre yeux ») : l'auteur d'une demande de
+    # remboursement ne peut pas la décider lui-même, quel que soit son rôle.
+    if item.requested_by_id == current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "code": "REFUND_SELF_DECISION_FORBIDDEN",
+                "message": "La décision doit être prise par un autre agent que l'auteur de la demande.",
+            },
+        )
+
     if item.status in _FINAL_REFUND_STATUSES:
         if item.status == decision:
             return item

@@ -271,8 +271,9 @@ class TestRefunds:
         pay_ref, booking_ref = _seed_paid_payment()
         with TestClient(app) as c:
             h = _super_admin_headers(c)
+            approver = _super_admin_headers(c)
             refund = self._request(c, pay_ref, h).json()
-            decision = c.post(f"/api/v1/payments/refunds/{refund['id']}/decision", headers=h,
+            decision = c.post(f"/api/v1/payments/refunds/{refund['id']}/decision", headers=approver,
                               json={"decision": "approved", "reason": "Session annulée par la DNTT"})
             assert decision.status_code == 200, decision.text
             done = c.post(f"/api/v1/payments/refunds/{refund['id']}/complete", headers=h, json={
@@ -299,6 +300,17 @@ class TestRefunds:
             })
         assert r.status_code == 409
         assert r.json()["detail"]["code"] == "REFUND_APPROVAL_REQUIRED"
+
+    def test_refund_requester_cannot_decide_own_request(self):
+        """Quatre yeux : même un super_admin ne valide pas sa propre demande."""
+        pay_ref, _ = _seed_paid_payment()
+        with TestClient(app) as c:
+            h = _super_admin_headers(c)
+            refund = self._request(c, pay_ref, h).json()
+            r = c.post(f"/api/v1/payments/refunds/{refund['id']}/decision", headers=h,
+                       json={"decision": "approved", "reason": "Auto-approbation"})
+        assert r.status_code == 403
+        assert r.json()["detail"]["code"] == "REFUND_SELF_DECISION_FORBIDDEN"
 
     def test_refund_decision_refused_to_candidate(self):
         from tests.conftest import get_candidate_headers
