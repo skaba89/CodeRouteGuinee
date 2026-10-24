@@ -6,8 +6,9 @@ Test E2E — Parcours candidat A→Z complet en conditions réelles :
   3. Réservation (référence + code de vérification)
   4. Paiement Mobile Money (sandbox) → réservation 'paid'
   5. Téléchargement de la convocation PDF (QR code inclus)
-  6. Le jour J : le candidat se connecte sur l'appareil du centre avec
-     SON compte et démarre SON examen depuis sa réservation
+  6. Le jour J : identité vérifiée, contrôle d'entrée au centre, puis le
+     candidat se connecte sur l'appareil du centre avec SON compte et
+     démarre SON examen depuis sa réservation
   7. 40 questions → soumission → résultat
   8. Notifications (email/SMS/WhatsApp) déclenchées sans bloquer
   9. Sécurité : un autre candidat ne peut PAS démarrer cette réservation
@@ -24,6 +25,7 @@ from app.main import app
 from app.db.session import SessionLocal, init_db
 from app.models_center import Center
 from app.models_session import ExamSession
+from tests.conftest import get_admin_headers, seed_media_ready_official_bank, verify_candidate_identity
 
 
 @pytest.fixture(scope="module")
@@ -36,12 +38,6 @@ def client():
 @pytest.fixture(scope="module")
 def center_session():
     db = SessionLocal()
-    # Questions officielles nécessaires au tirage des 40 questions d'épreuve
-    from app.models_question import Question
-    if db.query(Question).count() < 50:
-        from app.seed_full import seed_questions
-        seed_questions(db)
-        db.commit()
     center = Center(
         id=str(uuid.uuid4()), name="Centre A-Z", code=f"GN-AZ-{uuid.uuid4().hex[:6]}",
         city="Conakry", prefecture="Conakry", commune="Ratoma",
@@ -51,11 +47,12 @@ def center_session():
     s = ExamSession(
         id=str(uuid.uuid4()), reference=f"SES-AZ-{uuid.uuid4().hex[:6]}",
         center_id=center.id,
-        starts_at=datetime.now(UTC).replace(tzinfo=None) + timedelta(days=1),
+        # Dans la fenêtre opérationnelle : contrôle d'entrée et démarrage ouverts.
+        starts_at=datetime.now(UTC).replace(tzinfo=None) + timedelta(minutes=5),
         capacity=35, status="open",
     )
     db.add(s); db.commit()
-    ids = {"center_id": center.id, "session_id": s.id}
+    ids = {"center_id": center.id, "center_code": center.code, "session_id": s.id}
     db.close()
     return ids
 
@@ -78,6 +75,9 @@ def _register(client: TestClient) -> dict:
 
 def test_parcours_candidat_a_z(client: TestClient, center_session):
     ids = center_session
+    admin = get_admin_headers(client)
+    # Banque officielle homologuée avec médias exploitables (garde d'examen).
+    seed_media_ready_official_bank(client, admin, marker=f"az-{uuid.uuid4().hex[:6]}")
 
     # ── 1. Inscription ───────────────────────────────────────────────────
     reg = _register(client)
@@ -102,7 +102,7 @@ def test_parcours_candidat_a_z(client: TestClient, center_session):
     # ── 4. Paiement Mobile Money (sandbox → paid) ────────────────────────
     r = client.post("/api/v1/payments", json={
         "booking_reference": bk["reference"],
-        "amount_gnf": 250000,
+        "amount_gnf": 150000,
         "provider": "orange_money",
         "phone": "+224620000001",
     }, headers=_auth(tok))
@@ -123,8 +123,15 @@ def test_parcours_candidat_a_z(client: TestClient, center_session):
     assert r.content[:5] == b"%PDF-", "le fichier doit être un vrai PDF"
     assert len(r.content) > 1000
 
-    # ── 6. Jour J : le candidat démarre SON examen (appareil du centre,
-    #      compte du candidat) ─────────────────────────────────────────────
+    # ── 6. Jour J : identité vérifiée puis contrôle d'entrée au centre ─────
+    verify_candidate_identity(client, reg["candidate_id"], admin, marker=uuid.uuid4().hex[:8])
+    r = client.post("/api/v1/entries/validate", headers=admin, json={
+        "reference": bk["reference"], "verification_code": bk["verification_code"],
+        "center_code": ids["center_code"],
+    })
+    assert r.status_code == 200 and r.json()["allowed"] is True, r.text[:300]
+
+    #      Le candidat démarre SON examen (appareil du centre, son compte)
     r = client.post("/api/v1/exams/start-from-booking",
                     json={"booking_reference": bk["reference"]}, headers=_auth(tok))
     assert r.status_code == 201, r.text[:300]

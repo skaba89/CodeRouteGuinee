@@ -48,6 +48,7 @@ from app.main import app
 from app.db.session import SessionLocal, init_db
 from app.models_user import User
 from app.security import get_password_hash
+from tests.conftest import seed_media_ready_official_bank, verify_candidate_identity
 
 
 # ── Comptes fondateurs (créés hors flux, comme le seed de bootstrap) ─────────
@@ -63,11 +64,6 @@ def client():
         id=str(uuid.uuid4()), email=SA_EMAIL, full_name="Directeur National DNTT",
         password_hash=get_password_hash(SA_PASS), role="super_admin", is_active=True,
     ))
-    # Questions officielles (tirage des 40 par épreuve)
-    from app.models_question import Question
-    if db.query(Question).count() < 50:
-        from app.seed_full import seed_questions
-        seed_questions(db)
     db.commit(); db.close()
     with TestClient(app) as c:
         yield c
@@ -102,6 +98,8 @@ def test_journee_production_complete(client: TestClient):
     # ══ ACTE 1 — La DNTT prépare ═══════════════════════════════════════════
     sa = _login(client, SA_EMAIL, SA_PASS)
     tag = uuid.uuid4().hex[:6]
+    # Banque officielle homologuée : 40 questions avec média exploitable.
+    seed_media_ready_official_bank(client, _auth(sa), marker=f"prod-{tag}")
 
     # Un centre d'examen (créé en base comme lors de l'accréditation)
     from app.models_center import Center
@@ -138,6 +136,16 @@ def test_journee_production_complete(client: TestClient):
     }, headers=_auth(sa))
     assert r.status_code == 201, r.text[:200]
     assert r.json()["created_count"] >= 6  # ≥6 sessions programmées
+
+    # Session du jour : le contrôle d'entrée et l'examen ne sont ouverts que
+    # dans la fenêtre horaire de la session.
+    from datetime import UTC, datetime
+    r = client.post("/api/v1/sessions", json={
+        "center_id": center_id, "capacity": 35,
+        "starts_at": (datetime.now(UTC) + timedelta(minutes=5)).isoformat(),
+    }, headers=_auth(sa))
+    assert r.status_code == 201, r.text[:200]
+    today_session_id = r.json()["id"]
 
     # ══ ACTE 2 — Auto-école s'enregistre et est validée ════════════════════
     school_email = f"ecole-{tag}@auto.gn"
@@ -186,7 +194,7 @@ def test_journee_production_complete(client: TestClient):
     assert r.status_code == 200
     sessions = r.json()["sessions"]
     assert len(sessions) >= 6
-    slot = sessions[0]
+    slot = next(s for s in sessions if s["session_id"] == today_session_id)
     assert slot["remaining_seats"] == 35 and slot["full"] is False
 
     # 3.3 — Réservation
@@ -205,7 +213,7 @@ def test_journee_production_complete(client: TestClient):
 
     # 3.4 — Paiement Mobile Money
     r = client.post("/api/v1/payments", json={
-        "booking_reference": booking_ref, "amount_gnf": 250000,
+        "booking_reference": booking_ref, "amount_gnf": 150000,
         "provider": "orange_money", "phone": "+224620000001",
     }, headers=_auth(cand_tok))
     assert r.status_code == 201, r.text[:200]
@@ -220,6 +228,9 @@ def test_journee_production_complete(client: TestClient):
     assert r.status_code == 200
     assert r.headers["content-type"] == "application/pdf"
     assert r.content[:5] == b"%PDF-" and len(r.content) > 1000
+
+    # Pièce d'identité contrôlée par la DNTT (préalable à l'entrée au centre)
+    verify_candidate_identity(client, reg["candidate_id"], _auth(sa), marker=f"prod-{tag}")
 
     # ══ ACTE 4 — Jour de l'examen (au centre) ══════════════════════════════
     agent_tok = _login(client, agent_email, agent_pass := "AgentRatoma2026!")

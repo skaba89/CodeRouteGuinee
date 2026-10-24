@@ -66,14 +66,20 @@ def test_double_paiement_bloque() -> None:
         assert r1.status_code == 201
         assert r1.json()["status"] == "paid"
 
-        # 2e paiement (double-clic / relance) → REFUSÉ (idempotence)
+        # 2e paiement (double-clic / relance) → rejeu idempotent : le paiement
+        # existant est renvoyé, sans nouvel appel opérateur ni nouveau débit.
         r2 = client.post("/api/v1/payments", json=pay, headers=admin_headers)
-        assert r2.status_code == 409, "le double-paiement doit être bloqué"
+        assert r2.status_code == 200, r2.text
+        assert r2.json()["reference"] == r1.json()["reference"]
+        assert r2.json()["receipt_number"] == r1.json()["receipt_number"]
+        assert "sans nouveau débit" in r2.json()["message"]
 
-        # 3e tentative avec un autre provider → toujours refusé
+        # 3e tentative avec un autre provider → toujours le paiement initial
         pay_wave = {**pay, "provider": "wave"}
         r3 = client.post("/api/v1/payments", json=pay_wave, headers=admin_headers)
-        assert r3.status_code == 409
+        assert r3.status_code == 200, r3.text
+        assert r3.json()["reference"] == r1.json()["reference"]
+        assert r3.json()["provider"] == "orange_money"
 
 
 def test_un_seul_paiement_enregistre() -> None:
