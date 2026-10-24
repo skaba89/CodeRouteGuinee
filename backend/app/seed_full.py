@@ -41,6 +41,7 @@ from app.models_session import ExamSession
 from app.models_user import User
 from app.question_bank_gn import QUESTIONS_GN, QUESTIONS_TRAINING_FULL
 from app.security import get_password_hash
+from app.tarifs import get_tarif_for_candidate
 
 SEED_PASSWORD = "CodeRoute2026!"
 ALLOW_ENV = "ALLOW_DEMO_SEED_NON_DEV"
@@ -78,18 +79,21 @@ USERS = [
         "email": "chef.conakry@coderoute.gov.gn",
         "full_name": "Chef Centre Kaloum Conakry",
         "role": "center",
+        "center_code": "CRG-KAL-001",
         "description": "Chef de centre — Centre Conakry Kaloum",
     },
     {
         "email": "chef.kindia@coderoute.gov.gn",
         "full_name": "Chef Centre Kindia",
         "role": "center",
+        "center_code": "CRG-KINDIA-001",
         "description": "Chef de centre — Centre Kindia",
     },
     {
         "email": "operateur.conakry@coderoute.gov.gn",
         "full_name": "Opérateur Centre Kaloum",
         "role": "center",
+        "center_code": "CRG-KAL-001",
         "description": "Opérateur de saisie — Centre Conakry Kaloum",
     },
 ]
@@ -1853,6 +1857,21 @@ def seed_centers(db) -> dict[str, Center]:
     return centers
 
 
+def assign_center_users(db, users: dict[str, User], centers: dict[str, Center]) -> None:
+    """Rattache chaque agent centre à son centre.
+
+    Sans center_id, un agent centre est refusé (CENTER_SCOPE_MISMATCH) au
+    contrôle d'entrée : le cloisonnement par centre est appliqué côté API.
+    """
+    for u in USERS:
+        code = u.get("center_code")
+        user = users.get(u["email"])
+        if not code or user is None or user.center_id:
+            continue
+        user.center_id = centers[code].id
+    db.commit()
+
+
 # ── QUESTIONS ─────────────────────────────────────────────────────────────
 
 
@@ -2267,6 +2286,14 @@ def seed_candidates_and_flows(
 ) -> list[Candidate]:
     candidates = []
     payment_counter = db.query(Payment).count()
+    # Scénarios déclarés dans CANDIDATES_DATA.
+    paid_scenarios = ("admitted", "failed", "paid_future")
+    exam_scenarios = ("admitted", "failed")
+    # Une épreuve = les 40 questions officielles, pas toute la banque d'entraînement.
+    official_texts = {row["text"] for row in QUESTIONS_GN}
+    exam_questions = [q for q in questions if q.text in official_texts][:40]
+    # Un examen déjà passé se rattache à une session clôturée, pas à une session future.
+    past_session = next((s for s in sessions if s.status == "closed"), None)
 
     for cdata in CANDIDATES_DATA:
         # Créer ou récupérer le candidat
@@ -2292,6 +2319,8 @@ def seed_candidates_and_flows(
             continue
 
         session = sessions[sess_idx]
+        if scenario in exam_scenarios and past_session is not None:
+            session = past_session
         booking_ref = f"GN-BOOK-{cdata['reference']}"
         booking = db.scalar(select(Booking).where(Booking.reference == booking_ref))
 
@@ -2307,7 +2336,7 @@ def seed_candidates_and_flows(
             db.flush()
 
         # Paiement
-        if scenario in ("passed", "failed", "booked_paid"):
+        if scenario in paid_scenarios:
             payment_counter += 1
             pay_ref = f"GN-PAY-{cdata['reference']}"
             pay = db.scalar(select(Payment).where(Payment.reference == pay_ref))
@@ -2315,7 +2344,7 @@ def seed_candidates_and_flows(
                 pay = Payment(
                     reference=pay_ref,
                     booking_reference=booking_ref,
-                    amount_gnf=250_000,
+                    amount_gnf=get_tarif_for_candidate(cand.permit_category, 1),
                     provider="orange_money",
                     phone=cdata["phone"],
                     status="paid",
@@ -2326,19 +2355,19 @@ def seed_candidates_and_flows(
                 db.flush()
 
         # Examen pour les scénarios terminés
-        if scenario in ("passed", "failed"):
+        if scenario in exam_scenarios:
             attempt_id = f"ATT-{cdata['reference']}"
             attempt = db.scalar(select(ExamAttempt).where(ExamAttempt.id == attempt_id))
             if not attempt:
                 booking.status = "checked_in"
-                correct_ratio = cdata.get("correct_ratio", 35)
-                answers = _build_answers(questions, correct_ratio)
+                correct_ratio = cdata["score"]
+                answers = _build_answers(exam_questions, correct_ratio)
                 import hashlib
                 bank_hash = hashlib.sha256(
-                    "|".join(f"{q.id}:{q.correct_answer}" for q in questions).encode()
+                    "|".join(f"{q.id}:{q.correct_answer}" for q in exam_questions).encode()
                 ).hexdigest()
 
-                now = datetime.now(UTC).replace(tzinfo=None)
+                now = session.starts_at + timedelta(minutes=30)
                 attempt = ExamAttempt(
                     id=attempt_id,
                     candidate_id=cand.id,
@@ -2355,8 +2384,8 @@ def seed_candidates_and_flows(
 
                 trace = ExamQuestionTrace(
                     attempt_id=attempt.id,
-                    question_ids=[q.id for q in questions],
-                    question_count=len(questions),
+                    question_ids=[q.id for q in exam_questions],
+                    question_count=len(exam_questions),
                     bank_hash=bank_hash,
                     version_label=f"official-bank-{bank_hash[:12]}",
                     selection_mode="active_bank_snapshot",
@@ -2410,6 +2439,7 @@ def run_seed() -> None:
 
         print("\n🏢 Centres agréés...")
         centers = seed_centers(db)
+        assign_center_users(db, users, centers)
 
         print("\n📋 Banque de questions officielle...")
         questions = seed_questions(db)
