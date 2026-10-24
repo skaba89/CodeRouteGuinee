@@ -265,8 +265,9 @@ def test_official_exam_requires_checkin_registered_station_trace_and_server_scor
         assert result_payload["score"] == 40
         assert result_payload["total"] == 40
         assert result_payload["passed"] is True
-        assert len(result_payload["questions"]) == 40
-        assert all(item["is_correct"] for item in result_payload["questions"])
+        assert result_payload["questions"] == []
+        assert sum(theme["total"] for theme in result_payload["themes"]) == 40
+        assert all(theme["errors"] == 0 for theme in result_payload["themes"])
 
         certificate = client.get(f"/api/v1/exams/{attempt_id}/certificate/verify")
         assert certificate.status_code == 200

@@ -148,7 +148,9 @@ def test_journee_pilote_complete(client: TestClient):
     r = client.get(f"/api/v1/exams/{attempt_id}/results", headers=_auth(center_token))
     assert r.status_code == 200, r.text[:300]
     detail = r.json()
-    assert len(detail.get("questions", [])) == 40
+    # L'agent de centre ne voit pas les bonnes réponses : fautes par thème seulement.
+    assert detail["questions"] == []
+    assert sum(theme["total"] for theme in detail["themes"]) == 40
 
     # ── 9. Statut de la tentative ────────────────────────────────────────────
     r = client.get(f"/api/v1/exams/{attempt_id}/status", headers=_auth(center_token))

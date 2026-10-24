@@ -152,10 +152,11 @@ def test_parcours_candidat_a_z(client: TestClient, center_session):
     result = r.json()
     assert "score" in result and result["status"] in {"passed", "failed", "submitted", "completed"}
 
-    # Résultats détaillés accessibles au candidat
+    # Résultat du candidat : score et fautes par thème, sans les bonnes réponses
     r = client.get(f"/api/v1/exams/{attempt_id}/results", headers=_auth(tok))
     assert r.status_code == 200
-    assert len(r.json().get("questions", [])) == 40
+    assert r.json()["questions"] == []
+    assert sum(theme["total"] for theme in r.json()["themes"]) == 40
 
 
 def test_candidat_ne_demarre_pas_la_reservation_d_un_autre(client: TestClient, center_session):

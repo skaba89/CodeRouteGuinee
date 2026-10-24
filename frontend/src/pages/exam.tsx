@@ -11,7 +11,7 @@ import {
   startExamFromBooking,
   submitExamAttempt,
 } from '../api';
-import type { ExamQuestion } from '../api';
+import type { ExamQuestion, ExamThemeResult } from '../api';
 import { useIsMobile } from '../hooks/useIsMobile';
 import { isAudioLocale, speakFeedback, stop as stopAudio, playQuestionAudio, announceResult, announceInstructions } from '../audio';
 import { AudioModeBanner, LocaleAudioSwitcher, PlayButton } from '../components/AudioButton';
@@ -38,9 +38,12 @@ type DisplayResultQuestion = {
 
 type DisplayResult = {
   score: number;
+  total: number;
   threshold: number;
   passed: boolean;
   questions: DisplayResultQuestion[];
+  /** Examen officiel : fautes par thème, sans les bonnes réponses. */
+  themes?: ExamThemeResult[];
 };
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'offline';
@@ -99,8 +102,10 @@ function clearStoredAttempt(attemptId?: string | null) {
 function mapResult(serverResult: Awaited<ReturnType<typeof getExamResults>>): DisplayResult {
   return {
     score: serverResult.score,
+    total: serverResult.total,
     threshold: serverResult.threshold,
     passed: serverResult.passed,
+    themes: serverResult.detail_level === 'summary' ? serverResult.themes : undefined,
     questions: serverResult.questions.map(item => ({
       question_id: item.question_id,
       question_text: item.text,
@@ -372,7 +377,7 @@ export function ExamPage({ locale }: Props) {
 
   useEffect(() => {
     if (phase === 'done' && result && audioEnabled) {
-      void announceResult(Boolean(result.passed), Number(result.score ?? 0), Number(result.questions?.length ?? questions.length));
+      void announceResult(Boolean(result.passed), Number(result.score ?? 0), Number(result.total ?? questions.length));
     }
   }, [phase, result, audioEnabled, questions.length]);
 
@@ -589,6 +594,7 @@ export function ExamPage({ locale }: Props) {
       const score = questions.filter((_, index) => answers[index] === questions[index].correct_answer).length;
       setResult({
         score,
+        total: questions.length,
         threshold: 35,
         passed: score >= 35,
         questions: questions.map((question, index) => ({
@@ -686,39 +692,65 @@ export function ExamPage({ locale }: Props) {
       <section className="screen" role="main">
         <div style={{ maxWidth: 780, margin: '0 auto' }}>
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'auto 1fr', gap: isMobile ? 14 : 24, padding: isMobile ? 20 : 28, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16, marginBottom: 20, boxShadow: 'var(--sh)', alignItems: 'center', justifyItems: isMobile ? 'center' : 'stretch', textAlign: isMobile ? 'center' : 'left' }}>
-            <div style={{ width: 120, height: 120, borderRadius: '50%', background: `conic-gradient(${scoreColor} ${(result.score / Math.max(1, result.questions.length) * 100).toFixed(1)}%, var(--border) 0)`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ width: 120, height: 120, borderRadius: '50%', background: `conic-gradient(${scoreColor} ${(result.score / Math.max(1, result.total) * 100).toFixed(1)}%, var(--border) 0)`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <div style={{ width: 96, height: 96, borderRadius: '50%', background: 'var(--surface)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                <span style={{ fontSize: 28, fontWeight: 800, color: scoreColor }}>{result.score}</span><span style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 600 }}>/ {result.questions.length}</span>
+                <span style={{ fontSize: 28, fontWeight: 800, color: scoreColor }}>{result.score}</span><span style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 600 }}>/ {result.total}</span>
               </div>
             </div>
             <div>
               <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 12px', borderRadius: 20, background: result.passed ? '#E6F3EC' : '#FDECEA', color: scoreColor, fontSize: 12, fontWeight: 700, marginBottom: 10 }}>
                 {result.passed ? <IconCheck size={14}/> : <IconAlertTriangle size={14}/>} {result.passed ? 'ADMIS' : 'NON ADMIS'}
               </div>
-              <h2 style={{ fontSize: 20, fontWeight: 800, marginBottom: 4 }}>{result.score} réponses correctes sur {result.questions.length}</h2>
-              <p style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 14 }}>Seuil d'admission : {result.threshold} / {result.questions.length}</p>
+              <h2 style={{ fontSize: 20, fontWeight: 800, marginBottom: 4 }}>{result.score} réponses correctes sur {result.total}</h2>
+              <p style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 14 }}>Seuil d'admission : {result.threshold} / {result.total}</p>
               <button className="btn-success btn-sm" onClick={resetExamState}>Nouvel examen</button>
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-            {([['all', `Toutes (${result.questions.length})`], ['ok', `Correctes (${result.questions.filter(item => item.is_correct).length})`], ['ko', `Erreurs (${result.questions.filter(item => !item.is_correct).length})`]] as [string,string][]).map(([value, label]) => (
-              <button key={value} className={filter === value ? 'btn-success btn-sm' : 'secondary-button btn-sm'} onClick={() => setFilter(value as 'all' | 'ok' | 'ko')}>{label}</button>
-            ))}
-          </div>
-
-          <div style={{ display: 'grid', gap: 10 }}>
-            {filtered.map((item, index) => (
-              <div key={index} style={{ background: 'var(--surface)', border: `1.5px solid ${item.is_correct ? '#86efac' : '#fca5a5'}`, borderRadius: 12, padding: '14px 18px', display: 'grid', gap: 8 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><p style={{ fontSize: 13.5, fontWeight: 600, flex: 1 }}>{item.question_text}</p>{item.is_correct ? <IconCheck size={18}/> : <IconAlertTriangle size={18}/>}</div>
-                {!item.is_correct && <>
-                  <div style={{ fontSize: 12, color: 'var(--red)', background: '#FDECEA', padding: '4px 10px', borderRadius: 6 }}>Votre réponse : {item.candidate_answer}</div>
-                  <div style={{ fontSize: 12, color: 'var(--guinea-green)', background: '#E6F3EC', padding: '4px 10px', borderRadius: 6 }}>Bonne réponse : {item.correct_answer}</div>
-                  {item.explanation && <div style={{ fontSize: 12, padding: '6px 10px', background: 'var(--bg)', borderRadius: 6 }}>{item.explanation}</div>}
-                </>}
+          {result.themes ? (
+            <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '16px 20px' }}>
+              <h3 style={{ fontSize: 15, fontWeight: 800, marginBottom: 6 }}>Fautes par thème</h3>
+              <p style={{ fontSize: 12.5, color: 'var(--muted)', marginBottom: 12 }}>
+                Comme pour les examens officiels de référence, les bonnes réponses ne sont pas communiquées :
+                elles protègent la confidentialité de la banque nationale. Révisez les thèmes ci-dessous en mode entraînement.
+              </p>
+              <div className="table-wrap">
+                <table>
+                  <thead><tr><th>Thème</th><th>Questions</th><th>Fautes</th></tr></thead>
+                  <tbody>
+                    {result.themes.map(theme => (
+                      <tr key={theme.category}>
+                        <td>{theme.label}</td>
+                        <td>{theme.total}</td>
+                        <td style={{ fontWeight: 700, color: theme.errors > 0 ? 'var(--red)' : 'var(--guinea-green)' }}>{theme.errors}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-            ))}
-          </div>
+            </div>
+          ) : (
+            <>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+              {([['all', `Toutes (${result.questions.length})`], ['ok', `Correctes (${result.questions.filter(item => item.is_correct).length})`], ['ko', `Erreurs (${result.questions.filter(item => !item.is_correct).length})`]] as [string,string][]).map(([value, label]) => (
+                <button key={value} className={filter === value ? 'btn-success btn-sm' : 'secondary-button btn-sm'} onClick={() => setFilter(value as 'all' | 'ok' | 'ko')}>{label}</button>
+              ))}
+            </div>
+
+            <div style={{ display: 'grid', gap: 10 }}>
+              {filtered.map((item, index) => (
+                <div key={index} style={{ background: 'var(--surface)', border: `1.5px solid ${item.is_correct ? '#86efac' : '#fca5a5'}`, borderRadius: 12, padding: '14px 18px', display: 'grid', gap: 8 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><p style={{ fontSize: 13.5, fontWeight: 600, flex: 1 }}>{item.question_text}</p>{item.is_correct ? <IconCheck size={18}/> : <IconAlertTriangle size={18}/>}</div>
+                  {!item.is_correct && <>
+                    <div style={{ fontSize: 12, color: 'var(--red)', background: '#FDECEA', padding: '4px 10px', borderRadius: 6 }}>Votre réponse : {item.candidate_answer}</div>
+                    <div style={{ fontSize: 12, color: 'var(--guinea-green)', background: '#E6F3EC', padding: '4px 10px', borderRadius: 6 }}>Bonne réponse : {item.correct_answer}</div>
+                    {item.explanation && <div style={{ fontSize: 12, padding: '6px 10px', background: 'var(--bg)', borderRadius: 6 }}>{item.explanation}</div>}
+                  </>}
+                </div>
+              ))}
+            </div>
+            </>
+          )}
         </div>
       </section>
     );
