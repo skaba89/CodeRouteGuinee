@@ -12,8 +12,8 @@
 | 0.1 | Vérification par un humain des `.env*` suivis ; retrait du suivi git et rotation si nécessaire | E1 | Sécurité |
 | 0.2 | README : retirer l'étape `seed_full` en production, corriger les chiffres, isoler les comptes de démo dans `DEMO.md` | C5, README | Doc |
 | 0.3 | Garde : `seed_full` et `seed_demo_dntt` refusent `ENVIRONMENT=production` **sans exception possible** (+ test) | C5 | Code |
-| 0.4 | URL du certificat via `public_app_url` (+ test) | M4 | Code |
-| 0.5 | `GET /questions` refusé pour `expired` (+ test) | M5 | Code |
+| 0.4 | URL du certificat via `public_app_url` (+ test) ; URL de webhook Mobile Money (`mobile_money.py:141,545`) dans une PR paiements dédiée | M4 | Code |
+| 0.5 | ~~`GET /questions` refusé pour `expired`~~ : retiré, le comportement est nécessaire à la reprise (voir M5) | — | — |
 | 0.6 | Remplacer les 4 médias tronqués | M7 | Contenu |
 
 ## Lot 1 — P0 Intégrité de l'examen · 10 à 15 j
