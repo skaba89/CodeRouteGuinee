@@ -54,6 +54,20 @@ def get_center_headers(client: TestClient) -> dict[str, str]:
     return get_auth_headers(client, "center")
 
 
+def get_center_agent_headers(client: TestClient, center_id: str) -> dict[str, str]:
+    """Agent de centre rattaché à `center_id` (cloisonnement appliqué par l'API)."""
+    init_db()
+    email = f"agent-{uuid4().hex[:8]}@coderoute.test"
+    password = "AgentPass123!"
+    with SessionLocal() as db:
+        db.add(User(email=email, full_name="Agent centre", password_hash=get_password_hash(password),
+                    role="center", center_id=center_id, is_active=True))
+        db.commit()
+    resp = client.post("/api/v1/auth/login", data={"username": email, "password": password})
+    assert resp.status_code == 200, resp.text
+    return {"Authorization": f"Bearer {resp.json()['access_token']}"}
+
+
 def get_candidate_headers(client: TestClient) -> dict[str, str]:
     return get_auth_headers(client, "candidate")
 

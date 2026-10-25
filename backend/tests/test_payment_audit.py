@@ -33,4 +33,5 @@ def test_payment_failed_audit_log_is_written_for_unknown_booking() -> None:
         )
         assert audit_log is not None
         assert audit_log.details["reason"] == "booking_not_found"
-        assert audit_log.details["amount_gnf"] == 250000
+        # Montant demandé par le client (le montant réel est fixé par le serveur).
+        assert audit_log.details["requested_amount_gnf"] == 250000

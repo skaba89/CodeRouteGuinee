@@ -207,7 +207,10 @@ class TestCaptureException:
             capture_exception(exc, {"payment_id": "pay-123"})
 
         mock_sdk.capture_exception.assert_called_once_with(exc)
-        mock_scope.set_extra.assert_called_with("payment_id", "pay-123")
+        # Confidentialité (P11) : l'identifiant de paiement ne sort pas en clair vers Sentry.
+        key, value = mock_scope.set_extra.call_args.args
+        assert key == "payment_id"
+        assert value != "pay-123"
 
     def test_capture_without_context(self):
         """capture_exception sans contexte ne doit pas lever d'exception."""
@@ -230,21 +233,20 @@ class TestSetUserContext:
         mock_sdk = MagicMock()
         with patch.dict("sys.modules", {"sentry_sdk": mock_sdk}):
             set_user_context("user-456", "admin", "admin@coderoute.gov.gn")
-        mock_sdk.set_user.assert_called_once_with({
-            "id": "user-456",
-            "role": "admin",
-            "email": "admin@coderoute.gov.gn",
-        })
+        # Corrélation pseudonymisée : ni identifiant brut ni e-mail transmis.
+        sent = mock_sdk.set_user.call_args.args[0]
+        assert sent["role"] == "admin"
+        assert sent["id"] != "user-456"
+        assert "email" not in sent
 
     def test_set_user_with_none_email(self):
         mock_sdk = MagicMock()
         with patch.dict("sys.modules", {"sentry_sdk": mock_sdk}):
             set_user_context("user-789", "super_admin", None)
-        mock_sdk.set_user.assert_called_once_with({
-            "id": "user-789",
-            "role": "super_admin",
-            "email": None,
-        })
+        sent = mock_sdk.set_user.call_args.args[0]
+        assert sent["role"] == "super_admin"
+        assert sent["id"] != "user-789"
+        assert "email" not in sent
 
     def test_set_user_never_sends_password(self):
         """Vérifier que set_user ne transmet jamais de mot de passe."""

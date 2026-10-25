@@ -277,13 +277,15 @@ class TestSeedFull:
 
         from app.seed_full import _guard
 
-        # En mode development, _guard ne lève pas
-        with patch.dict(os.environ, {"ENVIRONMENT": "development"}):
-            try:
-                _guard()  # ne doit pas lever en development
-            except SystemExit as e:
-                # _guard peut appeler sys.exit en non-dev
-                assert e.code != 0
+        # La configuration est mise en cache : on remplace la source de vérité.
+        dev = MagicMock(environment="development")
+        prod = MagicMock(environment="production")
+        with patch("app.core.config.get_settings", return_value=dev):
+            _guard()  # autorisé en development
+        with patch("app.core.config.get_settings", return_value=prod), \
+                patch.dict(os.environ, {"ALLOW_DEMO_SEED_NON_DEV": ""}):
+            with pytest.raises(RuntimeError, match="Seed bloqué en production"):
+                _guard()
 
     def test_build_answers_returns_dict(self):
         """_build_answers retourne un dict {id: correct_answer}."""

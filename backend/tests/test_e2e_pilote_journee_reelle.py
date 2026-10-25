@@ -84,6 +84,45 @@ def test_journee_pilote_complete(client: TestClient):
     assert first["booking_reference"].startswith("BK-GN-CODE-B-PILOT-")
     assert len(first["verification_code"]) == 6
 
+    # ── 2 bis. Encaissement espèces enregistré par la DNTT (import officiel) ─
+    # Le pilote est payé en espèces au centre : les reçus sont importés par le
+    # circuit officiel auditable avant le contrôle d'entrée (pas de faux paiement).
+    r = client.post("/api/v1/payments/admin/import-official", headers=_auth(sa_token), json={
+        "source": "pilote-kaloum-especes",
+        "reason": "Reçus espèces de la journée pilote Kaloum",
+        "payments": [{
+            "booking_reference": first["booking_reference"],
+            "amount_gnf": 150000,
+            "provider": "especes",
+            "phone": first.get("phone") or "+224620000000",
+            "status": "paid",
+            "receipt_number": f"ESP-{first['booking_reference']}",
+        }],
+    })
+    assert r.status_code == 200, r.text[:300]
+
+    # Identité contrôlée par la DNTT (préalable au contrôle d'entrée)
+    from tests.conftest import verify_candidate_identity
+    from app.models_booking import Booking
+    with SessionLocal() as db:
+        candidate_id = db.query(Booking).filter_by(reference=first["booking_reference"]).one().candidate_id
+    verify_candidate_identity(client, candidate_id, _auth(sa_token), marker="pilote")
+
+    # Prérequis du pilote : la banque chargée par seed-pilote n'a pas de média
+    # exploitable ; l'autorité homologue une banque officielle avec médias.
+    from tests.conftest import seed_media_ready_official_bank
+    seed_media_ready_official_bank(client, _auth(sa_token), marker="pilote")
+
+    # Le test se place le jour J : la session du candidat commence dans 5 min,
+    # ce qui ouvre les fenêtres de contrôle d'entrée et de démarrage d'examen.
+    from datetime import UTC, datetime, timedelta
+    from app.models_session import ExamSession
+    with SessionLocal() as db:
+        booking = db.query(Booking).filter_by(reference=first["booking_reference"]).one()
+        session = db.get(ExamSession, booking.session_id)
+        session.starts_at = datetime.now(UTC).replace(tzinfo=None) + timedelta(minutes=5)
+        db.commit()
+
     # ── 3. Login agent centre (créé par le seed) ────────────────────────────
     center_password = os.environ.get("PILOT_CENTER_PASSWORD", "KaloumDNTT2024!")
     center_token = _login(client, "centre.kaloum@dntt.gov.gn", center_password)

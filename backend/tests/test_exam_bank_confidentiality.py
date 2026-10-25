@@ -11,14 +11,13 @@ from uuid import uuid4
 
 from fastapi.testclient import TestClient
 
-from app.db.session import SessionLocal, init_db
+from app.db.session import init_db
 from app.main import app
-from app.models_user import User
 from app.question_bank_gn import QUESTIONS_GN, QUESTIONS_TRAINING_FULL
-from app.security import get_password_hash
 from tests.conftest import (
     get_admin_headers,
     get_auth_headers,
+    get_center_agent_headers,
     seed_media_ready_official_bank,
     verify_candidate_identity,
 )
@@ -63,16 +62,6 @@ def _submitted_exam_for_registered_candidate(client: TestClient) -> dict:
     return {"attempt": attempt, "candidate": candidate, "admin": admin, "center": center}
 
 
-def _center_agent_headers(client: TestClient, center_id: str) -> dict[str, str]:
-    email = f"agent-conf-{uuid4().hex[:8]}@test.gn"
-    with SessionLocal() as db:
-        db.add(User(email=email, full_name="Agent centre", password_hash=get_password_hash("AgentPass123!"),
-                    role="center", center_id=center_id, is_active=True))
-        db.commit()
-    token = client.post("/api/v1/auth/login", data={"username": email, "password": "AgentPass123!"}).json()
-    return {"Authorization": f"Bearer {token['access_token']}"}
-
-
 def test_candidate_gets_score_and_errors_by_theme_without_answers() -> None:
     init_db()
     with TestClient(app) as client:
@@ -98,7 +87,7 @@ def test_center_agent_does_not_see_official_answers() -> None:
     init_db()
     with TestClient(app) as client:
         ctx = _submitted_exam_for_registered_candidate(client)
-        agent = _center_agent_headers(client, ctx["center"]["id"])
+        agent = get_center_agent_headers(client, ctx["center"]["id"])
         response = client.get(f"/api/v1/exams/{ctx['attempt']['id']}/results", headers=agent)
     assert response.status_code == 200, response.text
     assert response.json()["detail_level"] == "summary"

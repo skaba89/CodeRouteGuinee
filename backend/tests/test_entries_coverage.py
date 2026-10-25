@@ -10,7 +10,12 @@ from app.db.session import SessionLocal, init_db
 from app.main import app
 from app.models_center import Center
 from app.models_session import ExamSession
-from tests.conftest import get_admin_headers, get_center_headers
+from tests.conftest import (
+    get_admin_headers,
+    get_center_agent_headers,
+    get_center_headers,
+    prepare_checked_in_booking,
+)
 
 
 def _seed() -> tuple[str, str]:
@@ -80,47 +85,43 @@ def test_entry_validate_wrong_code() -> None:
 
 
 def test_entry_validate_full_flow() -> None:
-    """Flux complet : entrée validée, puis doublon détecté."""
-    center_code, session_id = _seed()
-    suffix = uuid4().hex[:8]
-
+    """Flux complet : entrée validée par l'agent du centre, puis doublon détecté."""
     with TestClient(app) as client:
         admin_headers = get_admin_headers(client)
-        center_headers = get_center_headers(client)
-
-        cand = client.post("/api/v1/candidates", headers=admin_headers, json={
-            "first_name": "Valid", "last_name": f"Entry-{suffix}",
-            "identity_number": f"ID-VE-{suffix}", "phone": "+224621000002",
-            "permit_category": "B",
-        }).json()
-
-        booking = client.post("/api/v1/bookings", headers=admin_headers, json={
-            "candidate_id": cand["id"], "session_id": session_id,
-        }).json()
-
-        # Payer
-        client.post("/api/v1/payments", headers=admin_headers, json={
-            "booking_reference": booking["reference"],
-            "amount_gnf": 250000, "provider": "orange_money", "phone": "+224621000002",
-        })
-
-        # Première entrée
-        r1 = client.post("/api/v1/entries/validate", headers=center_headers, json={
+        ready = prepare_checked_in_booking(client, admin_headers, check_in=False)
+        booking, center = ready["booking"], ready["center"]
+        agent = get_center_agent_headers(client, center["id"])
+        payload = {
             "reference": booking["reference"],
             "verification_code": booking["verification_code"],
-            "center_code": center_code,
-        })
-        assert r1.status_code == 200
+            "center_code": center["code"],
+        }
+
+        # Première entrée
+        r1 = client.post("/api/v1/entries/validate", headers=agent, json=payload)
+        assert r1.status_code == 200, r1.text
         assert r1.json()["allowed"] is True
 
         # Deuxième entrée — doublon
-        r2 = client.post("/api/v1/entries/validate", headers=center_headers, json={
-            "reference": booking["reference"],
-            "verification_code": booking["verification_code"],
-            "center_code": center_code,
-        })
+        r2 = client.post("/api/v1/entries/validate", headers=agent, json=payload)
         assert r2.status_code == 200
         assert r2.json()["reason"] == "already_checked_in"
+
+
+def test_entry_refused_to_agent_of_another_center() -> None:
+    """Cloisonnement : un agent ne contrôle que les entrées de son propre centre."""
+    with TestClient(app) as client:
+        admin_headers = get_admin_headers(client)
+        ready = prepare_checked_in_booking(client, admin_headers, check_in=False)
+        other_center = prepare_checked_in_booking(client, admin_headers, check_in=False)["center"]
+        intruder = get_center_agent_headers(client, other_center["id"])
+        response = client.post("/api/v1/entries/validate", headers=intruder, json={
+            "reference": ready["booking"]["reference"],
+            "verification_code": ready["booking"]["verification_code"],
+            "center_code": ready["center"]["code"],
+        })
+    assert response.status_code == 403
+    assert response.json()["detail"]["code"] == "CENTER_SCOPE_MISMATCH"
 
 
 def test_entries_require_auth() -> None:

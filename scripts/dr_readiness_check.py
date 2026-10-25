@@ -63,9 +63,18 @@ def _check_audit_chain() -> tuple[bool, str]:
     finally:
         db.close()
 
-    if rep["valid"]:
-        return True, f"chaîne intacte ({rep['total_entries']} entrées)"
-    return False, f"chaîne ROMPUE au seq {rep['broken_at_seq']} : {rep['reason']}"
+    if rep.get("valid"):
+        return True, f"chaîne intacte ({rep.get('total_entries', 0)} entrées)"
+    # Une chaîne non vérifiable n'est pas une preuve d'intégrité : échec explicite,
+    # jamais d'exception (le contrôle DR doit toujours produire un diagnostic).
+    reason = rep.get("reason")
+    if not rep.get("enabled", True):
+        return False, "chaîne d'audit désactivée (AUDIT_CHAIN_ENABLED=false) : intégrité non prouvable"
+    if reason == "missing_key":
+        return False, "AUDIT_CHAIN_HMAC_KEY absente : intégrité non vérifiable"
+    if reason == "missing_p11_anchor":
+        return False, "ancre de chaîne absente : redémarrer l'API pour la créer"
+    return False, f"chaîne ROMPUE au seq {rep.get('broken_at_seq')} : {reason}"
 
 
 def _check_database() -> tuple[bool, str]:

@@ -285,10 +285,13 @@ class TestCronFiles:
 
 class TestRoadSigns:
     def _read_component(self) -> str:
+        """Façade publique + module legacy qu'elle réexporte (panneaux et scènes SVG)."""
         from pathlib import Path
-        p = Path(__file__).parent.parent.parent / "frontend" / "src" / \
-            "pages" / "shared-exam-components.tsx"
-        return p.read_text() if p.exists() else ""
+        pages = Path(__file__).parent.parent.parent / "frontend" / "src" / "pages"
+        files = [pages / "shared-exam-components.tsx", pages / "shared-exam-components-legacy.tsx"]
+        missing = [str(f) for f in files if not f.exists()]
+        assert not missing, f"composants d'examen introuvables : {missing}"
+        return "\n".join(f.read_text(encoding="utf-8") for f in files)
 
     def test_sign_stop_defined(self):
         assert "type === 'stop'" in self._read_component()

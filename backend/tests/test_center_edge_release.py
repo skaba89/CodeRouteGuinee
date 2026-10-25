@@ -158,7 +158,26 @@ def _create_release(
         },
     )
     assert response.status_code == 201, response.text
-    return response.json()
+    release = response.json()
+    # P9 : aucun rollout sans preuves de chaîne d'approvisionnement attachées
+    # (provenance, SBOM, digest du sujet, scan de vulnérabilités).
+    evidence = client.post(
+        f"/api/v1/center-edge/releases/{release['release_id']}/supply-chain",
+        headers=headers,
+        json={
+            "builder": "github-actions",
+            "source_commit_sha": "1" * 40,
+            "workflow_ref": f"Edge Release Supply Chain@refs/tags/{version}",
+            "provenance_url": "https://github.com/skaba89/CodeRouteGuinee/attestations/2001",
+            "sbom_sha256": "c" * 64,
+            "sbom_attestation_url": "https://github.com/skaba89/CodeRouteGuinee/attestations/2002",
+            "subject_sha256": sha,
+            "vulnerability_scan_status": "passed",
+        },
+    )
+    assert evidence.status_code == 200, evidence.text
+    assert evidence.json()["supply_chain_ready"] is True
+    return release
 
 
 def _rollout(client: TestClient, headers: dict[str, str], release_id: str, status_value: str, percent: int, **extra) -> object:
@@ -251,7 +270,10 @@ def test_release_quality_gate_auto_pause_and_rollback() -> None:
             sha="b" * 64,
         )
         assert previous_installed.status_code == 200, previous_installed.text
-        assert _rollout(client, headers, previous_id, "rolling", 100).status_code == 200
+        # Vague restreinte au centre du test : la porte qualité compte les
+        # passerelles éligibles du périmètre, pas celles des autres tests.
+        assert _rollout(client, headers, previous_id, "rolling", 100,
+                        allowed_center_ids=[center.id]).status_code == 200
         assert _rollout(client, headers, previous_id, "released", 100).status_code == 200
 
         release = _create_release(

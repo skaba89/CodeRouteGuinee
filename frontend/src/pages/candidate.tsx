@@ -39,7 +39,7 @@ import {
   updateInstitutionalUserRole, updateInstitutionalUserStatus,
   resetInstitutionalUserPassword,
   validateEntry, reportCenterIncident, getCenterIncidents, resolveCenterIncident,
-  getConvocationPdfUrl, openConvocationPdf, verifyExamCertificate,
+  getConvocationPdfUrl, downloadConvocationPdf, verifyExamCertificate,
   getMyCandidateProfile, getMyBookings, type MyBooking,
   downloadExamCertificatePdf, getExamResults,
   startExamFromBooking, submitExamAttempt, getExamLiveStatus,
@@ -175,7 +175,7 @@ export function CandidatePage() {
                 </div>
                 <div style={{ display: 'flex', gap: 8 }}>
                   <button className="btn-sm btn-outline"
-                    onClick={() => { openConvocationPdf(bk.reference).catch(e => alert(e.message)); }}>
+                    onClick={() => { downloadConvocationPdf(bk.reference).catch(e => alert(e.message)); }}>
                     Convocation PDF
                   </button>
                   <button className="btn-sm btn-outline" onClick={() => setBookRef(bk.reference)}>
@@ -273,7 +273,7 @@ export function CandidatePage() {
               <input value={bookRef} onChange={e => setBookRef(e.target.value)} placeholder="GN-CONV-2026-000001" />
             </label>
             <button className="btn-primary btn-block" disabled={!bookRef}
-              onClick={() => { if (bookRef) openConvocationPdf(bookRef).catch(e => alert(e.message)); }}>
+              onClick={() => { if (bookRef) downloadConvocationPdf(bookRef).catch(e => alert(e.message)); }}>
               ↓ Télécharger la convocation PDF
             </button>
             <div className="divider" />
@@ -526,7 +526,7 @@ function PostBookingActions({ reference }: { reference: string }) {
       )}
 
       <button className="btn-success btn-block" style={{ marginTop: 10 }}
-        onClick={() => { openConvocationPdf(reference).catch(e => alert(e.message)); }}>
+        onClick={() => { downloadConvocationPdf(reference).catch(e => alert(e.message)); }}>
         Télécharger ma convocation PDF (avec QR code)
       </button>
     </div>

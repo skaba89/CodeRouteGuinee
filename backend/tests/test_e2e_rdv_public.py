@@ -141,4 +141,5 @@ def test_session_inexistante_ou_passee(client: TestClient, center_with_sessions)
     )
     db.add(past); db.commit(); past_id = past.id; db.close()
     r = client.post("/api/v1/bookings/self", json={"session_id": past_id}, headers=_auth(tok))
-    assert r.status_code == 422
+    assert r.status_code == 409
+    assert "passée" in r.json()["detail"]

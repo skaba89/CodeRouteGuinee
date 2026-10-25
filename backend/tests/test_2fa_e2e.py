@@ -309,39 +309,57 @@ class TestTwoFactorEndpoints:
         assert data.get("requires_2fa") is True
         assert data.get("user_id") is not None
 
-    def test_2fa_check_endpoint_with_valid_code(self):
-        """POST /auth/2fa/check avec un vrai code TOTP → 200 + access_token + refresh_token."""
+    @staticmethod
+    def _enable_2fa_and_get_challenge() -> tuple[str, str, str]:
+        """Active la 2FA puis se reconnecte : renvoie (user_id, secret, jeton de défi)."""
         email, pwd, user_id = _make_user()
         tok = _get_token(email, pwd)
         with TestClient(app) as c:
-            setup_resp = c.post("/api/v1/auth/2fa/setup", headers=_auth(tok))
-            secret = setup_resp.json()["secret_b32"]
-            c.post("/api/v1/auth/2fa/verify", headers=_auth(tok),
-                   json={"code": generate_totp(secret)})
+            secret = c.post("/api/v1/auth/2fa/setup", headers=_auth(tok)).json()["secret_b32"]
+            verify = c.post("/api/v1/auth/2fa/verify", headers=_auth(tok),
+                            json={"code": generate_totp(secret)})
+            assert verify.status_code == 200, verify.text
+            login = c.post("/api/v1/auth/login", data={"username": email, "password": pwd})
+        assert login.json()["requires_2fa"] is True
+        return user_id, secret, login.json()["access_token"]
+
+    def test_2fa_check_endpoint_with_valid_code(self):
+        """POST /auth/2fa/check avec le jeton de défi + vrai code TOTP → 200 + tokens."""
+        user_id, secret, challenge = self._enable_2fa_and_get_challenge()
+        with TestClient(app) as c:
             r = c.post("/api/v1/auth/2fa/check",
                        params={"user_id": user_id},
-                       headers=_auth(tok),
+                       headers=_auth(challenge),
                        json={"code": generate_totp(secret)})
-        assert r.status_code == 200
+        assert r.status_code == 200, r.text
         data = r.json()
-        # Le backend retourne maintenant les vrais tokens (pas juste valid=True)
         assert "access_token" in data, f"access_token manquant dans {data}"
         assert "refresh_token" in data, f"refresh_token manquant dans {data}"
         assert data.get("requires_2fa") is False
 
     def test_2fa_check_endpoint_invalid_code(self):
+        user_id, _, challenge = self._enable_2fa_and_get_challenge()
+        with TestClient(app) as c:
+            r = c.post("/api/v1/auth/2fa/check",
+                       params={"user_id": user_id},
+                       headers=_auth(challenge),
+                       json={"code": "999999"})
+        assert r.status_code == 401
+        assert r.json()["detail"] == "Code 2FA invalide"
+
+    def test_2fa_check_refuses_regular_access_token(self):
+        """Sécurité : seul le jeton de défi émis à la connexion finalise la 2FA."""
         email, pwd, user_id = _make_user()
         tok = _get_token(email, pwd)
         with TestClient(app) as c:
-            setup_resp = c.post("/api/v1/auth/2fa/setup", headers=_auth(tok))
-            secret = setup_resp.json()["secret_b32"]
-            c.post("/api/v1/auth/2fa/verify", headers=_auth(tok),
-                   json={"code": generate_totp(secret)})
+            secret = c.post("/api/v1/auth/2fa/setup", headers=_auth(tok)).json()["secret_b32"]
+            c.post("/api/v1/auth/2fa/verify", headers=_auth(tok), json={"code": generate_totp(secret)})
             r = c.post("/api/v1/auth/2fa/check",
                        params={"user_id": user_id},
                        headers=_auth(tok),
-                       json={"code": "999999"})
+                       json={"code": generate_totp(secret)})
         assert r.status_code == 401
+        assert r.json()["detail"] == "Challenge 2FA invalide ou expiré"
 
     def test_disable_endpoint(self):
         email, pwd, _ = _make_user()
