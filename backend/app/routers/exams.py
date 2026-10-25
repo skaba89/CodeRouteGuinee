@@ -683,7 +683,8 @@ def submit_exam(
         if candidate and candidate.email:
             cert_url = None
             if result["passed"]:
-                cert_url = f"https://api.coderoute.gov.gn/api/v1/exams/{attempt.id}/certificate/verify"
+                # Même page publique que le QR de l'attestation (configurable par environnement).
+                cert_url = f"{get_settings().public_app_url.rstrip('/')}/#/verifier/{attempt.id}"
             from app.email_service import send_exam_result
             send_exam_result(
                 to_email=candidate.email,

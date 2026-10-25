@@ -52,6 +52,13 @@ def _guard() -> None:
     env = get_settings().environment.lower()
     if env == "development":
         return
+    # Ces comptes partagent un mot de passe public : aucune dérogation possible
+    # en production, même avec ALLOW_DEMO_SEED_NON_DEV.
+    if env == "production":
+        raise RuntimeError(
+            "Seed bloqué en production : comptes de démonstration à mot de passe connu. "
+            "Créer le premier administrateur avec python -m app.bootstrap_admin."
+        )
     if os.getenv(ALLOW_ENV) == "true":
         print(f"⚠️  Seed autorisé explicitement sur {env}")
         return
