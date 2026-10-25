@@ -1,3 +1,5 @@
+# ⚠️  OBSOLÈTE pour le VPS OVH : utiliser deploy/vps/ (ce fichier publie 80/443
+#     et lance les migrations au démarrage). Conservé pour mémoire.
 # docker-compose.prod.yml — CodeRoute Guinée
 # Optimisé pour la montée en charge (1 000+ utilisateurs simultanés)
 #

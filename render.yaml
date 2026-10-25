@@ -1,3 +1,6 @@
+# ⚠️  INACTIF depuis octobre 2026 — la production CodeRoute est sur le VPS OVH
+# (deploy/vps/README.md). Conservé pour mémoire ; aucun déploiement automatique.
+# Suspendre ou supprimer les services restants dans le tableau de bord Render.
 # render.yaml — CodeRoute Guinée P11
 # Les variables marquées sync:false DOIVENT être saisies manuellement dans
 # Render Dashboard → Environment avant activation de la fonction concernée.
@@ -16,7 +19,7 @@ services:
   - type: web
     name: coderouteguinee-backend
     runtime: docker
-    autoDeployTrigger: checksPass
+    autoDeployTrigger: "off"
     dockerContext: backend
     dockerfilePath: backend/Dockerfile
     plan: starter
@@ -208,7 +211,7 @@ services:
   - type: cron
     name: coderoute-offsite-backup
     runtime: docker
-    autoDeployTrigger: checksPass
+    autoDeployTrigger: "off"
     dockerContext: backend
     dockerfilePath: backend/Dockerfile
     dockerCommand: "./scripts/run_offsite_backup.sh"
@@ -258,7 +261,7 @@ services:
   - type: web
     name: coderouteguinee-frontend
     runtime: static
-    autoDeployTrigger: checksPass
+    autoDeployTrigger: "off"
     buildCommand: "cd frontend && npm ci && npm run build"
     staticPublishPath: frontend/dist
     pullRequestPreviewsEnabled: false

@@ -34,28 +34,16 @@ scripts/demo.sh init && scripts/demo.sh up && scripts/demo.sh seed 15 && scripts
 
 ## Déploiement production
 
+Production sur le VPS OVH, à côté d'Academy Guinéenne : voir
+[`deploy/vps/README.md`](deploy/vps/README.md).
+
 ```bash
-# 1. Configurer les variables d'environnement
-cp .env.example .env
-# Éditer .env avec les vraies valeurs (Brevo, Wave, Orange Money, MTN)
-
-# 2. Déployer
-docker compose -f docker-compose.prod.yml up -d
-
-# 3. Appliquer les migrations
-docker compose -f docker-compose.prod.yml exec backend alembic upgrade head
-
-# 4. Créer le premier super-admin
-docker compose -f docker-compose.prod.yml exec backend \
-  python -m app.bootstrap_admin
-
-# 5. Charger les données initiales (questions, centres DNTT)
-docker compose -f docker-compose.prod.yml exec backend \
-  ALLOW_SEED_IN_PROD=true python -m app.seed_full
+cp deploy/vps/.env.vps.example .env.vps   # remplir les secrets
+./deploy/vps/deploy.sh                    # build, migrations, redémarrage, contrôle
+./deploy/vps/scripts/creer-admin.sh       # premier super-administrateur
 ```
 
-→ **API** : https://api.coderoute.gov.gn  
-→ **Frontend** : https://coderoute.gov.gn
+Render n'est plus utilisé (`render.yaml` inactif).
 
 ---
 

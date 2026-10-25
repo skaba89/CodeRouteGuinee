@@ -1,0 +1,128 @@
+# deploy/vps/docker-compose.vps.yml — Production CodeRoute sur le VPS OVH
+# (à côté d'Academy Guinéenne, voir deploy/vps/README.md).
+#
+# Usage : ./deploy/vps/deploy.sh (ne pas lancer à la main sans --env-file).
+#
+# Règles :
+#   - AUCUN port publié sur l'hôte : Docker contourne ufw pour les ports
+#     publiés. Le seul point d'entrée public est le Caddy d'Academy, qui joint
+#     le réseau externe « coderoute-edge » ;
+#   - migrations = étape séparée de deploy.sh, jamais au démarrage de l'API ;
+#   - seeds de démonstration impossibles (ENVIRONMENT=production).
+name: coderoute-prod
+
+x-backend-env: &backend-env
+  ENVIRONMENT: production
+  AUTO_CREATE_TABLES: "false"
+  ENABLE_API_DOCS: "false"
+  RUN_MIGRATIONS_ON_STARTUP: "false"
+  RUN_BOOTSTRAP_SEED_ON_STARTUP: "false"
+  DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:?}:${POSTGRES_PASSWORD:?}@postgres:5432/${POSTGRES_DB:?}
+  PUBLIC_APP_URL: https://${CODEROUTE_DOMAIN:?définir CODEROUTE_DOMAIN dans .env.vps}
+  CORS_ORIGINS: https://${CODEROUTE_DOMAIN}
+  ALLOWED_HOSTS: ${CODEROUTE_DOMAIN}
+  DEPLOYMENT_ID: vps-ovh
+  WEB_CONCURRENCY: ${WEB_CONCURRENCY:-3}
+  DB_POOL_SIZE: ${DB_POOL_SIZE:-5}
+  DB_MAX_OVERFLOW: ${DB_MAX_OVERFLOW:-5}
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: always
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?}
+      POSTGRES_USER: ${POSTGRES_USER:?}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    command: >
+      postgres
+        -c shared_buffers=256MB
+        -c effective_cache_size=768MB
+        -c work_mem=4MB
+        -c maintenance_work_mem=64MB
+        -c max_connections=60
+        -c log_min_duration_statement=500
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    mem_limit: 768m
+    networks: [coderoute-internal]
+
+  backend:
+    build:
+      context: ../../backend
+      dockerfile: Dockerfile
+    restart: always
+    env_file: ../../.env.vps
+    environment: *backend-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # ALLOWED_HOSTS refuse localhost en production : le contrôle interne
+    # présente le vrai nom de domaine.
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf -H \"Host: $${ALLOWED_HOSTS}\" http://127.0.0.1:8000/health/live || exit 1"]
+      interval: 30s
+      timeout: 5s
+      start_period: 60s
+      retries: 5
+    mem_limit: 768m
+    networks:
+      coderoute-internal:
+      coderoute-edge:
+        aliases: [coderoute-backend]
+
+  frontend:
+    build:
+      context: ../../frontend
+      dockerfile: Dockerfile
+      args:
+        # Même origine : Caddy route /api et /health vers le backend.
+        VITE_API_BASE_URL: https://${CODEROUTE_DOMAIN}
+        VITE_API_URL: https://${CODEROUTE_DOMAIN}/api/v1
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:4173/ping || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    mem_limit: 128m
+    networks:
+      coderoute-edge:
+        aliases: [coderoute-frontend]
+
+  db-backup:
+    image: prodrigestivill/postgres-backup-local:16-alpine
+    restart: always
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_DB: ${POSTGRES_DB:?}
+      POSTGRES_USER: ${POSTGRES_USER:?}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
+      SCHEDULE: "@daily"
+      BACKUP_KEEP_DAYS: "14"
+      BACKUP_KEEP_WEEKS: "8"
+      BACKUP_KEEP_MONTHS: "6"
+      HEALTHCHECK_PORT: "8080"
+    volumes:
+      - ../../backups/postgres:/backups
+    depends_on:
+      postgres:
+        condition: service_healthy
+    mem_limit: 128m
+    networks: [coderoute-internal]
+
+volumes:
+  postgres_data:
+
+networks:
+  # Base et API seulement ; aucune sortie vers l'extérieur n'est nécessaire
+  # pour PostgreSQL, mais l'API doit joindre Mobile Money, e-mail, SMS.
+  coderoute-internal:
+  # Réseau partagé avec le Caddy d'Academy (créé par deploy.sh).
+  coderoute-edge:
+    external: true
