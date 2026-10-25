@@ -31,6 +31,12 @@ def ensure_demo_seed_allowed() -> None:
     environment = settings.environment.lower()
     if environment == "development":
         return
+    # Comptes de démonstration à mot de passe connu : jamais en production.
+    if environment == "production":
+        raise RuntimeError(
+            "Demo seed is blocked outside development, and always in production "
+            "(known demo passwords), even with an explicit override."
+        )
     if os.getenv(ALLOW_NON_DEV_SEED_ENV) == "true":
         print(f"WARNING: demo seed explicitly allowed in {settings.environment}. Do not use this on production data.")
         return
