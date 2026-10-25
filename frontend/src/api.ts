@@ -1184,8 +1184,9 @@ export async function openAuthedPdf(url: string): Promise<void> {
   setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
 }
 
-export function openConvocationPdf(reference: string): Promise<void> {
-  return openAuthedPdf(getConvocationPdfUrl(reference));
+/** Télécharge la convocation sous un nom explicite (fiable aussi sur mobile). */
+export function downloadConvocationPdf(reference: string): Promise<void> {
+  return downloadProtectedFile(getConvocationPdfUrl(reference), `coderoute-convocation-${reference}.pdf`);
 }
 
 export function getExamCertificatePdfUrl(attemptId: string): string {

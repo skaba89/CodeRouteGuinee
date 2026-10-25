@@ -8,7 +8,7 @@ def build_entry_success(reference: str, center_code: str | None = None) -> dict:
         "status": "checked_in",
         "center_code": center_code,
         "checked_in_at": datetime.now(UTC).replace(tzinfo=None).isoformat(),
-        "message": "Candidate entry validated",
+        "message": "Entrée du candidat validée",
     }
 
 
