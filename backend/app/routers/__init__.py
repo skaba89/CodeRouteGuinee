@@ -21,6 +21,17 @@ from app.routers import center_edge_supply_chain as center_edge_supply_chain
 from app.routers import center_edge_supply_chain_guard as center_edge_supply_chain_guard
 
 center_edge.router.include_router(center_edge_station_guard.router)
+# La garde de poste remplace leases/issue et offline-sync du routeur hors ligne,
+# qui n'est donc pas monté. Sa clé publique de signature reste indispensable :
+# l'agent Edge la télécharge pour vérifier les baux d'examen hors ligne.
+from app.routers import center_edge_offline as center_edge_offline
+
+center_edge.router.add_api_route(
+    "/lease-signing-key",
+    center_edge_offline.get_edge_lease_signing_key,
+    methods=["GET"],
+    tags=["center-edge-offline"],
+)
 # P9 doit intercepter le rollout avant le quality gate P8, puis déléguer vers lui.
 center_edge.router.include_router(center_edge_supply_chain_guard.router)
 center_edge.router.include_router(center_edge_release_guard.router)
