@@ -105,15 +105,22 @@ def test_legacy_availability_excludes_non_operational_centers_and_booking_reuses
     suspended_id = suspended_session.id
     active_ref = active_session.reference
     suspended_ref = suspended_session.reference
+    active_center_id = active_center.id
+    suspended_center_id = suspended_center.id
     db.commit()
     db.close()
 
     with TestClient(app) as client:
-        availability = client.get("/api/v1/registration/availability", headers=headers)
-        assert availability.status_code == 200
-        refs = {item["session_reference"] for item in availability.json()["items"]}
-        assert active_ref in refs
-        assert suspended_ref not in refs
+        # Filtré par centre : la liste nationale non filtrée est paginée (60 sessions)
+        # et dépendrait des autres données de la base.
+        def refs_for(center_id: str) -> set[str]:
+            availability = client.get("/api/v1/registration/availability", headers=headers,
+                                      params={"center_id": center_id})
+            assert availability.status_code == 200
+            return {item["session_reference"] for item in availability.json()["items"]}
+
+        assert active_ref in refs_for(active_center_id)
+        assert suspended_ref not in refs_for(suspended_center_id)
 
         rejected = client.post(
             "/api/v1/registration/book",

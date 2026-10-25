@@ -87,6 +87,11 @@ class TestBuildConfigurationCheck:
         s.enable_api_docs = overrides.get("enable_api_docs", True)
         s.admin_registration_token = overrides.get("admin_registration_token", "token123")
         s.bootstrap_admin_email = overrides.get("bootstrap_admin_email", "admin@test.com")
+        # Réglages haute disponibilité : un MagicMock serait « vrai » par défaut.
+        s.ha_mode = overrides.get("ha_mode", False)
+        s.redis_required = overrides.get("redis_required", False)
+        s.redis_url = overrides.get("redis_url", "")
+        s.expected_api_instances = overrides.get("expected_api_instances", 1)
         return s
 
     def test_valid_dev_config_returns_ok(self):
@@ -94,11 +99,15 @@ class TestBuildConfigurationCheck:
         assert result["status"] == "ok"
         assert result["errors"] == []
 
-    def test_default_secret_key_is_error(self):
-        s = self._make_settings(secret_key="change-me-in-production")
+    def test_default_secret_key_is_error_in_production(self):
+        s = self._make_settings(secret_key="change-me-in-production", environment="production", cors_origins=["https://coderoute.gov.gn"], allowed_hosts=["coderoute.gov.gn"], enable_api_docs=False)
         result = _build_configuration_check(s)
         assert result["status"] == "error"
         assert any("SECRET_KEY" in e for e in result["errors"])
+
+    def test_default_secret_key_is_warning_in_dev(self):
+        result = _build_configuration_check(self._make_settings(secret_key="change-me-in-production"))
+        assert any("SECRET_KEY" in w for w in result["warnings"])
 
     def test_short_secret_key_is_warning_in_dev(self):
         s = self._make_settings(secret_key="short")
@@ -132,13 +141,15 @@ class TestBuildConfigurationCheck:
         assert any("AUTO_CREATE_TABLES" in e for e in result["errors"])
 
     def test_empty_cors_origins_is_error(self):
-        s = self._make_settings(cors_origins=[])
+        s = self._make_settings(environment="production", cors_origins=[],
+                                allowed_hosts=["coderoute.gov.gn"], enable_api_docs=False)
         result = _build_configuration_check(s)
         assert result["status"] == "error"
         assert any("CORS_ORIGINS" in e for e in result["errors"])
 
     def test_wildcard_cors_is_error(self):
-        s = self._make_settings(cors_origins=["*"])
+        s = self._make_settings(environment="production", cors_origins=["*"],
+                                allowed_hosts=["coderoute.gov.gn"], enable_api_docs=False)
         result = _build_configuration_check(s)
         assert any("wildcard" in e for e in result["errors"])
 
@@ -154,7 +165,8 @@ class TestBuildConfigurationCheck:
         assert any("localhost" in e or "local" in e.lower() for e in result["errors"])
 
     def test_empty_allowed_hosts_is_error(self):
-        s = self._make_settings(allowed_hosts=[])
+        s = self._make_settings(environment="production", allowed_hosts=[],
+                                cors_origins=["https://coderoute.gov.gn"], enable_api_docs=False)
         result = _build_configuration_check(s)
         assert any("ALLOWED_HOSTS" in e for e in result["errors"])
 
@@ -220,8 +232,11 @@ class TestBuildConfigurationCheck:
             assert result["status"] == "warning"
 
     def test_status_error_overrides_warning(self):
-        s = self._make_settings(secret_key="change-me-in-production", cors_origins=[])
+        s = self._make_settings(environment="production", secret_key="change-me-in-production",
+                                cors_origins=[], allowed_hosts=["coderoute.gov.gn"], enable_api_docs=False,
+                                bootstrap_admin_email="")
         result = _build_configuration_check(s)
+        assert result["warnings"], "un avertissement doit coexister avec les erreurs"
         assert result["status"] == "error"
         assert len(result["errors"]) >= 2
 
@@ -229,8 +244,8 @@ class TestBuildConfigurationCheck:
 # ── Readiness avec DB erreur simulée ─────────────────────────────
 
 class TestReadinessDegraded:
-    def test_readiness_degraded_when_db_fails(self):
-        """Simule une panne DB — le readiness doit retourner degraded."""
+    def test_readiness_not_ready_when_db_fails(self):
+        """Panne DB : readiness `not_ready` + 503, l'instance sort du trafic."""
         from sqlalchemy.exc import OperationalError
 
         from app.db.session import get_db
@@ -245,7 +260,8 @@ class TestReadinessDegraded:
             try:
                 r = client.get("/health/readiness")
                 data = r.json()
+                assert r.status_code == 503
                 assert data["checks"]["database"]["status"] == "error"
-                assert data["status"] == "degraded"
+                assert data["status"] == "not_ready"
             finally:
                 app.dependency_overrides.pop(get_db, None)

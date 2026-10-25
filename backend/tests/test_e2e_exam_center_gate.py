@@ -7,6 +7,7 @@ from app.db.session import SessionLocal, init_db
 from app.main import app
 from app.models_question import Question
 from app.question_bank_gn import QUESTIONS_GN
+from tests.conftest import verify_candidate_identity
 
 
 def _admin_headers(client: TestClient) -> dict[str, str]:
@@ -43,6 +44,10 @@ def _ensure_official_bank() -> None:
                 options=row["options"],
                 correct_answer=row["correct_answer"],
                 explanation=row.get("explanation", ""),
+                # La garde d'examen exige un média candidat exploitable.
+                media_type="image",
+                media_url=f"https://cdn.example.com/coderoute-tests/center-gate/{suffix}/{index}.webp",
+                media_alt=f"Illustration de test {index + 1}",
                 is_active=True,
                 validation_status="approved",
             )
@@ -99,6 +104,8 @@ def _create_candidate_booking(
     )
     assert candidate_response.status_code == 201
     candidate = candidate_response.json()
+    # L'identité vérifiée est un préalable au contrôle d'entrée.
+    verify_candidate_identity(client, candidate["id"], headers, marker=suffix)
 
     booking_response = client.post(
         "/api/v1/bookings",
