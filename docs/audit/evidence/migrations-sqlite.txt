@@ -1,0 +1,42 @@
+INFO  [alembic.runtime.migration] Context impl SQLiteImpl.
+INFO  [alembic.runtime.migration] Will assume non-transactional DDL.
+INFO  [alembic.runtime.migration] Running upgrade  -> 20260617_0001, Initial CodeRoute Guinee schema.
+INFO  [alembic.runtime.migration] Running upgrade 20260617_0001 -> 20260618_0002, Add media fields to exam questions.
+INFO  [alembic.runtime.migration] Running upgrade 20260618_0002 -> 20260619_0003, Explicit DDL for all tables + login_rate_limit table.
+INFO  [alembic.runtime.migration] Running upgrade 20260619_0003 -> 20260620_0004, Session capacity rules: max 35 candidates, 3 sessions/week, commune constraint.
+INFO  [alembic.runtime.migration] Running upgrade 20260620_0004 -> 20260623_0005, payment external_reference + paid_at
+INFO  [alembic.runtime.migration] Running upgrade 20260623_0005 -> 0006, Migration 0006 — Tables manquantes et champs absents
+INFO  [alembic.runtime.migration] Running upgrade 0006 -> 0007, Migration 0007 — Index manquants + nettoyage
+INFO  [alembic.runtime.migration] Running upgrade 0007 -> 0008, Migration 0008 — users.center_id
+INFO  [alembic.runtime.migration] Running upgrade 0008 -> 0009, Migration 0009 — seed admin super_admin
+INFO  [alembic.runtime.migration] Running upgrade 0009 -> 0010, Migration 0010 — Index pour le déploiement national (135 centres)
+INFO  [alembic.runtime.migration] Running upgrade 0010 -> 0011, Migration 0011 — Inscription candidat libre et auto-école
+INFO  [alembic.runtime.migration] Running upgrade 0011 -> 0012, Migration 0012 — Workflow de validation officielle des questions
+INFO  [alembic.runtime.migration] Running upgrade 0012 -> 0013, Migration 0013 — Traductions multilingues des questions
+INFO  [alembic.runtime.migration] Running upgrade 0013 -> 0014, Migration 0014 — Journal d'audit inviolable (chaînage cryptographique)
+INFO  [alembic.runtime.migration] Running upgrade 0014 -> 0015, Migration 0015 — architecture média premium normalisée.
+INFO  [alembic.runtime.migration] Running upgrade 0015 -> 0016, Allow candidate follow-ups that are not tied to an exam attempt.
+INFO  [alembic.runtime.migration] Running upgrade 0016 -> 0017, Add auditable refund requests instead of marking manual refunds completed early.
+.....                                                                    [100%]
+=============================== warnings summary ===============================
+../../../../../tmp/coderoute-audit-venv/lib/python3.12/site-packages/starlette/testclient.py:40
+  /tmp/coderoute-audit-venv/lib/python3.12/site-packages/starlette/testclient.py:40: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+    _PortalFactoryType = typing.Callable[[], typing.ContextManager[anyio.abc.BlockingPortal]]
+
+../../../../../tmp/coderoute-audit-venv/lib/python3.12/site-packages/passlib/utils/__init__.py:854
+  /tmp/coderoute-audit-venv/lib/python3.12/site-packages/passlib/utils/__init__.py:854: DeprecationWarning: 'crypt' is deprecated and slated for removal in Python 3.13
+    from crypt import crypt as _crypt
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+5 passed, 2 warnings in 0.82s
+CodeRoute Guinee demo data ready
+Admin: admin@coderoute.gov.gn / password123
+Center: CRG-CONAKRY-001 - Centre agree Conakry Kaloum
+Candidate: CRG-CAND-DEMO-001 - Mamadou Diallo
+Booking: CRG-BOOK-DEMO-001 / verification: CRG-VERIFY-DEMO-001
+Payment: CRG-PAY-DEMO-001 / receipt: CRG-RECEIPT-DEMO-001
+Exam attempt: 8e0e9017-40c5-4d89-b858-44bb62c5b459 / score: 5
+$ /tmp/coderoute-audit-venv/bin/python -m alembic upgrade head
+$ /tmp/coderoute-audit-venv/bin/python -m pytest tests/test_database_migrations.py -q
+$ /tmp/coderoute-audit-venv/bin/python -m app.seed_demo
+Migration verification completed successfully.

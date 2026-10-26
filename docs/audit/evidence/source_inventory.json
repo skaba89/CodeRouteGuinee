@@ -1,0 +1,4948 @@
+{
+  "commit": "2b4e9b809ff27ed9111bc51c074e599e166b1793",
+  "tracked_files": 861,
+  "python": [
+    {
+      "path": "backend/alembic/env.py",
+      "lines": 53,
+      "sha256": "a0861c51eed40a8ab96d8fa53d777461f778723ce82699c9396e8b2caab85707",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/alembic/versions/0016_candidate_followups_optional_attempt.py",
+      "lines": 41,
+      "sha256": "19298a9505d4a795f599859906681ec46eba7dfcd98330a60f96186fd9e9389e",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/alembic/versions/0017_payment_refund_workflow.py",
+      "lines": 48,
+      "sha256": "a52c48035f6cab7f4f65f27287b75a55905b833dc41f5f21ec6829e7d40c2587",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/alembic/versions/20260617_0001_initial_schema.py",
+      "lines": 26,
+      "sha256": "37e763d6386f35f8d656380d3230ddbd819ed76fd3a0f743347ef38831c01434",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/alembic/versions/20260618_0002_question_media_fields.py",
+      "lines": 37,
+      "sha256": "a919903baacfc348b8cb7a949f8cdbbf7933d19f7c2c639fba5f7291646eb459",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/alembic/versions/20260619_0003_explicit_ddl_and_rate_limit_table.py",
+      "lines": 118,
+      "sha256": "8ce4d48590deeab0dc786d435232de24349c3a6158722ac4d28db849cd672d0c",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/alembic/versions/20260620_0004_session_capacity_rules.py",
+      "lines": 161,
+      "sha256": "a9f962c20f51f4d7de8bb93eae102050b0f3bd8ccd1ef611fa3db7466ce3a535",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/alembic/versions/20260623_0005_payment_external_reference.py",
+      "lines": 53,
+      "sha256": "82b847d943edaa4d144c8be85aea7358a64e679cf4f839ceed8e5968d167e701",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/alembic/versions/20260624_0006_missing_tables_and_fields.py",
+      "lines": 195,
+      "sha256": "84b48dde10615b1256ff3a6a5513945d136d7c19072e97e6405c1677a512773f",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/alembic/versions/20260624_0007_indexes_and_candidat_schema.py",
+      "lines": 77,
+      "sha256": "aeda51042591b7c6353185bfd2c4b06f5b8915d4e63412464f006153b40e44f6",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/alembic/versions/20260625_0008_users_center_id.py",
+      "lines": 51,
+      "sha256": "328c2ca7937a570d8c6786d1f10fbba6b1b81d1454c2fa708b28903df2742d13",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/alembic/versions/20260701_0009_seed_admin.py",
+      "lines": 35,
+      "sha256": "ba702d0577da66f0600906c611d722505f4551af6cb518b87991dc2579c93ccb",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/alembic/versions/20260704_0010_national_scale_indexes.py",
+      "lines": 95,
+      "sha256": "f5ff40afbfe3d61fb9f8964ca26dd1c55a8064bab3f53bb566d10c6fa465fc16",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/alembic/versions/20260704_0011_candidate_registration_links.py",
+      "lines": 77,
+      "sha256": "c7457d34a526a9e13c0aa18682a1e820b408e9802e8bc48514c0af88813e0129",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/alembic/versions/20260711_0012_question_validation_workflow.py",
+      "lines": 100,
+      "sha256": "10e8c0b5a863c1a55264103c54a2518e9168e5a29f99846bff8674aed4cea50d",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/alembic/versions/20260711_0013_question_translations.py",
+      "lines": 51,
+      "sha256": "74b825afa5e578d74dcef812807abe8b6137b2427cd8104ce79911004c33b351",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/alembic/versions/20260711_0014_audit_chain.py",
+      "lines": 73,
+      "sha256": "512d424d1a9e77cf8259daf239ed3954ca016e9e613fa725890ed47c33b94de2",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/alembic/versions/20260810_0015_media_asset_architecture.py",
+      "lines": 166,
+      "sha256": "bbb4c0164b42e0974d04b174b53b500e7ec16d9a56d8e7d4088514bf0dd23525",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/__init__.py",
+      "lines": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/api.py",
+      "lines": 1,
+      "sha256": "68c66497a333573b294277b865f4e95a791e8991afef92f3158b7ff5d9a150ec",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/audit_chain.py",
+      "lines": 263,
+      "sha256": "c548f3c2842fafd909ffbf77a0d0b51d4e8ed634ba5a643adb0b207a43b878b9",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/auth_guard.py",
+      "lines": 184,
+      "sha256": "6e5b0cb5f49a48aae00701d9083b4ac0a79882e4fddc5c76a6145ba8d148a354",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/booking_rules.py",
+      "lines": 82,
+      "sha256": "45fe679120baa3f0e279dfc020aa2ffb72709a74b4202abde86a62d4668e3315",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/booking_service.py",
+      "lines": 13,
+      "sha256": "7be4fd6119119547215f433c88f94da57d81f41fb6a1e00836bba0216a97030f",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/bootstrap_admin.py",
+      "lines": 64,
+      "sha256": "3115d403b2123b928457ddd3e47489f9cc7611678c597885f5e8a7d6aef4bb44",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/candidate_creation_rules.py",
+      "lines": 48,
+      "sha256": "a0f4fcd0d3b5afd8af50dcfc8990a082a81eb3e52ff7dabb5e5f99ac75420bba",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/candidate_eligibility.py",
+      "lines": 56,
+      "sha256": "62c812bcf9a02f4a22d0922431a7269be72d4a8a680cb11b49647e6080adeff8",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/center_anomalies.py",
+      "lines": 140,
+      "sha256": "7463101d1d7a93d60193cf834a686ae615f1197f67cd78625d9df537af011a0b",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/cloudinary_service.py",
+      "lines": 68,
+      "sha256": "9c19b57c1214955665f418c20cfdd0156c0ae2d7a2c30fab52119b117b7913b6",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/convocation_service.py",
+      "lines": 36,
+      "sha256": "7ffefcbf76fdc7d262e9ede009588f5d02d85aed178214d72b8065df37f6368b",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/core/__init__.py",
+      "lines": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/core/config.py",
+      "lines": 191,
+      "sha256": "488677fec25c037e54ab2a641eb177317cf947b02ab29762694813e8022f2c42",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/csrf.py",
+      "lines": 211,
+      "sha256": "76dc2864688da6ffea7b77492d35fc05e43fdd0e9eed94e011dd1c3086ddf2f9",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/db/__init__.py",
+      "lines": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/db/base.py",
+      "lines": 5,
+      "sha256": "987edfd9dfe38b2c49492c7d1a4e774015d16b72e2281b018e4160be6b47d560",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/db/session.py",
+      "lines": 217,
+      "sha256": "5162670fc12b012d194149f289d2a7cb6b0ee8c96800a959e97d8488350d65ba",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/deps.py",
+      "lines": 32,
+      "sha256": "9718d0105c835be02e5803c76b2e443b8fb28422b3be68205ff652ed2be0c774",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/distributed.py",
+      "lines": 195,
+      "sha256": "527c7b85f76c32fe2cb7df3800cd6381a6381de93f652bb606d8280dd239ba16",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/domain.py",
+      "lines": 3,
+      "sha256": "b9fd9501e695ff2b134b9de1649465ebab4e6326332b916d39a73c05b9d1a163",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/edge_gateway.py",
+      "lines": 225,
+      "sha256": "9139756c4b10469a4cfb05d244ec348f00483883128ee1a6039f3287726576ac",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/edge_install_authorization.py",
+      "lines": 62,
+      "sha256": "79742256025285f18a4488d892e9b40960b0a2f28ac4d4046060a97e62aae3d2",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/edge_offline.py",
+      "lines": 210,
+      "sha256": "ad496dd6e5b84fa0ed50841254a6f4070475a9b3976131f07b3a6a8c79969bc2",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/edge_release.py",
+      "lines": 299,
+      "sha256": "51aa64eddb91bb0845daf952746c0cfcde71aa3f24b9cea7aacb87bf20b40c8e",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/email_service.py",
+      "lines": 256,
+      "sha256": "da8a7b944aef8cb68a674a234b3dbac883b02e4fccf3db317cfc3ed031decfee",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/entry_service.py",
+      "lines": 22,
+      "sha256": "ed5f2677584eca1c542bc69aeb4b139af451ebbbeee94fd5fcaee38a4ab4f98c",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/exam_attempt_locking.py",
+      "lines": 75,
+      "sha256": "bc5470e0209435bf2cd34255ee6d735d61e28a2881ce839525c29de82e14b71e",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/exam_center_gate.py",
+      "lines": 216,
+      "sha256": "255794c24ea6b8b6fbcd00aa3feee7a934a9497bc668f936973d5e618971b5b8",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/exam_engine.py",
+      "lines": 206,
+      "sha256": "f6158e6db811aed35ceca0367870971d9aff4993fd76816148aa04032e6558fe",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/logging_config.py",
+      "lines": 268,
+      "sha256": "178244836fe7922360e522216d6df969ea95c4597efaf437d3b3666904efa18d",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/main.py",
+      "lines": 306,
+      "sha256": "1fd9ba795f9499829c3c3d17344b67d7cfc8a2e26d8718fdc2572106af9195a4",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/media_policy.py",
+      "lines": 160,
+      "sha256": "bdee834e2dbf84e8bf5d057484f59e339f7288e3a00349aab30838ffe7258b0a",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/media_quality.py",
+      "lines": 232,
+      "sha256": "b95b09c76875306f261fa0a483e9af8c7057339d0ce4115fbd36bbf54616b75f",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/media_runtime_resolver.py",
+      "lines": 172,
+      "sha256": "7e17e90bccdfab2f00d9d91bff88f13dee49ba970ffdc542e85e7108e3160956",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/media_storage.py",
+      "lines": 207,
+      "sha256": "5f80df449f777661f51d4f7bb7325d24d099a1bb96ad9cb552409beb8fecd665",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/media_validation.py",
+      "lines": 102,
+      "sha256": "4b126ee0a36d04bb93a2dd0a70674dba06bdb52873bf45ed8bf185de023097b0",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/middleware.py",
+      "lines": 257,
+      "sha256": "ef166933e83c7fc90952bec9bb5a3de7c633c1408302ed05a4015b2cced953b9",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/mobile_money.py",
+      "lines": 571,
+      "sha256": "0b43336dfa95298375695fa21bf2b1a54f54e02e4e2185636f1f3e4a1166bf5f",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/models.py",
+      "lines": 44,
+      "sha256": "ff399ce982bdca4742f86b6bde36c9f5127f502cc02102a032ab8d33900ee01a",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/models_audit.py",
+      "lines": 39,
+      "sha256": "6f3495c45cecdddf48e5a7b50f508e576e3d5adbd0f3bfed771155be7d7f5680",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/models_booking.py",
+      "lines": 26,
+      "sha256": "82497eff83b94cb44c7c1f81399795f2e9e612cca84d67d2bd3c9a40458d6548",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/models_candidate.py",
+      "lines": 41,
+      "sha256": "f7a537a9e8bbcba219bd889955a2f249ceae9cee2cc52d4129d60e762f247606",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/models_candidate_followup.py",
+      "lines": 26,
+      "sha256": "626abbd05590f91c183214aca01aca5e400e3de0bae3d7f90a5eeef477d293ac",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/models_candidate_identity.py",
+      "lines": 26,
+      "sha256": "24eb7cbe9643ef0ce379295b0a59d2bf3584ba89b5c4c1af5ae69346e66dcc30",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/models_center.py",
+      "lines": 46,
+      "sha256": "8e74273ce6437a79afe16e3e387b915442f4e9a668dce03acce34cf4b7db662f",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/models_center_incident.py",
+      "lines": 30,
+      "sha256": "d56723a84a3fb2dca8ca68cffa9c6a899df14c0cf404b10158988b360165221c",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/models_center_station.py",
+      "lines": 25,
+      "sha256": "a76d09fff610a80be4aeed6cd876e55d2f3c5ef33de382c0cfd484f867ef3be3",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/models_device_session.py",
+      "lines": 28,
+      "sha256": "66052f013c46e77bccc125a2225d21eab804a27bcdfc3925df9071af4f6ebce6",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/models_elearning.py",
+      "lines": 88,
+      "sha256": "07834f5ebb7a98af8df0cbdc8120b89146bd52aae226e77addf98c39291f981d",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/models_exam_attempt.py",
+      "lines": 30,
+      "sha256": "56b7b01f4aa807460bd680d35708bf095b0c93b612d031606e31cc63211b8b49",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/models_exam_monitoring.py",
+      "lines": 27,
+      "sha256": "c4a5f0dba99de9d456e3558bb94b30542e4d2879fbd731a12e1a3f32f700e29a",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/models_exam_question_trace.py",
+      "lines": 24,
+      "sha256": "eeecf2fdbbdcbc00016d595f4799dd7d30e7ce23d927c73e2e018a70d3c4a3a2",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/models_exam_review.py",
+      "lines": 24,
+      "sha256": "e8b4b3d51cbd4c0f91015057865b9f8cf59def5d40c764f10806edb4d546b0d1",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/models_institutional_authorization.py",
+      "lines": 26,
+      "sha256": "afc0b99daf89a12271ad619fd2c0cbc70408b42116d9a7a2c0acd6b2ad1ab423",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/models_media.py",
+      "lines": 160,
+      "sha256": "7e27789a9caa4f21bb64f0dc8ed1f8597300cbd3220a04a653c5f4a01d739db8",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/models_payment.py",
+      "lines": 31,
+      "sha256": "8c1bae41439c769ca3ab6ceb2c78178d09206feede0584efca008656fad48d4e",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/models_payment_refund.py",
+      "lines": 37,
+      "sha256": "61be2a521a8bd1bc1e0bbf83acbd0c4276c497d2317051d407480d1ee5e32901",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/models_question.py",
+      "lines": 49,
+      "sha256": "3980d59958301196cb010a2a6a21c1a3289e2cbf6e47fcb3394d6b1167db07dc",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/models_question_governance.py",
+      "lines": 22,
+      "sha256": "3733028d5905cb8fcc2a8afd53705bd7ff6c0a1d5af7f4f7810229dd75031ab1",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/models_session.py",
+      "lines": 23,
+      "sha256": "71ccfaa10b4f31d9b10a6887f66ef9ef7566fad30610a14776d3dc7e225746eb",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/models_user.py",
+      "lines": 24,
+      "sha256": "7c935e5524409284d273eae80ea142f512b2dc0f3f59ab7fb4830a057989386f",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/monitoring.py",
+      "lines": 93,
+      "sha256": "1c39331bda30621fe567e379d8e79c7a16eea34245d109771961c33e82250c8d",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/national_governance.py",
+      "lines": 657,
+      "sha256": "734a4229816f75c184fce947ca163ba780cb33ebe8d26f7df7c739e1d80d9a25",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/national_governance_evidence.py",
+      "lines": 179,
+      "sha256": "2b0c66b8185a3ab9a9cb52743658ce663642c08286abd2c2083f7367fa6db71d",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/national_governance_guard.py",
+      "lines": 46,
+      "sha256": "0d636c8279a689067a2bd3abd1bdbbeea68b92872cab99a71dd2e944dc02ceb3",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/national_media_readiness.py",
+      "lines": 36,
+      "sha256": "511804a0421202e3359ac19700b3bba51ba8e895916ba1773665b2de09c93854",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/official_exam_attempt_service.py",
+      "lines": 141,
+      "sha256": "b1a06cee3541657c357b6fba31c9e7f8a05028d73700d7e7b0f9745b966f01d2",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/official_media_policy.py",
+      "lines": 28,
+      "sha256": "0ddede918bc57965d0b979861cf970845fceb5bf195fca8eada74e9e393b0b10",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/official_media_readiness.py",
+      "lines": 283,
+      "sha256": "fc2782f7ced7ad5e63cda17043ad0c59f476abb9cdb4c599309cfd90cd6455f3",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/orange_sms.py",
+      "lines": 221,
+      "sha256": "cbbaa18a8b3458f5369c01a4ecf8c4737b809d047adbf701b83edf0a11b06078",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/payment_provider_dispatcher.py",
+      "lines": 172,
+      "sha256": "048eea3d8402077d68ed8acddf80cef6f7980727b61492d973ab97103f3d88ed",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/payment_recap.py",
+      "lines": 25,
+      "sha256": "cf36d32a6d03324339e102874b6937d7168e4ef37eb068d64549519ef17f3ac4",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/payment_rules.py",
+      "lines": 251,
+      "sha256": "5ed0d2cc6bba964cf2405cee0f3ddb172bc318ab8e2030f72b2080a9f9178707",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/payment_service.py",
+      "lines": 9,
+      "sha256": "7c626fa1708e0dc53831919f739cade856d3c4579fa0711b51bfe1153e52024d",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/payment_webhook_security.py",
+      "lines": 112,
+      "sha256": "fcb7af03b11c62fc25975273ade95fcfd93138cb813001b206e57e803d858a48",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/pdf_service.py",
+      "lines": 428,
+      "sha256": "65d2464e6d23754f0642ef9f633a5150fe17f34230daf7a49c9f91f82676ab19",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/qr_service.py",
+      "lines": 12,
+      "sha256": "3f8ae0763c2a51f4bbe01efe6bb9de00d590ecdc9b3555889fe36b6d998d12fc",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/question_bank_gn.py",
+      "lines": 745,
+      "sha256": "a3dff9bfac1401066683cdef8b239a3dfd2b700ce9ff1d6858cde1fedef3aaa7",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/question_i18n.py",
+      "lines": 77,
+      "sha256": "704fccf5919c4d15ac9979ebb5f3c76b85485ac39687fcb6c8832b7697f76a3b",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/reliability_config.py",
+      "lines": 130,
+      "sha256": "cdba13a04502ebbfdf6107886b9ac97f39e082be6ceee6070f042a079d194869",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/reliability_metrics.py",
+      "lines": 214,
+      "sha256": "ace5caf81bf998ed15effad1fb94e74382784a8a96d0faa5125327d29a05a9ee",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/resource_access.py",
+      "lines": 75,
+      "sha256": "5dec91bb1e095388c30d11f176a5f40c37a0077f9acdb0c8e30c6d2d427d9cc5",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/rgpd.py",
+      "lines": 188,
+      "sha256": "45619eb840339ffc00a9e52b308d7818ada33c2a83f377fae0bd2d833f86f5d6",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/routers/__init__.py",
+      "lines": 276,
+      "sha256": "3d6f97ba13d67032c3752207b5124d986addefa68c2b8064459421fe54dff7a8",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/routers/admin_ops.py",
+      "lines": 265,
+      "sha256": "9dd4cea29fa50cf157b36818f20347699030e738ba28c661fc649683c5d5ac3c",
+      "tests": 0,
+      "routes": [
+        {
+          "line": 33,
+          "method": "post",
+          "path": "/seed-pilote",
+          "function": "trigger_seed_pilote"
+        },
+        {
+          "line": 47,
+          "method": "get",
+          "path": "/pilote-roster",
+          "function": "get_pilote_roster"
+        },
+        {
+          "line": 81,
+          "method": "post",
+          "path": "/refresh-question-media",
+          "function": "refresh_question_media"
+        },
+        {
+          "line": 105,
+          "method": "post",
+          "path": "/import-wikimedia-signs",
+          "function": "import_wikimedia_signs"
+        },
+        {
+          "line": 191,
+          "method": "get",
+          "path": "/notifications-status",
+          "function": "notifications_status"
+        },
+        {
+          "line": 221,
+          "method": "post",
+          "path": "/notifications-test",
+          "function": "notifications_test"
+        },
+        {
+          "line": 253,
+          "method": "get",
+          "path": "/audit-chain/verify",
+          "function": "verify_audit_chain_endpoint"
+        }
+      ]
+    },
+    {
+      "path": "backend/app/routers/audio.py",
+      "lines": 150,
+      "sha256": "3fc2db29d6eb79c1bc6482537f3fd21e5445d4c1f0b8670a0b03bd4ae12a2e4e",
+      "tests": 0,
+      "routes": [
+        {
+          "line": 56,
+          "method": "get",
+          "path": "/check/{locale}/{question_id}",
+          "function": "check_audio_exists"
+        },
+        {
+          "line": 70,
+          "method": "get",
+          "path": "/inventory",
+          "function": "get_audio_inventory"
+        },
+        {
+          "line": 102,
+          "method": "post",
+          "path": "/upload/{locale}/{question_id}",
+          "function": "upload_audio"
+        },
+        {
+          "line": 140,
+          "method": "delete",
+          "path": "/delete/{locale}/{question_id}",
+          "function": "delete_audio"
+        }
+      ]
+    },
+    {
+      "path": "backend/app/routers/audit.py",
+      "lines": 39,
+      "sha256": "13009a7ed2d7deda1d5791fa84d124be68bb2da9f564831607ed43ff14996cdc",
+      "tests": 0,
+      "routes": [
+        {
+          "line": 14,
+          "method": "get",
+          "path": "",
+          "function": "list_audit_logs"
+        }
+      ]
+    },
+    {
+      "path": "backend/app/routers/auth.py",
+      "lines": 295,
+      "sha256": "d56c728c5ee62d4979eec4ebe7b317992ceae2878cc839c7f2834c3f16805dd0",
+      "tests": 0,
+      "routes": [
+        {
+          "line": 60,
+          "method": "post",
+          "path": "/register",
+          "function": "register"
+        },
+        {
+          "line": 97,
+          "method": "post",
+          "path": "/login",
+          "function": "login"
+        },
+        {
+          "line": 142,
+          "method": "get",
+          "path": "/me",
+          "function": "me"
+        },
+        {
+          "line": 147,
+          "method": "post",
+          "path": "/change-password",
+          "function": "change_password"
+        },
+        {
+          "line": 183,
+          "method": "get",
+          "path": "/csrf-token",
+          "function": "get_csrf_token"
+        },
+        {
+          "line": 191,
+          "method": "post",
+          "path": "/refresh",
+          "function": "refresh_token"
+        },
+        {
+          "line": 210,
+          "method": "post",
+          "path": "/2fa/setup",
+          "function": "setup_two_factor"
+        },
+        {
+          "line": 218,
+          "method": "post",
+          "path": "/2fa/verify",
+          "function": "verify_and_activate_2fa"
+        },
+        {
+          "line": 235,
+          "method": "post",
+          "path": "/2fa/check",
+          "function": "check_two_factor"
+        },
+        {
+          "line": 281,
+          "method": "post",
+          "path": "/2fa/disable",
+          "function": "disable_two_factor"
+        },
+        {
+          "line": 290,
+          "method": "get",
+          "path": "/2fa/status",
+          "function": "get_2fa_status"
+        }
+      ]
+    },
+    {
+      "path": "backend/app/routers/bookings.py",
+      "lines": 393,
+      "sha256": "d95076f19644c0232c8d42e84f1d0411e78e6775e4795f4c75ae0a09c42c1686",
+      "tests": 0,
+      "routes": [
+        {
+          "line": 71,
+          "method": "get",
+          "path": "/my",
+          "function": "get_my_bookings"
+        },
+        {
+          "line": 119,
+          "method": "get",
+          "path": "",
+          "function": "list_bookings"
+        },
+        {
+          "line": 151,
+          "method": "post",
+          "path": "",
+          "function": "create_booking"
+        },
+        {
+          "line": 197,
+          "method": "get",
+          "path": "/{reference}",
+          "function": "get_booking"
+        },
+        {
+          "line": 210,
+          "method": "get",
+          "path": "/{reference}/convocation",
+          "function": "get_convocation"
+        },
+        {
+          "line": 228,
+          "method": "get",
+          "path": "/{reference}/convocation/qr.svg",
+          "function": "get_convocation_qr"
+        },
+        {
+          "line": 242,
+          "method": "post",
+          "path": "/{reference}/cancel",
+          "function": "cancel_booking"
+        },
+        {
+          "line": 278,
+          "method": "get",
+          "path": "/verify/{verification_code}",
+          "function": "verify_booking"
+        },
+        {
+          "line": 286,
+          "method": "get",
+          "path": "/availability/{center_id}",
+          "function": "get_center_availability"
+        },
+        {
+          "line": 355,
+          "method": "post",
+          "path": "/self",
+          "function": "create_self_booking"
+        }
+      ]
+    },
+    {
+      "path": "backend/app/routers/candidate_identity.py",
+      "lines": 153,
+      "sha256": "c510891a126ae9527ee45f29fd536c2c3c46f6bb71bdd24568a9ab9c0702f1db",
+      "tests": 0,
+      "routes": [
+        {
+          "line": 20,
+          "method": "post",
+          "path": "",
+          "function": "create_identity_check"
+        },
+        {
+          "line": 75,
+          "method": "get",
+          "path": "",
+          "function": "list_identity_checks"
+        },
+        {
+          "line": 92,
+          "method": "post",
+          "path": "/{check_id}/decision",
+          "function": "decide_identity_check"
+        }
+      ]
+    },
+    {
+      "path": "backend/app/routers/candidate_submissions.py",
+      "lines": 238,
+      "sha256": "3840ed8fc64748c08d89ae1bae8ed5dabead51588f8a967ad039be2cc49a2390",
+      "tests": 0,
+      "routes": [
+        {
+          "line": 75,
+          "method": "post",
+          "path": "",
+          "function": "create_submission"
+        },
+        {
+          "line": 157,
+          "method": "get",
+          "path": "",
+          "function": "list_submissions"
+        },
+        {
+          "line": 177,
+          "method": "post",
+          "path": "/{submission_id}/handle",
+          "function": "handle_submission"
+        }
+      ]
+    },
+    {
+      "path": "backend/app/routers/candidate_update_guard.py",
+      "lines": 133,
+      "sha256": "94268adecd168e1a4901195ebaedec8d52528aa7d97e607d7cbae2bd98510e57",
+      "tests": 0,
+      "routes": [
+        {
+          "line": 54,
+          "method": "patch",
+          "path": "/{candidate_id}",
+          "function": "update_candidate_controlled"
+        }
+      ]
+    },
+    {
+      "path": "backend/app/routers/candidates.py",
+      "lines": 275,
+      "sha256": "b3842afbbdb6d68514ba291a6dd11d42f3cc0eace8200a6ff95d2d0d30f54d38",
+      "tests": 0,
+      "routes": [
+        {
+          "line": 26,
+          "method": "get",
+          "path": "",
+          "function": "list_candidates"
+        },
+        {
+          "line": 65,
+          "method": "get",
+          "path": "/me",
+          "function": "get_my_candidate_profile"
+        },
+        {
+          "line": 76,
+          "method": "post",
+          "path": "",
+          "function": "create_candidate"
+        },
+        {
+          "line": 108,
+          "method": "get",
+          "path": "/export.csv",
+          "function": "export_candidates_csv"
+        },
+        {
+          "line": 164,
+          "method": "get",
+          "path": "/{candidate_id}",
+          "function": "get_candidate"
+        },
+        {
+          "line": 177,
+          "method": "patch",
+          "path": "/{candidate_id}",
+          "function": "update_candidate"
+        },
+        {
+          "line": 195,
+          "method": "post",
+          "path": "/import-official",
+          "function": "import_official_candidates"
+        }
+      ]
+    },
+    {
+      "path": "backend/app/routers/center_edge.py",
+      "lines": 615,
+      "sha256": "9f5ef6d88d401426b5e30b471191d8aa368047eca891344e613f968ee72d1391",
+      "tests": 0,
+      "routes": [
+        {
+          "line": 225,
+          "method": "get",
+          "path": "/time",
+          "function": "edge_server_time"
+        },
+        {
+          "line": 236,
+          "method": "post",
+          "path": "/nodes",
+          "function": "enroll_edge_node"
+        },
+        {
+          "line": 316,
+          "method": "get",
+          "path": "/nodes",
+          "function": "list_edge_nodes"
+        },
+        {
+          "line": 339,
+          "method": "post",
+          "path": "/nodes/{node_id}/status",
+          "function": "update_edge_node_status"
+        },
+        {
+          "line": 394,
+          "method": "post",
+          "path": "/heartbeat",
+          "function": "edge_heartbeat"
+        },
+        {
+          "line": 487,
+          "method": "get",
+          "path": "/readiness",
+          "function": "edge_readiness"
+        },
+        {
+          "line": 516,
+          "method": "get",
+          "path": "/fleet",
+          "function": "edge_national_fleet"
+        }
+      ]
+    },
+    {
+      "path": "backend/app/routers/center_edge_install_authorization_guard.py",
+      "lines": 35,
+      "sha256": "290c220f6d266d02b776b27a7991167895fb3e553bb804954a2ce45c7ae820c9",
+      "tests": 0,
+      "routes": [
+        {
+          "line": 14,
+          "method": "post",
+          "path": "/release/check",
+          "function": "authorized_edge_release_check"
+        }
+      ]
+    },
+    {
+      "path": "backend/app/routers/center_edge_offline.py",
+      "lines": 576,
+      "sha256": "be94a42894ba4012f286812b88dcf4ffc2de501ab0aaf00c066927ff0b47434e",
+      "tests": 0,
+      "routes": [
+        {
+          "line": 234,
+          "method": "get",
+          "path": "/lease-signing-key",
+          "function": "get_edge_lease_signing_key"
+        },
+        {
+          "line": 249,
+          "method": "post",
+          "path": "/leases/issue",
+          "function": "issue_edge_lease"
+        },
+        {
+          "line": 403,
+          "method": "post",
+          "path": "/offline-sync",
+          "function": "sync_edge_offline_submission"
+        }
+      ]
+    },
+    {
+      "path": "backend/app/routers/center_edge_release.py",
+      "lines": 497,
+      "sha256": "5f6d25c3b68b2d0bbb47d0876134c27ca5fc0468f28b0134cae6a5d3fee3d27d",
+      "tests": 0,
+      "routes": [
+        {
+          "line": 133,
+          "method": "get",
+          "path": "/release-signing-key",
+          "function": "get_release_signing_key"
+        },
+        {
+          "line": 148,
+          "method": "post",
+          "path": "/releases",
+          "function": "create_edge_release"
+        },
+        {
+          "line": 218,
+          "method": "get",
+          "path": "/releases",
+          "function": "list_edge_releases"
+        },
+        {
+          "line": 228,
+          "method": "post",
+          "path": "/releases/{release_id}/rollout",
+          "function": "update_release_rollout"
+        },
+        {
+          "line": 296,
+          "method": "post",
+          "path": "/release/check",
+          "function": "check_edge_release"
+        },
+        {
+          "line": 352,
+          "method": "post",
+          "path": "/release/attest",
+          "function": "attest_edge_release"
+        },
+        {
+          "line": 447,
+          "method": "get",
+          "path": "/releases/{release_id}/rollout",
+          "function": "release_rollout_status"
+        }
+      ]
+    },
+    {
+      "path": "backend/app/routers/center_edge_release_guard.py",
+      "lines": 251,
+      "sha256": "cb0b61aab249d3db3d9797da7238527ad4ef2f39340ee3d97404cc13391fa84e",
+      "tests": 0,
+      "routes": [
+        {
+          "line": 190,
+          "method": "post",
+          "path": "/releases/{release_id}/rollout",
+          "function": "guarded_release_rollout"
+        },
+        {
+          "line": 212,
+          "method": "post",
+          "path": "/release/attest",
+          "function": "guarded_release_attestation"
+        }
+      ]
+    },
+    {
+      "path": "backend/app/routers/center_edge_station_guard.py",
+      "lines": 300,
+      "sha256": "d368d8dc0b010b995a783c6b3680b26fd320389869293f5a3c19be2b9573d1e9",
+      "tests": 0,
+      "routes": [
+        {
+          "line": 249,
+          "method": "post",
+          "path": "/leases/issue",
+          "function": "issue_edge_lease_bound_to_station"
+        },
+        {
+          "line": 286,
+          "method": "post",
+          "path": "/offline-sync",
+          "function": "sync_edge_offline_submission_bound_to_station"
+        }
+      ]
+    },
+    {
+      "path": "backend/app/routers/center_edge_supply_chain.py",
+      "lines": 124,
+      "sha256": "a2a05f9449f9feeab8a35482a2b681a6ddc387cce3015265062046c99f68a139",
+      "tests": 0,
+      "routes": [
+        {
+          "line": 41,
+          "method": "get",
+          "path": "/release-signing-key",
+          "function": "get_rotatable_release_signing_key"
+        },
+        {
+          "line": 63,
+          "method": "post",
+          "path": "/releases/{release_id}/supply-chain",
+          "function": "attach_release_supply_chain_evidence"
+        }
+      ]
+    },
+    {
+      "path": "backend/app/routers/center_edge_supply_chain_guard.py",
+      "lines": 41,
+      "sha256": "fb25ae11a1e66e6cf5779a5ca60be5cfc01c5f4128afe14150ea869b38bf9a72",
+      "tests": 0,
+      "routes": [
+        {
+          "line": 17,
+          "method": "post",
+          "path": "/releases/{release_id}/rollout",
+          "function": "supply_chain_guarded_rollout"
+        }
+      ]
+    },
+    {
+      "path": "backend/app/routers/center_incidents.py",
+      "lines": 175,
+      "sha256": "f51922d195571d2376ad64c19fb4fd5e2a8f550576e737778bfdcc2a89900db9",
+      "tests": 0,
+      "routes": [
+        {
+          "line": 21,
+          "method": "post",
+          "path": "",
+          "function": "report_center_incident"
+        },
+        {
+          "line": 89,
+          "method": "get",
+          "path": "",
+          "function": "list_center_incidents"
+        },
+        {
+          "line": 115,
+          "method": "post",
+          "path": "/{incident_id}/resolve",
+          "function": "resolve_center_incident"
+        }
+      ]
+    },
+    {
+      "path": "backend/app/routers/center_stations.py",
+      "lines": 153,
+      "sha256": "ea332e21c667a33c9a09f56259f5bcc9689f496a9e62f49d83fcedb6206eb125",
+      "tests": 0,
+      "routes": [
+        {
+          "line": 56,
+          "method": "post",
+          "path": "",
+          "function": "create_center_station"
+        },
+        {
+          "line": 99,
+          "method": "get",
+          "path": "",
+          "function": "list_center_stations"
+        },
+        {
+          "line": 116,
+          "method": "patch",
+          "path": "/{station_id}",
+          "function": "update_center_station"
+        }
+      ]
+    },
+    {
+      "path": "backend/app/routers/centers.py",
+      "lines": 160,
+      "sha256": "9814f0f8d75485e0748fb494ffe9c1323f5b98a0a3e935c9f15ce4bb5b1fc224",
+      "tests": 0,
+      "routes": [
+        {
+          "line": 16,
+          "method": "get",
+          "path": "",
+          "function": "list_centers"
+        },
+        {
+          "line": 47,
+          "method": "post",
+          "path": "",
+          "function": "create_center"
+        },
+        {
+          "line": 56,
+          "method": "post",
+          "path": "/import-official",
+          "function": "import_official_centers"
+        },
+        {
+          "line": 132,
+          "method": "patch",
+          "path": "/{center_id}/status",
+          "function": "update_center_status"
+        }
+      ]
+    },
+    {
+      "path": "backend/app/routers/dashboard.py",
+      "lines": 742,
+      "sha256": "f75d58ee544a2f253d5bb87cbdb7ceebfd1badb237dfb6d0a388ccba94de2a72",
+      "tests": 0,
+      "routes": [
+        {
+          "line": 173,
+          "method": "get",
+          "path": "",
+          "function": "dashboard"
+        },
+        {
+          "line": 288,
+          "method": "get",
+          "path": "/institutional-readiness",
+          "function": "institutional_readiness"
+        },
+        {
+          "line": 307,
+          "method": "get",
+          "path": "/institutional-action-center",
+          "function": "institutional_action_center"
+        },
+        {
+          "line": 326,
+          "method": "get",
+          "path": "/institutional-report",
+          "function": "institutional_report"
+        },
+        {
+          "line": 345,
+          "method": "get",
+          "path": "/institutional-report.csv",
+          "function": "export_institutional_report_csv"
+        },
+        {
+          "line": 385,
+          "method": "get",
+          "path": "/institutional-report.pdf",
+          "function": "export_institutional_report_pdf"
+        },
+        {
+          "line": 405,
+          "method": "get",
+          "path": "/anti-fraud",
+          "function": "anti_fraud_dashboard"
+        },
+        {
+          "line": 473,
+          "method": "get",
+          "path": "/live",
+          "function": "get_live_kpis"
+        },
+        {
+          "line": 554,
+          "method": "post",
+          "path": "/notifications/run-job",
+          "function": "run_notification_job"
+        },
+        {
+          "line": 575,
+          "method": "get",
+          "path": "/export.csv",
+          "function": "export_dashboard_csv"
+        },
+        {
+          "line": 613,
+          "method": "get",
+          "path": "/by-center",
+          "function": "dashboard_by_center"
+        },
+        {
+          "line": 707,
+          "method": "get",
+          "path": "/center-anomalies",
+          "function": "dashboard_center_anomalies"
+        }
+      ]
+    },
+    {
+      "path": "backend/app/routers/device_sessions.py",
+      "lines": 215,
+      "sha256": "0b2fab9f026681324010014f46221d3968c614ef59f6ff3665a5278543814964",
+      "tests": 0,
+      "routes": [
+        {
+          "line": 73,
+          "method": "post",
+          "path": "/heartbeat",
+          "function": "register_device_heartbeat"
+        },
+        {
+          "line": 182,
+          "method": "get",
+          "path": "",
+          "function": "list_device_sessions"
+        },
+        {
+          "line": 202,
+          "method": "get",
+          "path": "/alerts",
+          "function": "list_device_session_alerts"
+        }
+      ]
+    },
+    {
+      "path": "backend/app/routers/documents.py",
+      "lines": 34,
+      "sha256": "3b70702c59be8d37754172996ee3afacacc6e5369df8bc4e7ea81a8f1079dd4f",
+      "tests": 0,
+      "routes": [
+        {
+          "line": 19,
+          "method": "get",
+          "path": "/convocations/{reference}.pdf",
+          "function": "get_convocation_pdf"
+        }
+      ]
+    },
+    {
+      "path": "backend/app/routers/elearning.py",
+      "lines": 303,
+      "sha256": "5a8fb15a51d97fe9b1ea4f1ee47c6fba56a3691f81e9afe4d6679e43bca951b2",
+      "tests": 0,
+      "routes": [
+        {
+          "line": 93,
+          "method": "get",
+          "path": "",
+          "function": "list_courses"
+        },
+        {
+          "line": 114,
+          "method": "get",
+          "path": "/{course_id}",
+          "function": "get_course"
+        },
+        {
+          "line": 134,
+          "method": "get",
+          "path": "/{course_id}/lessons/{lesson_id}",
+          "function": "get_lesson"
+        },
+        {
+          "line": 154,
+          "method": "post",
+          "path": "/{course_id}/lessons/{lesson_id}/progress",
+          "function": "update_progress"
+        },
+        {
+          "line": 216,
+          "method": "post",
+          "path": "",
+          "function": "create_course"
+        },
+        {
+          "line": 234,
+          "method": "put",
+          "path": "/{course_id}",
+          "function": "update_course"
+        },
+        {
+          "line": 255,
+          "method": "delete",
+          "path": "/{course_id}",
+          "function": "delete_course"
+        },
+        {
+          "line": 269,
+          "method": "post",
+          "path": "/{course_id}/lessons",
+          "function": "create_lesson"
+        },
+        {
+          "line": 287,
+          "method": "put",
+          "path": "/{course_id}/lessons/{lesson_id}",
+          "function": "update_lesson"
+        }
+      ]
+    },
+    {
+      "path": "backend/app/routers/entries.py",
+      "lines": 257,
+      "sha256": "ba299cb77e41e7284f7cae64b3ece3b7f9014bac53e32e0819ccbdd151106a26",
+      "tests": 0,
+      "routes": [
+        {
+          "line": 91,
+          "method": "post",
+          "path": "/validate",
+          "function": "validate_entry"
+        },
+        {
+          "line": 205,
+          "method": "get",
+          "path": "/summary",
+          "function": "get_entry_summary"
+        },
+        {
+          "line": 240,
+          "method": "get",
+          "path": "/logs",
+          "function": "list_entry_logs"
+        }
+      ]
+    },
+    {
+      "path": "backend/app/routers/exam_media_guard.py",
+      "lines": 138,
+      "sha256": "cea7108bf514077dbad83d05bbbbe5d03ff01074ac15fa45383263e47e882610",
+      "tests": 0,
+      "routes": [
+        {
+          "line": 67,
+          "method": "get",
+          "path": "/{attempt_id}/questions",
+          "function": "get_exam_questions_with_resolved_media"
+        }
+      ]
+    },
+    {
+      "path": "backend/app/routers/exam_monitoring.py",
+      "lines": 224,
+      "sha256": "e26588a70951c86b6c53d26c36c9949428ec25bb50d84212a57f4a9fe95ce9b7",
+      "tests": 0,
+      "routes": [
+        {
+          "line": 77,
+          "method": "post",
+          "path": "/events",
+          "function": "create_monitoring_event"
+        },
+        {
+          "line": 134,
+          "method": "get",
+          "path": "/events",
+          "function": "list_monitoring_events"
+        },
+        {
+          "line": 161,
+          "method": "get",
+          "path": "/attempts/{attempt_id}/summary",
+          "function": "get_attempt_monitoring_summary"
+        },
+        {
+          "line": 189,
+          "method": "get",
+          "path": "/summary",
+          "function": "list_monitoring_summaries"
+        }
+      ]
+    },
+    {
+      "path": "backend/app/routers/exam_question_traces.py",
+      "lines": 106,
+      "sha256": "a7582967d73109e544fa37b18fe551e840f333071a0e691376d041885fd62690",
+      "tests": 0,
+      "routes": [
+        {
+          "line": 40,
+          "method": "get",
+          "path": "/attempts/{attempt_id}",
+          "function": "get_attempt_question_trace"
+        },
+        {
+          "line": 82,
+          "method": "get",
+          "path": "",
+          "function": "list_question_traces"
+        }
+      ]
+    },
+    {
+      "path": "backend/app/routers/exam_reviews.py",
+      "lines": 166,
+      "sha256": "714dcbd8171d0d6611e3c9507aec986430fe735647ff717edc165f212465e845",
+      "tests": 0,
+      "routes": [
+        {
+          "line": 81,
+          "method": "post",
+          "path": "/decisions",
+          "function": "create_review_decision"
+        },
+        {
+          "line": 126,
+          "method": "get",
+          "path": "/attempts/{attempt_id}",
+          "function": "get_review_case"
+        },
+        {
+          "line": 153,
+          "method": "get",
+          "path": "/decisions",
+          "function": "list_review_decisions"
+        }
+      ]
+    },
+    {
+      "path": "backend/app/routers/exam_runtime.py",
+      "lines": 235,
+      "sha256": "df3a5239b0c7395e34d7451b84343ec38cc4f6d262db81948dc8e17cd113477b",
+      "tests": 0,
+      "routes": [
+        {
+          "line": 87,
+          "method": "get",
+          "path": "/{attempt_id}/answers",
+          "function": "get_saved_exam_answers"
+        },
+        {
+          "line": 120,
+          "method": "post",
+          "path": "/{attempt_id}/answers",
+          "function": "save_exam_answers"
+        },
+        {
+          "line": 162,
+          "method": "post",
+          "path": "/{attempt_id}/timeout-submit",
+          "function": "timeout_submit_exam"
+        }
+      ]
+    },
+    {
+      "path": "backend/app/routers/exam_start_eligibility_guard.py",
+      "lines": 78,
+      "sha256": "cfb82a01efa6f8aea382411a33eab932d5a7e5b3b1accf978342a1bdcd3f4c4d",
+      "tests": 0,
+      "routes": [
+        {
+          "line": 42,
+          "method": "post",
+          "path": "/start",
+          "function": "start_exam_with_eligibility"
+        },
+        {
+          "line": 55,
+          "method": "post",
+          "path": "/start-from-booking",
+          "function": "start_exam_from_booking_with_eligibility"
+        }
+      ]
+    },
+    {
+      "path": "backend/app/routers/exam_submit_completion_guard.py",
+      "lines": 113,
+      "sha256": "1aba4349380c8f7cb1776d6da89dbe6906b66d06d0a523dd69224f35d097a78a",
+      "tests": 0,
+      "routes": [
+        {
+          "line": 41,
+          "method": "post",
+          "path": "/{attempt_id}/submit",
+          "function": "submit_complete_exam"
+        }
+      ]
+    },
+    {
+      "path": "backend/app/routers/exams.py",
+      "lines": 981,
+      "sha256": "0cbf16d104a1a2c246691704765d9666a61ce3757afbf0afafba9d086e8b2f5d",
+      "tests": 0,
+      "routes": [
+        {
+          "line": 317,
+          "method": "post",
+          "path": "/start",
+          "function": "start_exam"
+        },
+        {
+          "line": 328,
+          "method": "post",
+          "path": "/start-from-booking",
+          "function": "start_exam_from_booking"
+        },
+        {
+          "line": 440,
+          "method": "get",
+          "path": "/{attempt_id}/questions",
+          "function": "get_exam_questions"
+        },
+        {
+          "line": 500,
+          "method": "get",
+          "path": "/summary",
+          "function": "get_exam_summary"
+        },
+        {
+          "line": 522,
+          "method": "get",
+          "path": "/export.csv",
+          "function": "export_exam_attempts_csv"
+        },
+        {
+          "line": 581,
+          "method": "post",
+          "path": "/{attempt_id}/submit",
+          "function": "submit_exam"
+        },
+        {
+          "line": 731,
+          "method": "get",
+          "path": "/{attempt_id}/status",
+          "function": "get_exam_status"
+        },
+        {
+          "line": 773,
+          "method": "get",
+          "path": "/{attempt_id}/results",
+          "function": "get_exam_results"
+        },
+        {
+          "line": 853,
+          "method": "get",
+          "path": "/{attempt_id}/certificate/verify",
+          "function": "verify_exam_certificate"
+        },
+        {
+          "line": 943,
+          "method": "get",
+          "path": "/{attempt_id}/certificate.pdf",
+          "function": "get_exam_certificate"
+        }
+      ]
+    },
+    {
+      "path": "backend/app/routers/health.py",
+      "lines": 194,
+      "sha256": "2aeb9be8fac2153b3d67a22bd4fbe6f2b08d18c81e80570ebe3a6d507dc2b031",
+      "tests": 0,
+      "routes": [
+        {
+          "line": 132,
+          "method": "get",
+          "path": "/health",
+          "function": "health"
+        },
+        {
+          "line": 132,
+          "method": "get",
+          "path": "/health/live",
+          "function": "health"
+        },
+        {
+          "line": 145,
+          "method": "get",
+          "path": "/health/readiness",
+          "function": "readiness"
+        }
+      ]
+    },
+    {
+      "path": "backend/app/routers/institutional_authorizations.py",
+      "lines": 105,
+      "sha256": "5d8e666997d43113e02882d85dcc721c537a2df43c13c151be89dad1307625eb",
+      "tests": 0,
+      "routes": [
+        {
+          "line": 19,
+          "method": "get",
+          "path": "",
+          "function": "list_authorizations"
+        },
+        {
+          "line": 46,
+          "method": "post",
+          "path": "",
+          "function": "create_authorization"
+        },
+        {
+          "line": 73,
+          "method": "patch",
+          "path": "/{authorization_id}/status",
+          "function": "update_authorization_status"
+        }
+      ]
+    },
+    {
+      "path": "backend/app/routers/media_library.py",
+      "lines": 432,
+      "sha256": "67dd49f3341df8b3e8d0d0e00f3ef6d2f51a24e40e07dc1981e6dacaff5e7e64",
+      "tests": 0,
+      "routes": [
+        {
+          "line": 108,
+          "method": "get",
+          "path": "/assets",
+          "function": "list_media_assets"
+        },
+        {
+          "line": 160,
+          "method": "get",
+          "path": "/assets/{media_id}",
+          "function": "get_media_asset"
+        },
+        {
+          "line": 169,
+          "method": "post",
+          "path": "/assets",
+          "function": "create_media_asset"
+        },
+        {
+          "line": 223,
+          "method": "patch",
+          "path": "/assets/{media_id}",
+          "function": "update_media_asset"
+        },
+        {
+          "line": 297,
+          "method": "post",
+          "path": "/assets/{media_id}/archive",
+          "function": "archive_media_asset"
+        },
+        {
+          "line": 318,
+          "method": "post",
+          "path": "/upload-target",
+          "function": "create_upload_target"
+        },
+        {
+          "line": 338,
+          "method": "get",
+          "path": "/questions/{question_id}",
+          "function": "list_question_media"
+        },
+        {
+          "line": 354,
+          "method": "post",
+          "path": "/questions/{question_id}/links",
+          "function": "link_question_media"
+        },
+        {
+          "line": 410,
+          "method": "delete",
+          "path": "/questions/{question_id}/links/{link_id}",
+          "function": "unlink_question_media"
+        }
+      ]
+    },
+    {
+      "path": "backend/app/routers/media_link_guard.py",
+      "lines": 142,
+      "sha256": "0eea92964ae7b924c81881ebb320d61cc938ad32f644e1b5513e1f57ed160451",
+      "tests": 0,
+      "routes": [
+        {
+          "line": 43,
+          "method": "post",
+          "path": "/media-library/questions/{question_id}/links",
+          "function": "link_question_media_guard"
+        }
+      ]
+    },
+    {
+      "path": "backend/app/routers/media_migration_plan.py",
+      "lines": 304,
+      "sha256": "391e93b0f37c4eef50bc47e364c86a1c837aabfa251f01869f15fe057dfcd0a6",
+      "tests": 0,
+      "routes": [
+        {
+          "line": 171,
+          "method": "post",
+          "path": "/migration-plan",
+          "function": "media_migration_plan"
+        }
+      ]
+    },
+    {
+      "path": "backend/app/routers/media_migration_progress.py",
+      "lines": 109,
+      "sha256": "b10e27dbfb2c2a138ed5d6fc8e9630c00e6ad18f93a248530373ceb80e0f64af",
+      "tests": 0,
+      "routes": [
+        {
+          "line": 23,
+          "method": "get",
+          "path": "/migration-progress",
+          "function": "media_migration_progress"
+        }
+      ]
+    },
+    {
+      "path": "backend/app/routers/media_migration_queue.py",
+      "lines": 196,
+      "sha256": "a2d10d922ca59c3e84ab0956e1cdaed134393477d215f8195a5b82e110cc4132",
+      "tests": 0,
+      "routes": [
+        {
+          "line": 65,
+          "method": "get",
+          "path": "/migration-queue",
+          "function": "media_migration_queue"
+        }
+      ]
+    },
+    {
+      "path": "backend/app/routers/media_official_readiness.py",
+      "lines": 44,
+      "sha256": "190999db96d50dfb9981c7fe37dcf3424f9a371980b009278c276316a4319fb8",
+      "tests": 0,
+      "routes": [
+        {
+          "line": 17,
+          "method": "get",
+          "path": "",
+          "function": "get_official_media_readiness"
+        }
+      ]
+    },
+    {
+      "path": "backend/app/routers/media_reviews.py",
+      "lines": 216,
+      "sha256": "f36f051f86d5b21dfc17dde8d1af128a10593451abbacb325f34f7675a83ca7c",
+      "tests": 0,
+      "routes": [
+        {
+          "line": 48,
+          "method": "get",
+          "path": "/assets/{media_id}/quality-gate",
+          "function": "asset_quality_gate"
+        },
+        {
+          "line": 65,
+          "method": "post",
+          "path": "/assets/{media_id}/quality/submit",
+          "function": "submit_quality_review"
+        },
+        {
+          "line": 84,
+          "method": "post",
+          "path": "/assets/{media_id}/quality/approve",
+          "function": "approve_quality_review"
+        },
+        {
+          "line": 115,
+          "method": "post",
+          "path": "/assets/{media_id}/quality/reject",
+          "function": "reject_quality_review"
+        },
+        {
+          "line": 135,
+          "method": "post",
+          "path": "/assets/{media_id}/regulatory/submit",
+          "function": "submit_regulatory_review"
+        },
+        {
+          "line": 155,
+          "method": "post",
+          "path": "/assets/{media_id}/regulatory/approve",
+          "function": "approve_regulatory_review"
+        },
+        {
+          "line": 193,
+          "method": "post",
+          "path": "/assets/{media_id}/regulatory/reject",
+          "function": "reject_regulatory_review"
+        },
+        {
+          "line": 211,
+          "method": "get",
+          "path": "/questions/{question_id}/quality-gate",
+          "function": "question_quality_gate"
+        }
+      ]
+    },
+    {
+      "path": "backend/app/routers/metrics.py",
+      "lines": 68,
+      "sha256": "79438c72ed7a34dfc0bc23915891515666b3ee04f6db494c2ce3ad85cb1e6c49",
+      "tests": 0,
+      "routes": [
+        {
+          "line": 41,
+          "method": "get",
+          "path": "/internal/metrics",
+          "function": "metrics"
+        }
+      ]
+    },
+    {
+      "path": "backend/app/routers/national_governance.py",
+      "lines": 185,
+      "sha256": "09c9830e13f6b18a267c64821b34711252d93443502e9a87df30e7af394d3922",
+      "tests": 0,
+      "routes": [
+        {
+          "line": 40,
+          "method": "get",
+          "path": "/technical-contract",
+          "function": "get_technical_contract"
+        },
+        {
+          "line": 57,
+          "method": "get",
+          "path": "/readiness",
+          "function": "national_governance_readiness"
+        },
+        {
+          "line": 65,
+          "method": "get",
+          "path": "/policies",
+          "function": "policies"
+        },
+        {
+          "line": 73,
+          "method": "get",
+          "path": "/policies/active",
+          "function": "policy_active"
+        },
+        {
+          "line": 81,
+          "method": "post",
+          "path": "/policies",
+          "function": "policy_create"
+        },
+        {
+          "line": 90,
+          "method": "post",
+          "path": "/policies/{reference}/submit",
+          "function": "policy_submit"
+        },
+        {
+          "line": 99,
+          "method": "post",
+          "path": "/policies/{reference}/approve",
+          "function": "policy_approve"
+        },
+        {
+          "line": 109,
+          "method": "post",
+          "path": "/policies/{reference}/activate",
+          "function": "policy_activate"
+        },
+        {
+          "line": 119,
+          "method": "post",
+          "path": "/policies/{reference}/revoke",
+          "function": "policy_revoke"
+        },
+        {
+          "line": 129,
+          "method": "get",
+          "path": "/homologation-dossiers",
+          "function": "homologation_dossiers"
+        },
+        {
+          "line": 137,
+          "method": "post",
+          "path": "/homologation-dossiers",
+          "function": "homologation_create"
+        },
+        {
+          "line": 146,
+          "method": "post",
+          "path": "/homologation-dossiers/{reference}/evidence",
+          "function": "homologation_evidence"
+        },
+        {
+          "line": 156,
+          "method": "post",
+          "path": "/homologation-dossiers/{reference}/submit",
+          "function": "homologation_submit"
+        },
+        {
+          "line": 166,
+          "method": "post",
+          "path": "/homologation-dossiers/{reference}/approve",
+          "function": "homologation_approve"
+        },
+        {
+          "line": 176,
+          "method": "post",
+          "path": "/homologation-dossiers/{reference}/decision",
+          "function": "homologation_decision"
+        }
+      ]
+    },
+    {
+      "path": "backend/app/routers/national_readiness.py",
+      "lines": 350,
+      "sha256": "71147b782989ecbc8244d7b3751337a3b5d99e340aab48ecea851af96efb301f",
+      "tests": 0,
+      "routes": [
+        {
+          "line": 47,
+          "method": "get",
+          "path": "",
+          "function": "get_national_readiness"
+        }
+      ]
+    },
+    {
+      "path": "backend/app/routers/operations.py",
+      "lines": 148,
+      "sha256": "38f73bc6056db38f0055820615b82be02e79d8a8441975ea822466a058e788f3",
+      "tests": 0,
+      "routes": [
+        {
+          "line": 127,
+          "method": "get",
+          "path": "/summary",
+          "function": "operations_summary"
+        }
+      ]
+    },
+    {
+      "path": "backend/app/routers/payment_create_guard.py",
+      "lines": 216,
+      "sha256": "24a8e59ad845953a8bd7fbdfb4f392ffb39109ac21f2fa385e8314bfc624aeb2",
+      "tests": 0,
+      "routes": [
+        {
+          "line": 74,
+          "method": "post",
+          "path": "",
+          "function": "create_payment_idempotent"
+        }
+      ]
+    },
+    {
+      "path": "backend/app/routers/payment_quote.py",
+      "lines": 67,
+      "sha256": "722d9478e6b139d5763664c7e8620432528f8aaca0ff85e72b2a46f67e1056fe",
+      "tests": 0,
+      "routes": [
+        {
+          "line": 21,
+          "method": "get",
+          "path": "/quote/{booking_reference}",
+          "function": "get_payment_quote"
+        }
+      ]
+    },
+    {
+      "path": "backend/app/routers/payment_reconciliation.py",
+      "lines": 136,
+      "sha256": "accf2c9bf01862ea0a9af6b8e0563e089a3cf11ee1efed2fc9a4cca75bb9bf66",
+      "tests": 0,
+      "routes": [
+        {
+          "line": 45,
+          "method": "get",
+          "path": "/items",
+          "function": "list_reconciliation_items"
+        },
+        {
+          "line": 86,
+          "method": "get",
+          "path": "/alerts",
+          "function": "list_reconciliation_alerts"
+        }
+      ]
+    },
+    {
+      "path": "backend/app/routers/payment_refunds.py",
+      "lines": 394,
+      "sha256": "78b9aaa91780d8debfd32e61c75f60c4644b1fe2cfa4efa221f0d11d868ec7ae",
+      "tests": 0,
+      "routes": [
+        {
+          "line": 82,
+          "method": "post",
+          "path": "/{reference}/refund",
+          "function": "request_refund"
+        },
+        {
+          "line": 184,
+          "method": "get",
+          "path": "/refunds",
+          "function": "list_refunds"
+        },
+        {
+          "line": 197,
+          "method": "get",
+          "path": "/refunds/{refund_id}",
+          "function": "get_refund"
+        },
+        {
+          "line": 215,
+          "method": "post",
+          "path": "/refunds/{refund_id}/decision",
+          "function": "decide_refund"
+        },
+        {
+          "line": 286,
+          "method": "post",
+          "path": "/refunds/{refund_id}/complete",
+          "function": "complete_refund"
+        }
+      ]
+    },
+    {
+      "path": "backend/app/routers/payments.py",
+      "lines": 658,
+      "sha256": "ba63d0a2ebaa9881afbfeab5efd931a262a38f19387d5b15d347388b6422ab78",
+      "tests": 0,
+      "routes": [
+        {
+          "line": 129,
+          "method": "post",
+          "path": "",
+          "function": "create_payment"
+        },
+        {
+          "line": 258,
+          "method": "get",
+          "path": "/recap/summary",
+          "function": "get_payment_summary"
+        },
+        {
+          "line": 270,
+          "method": "get",
+          "path": "/admin/summary",
+          "function": "get_admin_payment_summary"
+        },
+        {
+          "line": 301,
+          "method": "get",
+          "path": "/admin/list",
+          "function": "get_admin_payment_list"
+        },
+        {
+          "line": 344,
+          "method": "get",
+          "path": "/admin/export.csv",
+          "function": "export_admin_payments_csv"
+        },
+        {
+          "line": 393,
+          "method": "post",
+          "path": "/admin/import-official",
+          "function": "import_official_payments"
+        },
+        {
+          "line": 499,
+          "method": "get",
+          "path": "/{reference}",
+          "function": "get_payment"
+        },
+        {
+          "line": 526,
+          "method": "post",
+          "path": "/webhook/wave",
+          "function": "wave_webhook"
+        },
+        {
+          "line": 563,
+          "method": "post",
+          "path": "/webhook/paydunya",
+          "function": "paydunya_webhook"
+        },
+        {
+          "line": 599,
+          "method": "post",
+          "path": "/{reference}/refund",
+          "function": "refund_payment"
+        }
+      ]
+    },
+    {
+      "path": "backend/app/routers/question_governance.py",
+      "lines": 114,
+      "sha256": "2f39ecfc08229b8599cbc130c70229b702456ae0ed9a42eef0e41594065da529",
+      "tests": 0,
+      "routes": [
+        {
+          "line": 43,
+          "method": "get",
+          "path": "",
+          "function": "list_question_governance"
+        },
+        {
+          "line": 58,
+          "method": "post",
+          "path": "/{question_id}/decision",
+          "function": "decide_question_governance"
+        }
+      ]
+    },
+    {
+      "path": "backend/app/routers/questions.py",
+      "lines": 465,
+      "sha256": "d6dbd52b5130aef033be9fed792660152ad2308babc513cd73d2a75993b4edb2",
+      "tests": 0,
+      "routes": [
+        {
+          "line": 30,
+          "method": "get",
+          "path": "",
+          "function": "list_questions"
+        },
+        {
+          "line": 57,
+          "method": "post",
+          "path": "",
+          "function": "create_question"
+        },
+        {
+          "line": 75,
+          "method": "post",
+          "path": "/import-official",
+          "function": "import_official_questions"
+        },
+        {
+          "line": 176,
+          "method": "patch",
+          "path": "/{question_id}/media",
+          "function": "update_question_media"
+        },
+        {
+          "line": 216,
+          "method": "post",
+          "path": "/media/sign-upload",
+          "function": "sign_media_upload"
+        },
+        {
+          "line": 238,
+          "method": "post",
+          "path": "/{question_id}/submit-validation",
+          "function": "submit_question_for_validation"
+        },
+        {
+          "line": 261,
+          "method": "post",
+          "path": "/{question_id}/approve",
+          "function": "approve_question"
+        },
+        {
+          "line": 285,
+          "method": "post",
+          "path": "/{question_id}/reject",
+          "function": "reject_question"
+        },
+        {
+          "line": 308,
+          "method": "get",
+          "path": "/validation-summary",
+          "function": "question_validation_summary"
+        },
+        {
+          "line": 347,
+          "method": "get",
+          "path": "/media-coverage",
+          "function": "media_coverage"
+        },
+        {
+          "line": 379,
+          "method": "put",
+          "path": "/{question_id}/audio",
+          "function": "set_question_audio"
+        },
+        {
+          "line": 431,
+          "method": "get",
+          "path": "/audio-coverage",
+          "function": "audio_coverage"
+        }
+      ]
+    },
+    {
+      "path": "backend/app/routers/registration.py",
+      "lines": 543,
+      "sha256": "f2c0672da82ab95390f4a3956a649d707f14dba510861cb3ea9a9469a051acfc",
+      "tests": 0,
+      "routes": [
+        {
+          "line": 132,
+          "method": "post",
+          "path": "/candidate",
+          "function": "register_free_candidate"
+        },
+        {
+          "line": 184,
+          "method": "post",
+          "path": "/school-candidate",
+          "function": "register_school_candidate"
+        },
+        {
+          "line": 237,
+          "method": "get",
+          "path": "/my-candidates",
+          "function": "list_my_school_candidates"
+        },
+        {
+          "line": 289,
+          "method": "get",
+          "path": "/my-profile",
+          "function": "get_my_candidate_profile"
+        },
+        {
+          "line": 334,
+          "method": "get",
+          "path": "/availability",
+          "function": "get_availability"
+        },
+        {
+          "line": 394,
+          "method": "post",
+          "path": "/book",
+          "function": "book_session"
+        },
+        {
+          "line": 498,
+          "method": "post",
+          "path": "/school",
+          "function": "register_school"
+        }
+      ]
+    },
+    {
+      "path": "backend/app/routers/registration_booking_guard.py",
+      "lines": 170,
+      "sha256": "6373d3381915f53558962b0fc59193cb12ae9d75c430a6ea2761a0a9dbbda2ef",
+      "tests": 0,
+      "routes": [
+        {
+          "line": 52,
+          "method": "get",
+          "path": "/availability",
+          "function": "get_legacy_availability"
+        },
+        {
+          "line": 122,
+          "method": "post",
+          "path": "/book",
+          "function": "book_legacy_session"
+        }
+      ]
+    },
+    {
+      "path": "backend/app/routers/reliability.py",
+      "lines": 170,
+      "sha256": "565ae024fcba7e7eefec8ceae247f3eb23902a089645477f01f87500579d87cf",
+      "tests": 0,
+      "routes": [
+        {
+          "line": 121,
+          "method": "get",
+          "path": "",
+          "function": "reliability_status"
+        },
+        {
+          "line": 139,
+          "method": "post",
+          "path": "/evidence",
+          "function": "record_reliability_evidence"
+        }
+      ]
+    },
+    {
+      "path": "backend/app/routers/rgpd.py",
+      "lines": 129,
+      "sha256": "d16f0c8f83190150958650c992d7742100c6768b37bf488c2bf1d3313ade0111",
+      "tests": 0,
+      "routes": [
+        {
+          "line": 16,
+          "method": "get",
+          "path": "/export",
+          "function": "export_my_data"
+        },
+        {
+          "line": 60,
+          "method": "post",
+          "path": "/delete",
+          "function": "request_erasure"
+        },
+        {
+          "line": 97,
+          "method": "get",
+          "path": "/export/{candidate_id}",
+          "function": "admin_export_candidate"
+        },
+        {
+          "line": 117,
+          "method": "post",
+          "path": "/delete/{candidate_id}",
+          "function": "admin_anonymize_candidate"
+        }
+      ]
+    },
+    {
+      "path": "backend/app/routers/security_operations.py",
+      "lines": 183,
+      "sha256": "274df965a37bd3070694af85c4a47a511714d7d415f680db096cf18ce24de7bf",
+      "tests": 0,
+      "routes": [
+        {
+          "line": 121,
+          "method": "get",
+          "path": "/status",
+          "function": "security_status"
+        }
+      ]
+    },
+    {
+      "path": "backend/app/routers/sessions.py",
+      "lines": 579,
+      "sha256": "67bf250d2e75da6107cfa2fe601455774acbe41ed2be99a4848a007d62794813",
+      "tests": 0,
+      "routes": [
+        {
+          "line": 68,
+          "method": "get",
+          "path": "",
+          "function": "list_sessions"
+        },
+        {
+          "line": 114,
+          "method": "get",
+          "path": "/available",
+          "function": "list_available_sessions"
+        },
+        {
+          "line": 152,
+          "method": "get",
+          "path": "/week-schedule",
+          "function": "get_week_schedule"
+        },
+        {
+          "line": 218,
+          "method": "get",
+          "path": "/{session_id}",
+          "function": "get_session"
+        },
+        {
+          "line": 231,
+          "method": "get",
+          "path": "/{session_id}/capacity-status",
+          "function": "get_session_capacity"
+        },
+        {
+          "line": 261,
+          "method": "post",
+          "path": "",
+          "function": "create_session"
+        },
+        {
+          "line": 300,
+          "method": "patch",
+          "path": "/{session_id}/open",
+          "function": "open_session"
+        },
+        {
+          "line": 322,
+          "method": "patch",
+          "path": "/{session_id}/close",
+          "function": "close_session"
+        },
+        {
+          "line": 350,
+          "method": "patch",
+          "path": "/{session_id}/cancel",
+          "function": "cancel_session"
+        },
+        {
+          "line": 410,
+          "method": "get",
+          "path": "/stats/by-commune",
+          "function": "get_sessions_stats_by_commune"
+        },
+        {
+          "line": 477,
+          "method": "post",
+          "path": "/bulk-plan",
+          "function": "bulk_plan_sessions"
+        },
+        {
+          "line": 541,
+          "method": "get",
+          "path": "/upcoming-by-center/{center_id}",
+          "function": "upcoming_sessions_by_center"
+        }
+      ]
+    },
+    {
+      "path": "backend/app/routers/supervision.py",
+      "lines": 78,
+      "sha256": "778dc40a63e012773f72a4a005bd63e18bad6287cd353c1c0ab928b1724ba07c",
+      "tests": 0,
+      "routes": [
+        {
+          "line": 19,
+          "method": "get",
+          "path": "/audit-logs",
+          "function": "list_audit_logs"
+        },
+        {
+          "line": 46,
+          "method": "get",
+          "path": "/audit-logs/export.csv",
+          "function": "export_audit_logs_csv"
+        }
+      ]
+    },
+    {
+      "path": "backend/app/routers/tarifs.py",
+      "lines": 73,
+      "sha256": "6814076bb414a22931c68c1b23ce04ed0b7fe85ea00b14ebfdac09a4f0821a61",
+      "tests": 0,
+      "routes": [
+        {
+          "line": 22,
+          "method": "get",
+          "path": "/current",
+          "function": "get_current_tarifs"
+        },
+        {
+          "line": 43,
+          "method": "get",
+          "path": "",
+          "function": "list_tarifs"
+        },
+        {
+          "line": 53,
+          "method": "put",
+          "path": "/{cle}",
+          "function": "update_tarif_endpoint"
+        }
+      ]
+    },
+    {
+      "path": "backend/app/routers/training.py",
+      "lines": 190,
+      "sha256": "30b141cfe84b82fc1fc6d1567bcb42cf9a589c4a10d33afd597d0c8b813826f9",
+      "tests": 0,
+      "routes": [
+        {
+          "line": 51,
+          "method": "get",
+          "path": "/categories",
+          "function": "get_training_categories"
+        },
+        {
+          "line": 64,
+          "method": "get",
+          "path": "/questions",
+          "function": "get_training_questions"
+        },
+        {
+          "line": 96,
+          "method": "get",
+          "path": "/mock-exam",
+          "function": "get_mock_exam"
+        },
+        {
+          "line": 152,
+          "method": "post",
+          "path": "/check-answer",
+          "function": "check_answer"
+        }
+      ]
+    },
+    {
+      "path": "backend/app/routers/users.py",
+      "lines": 227,
+      "sha256": "24966ac000e046b38c076479ebf40f9c54446d9ea29bb9a58b36615fd11fedb3",
+      "tests": 0,
+      "routes": [
+        {
+          "line": 41,
+          "method": "get",
+          "path": "",
+          "function": "list_users"
+        },
+        {
+          "line": 71,
+          "method": "post",
+          "path": "",
+          "function": "create_institutional_user"
+        },
+        {
+          "line": 124,
+          "method": "patch",
+          "path": "/{user_id}/role",
+          "function": "update_user_role"
+        },
+        {
+          "line": 145,
+          "method": "patch",
+          "path": "/{user_id}/status",
+          "function": "update_user_status"
+        },
+        {
+          "line": 166,
+          "method": "post",
+          "path": "/{user_id}/reset-password",
+          "function": "reset_user_password"
+        },
+        {
+          "line": 183,
+          "method": "patch",
+          "path": "/{user_id}/center",
+          "function": "assign_user_center"
+        }
+      ]
+    },
+    {
+      "path": "backend/app/scheduled_notifications.py",
+      "lines": 278,
+      "sha256": "e7c1bd19f21aa9fb3cb308056a5472d26edaf5d9cb83a430d97831e79da92a46",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/schemas.py",
+      "lines": 530,
+      "sha256": "53694e9449c82ed311a64262cbaf5456a5a10413ab09fa6174d8d96baff874d2",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/schemas_media.py",
+      "lines": 224,
+      "sha256": "6ab9deef78a3bd2953fbbc39e70a965a29360b93e6e23b2beec92341007a571e",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/schemas_media_migration.py",
+      "lines": 25,
+      "sha256": "bca65bb83f47cd9846b19060bc2bbf57137be3fed0da100886af9a73232431c0",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/schemas_media_review.py",
+      "lines": 22,
+      "sha256": "9c77e89b32f1e49a3685b2f5548f97df0caf80e1fda004fee2f115e3c189ca1c",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/security.py",
+      "lines": 78,
+      "sha256": "b6768ccb195a29f80d02007915cd573d52756c2b556bb51378cc01f630164e5d",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/seed_demo.py",
+      "lines": 248,
+      "sha256": "6e25eb8d131273acf1a8043eb8ee6a3623f6d307bc916b61f872c8dd27ff6554",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/seed_demo_dntt.py",
+      "lines": 550,
+      "sha256": "88cb13b091c5550f8ef5501568b6fb773efa3cd75dcea9705693921aa030cee1",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/seed_elearning.py",
+      "lines": 182,
+      "sha256": "1a08b55f119ea081233493d7a40eb305b54236bcf02a64ebaa40cc5a3a5fa943",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/seed_full.py",
+      "lines": 2492,
+      "sha256": "f0f0dc9aec164b817fb751d47bd8f6eb6dfb68ad9dfb3cbf6eb6e428d2bec2bf",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/seed_pilote_conakry.py",
+      "lines": 253,
+      "sha256": "f7808d7d15c70041c4452512f9001060e18105c93b8a3ecadcae3fc7481ae608",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/sentry.py",
+      "lines": 85,
+      "sha256": "c34dd1e2a4d455c4911d3ef4552f6f5b28cec082b1ea70b0dbb6eaa11ed319b9",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/session_rules.py",
+      "lines": 95,
+      "sha256": "709084907e6bddf601ccf87561279cd8763a2f9414c4a23eaf2db2eb565c35a0",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/soc_config.py",
+      "lines": 111,
+      "sha256": "221ae4ed546988de4f611c1f2c4483ec48b7aced61a87ec2a8dc9791bef3fa05",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/soc_logging.py",
+      "lines": 17,
+      "sha256": "97262f7867d7263e4f83ea04591698e89abb4a86044ebdd11fe9637b1bcb2a49",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/soc_metrics.py",
+      "lines": 51,
+      "sha256": "eb50a3ec8c3101e9c77ea8e6967e294a43cbba78a063c5ee4df28ade8ffdf2c1",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/soc_privacy.py",
+      "lines": 152,
+      "sha256": "ec0eaa783d41a4fa25e79d641066b6b6dbbfa66195ee89712fe83487642fcf1d",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/soc_telemetry.py",
+      "lines": 183,
+      "sha256": "db076d55f7364bfdeace5bfedfe7bf2b056d331012dccb653eec3923a2d2275f",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/tarifs.py",
+      "lines": 228,
+      "sha256": "7d51b2fd80388f83fb8db205a7e75e62965539e926106de79bc4f40dd5510e78",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/territory.py",
+      "lines": 54,
+      "sha256": "6bd0a918cef7e651c1677430ffe5485cf8631a252a7c7080ad9e18468e700f09",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/two_factor.py",
+      "lines": 279,
+      "sha256": "2fda2a86a66d0598819cfb4538aaf75198fde342f97ca8171cc353c5ffe5c742",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/whatsapp_service.py",
+      "lines": 90,
+      "sha256": "1ef1fa16546a85d1fe4340cf586a770ba0c74c3a6f85c7a32c9550f8fe9aa0a3",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/app/wikimedia_signs.py",
+      "lines": 111,
+      "sha256": "5d161ffb6dc5cdd37311f9c1fb47576502646d7d67c9b948a69ef081352eddb1",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/gunicorn.conf.py",
+      "lines": 52,
+      "sha256": "2ea83e5a238e561cfdf51208e957bfbde5758d2e253b9c779c1b3f400c2bba6f",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/scripts/audio_inventory.py",
+      "lines": 77,
+      "sha256": "68e86448039876bfb8fe4c6302f169efc63944a82bdfca7cf27cf7ef2ac8b64e",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/scripts/chaos_dependency_probe.py",
+      "lines": 107,
+      "sha256": "35ef8d0d515d085e06bfe6192ad50116efd0dccc21b51ebab413038e9c1473a6",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/scripts/collect_go_live_evidence.py",
+      "lines": 618,
+      "sha256": "234d0c54104d6a05884b62fecb7e958d9612c53655342d86a9ff2d7d66de87b4",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/scripts/download_backup_s3.py",
+      "lines": 105,
+      "sha256": "6de968a57012c2798a595707aa6ce760fc305b67339957ed48d7805517d6d98d",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/scripts/ha_failover_probe.py",
+      "lines": 112,
+      "sha256": "55412fef5017178239b58de0d3c647bf367c9338b816ed1cb3172fad9b78b2aa",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/scripts/publish_reliability_evidence.py",
+      "lines": 101,
+      "sha256": "2fa7cbfb0cf97d7798d6c17e3015ecc1df87ea026a17799b76daa7532a5134c8",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/scripts/secure_backup_bundle.py",
+      "lines": 235,
+      "sha256": "5e53f37916d7ff95e00fe05e88aae41533339fcba42dd03b760d68721742880f",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/scripts/seed_fullstack_e2e.py",
+      "lines": 111,
+      "sha256": "eadb015fec610c1e5fb8bbe252c873b559855815014b4875f0135f01c4a7fab4",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/scripts/upload_backup_s3.py",
+      "lines": 140,
+      "sha256": "c1a1547d5dab9f1a297102fb2412a40b4d55f50962ceef6cd989fe5f9f87234f",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/scripts/verify_media_deployment.py",
+      "lines": 226,
+      "sha256": "06b9bc53e85eaeb13602c6ba60045cd7678bdba9adbf2ec0f713a061ebaddb5c",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/scripts/verify_render_deployment.py",
+      "lines": 341,
+      "sha256": "96d2f1114982c47daa6cc84d4e05061be3bdc8015c3ddbe58266025373cb89da",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/conftest.py",
+      "lines": 225,
+      "sha256": "ce14aa496e65f8c24fcaf4014e4f8371aaa28b86e86bec45bb2d16b43de3d120",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_2fa_e2e.py",
+      "lines": 377,
+      "sha256": "5c906f9c88f03bf5ec3e6dcf66db46c3f98c2cf2e0cbf6d064517bbf0b9b1973",
+      "tests": 31,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_api_routes.py",
+      "lines": 80,
+      "sha256": "3b0dfb63adf00caeb6347da4a5c58f57bce9c64643792a0637eebd5c238cdf34",
+      "tests": 1,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_audio_router_security.py",
+      "lines": 123,
+      "sha256": "966c220161b0f79b79ce58e86c0cb74005a7aeb6edf6bf4ef8d863dd6731cbbc",
+      "tests": 10,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_audit_chain.py",
+      "lines": 126,
+      "sha256": "4082f45f999a1471a4f5022754c19a3608b817c142e175185e8822887c35ac14",
+      "tests": 8,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_audit_chain_p11.py",
+      "lines": 174,
+      "sha256": "2966ea95b5820f78bb2b9610570b28f9dbf890eb9d56312169adb53b283e3bff",
+      "tests": 7,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_audit_chain_registration.py",
+      "lines": 41,
+      "sha256": "0044ff8c0c05f3ba6964689d7832f9a7e9c141f49f8bff62ba162e8054dbcf11",
+      "tests": 1,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_audit_immutability_p11.py",
+      "lines": 61,
+      "sha256": "a0c5b9f496073435811731ea5827c9bde98759bc0eb77cbd0768ee1c9ac7badf",
+      "tests": 2,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_auth_routes.py",
+      "lines": 185,
+      "sha256": "68857ee854219f59d7c401e4a691e9b52f3d6e41c3ffbb1b859b090350d98d50",
+      "tests": 8,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_auth_security_invariants.py",
+      "lines": 93,
+      "sha256": "3198dbd781da03450bb3ddd7217fed777694b0e2e2dec1223b1f4406fd182f64",
+      "tests": 3,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_booking_flow.py",
+      "lines": 38,
+      "sha256": "6d338712e858b1fc76d83a2dcb0d7b9869c7e9e72a559e8d68c0f2f178a53383",
+      "tests": 1,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_bootstrap_admin.py",
+      "lines": 61,
+      "sha256": "771a27fe9084fc9196d1ba1f11d4b9b397d51b2a93a55c8539577eec7974f950",
+      "tests": 2,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_bruteforce_protection.py",
+      "lines": 86,
+      "sha256": "9431a4a9e320f24c7b3ab1ad67b4a6fccd01b3b004f089bbf0d9e7606284c492",
+      "tests": 4,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_candidate_creation_concurrency.py",
+      "lines": 150,
+      "sha256": "3e6785ab6f838dcea105db7d89cb92d3b646709ecac3a207069a3bf181801125",
+      "tests": 3,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_candidate_exam_eligibility.py",
+      "lines": 221,
+      "sha256": "8a38931b57731208e4496346a02c3b676dcd3cd0ea79a5d063922918c061b96b",
+      "tests": 3,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_candidate_identity.py",
+      "lines": 106,
+      "sha256": "d11fc8875a64a980b79e0c08ddae4479406c3cae3812ece9ab2a524e50043d24",
+      "tests": 3,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_candidate_official_import.py",
+      "lines": 193,
+      "sha256": "dbd91d1d83c7722a83bf9df5d29ead9af0c5385a5bf587f115d9cc47d1360d74",
+      "tests": 4,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_candidate_self_service_authorization.py",
+      "lines": 325,
+      "sha256": "7b8004bad5614ec0391d26a8b644a16612b94da69872de141c2006a02284b4a5",
+      "tests": 2,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_candidate_status_state_machine.py",
+      "lines": 201,
+      "sha256": "19fdee8dfe8841e507cfb93966292c503ee0dfe2e8fde73b89fd504175b37258",
+      "tests": 3,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_center_anomalies.py",
+      "lines": 91,
+      "sha256": "acd69c34bb0ca6b2371b4628f1893ea3cc07d302ec16d34160bf806d8328f8eb",
+      "tests": 3,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_center_edge.py",
+      "lines": 224,
+      "sha256": "ebbd54e1abf9e35221ba63b7403667fa72d3733abb06026b4c733f2947886b7c",
+      "tests": 2,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_center_edge_fleet.py",
+      "lines": 216,
+      "sha256": "2b3550e57dd377f3954455760c05f016daf5e95d38160cd972c4f5aea4eeed25",
+      "tests": 3,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_center_edge_offline.py",
+      "lines": 432,
+      "sha256": "0b118dc0a2aca21bb04b907a91c8c40cfe0d6ba2251fd3e79837500327259e94",
+      "tests": 2,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_center_edge_release.py",
+      "lines": 422,
+      "sha256": "94847b5802c1b5ec1263f1b47229d3ccd8f571313eab6916640b791f35652e9f",
+      "tests": 2,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_center_edge_supply_chain.py",
+      "lines": 152,
+      "sha256": "cd5510b03b58a0c9d7dc53570a09f41a7dc6ce096d7894372e8d4ead53503390",
+      "tests": 4,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_center_governance.py",
+      "lines": 255,
+      "sha256": "3d5b51c878925fe849f136de16eadbfc02218231704364a8ca53392a19e8f9ed",
+      "tests": 6,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_certificate_audit.py",
+      "lines": 35,
+      "sha256": "c9f670863f959c604de0767170990b042aa091b855ef42164b787703969dbd5b",
+      "tests": 1,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_certificate_qr.py",
+      "lines": 21,
+      "sha256": "eb8a3cf9603c7b757d3d0e47caeff6c0e700b42d5493d4ae5ceb717ae2ee18fd",
+      "tests": 1,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_convocation_flow.py",
+      "lines": 38,
+      "sha256": "7c5444fbb47f51bed08247941d93541ecee282237d021cb4f14143af922da4c3",
+      "tests": 1,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_coverage_v2.py",
+      "lines": 713,
+      "sha256": "967487c8cd36236eb7140c2816484050b800a59e3d0a2a97329e31f00e68da78",
+      "tests": 54,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_coverage_v3.py",
+      "lines": 839,
+      "sha256": "c9a4a76fc6ba7156d228a36708c2b1bdd0e25921875bd16bcb8d1d3ff2e9aa90",
+      "tests": 53,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_coverage_v4.py",
+      "lines": 601,
+      "sha256": "6504a6fa48173d56aee6753884aa830021fbbdd7418a958b6d995408d4f49845",
+      "tests": 47,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_coverage_v5.py",
+      "lines": 608,
+      "sha256": "c8ddea22ca18c54d9e07026684c74c8585a4e8c7504d9fa4bee55e21530f264f",
+      "tests": 37,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_csrf_double_submit.py",
+      "lines": 115,
+      "sha256": "afec5cd45e05163296a849825d5f4477364962d2425af356a0f70fa985f2e045",
+      "tests": 11,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_dashboard_by_center.py",
+      "lines": 40,
+      "sha256": "f1767b32fa6f9175c34d705b6dcf7798c922433e354ffad39c30f9dd851a33a5",
+      "tests": 2,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_dashboard_export.py",
+      "lines": 206,
+      "sha256": "b1946242e25e21f8af53f6c19d9f4551bf003c031637dc3c28b09c28cebbd461",
+      "tests": 11,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_database_migrations.py",
+      "lines": 165,
+      "sha256": "6cb77182c1a3c4d494d58b5c21694838cb75c4beb16b41547695963c7d7c2e65",
+      "tests": 5,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_db_session.py",
+      "lines": 98,
+      "sha256": "835ab9ddd9094b9e02bd2a8fab4798136ad17d40328c848f921fa88d590f34bd",
+      "tests": 5,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_deploy_preflight.py",
+      "lines": 88,
+      "sha256": "2967f2c7f81521f35f49b206e79609a090fdcc02bd6cda3aa91f1efb4d654814",
+      "tests": 3,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_distributed_ha.py",
+      "lines": 85,
+      "sha256": "76a1d7bc6946a80d930792a8500e81c3066ce5fae5f069c99ec7190797194fac",
+      "tests": 5,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_dr_readiness.py",
+      "lines": 68,
+      "sha256": "2cdc0e32799f10d6c4a49e1be7f0106c913115ed092434fa725d5549218aff10",
+      "tests": 3,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_e2e_admin_finance.py",
+      "lines": 128,
+      "sha256": "562fbe96cc2449b479eec0a1ba4b6f6c788db8b02dc9f9fab6c126e23760a192",
+      "tests": 1,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_e2e_antifraud_dashboard.py",
+      "lines": 189,
+      "sha256": "fcc6746f3a772ba065640daab4b708812bb2d769384b4144fc5f4d64fed6aafa",
+      "tests": 1,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_e2e_bulk_plan_sessions.py",
+      "lines": 150,
+      "sha256": "cc78351ad7c8afb90cb77d503cdea618cf47668d32d601fddb20e8994347bc15",
+      "tests": 4,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_e2e_candidate_booking.py",
+      "lines": 143,
+      "sha256": "b7dd7ccd22e85aee5050b34c484bd1a0e7676eae318056de627c07c80ec161f9",
+      "tests": 1,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_e2e_candidate_center_multimedia_exam.py",
+      "lines": 301,
+      "sha256": "02154aa72b860fa853ae82c85d5ebbdfd4055dbf7b8c184ccf4a92353c807930",
+      "tests": 1,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_e2e_candidate_full_flow.py",
+      "lines": 215,
+      "sha256": "7cd320b25c1ffae011359611d2798c2f0cc2fd73690ca4468e479b3883158f41",
+      "tests": 1,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_e2e_candidate_submissions.py",
+      "lines": 140,
+      "sha256": "37d74e9dc58043d1a2dbc356e49e09955d21586d56dd82eae7a502ad088fc8be",
+      "tests": 1,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_e2e_center_incident_recovery.py",
+      "lines": 230,
+      "sha256": "ae32e275b911cdc8c87c80b81e345ccf59c0a4bf7f0f7f76499eaa6019a8cc09",
+      "tests": 1,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_e2e_center_stations_registry.py",
+      "lines": 172,
+      "sha256": "1a865cc185c63758ede00e0ad75b17de48efc8324a0e211ffb219bbfb1c18db7",
+      "tests": 1,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_e2e_cloudinary_upload.py",
+      "lines": 87,
+      "sha256": "8a6871f3c03b0c35dbf6b9a6fd4dee4de9aa3960f93b0aa860ba6ef1aa2353f9",
+      "tests": 3,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_e2e_device_session_tracking.py",
+      "lines": 290,
+      "sha256": "17540dcadc2b7ecdf308b9261e30cd249d82c3af5492a8071181557a2eb957f4",
+      "tests": 2,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_e2e_exam_center_gate.py",
+      "lines": 264,
+      "sha256": "b2a821b1103a04d5e86594cc4b4380da931fa0e53f24339e0c53d6ea680be719",
+      "tests": 2,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_e2e_exam_certificate.py",
+      "lines": 144,
+      "sha256": "105c4bccc57b46232e02f8faa64b625054f88d3fe3c78fb996f42c5b1b8a2558",
+      "tests": 1,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_e2e_exam_monitoring_events.py",
+      "lines": 156,
+      "sha256": "105099826c2bb7865f78706e8d4cb878e2079f501a47eb412ec9c1aea2c58c53",
+      "tests": 1,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_e2e_exam_question_trace.py",
+      "lines": 206,
+      "sha256": "baa95848f0672a997a9ef43103cee960a496c311fe014d3aa8cdb5a6752dbfbd",
+      "tests": 1,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_e2e_institutional_pilot_recipe.py",
+      "lines": 299,
+      "sha256": "7c34296bb0eb91cd61cc8ac205bb8201b228bd9de1a74e77c04064a59bf0a040",
+      "tests": 1,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_e2e_manual_review_decisions.py",
+      "lines": 158,
+      "sha256": "22b9ae37f2276ba57723deb2408ceb51cfe5d7a0295f8b06e6589bb77ee19fdd",
+      "tests": 1,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_e2e_parcours_a_z.py",
+      "lines": 177,
+      "sha256": "403eb0e04afe62940433d4dfbfdedb9f7a058a1bc4a18ab67eae9c5f4b3e5c6c",
+      "tests": 2,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_e2e_pilote_journee_reelle.py",
+      "lines": 204,
+      "sha256": "92c39bd83d9695ca6d42729718769dd805a1e1166fa3d2ebb93b9d1524f724f7",
+      "tests": 2,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_e2e_production_journee.py",
+      "lines": 313,
+      "sha256": "eb4c3e8c187bdfa155a1d533e0c450b595c8b210df9ce9e8d88da419de8859aa",
+      "tests": 1,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_e2e_question_media.py",
+      "lines": 106,
+      "sha256": "ec5e70fd6f343855a4782d02f3c9a1a146846930126abc5474fd5cf40edbb4bf",
+      "tests": 5,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_e2e_question_validation.py",
+      "lines": 138,
+      "sha256": "7d4d1e70c6bfc0c6d67fad68ac3ce7185f281e0b0439bb65515ce131a2e8823c",
+      "tests": 6,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_e2e_rdv_public.py",
+      "lines": 145,
+      "sha256": "4d37be3d90be41a13c1eab30c236c8c41ad1453c0653cfb4c106471257fb8a44",
+      "tests": 3,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_e2e_registration.py",
+      "lines": 185,
+      "sha256": "b32a3b2f28dffe8e27fbc31822071aa51b22ffc1211a6112b19d10ca92e8e495",
+      "tests": 7,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_e2e_school_public_registration.py",
+      "lines": 106,
+      "sha256": "9a06caf0b0c58b2d5e0530186005b1b5263906102c44add19b3911ab6d8ff5f2",
+      "tests": 2,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_e2e_tous_les_roles.py",
+      "lines": 147,
+      "sha256": "dcc2ab56488ec8f4f033750ed4d852e8242226f19a3eaf906957598aafc04ecc",
+      "tests": 2,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_e2e_wikimedia_import.py",
+      "lines": 101,
+      "sha256": "4b97cd703bba14cf23df1bd01aafc6e7a37fee092f886e39cc0722f082e63c3c",
+      "tests": 3,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_edge_agent_api_contract.py",
+      "lines": 30,
+      "sha256": "3fdc31c5066e9d002895f6c0dbe577180d7e2a11ffa5d430ec4c32ed87246e52",
+      "tests": 1,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_edge_install_authorization.py",
+      "lines": 44,
+      "sha256": "fcf1522cf916dade5dda9d056f04e239ff7b77068a95a16954ea77183067c8e8",
+      "tests": 1,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_elearning_security.py",
+      "lines": 100,
+      "sha256": "3dc201def0a23571f1015ff06277304461219009bc22d562513c4c2df6624684",
+      "tests": 6,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_entries_coverage.py",
+      "lines": 132,
+      "sha256": "95bccfe04f497f4ceaa796b69add0a0baca15d53013bd8a6816cce746c698e26",
+      "tests": 5,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_entry_service.py",
+      "lines": 13,
+      "sha256": "558ddaed4822d1c8eef4be0bcf95987c496a818e4467851dbf2f1e21b966a9a2",
+      "tests": 2,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_exam_attempt_access.py",
+      "lines": 226,
+      "sha256": "55e36938918c21d926d4569fb8f9762b7ef47027f79c58bc794d1f5ed5ec0d12",
+      "tests": 16,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_exam_bank_confidentiality.py",
+      "lines": 131,
+      "sha256": "430095b10348cc5b1d3cce7f1667068c5417d147313df5f23ca8c46a37d34f36",
+      "tests": 5,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_exam_center_gate.py",
+      "lines": 103,
+      "sha256": "515c7ebf53bd2d9754c4c3363e5b96afc94514fb67f9773bdbeef920f566d3f3",
+      "tests": 9,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_exam_certificate_verification.py",
+      "lines": 14,
+      "sha256": "baeb549ceeba5ff67142276085b4a14552c337c9425f9ba41435005056298455",
+      "tests": 1,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_exam_engine.py",
+      "lines": 25,
+      "sha256": "a22e20085e302af54211a3bc7ed896ec5c5d670c4c493e79ab328339e066ce31",
+      "tests": 2,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_exam_export.py",
+      "lines": 10,
+      "sha256": "c8f7630b8ac9ecf87aa1f73c2152964dda484727990b1190d8fe5b0e7661ce95",
+      "tests": 1,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_exam_flow.py",
+      "lines": 59,
+      "sha256": "1d65a5348708b9b29241e19d58f06d970f66956fcd1665afc750b67429b5381b",
+      "tests": 3,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_exam_fraud.py",
+      "lines": 51,
+      "sha256": "94f951ce9380e8f4b8284435de2f3e42d6754a88ab78d4bef035e56a88ec09e3",
+      "tests": 3,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_exam_new_endpoints.py",
+      "lines": 106,
+      "sha256": "d92a793398021a7e1aa270a19fb3b11af38c0b05104d16e995242bf4c19a6394",
+      "tests": 5,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_exam_result_certificate_link.py",
+      "lines": 44,
+      "sha256": "1d6c62040ae4d00403be43d19fc34ba5f2b3daed58e0ea0f8c36caf2742cdccd",
+      "tests": 1,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_exam_runtime_recovery.py",
+      "lines": 81,
+      "sha256": "e534b7735e3e9a57dda63f8cbc343ebeab6cc4b0c276013b4f98e240517fefd6",
+      "tests": 6,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_exam_start_eligibility_guard.py",
+      "lines": 184,
+      "sha256": "3a1ef48c5da48656cb493332037305cd853d637eb17fc2360a865473a33b5647",
+      "tests": 4,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_exam_summary.py",
+      "lines": 18,
+      "sha256": "52e12a9c26cec40c14f8e227303823a5c00c08d06a49c37e66db45fda154f1cc",
+      "tests": 1,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_final_features.py",
+      "lines": 234,
+      "sha256": "b383df50e617f9c1b4d6be1003533aeb7193a2ff8cfb5c967c4433462b472337",
+      "tests": 18,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_general_candidate_appeals.py",
+      "lines": 251,
+      "sha256": "2f4b050d8f2b354dcb4b17f5bde2d868e7075b47d0655d10945a0643cabb31c3",
+      "tests": 3,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_github_main_ruleset.py",
+      "lines": 142,
+      "sha256": "08e4f09e9a8c85c8a5005ad8507690c9743d26c8bd689a3976c23db2298be73d",
+      "tests": 6,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_go_live_evidence_pack.py",
+      "lines": 221,
+      "sha256": "b178c5c8ee36621e4129b575b65cfc1e77878fc4c2b493e9cff5362189833017",
+      "tests": 7,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_go_live_evidence_pitr.py",
+      "lines": 82,
+      "sha256": "6db841a30811b31c5306a1b536b885c35c89384f65d521fd59cb1e4ea48f7215",
+      "tests": 3,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_ha_config.py",
+      "lines": 41,
+      "sha256": "c96b1d9b68e823473cf3d8723abfe546ecba2800126479054ee86010d6bbc834",
+      "tests": 4,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_ha_failover_probe.py",
+      "lines": 41,
+      "sha256": "3f2e93fb316f8e06a1567fcd7aee2b4621d36e60e77ddb41631a91224869347c",
+      "tests": 2,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_health.py",
+      "lines": 131,
+      "sha256": "25d5a40e340b57b4acab813a7df87fbe222d1557ee2659b62aa22373182ff409",
+      "tests": 6,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_health_coverage.py",
+      "lines": 267,
+      "sha256": "3b1323ad8cd94be38a53e917a1589b66748b254a2fb48cdcbd28381f5a425fdb",
+      "tests": 27,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_homologation_evidence_integrity.py",
+      "lines": 187,
+      "sha256": "213d8b8e471d7b1abf096d507c8ac640b5b1c273912baa09c53cdf3595e989da",
+      "tests": 4,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_infra_coverage.py",
+      "lines": 552,
+      "sha256": "8e3b782a2ec1a34e27ac520eae651b380cbcb1a4598b9f356fc3b40091b83a5e",
+      "tests": 50,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_institutional_authorizations.py",
+      "lines": 73,
+      "sha256": "3e17bac091a57201dd679de65f0d0f1a75a6911794751dbbb7c927d1e6f53986",
+      "tests": 2,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_live_sentry_darkmode.py",
+      "lines": 221,
+      "sha256": "9563b95d63a081996636f48e4349e806d42a1e7daa85c4de5189d8d040d21f59",
+      "tests": 32,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_logging_redaction.py",
+      "lines": 107,
+      "sha256": "934fd15dec0a9b4483927ea15f827fee86a52fbc100b3e3846bd7f536e42cb96",
+      "tests": 10,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_media_asset_models.py",
+      "lines": 77,
+      "sha256": "2e650eb403dad4e7fcb20d0d4f7b48b6973d774ef0c18c5fe521a2632d65e9dc",
+      "tests": 5,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_media_audit_script.py",
+      "lines": 58,
+      "sha256": "9f4fa7d8d8df4c27575747d26a3ae801d9ae087e97962db3da5c133dbf7d3c1e",
+      "tests": 5,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_media_deployment_verifier.py",
+      "lines": 113,
+      "sha256": "38c957d5f945660d11e1bb5dcdf4df146f556e0850f202c095cc5341640db44c",
+      "tests": 4,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_media_exam_guard.py",
+      "lines": 105,
+      "sha256": "2a39cac79352e7df836220e5e91719cf8585338e6e451626f8cab2fc4fb2f259",
+      "tests": 2,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_media_frontend_demo_pack.py",
+      "lines": 84,
+      "sha256": "b61690a01fa92934725293ab914d41e539336f2f40bcf7a1228cf8732bc6f52f",
+      "tests": 4,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_media_library_api.py",
+      "lines": 237,
+      "sha256": "9740158aaff57f4a4879575e0aa9d542bdd8941864029b8f12224d35f1ee0c55",
+      "tests": 7,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_media_link_guard.py",
+      "lines": 141,
+      "sha256": "c4f41880b201160f09b157a0f286fce038ebdcc8c279e71e90c2451c9e3d17ae",
+      "tests": 5,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_media_mapping_workbench_contract.py",
+      "lines": 47,
+      "sha256": "8d1f626f8fb8b9e73944378ccfdf8c7545f2367e5dd29c9ba20f99734cadaacb",
+      "tests": 3,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_media_migration_csv_workflow_contract.py",
+      "lines": 39,
+      "sha256": "e2bf697f0deaa3939c5489a2151456699bde87c00254cb6f06eb615c37652000",
+      "tests": 3,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_media_migration_plan.py",
+      "lines": 165,
+      "sha256": "1b5ac66f3ec23a51df76eeaaffee3e79bb6efc8154202424661192569806c4c9",
+      "tests": 6,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_media_migration_plan_frontend_contract.py",
+      "lines": 44,
+      "sha256": "14a00e83f3a6e65a72e83f55fa98852c7724b5692609a48eb33ae99369b4e184",
+      "tests": 4,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_media_migration_progress.py",
+      "lines": 63,
+      "sha256": "e36658bce64c94bf436bfe81db35ceaf32e2d424e71a66a81a35c650dedc8091",
+      "tests": 2,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_media_migration_progress_frontend_contract.py",
+      "lines": 35,
+      "sha256": "82399a1098fb3e7828cdeceb13edab8528dc9fd3a0c28c004474d4bf7e245e42",
+      "tests": 3,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_media_migration_queue.py",
+      "lines": 166,
+      "sha256": "78a7d7e6862548877f0bd0c695a267ba16fac59e75f99795c5966357101f8938",
+      "tests": 4,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_media_migration_queue_frontend_contract.py",
+      "lines": 48,
+      "sha256": "629f9b54b597cc0cbadc90702d0bd6116606319d6f474eee38757fe93cd26858",
+      "tests": 4,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_media_migration_readiness_workflow_contract.py",
+      "lines": 48,
+      "sha256": "5f64dbe15dd697a22d8c73bb472e04fd3612195c1458e6990c60eee9b2513b1e",
+      "tests": 3,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_media_policy.py",
+      "lines": 93,
+      "sha256": "5d274bbaebb3e5141e592f75204e9c1b8a0c80a993387717b1be849b8f58021d",
+      "tests": 14,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_media_quality_workflow.py",
+      "lines": 299,
+      "sha256": "f922fba6437daf7d44d48d0db8d2390531af7398b6599f445d1334a5bfe0fb5d",
+      "tests": 7,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_media_runtime_frontend_fallback_contract.py",
+      "lines": 25,
+      "sha256": "86d3608d5953707eea49b730c4a3de3e8f5362f1cfea3d69a50efffd84008e4f",
+      "tests": 2,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_media_runtime_resolver.py",
+      "lines": 155,
+      "sha256": "b8040771aae0ec9f9b569039dd2a6fd63842469d972783746df19e021b7f55bb",
+      "tests": 6,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_media_storage.py",
+      "lines": 134,
+      "sha256": "69e5a239eff6464071af577233102beb2de3872e8b9ff9eb60c2627b483a02a2",
+      "tests": 7,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_media_upload_target_api.py",
+      "lines": 55,
+      "sha256": "33e672029867488007667b2f9e3699c641c99281ee189bf5d60299b696711cee",
+      "tests": 3,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_media_validation.py",
+      "lines": 65,
+      "sha256": "b57f929b5d8f03d24c8d94e57ad3dc5a3c188743c70fa3235b51371521905a04",
+      "tests": 5,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_media_video_support_workbench_contract.py",
+      "lines": 37,
+      "sha256": "3fbd51184b37bf18665a4afe62af62ce8b35c473eb8b1d06be6612765cb44d67",
+      "tests": 3,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_metrics_endpoint.py",
+      "lines": 65,
+      "sha256": "1d0c7c437b4b2d8e032377112e97710d03880e1280dc618490e7119d803f40f9",
+      "tests": 4,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_middleware_coverage.py",
+      "lines": 298,
+      "sha256": "3f9608eda36b86329c770fabea5382623d56b356f31e767ba5bc391ac6e39232",
+      "tests": 26,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_middleware_ha.py",
+      "lines": 76,
+      "sha256": "90e8a2c6399df762412f0c26af342d4f2ec60ff187583c760ce53cbbff3a1384",
+      "tests": 3,
+      "routes": [
+        {
+          "line": 13,
+          "method": "get",
+          "path": "/api/v1/centers",
+          "function": "centers"
+        },
+        {
+          "line": 36,
+          "method": "get",
+          "path": "/api/test",
+          "function": "endpoint"
+        },
+        {
+          "line": 58,
+          "method": "get",
+          "path": "/api/test",
+          "function": "endpoint"
+        }
+      ]
+    },
+    {
+      "path": "backend/tests/test_mobile_money.py",
+      "lines": 14,
+      "sha256": "8b6dd454120911fddeba5a97d6745a1ace622994d93dbfa0b8df85074b07308b",
+      "tests": 2,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_mobile_money_extended.py",
+      "lines": 230,
+      "sha256": "60ef0fa2c0bf1dc3ef5d47083a57e5c27f591255133565a56fe84d8b7b167bde",
+      "tests": 24,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_mobile_money_sandbox.py",
+      "lines": 91,
+      "sha256": "d46f91628bd6dd341cd57f3c0a0ee4467b14129d4dfba2bb5db68bb55d172812",
+      "tests": 9,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_monitoring_coverage.py",
+      "lines": 258,
+      "sha256": "c0f1afb5eead9fc53e2324274c2b8ba3ec2514709788ea83e971b7cba515cdbd",
+      "tests": 25,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_multicenter_business_invariants.py",
+      "lines": 223,
+      "sha256": "8c3531f49656a18c4885d3d0ca17767883baa32439e31de006a261fc70b6bcfd",
+      "tests": 4,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_national_governance.py",
+      "lines": 176,
+      "sha256": "58db957236bae814b58db5a24b91f2d14bd38c86e34123e77da62cceb0bd2f75",
+      "tests": 5,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_national_homologation.py",
+      "lines": 96,
+      "sha256": "bde90952ce2ebbb0b05a016aad45ae1082ab407d41909ddb4c8f52d5223f625f",
+      "tests": 1,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_national_readiness_pitr.py",
+      "lines": 53,
+      "sha256": "b7f484b04d6ff4c951fb4116036fdba5ad37bf7af42d2ee291806a257790943e",
+      "tests": 2,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_national_readiness_v2.py",
+      "lines": 48,
+      "sha256": "cba7d4bd13a61d5b8bcb19f80d5f01227738506f4f34bee1c2b29fd257563014",
+      "tests": 1,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_national_strict_media_rollout.py",
+      "lines": 169,
+      "sha256": "1497f5c947cd3636da57517e60560c2bd898f9991beebec17d42f9720af9b0af",
+      "tests": 4,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_notifications_status.py",
+      "lines": 46,
+      "sha256": "c203ade2fa46e7d6551d0d3596ccb82e9c9e05117b622b573db53d2edd0dc862",
+      "tests": 3,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_official_exam_runtime_e2e.py",
+      "lines": 312,
+      "sha256": "5998f8bfa05e60ae6cfc21aab33fe4be575b018b565382368fff4f5e3a965b42",
+      "tests": 1,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_official_media_bank_gate.py",
+      "lines": 392,
+      "sha256": "5cb0a6cb28fb3d5c327ec8a1279ac64711c47bdaaa6a32e5d66d3dc714720144",
+      "tests": 8,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_offsite_backup.py",
+      "lines": 106,
+      "sha256": "81f931b3cdb73958ad570d11dfd0c3f6727f2618fa327e3978d34af92e859575",
+      "tests": 4,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_operations_summary.py",
+      "lines": 135,
+      "sha256": "7e6e0eac8100a8daf873ade6a867f0ace1b3456139802f0ac843da5c30909724",
+      "tests": 2,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_payment_admin_summary.py",
+      "lines": 23,
+      "sha256": "78ecbb663f25a3759e6f1bee988164b35f27f32fd9f67e8e9ddbefc037fa48e6",
+      "tests": 3,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_payment_alerts.py",
+      "lines": 23,
+      "sha256": "e528f3b6ca2fadea242a0d19c469f4033572aa32335b035d2e7226f64c45314b",
+      "tests": 3,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_payment_audit.py",
+      "lines": 37,
+      "sha256": "f983289ee4c0808d80106faa9737ea2f7f23c994f056c6f50e1064440a67701b",
+      "tests": 1,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_payment_export.py",
+      "lines": 18,
+      "sha256": "15470beb44ce3508dd627e6a13ec9865e3af3e77f8d09aa4fa5a93e52d448696",
+      "tests": 2,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_payment_idempotency.py",
+      "lines": 119,
+      "sha256": "bdbd267be68284459d52a04e276415e1bb3a087296665463828f9dea923f8fe7",
+      "tests": 2,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_payment_idempotency_lifecycle.py",
+      "lines": 297,
+      "sha256": "526b2ec144d35414b3b1c2e80dbce5f140ae5a73b0aa5aae0339ced3444c7520",
+      "tests": 5,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_payment_official_import.py",
+      "lines": 262,
+      "sha256": "4e0690bfdfad9e4d4879767a2cf9788c1b0328f22abba735ef7a0941126d8794",
+      "tests": 4,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_payment_provider_dispatcher.py",
+      "lines": 113,
+      "sha256": "79cd98343e9615426a885233cabbee4ed719669ad9a52ff28e11b8f50559a449",
+      "tests": 8,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_payment_quote.py",
+      "lines": 122,
+      "sha256": "c293dc71a76b25773545321700f966d37b587db636249375f0f5ed1602492054",
+      "tests": 2,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_payment_recap.py",
+      "lines": 16,
+      "sha256": "20c2e0bb98fe32ebd373ead92d9332edff3c8a11578fe5ca3bc73da8071d0c18",
+      "tests": 1,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_payment_reconciliation.py",
+      "lines": 20,
+      "sha256": "4b64f289f5dee5cb35ea0c0c3ab46b7bb34c599e1b44cf0f8656dad7f676e652",
+      "tests": 2,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_payment_reconciliation_extra.py",
+      "lines": 12,
+      "sha256": "a7b490c397a44f6543191a31a28e5af13aaee1a6578851da9b1220b2543a11c7",
+      "tests": 1,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_payment_reconciliation_filters.py",
+      "lines": 12,
+      "sha256": "80c02e9ab96d057d07a6302d2002a08526f0bdfd5194e52581fd06f2fb377cc4",
+      "tests": 1,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_payment_refund_workflow.py",
+      "lines": 413,
+      "sha256": "e4a52a8887f075068a2aa9d5da0d2c2c512cf635d15cefc07c96df21f8723898",
+      "tests": 6,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_payment_security_invariants.py",
+      "lines": 195,
+      "sha256": "9d3fb13ad1dbf691af9b5eacbf6c3ef83a3ef2769be1c5988f2511e0fe6601a6",
+      "tests": 6,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_payment_service.py",
+      "lines": 8,
+      "sha256": "c0f79f73d2b84613612e99191548828defa1fbf0033dc5180f2324829378c25b",
+      "tests": 1,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_pdf_service.py",
+      "lines": 45,
+      "sha256": "55e5ac540d836bf9c5660da794695060b87d41c4d9dae68a09694055466f397c",
+      "tests": 2,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_postgres_backup_script.py",
+      "lines": 129,
+      "sha256": "e291f2fbe0ade92b66e046f6e12253b5e63eb8044571fd247ea7fb760e3569de",
+      "tests": 12,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_pra_scripts.py",
+      "lines": 93,
+      "sha256": "dac4de241956c0781e7739f38569ebada0f31222516feff062c7c292698e6234",
+      "tests": 8,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_production_secrets.py",
+      "lines": 80,
+      "sha256": "86165233226c5274f7063eeb0e3eaee2d8e77f6bb42dfd8db133307c92118c9a",
+      "tests": 9,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_pwa_tarifs_refunds.py",
+      "lines": 519,
+      "sha256": "71596fcb642e5565978ef2bfe149d9b3d2cea99c3fefc2aa4d5e2d2c2085beee",
+      "tests": 52,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_qr_convocation.py",
+      "lines": 35,
+      "sha256": "ba87fa435576e1565b4f5843c95073885e9cc6f227cc3cdb592f83923ae9d3a4",
+      "tests": 1,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_question_governance.py",
+      "lines": 270,
+      "sha256": "989b06c52f24daf1eafa730bbcfaea42be4a23cab7d14018e8ab71978f518b4f",
+      "tests": 6,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_question_i18n.py",
+      "lines": 161,
+      "sha256": "1d4ded8e0969446f395f6505247aea9ddd888f0e12018bf3b2eee7ae8b109e0d",
+      "tests": 8,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_question_media_schema_compat.py",
+      "lines": 60,
+      "sha256": "0a3cd91340c62be946de185b9d082642a17fd8d15c9e61669053b72b49d7bcba",
+      "tests": 4,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_registration_booking_compatibility.py",
+      "lines": 146,
+      "sha256": "d5acec471151d2e67ee59a0b630bc5dff5236c2c85b8a27f8eee4e80ed9a0c7d",
+      "tests": 2,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_reliability_api.py",
+      "lines": 247,
+      "sha256": "726ac45ab7a2052a9fb755c001b105352d03cc60a8ed6f3d2e1989c82bd4a8bf",
+      "tests": 8,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_reliability_config.py",
+      "lines": 65,
+      "sha256": "62cd3b20458fd860f17e746926283a489cbb7b3944448106db9c58dd373beb08",
+      "tests": 4,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_reliability_evidence_provenance.py",
+      "lines": 168,
+      "sha256": "0a852259036bc1f09f3da518c93f7fa897830be5c14e6d55a73175b8af74e541",
+      "tests": 4,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_reliability_evidence_publisher.py",
+      "lines": 98,
+      "sha256": "d0836d267b1ec49e11b561483dd3de1886ffa0e6e0b65beef5df9ac2386c5893",
+      "tests": 5,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_reliability_evidence_time.py",
+      "lines": 39,
+      "sha256": "d307466c921069e1361b9171af18147f4c48d294a12facafa214501ce695ec2d",
+      "tests": 1,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_reliability_security.py",
+      "lines": 36,
+      "sha256": "dca488585fc4acfee62996ee960e7dcc883b6627a411722aaeaafc016d181f1f",
+      "tests": 3,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_render_deployment_fingerprint.py",
+      "lines": 261,
+      "sha256": "db166479bf8ee2455c4644ad7c278fefe3949b374ada3cdde5ee01d7e56f7013",
+      "tests": 14,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_rgpd_offline_cron.py",
+      "lines": 336,
+      "sha256": "50b38ef305653e9993e554500682f1e36fcc4b71c925db40ca3adedb3c943c7c",
+      "tests": 40,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_scheduled_notifications.py",
+      "lines": 395,
+      "sha256": "edd9da4f71886ffe2bed61daa7d918d1f6156af3d3da3b1b8a3b34fd61cbc3e2",
+      "tests": 25,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_secure_backup_bundle.py",
+      "lines": 97,
+      "sha256": "5d09a1beb78edd73ec7a4f057d99352966435bfa8032cf90f385991e1415ff70",
+      "tests": 5,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_security_refresh.py",
+      "lines": 135,
+      "sha256": "72924119d99b7d47cc38ce929ff55f15afbc7f5603307851581b40055debe741",
+      "tests": 7,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_seed_and_dashboard_kpis.py",
+      "lines": 175,
+      "sha256": "1fd3d5710563b5feed8b08121ec2da72fe6de086fe40be7ec99ff6efdad647e1",
+      "tests": 13,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_seed_demo_dntt.py",
+      "lines": 216,
+      "sha256": "ce34cfebc024e6a8c428888b0d8e7fa84a5845b7db5c813be7c0cc8319959b7d",
+      "tests": 6,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_seed_demo_safety.py",
+      "lines": 68,
+      "sha256": "aad0f45e21cdad4404bfdff62f1cdce754728ee8b0d37be34319d05049319df9",
+      "tests": 6,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_session_rules.py",
+      "lines": 428,
+      "sha256": "a51890d78eef754776fe41ba4aea1015058e13f3af57ddd43f74b055c48f91d2",
+      "tests": 16,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_sessions_extended.py",
+      "lines": 215,
+      "sha256": "45e573fed1274a65fe0fd8dc436aad36111f4b3950635597c2dbd9a3c535c0f7",
+      "tests": 15,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_soc_config.py",
+      "lines": 62,
+      "sha256": "302e07ad644013addf40dee519c02696922b9e631490c3234f86d1393199c403",
+      "tests": 5,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_soc_go_live_readiness.py",
+      "lines": 111,
+      "sha256": "d7bce797cc8b7629a22412ccc105e52fdf8452d107e6856baa2283cc12d8f397",
+      "tests": 6,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_soc_privacy.py",
+      "lines": 82,
+      "sha256": "bfd31b0c16744dde02ecc8b79de837576911dea19ace0f5f4b02958ff3991640",
+      "tests": 4,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_soc_runtime_security.py",
+      "lines": 49,
+      "sha256": "bb30634d6b496d6a094236434dbd3a827727a209cc4e78f4ab6c26607e559407",
+      "tests": 5,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_supervision_logs.py",
+      "lines": 47,
+      "sha256": "b511e3459995cc7266d5bc9997bbe34eb5bc79d5f7fbe695e6be50efa9a401d1",
+      "tests": 2,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_territory_supervision.py",
+      "lines": 79,
+      "sha256": "e8281f375654376f88a1dc871d2ecca5ee944fdec5405ac1a87b82bfd727d731",
+      "tests": 5,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_training_extended.py",
+      "lines": 232,
+      "sha256": "5be66d5918ee9afb5884141b3a6d9b2f3d3a7faf44d8d1272b9eff58c6cd1dfc",
+      "tests": 20,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_untested_routers.py",
+      "lines": 406,
+      "sha256": "eb679c8579682204cf95161ba8384df85e9e6ee680fcc20e1408a5750b31524a",
+      "tests": 29,
+      "routes": []
+    },
+    {
+      "path": "backend/tests/test_user_governance.py",
+      "lines": 194,
+      "sha256": "9184ef4fe44090e69bc008b65c975c2687139560bb0e79268fea6413f89d484b",
+      "tests": 7,
+      "routes": []
+    },
+    {
+      "path": "edge_agent/coderoute_edge/__init__.py",
+      "lines": 6,
+      "sha256": "080938f98af5eaf18b77d7f983e52c9150e0ba6701ba2cd10f4d6ead0b99c7be",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "edge_agent/coderoute_edge/__main__.py",
+      "lines": 25,
+      "sha256": "d3ff847cefde747d0b3e98c8ee6909fc6ec688e777428efe5726e60f9424603d",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "edge_agent/coderoute_edge/app.py",
+      "lines": 258,
+      "sha256": "7061194cb3e798cc6ffb865539e03d5b25ee5aac7ca8752b85b961be9b838ab1",
+      "tests": 0,
+      "routes": [
+        {
+          "line": 101,
+          "method": "get",
+          "path": "/health",
+          "function": "health"
+        },
+        {
+          "line": 111,
+          "method": "post",
+          "path": "/operator/heartbeat",
+          "function": "operator_heartbeat"
+        },
+        {
+          "line": 118,
+          "method": "post",
+          "path": "/operator/leases",
+          "function": "operator_activate"
+        },
+        {
+          "line": 140,
+          "method": "post",
+          "path": "/v1/claim",
+          "function": "candidate_claim"
+        },
+        {
+          "line": 161,
+          "method": "post",
+          "path": "/operator/sync/{attempt_id}",
+          "function": "operator_sync"
+        },
+        {
+          "line": 168,
+          "method": "get",
+          "path": "/operator/status",
+          "function": "operator_status"
+        },
+        {
+          "line": 177,
+          "method": "post",
+          "path": "/operator/releases/check",
+          "function": "operator_release_check"
+        },
+        {
+          "line": 184,
+          "method": "post",
+          "path": "/operator/releases/stage",
+          "function": "operator_release_stage"
+        },
+        {
+          "line": 191,
+          "method": "get",
+          "path": "/operator/releases/status",
+          "function": "operator_release_status"
+        },
+        {
+          "line": 195,
+          "method": "post",
+          "path": "/operator/releases/attest-install",
+          "function": "operator_release_attest_install"
+        },
+        {
+          "line": 202,
+          "method": "get",
+          "path": "/v1/exams/{attempt_id}",
+          "function": "candidate_exam"
+        },
+        {
+          "line": 217,
+          "method": "post",
+          "path": "/v1/exams/{attempt_id}/answers",
+          "function": "candidate_answer"
+        },
+        {
+          "line": 230,
+          "method": "post",
+          "path": "/v1/exams/{attempt_id}/finalize",
+          "function": "candidate_finalize"
+        },
+        {
+          "line": 242,
+          "method": "get",
+          "path": "/v1/exams/{attempt_id}/media/{digest}",
+          "function": "local_media"
+        }
+      ]
+    },
+    {
+      "path": "edge_agent/coderoute_edge/central.py",
+      "lines": 276,
+      "sha256": "a91d039b27a0e181d6dcf8ae72a9bb6a381cb742b98a8ca1702bbf1d157563b6",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "edge_agent/coderoute_edge/config.py",
+      "lines": 163,
+      "sha256": "46a6da3b18609b52685d273cda4a5f816665d1c4fca64e2138c9d5a465489839",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "edge_agent/coderoute_edge/crypto.py",
+      "lines": 88,
+      "sha256": "c0a587b55a3d68ffe42aa10d1f6648146c86d7642d1c05650de320bbf5e89faa",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "edge_agent/coderoute_edge/maintenance.py",
+      "lines": 136,
+      "sha256": "360dc189b736c3fcee4e2d3b15cf690fcd34c1d2a0fec082a84c57e68c8a3d8d",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "edge_agent/coderoute_edge/media.py",
+      "lines": 109,
+      "sha256": "9c5915026ef3026c0f4c86e5fffe4e7c7e321f40ec9c3e2cd1478fff82a8af33",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "edge_agent/coderoute_edge/operator_view.py",
+      "lines": 131,
+      "sha256": "1611ee1af0638f3b51eafabd55cd71a18120bc35e4f39d47c33161fc7f9c342f",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "edge_agent/coderoute_edge/release.py",
+      "lines": 224,
+      "sha256": "3f219e3436afdd75b4012c7eb714da06890b9ddd5f0916c12286cdf78e9ec2b8",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "edge_agent/coderoute_edge/release_trust.py",
+      "lines": 198,
+      "sha256": "303851fded4b187e39a49708d3e55f83fa3fca54d5184db0f757ee5cb0e3baea",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "edge_agent/coderoute_edge/service.py",
+      "lines": 178,
+      "sha256": "8b5209770a2f426d65c0b05b647d6a6016a2c04e78dfc72f9cdc603ca03ed962",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "edge_agent/coderoute_edge/store.py",
+      "lines": 410,
+      "sha256": "923503cbefbf6102f212dc220f23dd1ac8c9e6b867843e8acbbdfe5a9ebdaf02",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "edge_agent/coderoute_edge/system_update.py",
+      "lines": 335,
+      "sha256": "3be602352bdb96ff331d3e5f7933fb0048c8dfa90b2df239e9d85deb4e279c3e",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "edge_agent/coderoute_edge/tickets.py",
+      "lines": 26,
+      "sha256": "0d06e76c272f929ea7c2e3ceae66bdc3695da87553ff7a33b73bd453d209b205",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "edge_agent/coderoute_edge/updater.py",
+      "lines": 190,
+      "sha256": "098acb310c756af40c57b2ab850faf4708de15bbdd7d95af3f1a0caf0129ab6d",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "edge_agent/scripts/apply_verified_release.py",
+      "lines": 35,
+      "sha256": "57167b3914b81d349cbc4988613b70599be20823e583e71c26cdd28741d6b92b",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "edge_agent/scripts/build_release_artifact.py",
+      "lines": 122,
+      "sha256": "efb24c80ab226c568f608da9e3b071dbf2f186b6bc744acf07d99ad4f56837ad",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "edge_agent/scripts/build_runtime_lock.py",
+      "lines": 53,
+      "sha256": "aa3a470169ee591ef7c6012f09370b14f0776be8dd17866aeb336a86b4c14c11",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "edge_agent/scripts/run_system_update.py",
+      "lines": 111,
+      "sha256": "1d8961096dd3541cd93bc3470aca8b6268d2836f6e8c1d737d7feb0b580328a9",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "edge_agent/tests/test_agent.py",
+      "lines": 247,
+      "sha256": "3f0cca0a5c84dfe0c8aa88aa7f7f1642de2c90f3c8a07dc10ad79864ddcd8bbb",
+      "tests": 4,
+      "routes": []
+    },
+    {
+      "path": "edge_agent/tests/test_claim.py",
+      "lines": 80,
+      "sha256": "9fe6c61dfb2ada7e4c59a4c8b843a16a8097e16a10f1ff23a87bad553146f371",
+      "tests": 2,
+      "routes": []
+    },
+    {
+      "path": "edge_agent/tests/test_fleet_telemetry.py",
+      "lines": 53,
+      "sha256": "fec5824bd10d5a222e7aa240d971ee022a6130a966bc2d96dc2ac82d8babd760",
+      "tests": 1,
+      "routes": []
+    },
+    {
+      "path": "edge_agent/tests/test_maintenance.py",
+      "lines": 72,
+      "sha256": "08417299850205f5648a378566a72d66d070998c9d95a9f47982159b63c45a2c",
+      "tests": 4,
+      "routes": []
+    },
+    {
+      "path": "edge_agent/tests/test_media_ticket.py",
+      "lines": 14,
+      "sha256": "c34295b0a2685aad3eaf97032cd3edbf8ae7552f17e2fda50baf229ff0df72ee",
+      "tests": 1,
+      "routes": []
+    },
+    {
+      "path": "edge_agent/tests/test_operator_view.py",
+      "lines": 127,
+      "sha256": "769a9193ffa90c2173ad41a59212b18aec9031cdaa43f128889364cbd6f44703",
+      "tests": 2,
+      "routes": []
+    },
+    {
+      "path": "edge_agent/tests/test_operator_view_corruption.py",
+      "lines": 56,
+      "sha256": "f560590f04da01790c45aca6c8f93c64a3132f7926e5ddcaf91a2dd126a32824",
+      "tests": 1,
+      "routes": []
+    },
+    {
+      "path": "edge_agent/tests/test_release_artifact_builder.py",
+      "lines": 75,
+      "sha256": "89917007c59bb298ab2b4b9c19257c310097980ff01b263fc6dd7d9b67528012",
+      "tests": 2,
+      "routes": []
+    },
+    {
+      "path": "edge_agent/tests/test_release_key_rotation.py",
+      "lines": 73,
+      "sha256": "84b02b9b2828695e9c42fab591ba60375a97644e252f06adba7f03f704f1c80d",
+      "tests": 2,
+      "routes": []
+    },
+    {
+      "path": "edge_agent/tests/test_release_manager.py",
+      "lines": 151,
+      "sha256": "3a1302601b3e889d46442f9feadce2a5837bf62fffedefc04512adcf569d54e6",
+      "tests": 5,
+      "routes": []
+    },
+    {
+      "path": "edge_agent/tests/test_release_trust.py",
+      "lines": 97,
+      "sha256": "86a17929d40ca8ecfce498fd16472d4f145587feaa12674e2c3de0ec188c7781",
+      "tests": 3,
+      "routes": []
+    },
+    {
+      "path": "edge_agent/tests/test_runtime_lock_builder.py",
+      "lines": 55,
+      "sha256": "e211d75bb1db03c81a5a0865443fcb99abb34fb9bba2a846fb4f3d142d68cee0",
+      "tests": 2,
+      "routes": []
+    },
+    {
+      "path": "edge_agent/tests/test_system_update.py",
+      "lines": 289,
+      "sha256": "a175081c78a2d854e02253fde5156f61a622443cc56641171449884653ca70fb",
+      "tests": 6,
+      "routes": []
+    },
+    {
+      "path": "edge_agent/tests/test_system_update_reauthorization.py",
+      "lines": 114,
+      "sha256": "116f6e2d0b06bf81f4509da2ad51f70497aeb02df8983c2ad1799c2d0293148b",
+      "tests": 2,
+      "routes": []
+    },
+    {
+      "path": "edge_agent/tests/test_systemd_hardening.py",
+      "lines": 37,
+      "sha256": "fb14be9fbca9ef029c474f3218f220a2f9a5e9ad7f7ae129ef7b927a844537af",
+      "tests": 3,
+      "routes": []
+    },
+    {
+      "path": "edge_agent/tests/test_updater.py",
+      "lines": 125,
+      "sha256": "932a8c8a843ca973192c0184c8cbb63c390c6deb98a50b7894704653827f2f54",
+      "tests": 4,
+      "routes": []
+    },
+    {
+      "path": "scripts/apply_github_main_ruleset.py",
+      "lines": 319,
+      "sha256": "d2078257bc11998df11e7d772f3381fb42b0b748bf57d239e39ba21ad77d116e",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "scripts/audit_media_library.py",
+      "lines": 242,
+      "sha256": "f98931cacd535e0c56911bfae324cc3ffd00938b77a1b5785cc8d22aaafbaf1d",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "scripts/demo_rehearsal.py",
+      "lines": 149,
+      "sha256": "3c7a40a97f1ad49f13198419fc432a51ee32122fef9b686698c63dadef39d19b",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "scripts/dr_readiness_check.py",
+      "lines": 141,
+      "sha256": "081ac741cea64bb6e82998c764c0e36be396963d4b4d3e9338e57a03b8e1cb56",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "scripts/generate_edge_identity.py",
+      "lines": 91,
+      "sha256": "7c88a9ac2078d41ab842d49afc87d394d283f85a508b4c1c092271e71ec481b1",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "scripts/import_audio.py",
+      "lines": 208,
+      "sha256": "d3e396b7dbcca12df5729ebe4c103dc8e0f51d67eb7b4fb2e7ab148a0795de23",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "scripts/load_test.py",
+      "lines": 115,
+      "sha256": "237c0cc06d282eb3b5c06e31521dabca59f6cc67faf2baa6d8d8144008513ca9",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "scripts/postgres_backup.py",
+      "lines": 240,
+      "sha256": "12f6514af4d899b52fdee75a324e40008d1cd6afbaed660b4de817f90f4920f5",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "scripts/preflight_deploy.py",
+      "lines": 172,
+      "sha256": "4ca66ae4e3e951cf9f4d318f95b69000481643a1fb9415fc504cf4685fbd2550",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "scripts/smoke_local.py",
+      "lines": 93,
+      "sha256": "70bba8ae7aa8365f3da8cda1a17d7c974a7082cc5d98a09b1eb25ca5898cda13",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "scripts/vendor_realistic_training_media.py",
+      "lines": 165,
+      "sha256": "ac4ca54f4ab69ae9920ebeb9e59049926cf40a30dd99ec6460cb849b6021d06b",
+      "tests": 0,
+      "routes": []
+    },
+    {
+      "path": "scripts/verify_migrations.py",
+      "lines": 46,
+      "sha256": "8eb7e4b8e5a034519b761b12a3b40e9346d97b8bcca2a81defd936edfdf7e8a9",
+      "tests": 0,
+      "routes": []
+    }
+  ],
+  "frontend_files": [
+    "frontend/src/App.tsx",
+    "frontend/src/ErrorBoundary.tsx",
+    "frontend/src/api.ts",
+    "frontend/src/apiError.ts",
+    "frontend/src/audio.ts",
+    "frontend/src/auth.ts",
+    "frontend/src/authClient.ts",
+    "frontend/src/authSession.tsx",
+    "frontend/src/components/AdminExtras.tsx",
+    "frontend/src/components/AdminExtrasLegacy.tsx",
+    "frontend/src/components/AudioButton.tsx",
+    "frontend/src/components/CenterEdgeReleaseLocalPanel.tsx",
+    "frontend/src/components/EdgeReleasePanel.tsx",
+    "frontend/src/components/EdgeSupplyChainPanel.tsx",
+    "frontend/src/components/ExamMediaPremium.tsx",
+    "frontend/src/components/ExamMediaRuntime.tsx",
+    "frontend/src/components/LocaleSwitcher.tsx",
+    "frontend/src/components/MediaBatchMigrationWorkbench.tsx",
+    "frontend/src/components/MediaMigrationProgressPanel.tsx",
+    "frontend/src/components/MediaMigrationQueuePanel.tsx",
+    "frontend/src/components/MediaQuestionMappingWorkbench.tsx",
+    "frontend/src/components/MediaVideoSupportWorkbench.tsx",
+    "frontend/src/components/NationalDashboard.tsx",
+    "frontend/src/components/NationalGoLiveCommandCenter.tsx",
+    "frontend/src/components/NationalGovernancePanel.tsx",
+    "frontend/src/components/NationalHomologationEvidencePanel.tsx",
+    "frontend/src/components/NationalSecurityOperationsPanel.tsx",
+    "frontend/src/components/OfflineBanner.tsx",
+    "frontend/src/components/Pagination.tsx",
+    "frontend/src/components/Paginator.tsx",
+    "frontend/src/components/QrScanner.tsx",
+    "frontend/src/components/QuestionsAdminPanelPremium.tsx",
+    "frontend/src/components/live-dashboard.tsx",
+    "frontend/src/components/login-form.tsx",
+    "frontend/src/components/mediaUploadPolicy.ts",
+    "frontend/src/components/pwa-install-prompt.tsx",
+    "frontend/src/components/theme-toggle.tsx",
+    "frontend/src/deviceIdentity.ts",
+    "frontend/src/edgeExamBootstrap.ts",
+    "frontend/src/edgeExamFetchBridge.ts",
+    "frontend/src/edgeExamSession.ts",
+    "frontend/src/edgeFleetClient.ts",
+    "frontend/src/edgeOperatorClient.ts",
+    "frontend/src/edgeReleaseClient.ts",
+    "frontend/src/examDeviceFetchBridge.ts",
+    "frontend/src/hooks/useIsMobile.ts",
+    "frontend/src/i18n/index.ts",
+    "frontend/src/icons.tsx",
+    "frontend/src/main.tsx",
+    "frontend/src/media-library.css",
+    "frontend/src/mediaApi.ts",
+    "frontend/src/mediaMigrationPlanApi.ts",
+    "frontend/src/mediaProgressApi.ts",
+    "frontend/src/mediaQuestionApi.ts",
+    "frontend/src/mediaQueueApi.ts",
+    "frontend/src/mediaVideoApi.ts",
+    "frontend/src/nationalGovernanceClient.ts",
+    "frontend/src/pages.tsx",
+    "frontend/src/pages/CenterEdgeOperationsPage.tsx",
+    "frontend/src/pages/EdgeExamEntry.tsx",
+    "frontend/src/pages/EdgePendingPage.tsx",
+    "frontend/src/pages/admin.tsx",
+    "frontend/src/pages/candidate.tsx",
+    "frontend/src/pages/center.tsx",
+    "frontend/src/pages/certificate-verify.tsx",
+    "frontend/src/pages/driving-school.tsx",
+    "frontend/src/pages/elearning.tsx",
+    "frontend/src/pages/exam.tsx",
+    "frontend/src/pages/examQuestions.ts",
+    "frontend/src/pages/home.tsx",
+    "frontend/src/pages/illustrations.tsx",
+    "frontend/src/pages/illustrations_signs.tsx",
+    "frontend/src/pages/index.ts",
+    "frontend/src/pages/institutional-dossier.tsx",
+    "frontend/src/pages/landing.tsx",
+    "frontend/src/pages/media-library-v2.tsx",
+    "frontend/src/pages/media-library.tsx",
+    "frontend/src/pages/ministerial.tsx",
+    "frontend/src/pages/register.tsx",
+    "frontend/src/pages/results.tsx",
+    "frontend/src/pages/shared-exam-components-legacy.tsx",
+    "frontend/src/pages/shared-exam-components.tsx",
+    "frontend/src/pages/training.tsx",
+    "frontend/src/paymentQuote.ts",
+    "frontend/src/premium-ui.css",
+    "frontend/src/reliabilityClient.ts",
+    "frontend/src/role.css",
+    "frontend/src/securityOperationsClient.ts",
+    "frontend/src/styles.css",
+    "frontend/src/vite-env.d.ts"
+  ],
+  "migrations": [
+    "backend/alembic/versions/0016_candidate_followups_optional_attempt.py",
+    "backend/alembic/versions/0017_payment_refund_workflow.py",
+    "backend/alembic/versions/20260617_0001_initial_schema.py",
+    "backend/alembic/versions/20260618_0002_question_media_fields.py",
+    "backend/alembic/versions/20260619_0003_explicit_ddl_and_rate_limit_table.py",
+    "backend/alembic/versions/20260620_0004_session_capacity_rules.py",
+    "backend/alembic/versions/20260623_0005_payment_external_reference.py",
+    "backend/alembic/versions/20260624_0006_missing_tables_and_fields.py",
+    "backend/alembic/versions/20260624_0007_indexes_and_candidat_schema.py",
+    "backend/alembic/versions/20260625_0008_users_center_id.py",
+    "backend/alembic/versions/20260701_0009_seed_admin.py",
+    "backend/alembic/versions/20260704_0010_national_scale_indexes.py",
+    "backend/alembic/versions/20260704_0011_candidate_registration_links.py",
+    "backend/alembic/versions/20260711_0012_question_validation_workflow.py",
+    "backend/alembic/versions/20260711_0013_question_translations.py",
+    "backend/alembic/versions/20260711_0014_audit_chain.py",
+    "backend/alembic/versions/20260810_0015_media_asset_architecture.py"
+  ],
+  "workflows": [
+    ".github/workflows/agent-branch-ci.yml",
+    ".github/workflows/backup.yml",
+    ".github/workflows/ci.yml",
+    ".github/workflows/edge-release-supply-chain.yml",
+    ".github/workflows/frontend-build-pr-ci.yml",
+    ".github/workflows/fullstack-business-e2e.yml",
+    ".github/workflows/go-live-evidence-pack-pr-ci.yml",
+    ".github/workflows/media-migration-readiness.yml",
+    ".github/workflows/national-code-readiness.yml",
+    ".github/workflows/national-go-live-command-center-contract.yml",
+    ".github/workflows/p10-2-reliability-pr-ci.yml",
+    ".github/workflows/p10-ha-pr-ci.yml",
+    ".github/workflows/p10-pitr-pr-ci.yml",
+    ".github/workflows/p11-go-live-gate-ci.yml",
+    ".github/workflows/p11-soc-pr-ci.yml",
+    ".github/workflows/p12-governance-pr-ci.yml",
+    ".github/workflows/render-deployment-fingerprint-ci.yml",
+    ".github/workflows/vendor-realistic-training-media-temp.yml",
+    ".github/workflows/verify-media-deployment.yml",
+    ".github/workflows/verify-render-deployment.yml"
+  ]
+}
