@@ -35,7 +35,9 @@ AUDIT_CHAIN_HMAC_KEY=$(secret)
 WEB_CONCURRENCY=3
 DB_POOL_SIZE=5
 DB_MAX_OVERFLOW=5
-MOBILE_MONEY_MODE=sandbox
+# Aucun paiement simulé en production (refus de démarrer sinon) ; sans
+# identifiants opérateurs, les paiements Mobile Money échouent.
+MOBILE_MONEY_MODE=production
 BREVO_API_KEY=
 SENTRY_DSN=
 ENV
