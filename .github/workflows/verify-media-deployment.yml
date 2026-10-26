@@ -1,8 +1,7 @@
 name: Verify Render Media Deployment
 
+# Render inactif (production sur le VPS OVH) : déclenchement manuel uniquement.
 on:
-  schedule:
-    - cron: '17 0,6,12,18 * * *'
   workflow_dispatch:
     inputs:
       frontend_url:

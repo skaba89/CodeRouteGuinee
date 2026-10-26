@@ -1,0 +1,6 @@
+# À copier dans /etc/cron.d/coderoute-offsite (root, mode 644) — chemin du
+# dépôt à adapter. Copie chiffrée des sauvegardes CodeRoute vers B2, après le
+# dump local de minuit (service db-backup) et décalée de la copie d'Academy (3 h).
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+30 3 * * * root /home/ubuntu/CodeRouteGuinee/deploy/vps/scripts/sauvegarde-distante.sh

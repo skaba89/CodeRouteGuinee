@@ -1,0 +1,25 @@
+# Site CodeRoute pour le Caddy d'Academy Guinéenne.
+# NE PAS ÉDITER deploy/vps/generated/coderoute.caddy : il est régénéré par
+# deploy.sh à partir de ce modèle (__CODEROUTE_DOMAIN__ ← .env.vps).
+__CODEROUTE_DOMAIN__ {
+	encode zstd gzip
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Frame-Options "DENY"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(self), microphone=(), geolocation=()"
+		-Server
+	}
+	request_body {
+		max_size 25MB
+	}
+	# /metrics et /docs ne sont jamais exposés.
+	@backend path /api/* /health /health/*
+	handle @backend {
+		reverse_proxy coderoute-backend:8000
+	}
+	handle {
+		reverse_proxy coderoute-frontend:4173
+	}
+}

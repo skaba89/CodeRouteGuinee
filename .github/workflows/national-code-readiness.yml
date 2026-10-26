@@ -219,7 +219,7 @@ jobs:
           assert backend['numInstances'] == 2
           assert backend['healthCheckPath'] == '/health/readiness'
           for service in (backend, backup, frontend):
-              assert service['autoDeployTrigger'] == 'checksPass', f"{service['name']} must deploy only after CI checks pass"
+              assert service['autoDeployTrigger'] == 'off', f"{service['name']} : Render inactif, production sur le VPS (deploy/vps)"
 
           assert env['HA_MODE']['value'] == 'true'
           assert env['EXPECTED_API_INSTANCES']['value'] == '2'

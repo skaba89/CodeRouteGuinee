@@ -183,9 +183,9 @@ jobs:
               raise SystemExit(0)
 
           for service in (backend, backup, frontend):
-              assert service.get('autoDeployTrigger') == 'checksPass', service['name']
+              assert service.get('autoDeployTrigger') == 'off', service['name']  # Render inactif (deploy/vps)
           verifier = verifier_path.read_text(encoding='utf-8')
           for marker in ('DEPLOYED_SHA_MATCH', 'RENDER_GIT_COMMIT_PRESENT', 'coderoute_render_deployment_receipt_v1'):
               assert marker in verifier, marker
-          print('Render fingerprint + checksPass contract: OK')
+          print('Render fingerprint contract (inactive, auto-deploy off): OK')
           PY
