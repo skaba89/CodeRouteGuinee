@@ -284,6 +284,9 @@ class QuestionOfficialImportResult(BaseModel):
     updated: int
     skipped: int
     question_ids: list[str]
+    # Questions déjà validées dont le contenu change : renvoyées en brouillon.
+    returned_to_validation: int = 0
+    returned_to_validation_ids: list[str] = []
 
 
 class QuestionGovernanceDecisionCreate(BaseModel):

@@ -394,6 +394,8 @@ export type QuestionOfficialImportResult = {
   updated: number;
   skipped: number;
   question_ids: string[];
+  returned_to_validation?: number;
+  returned_to_validation_ids?: string[];
 };
 
 export type InstitutionalAuthorization = {

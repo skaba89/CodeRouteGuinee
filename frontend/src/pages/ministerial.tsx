@@ -186,7 +186,9 @@ export function MinisterialPage() {
           return { category: cat, text, options: [opt1,opt2,opt3,opt4].filter(Boolean), correct_answer: correct, is_active: true };
         });
         const r = await importOfficialQuestions('csv_import', `Import CSV ${importFile.name}`, rows, true);
-        setImportStatus(` Aperçu import : ${r.created ?? 0} nouvelles questions sur ${count} lignes`);
+        const toRevalidate = r.returned_to_validation ?? 0;
+        setImportStatus(` Aperçu import : ${r.created ?? 0} nouvelles questions sur ${count} lignes`
+          + (toRevalidate ? ` — ${toRevalidate} question(s) validée(s) modifiée(s) repasseront en validation` : ''));
       }
     } catch (err) {
       setImportStatus(` Erreur import : ${errMsg(err)}`);
