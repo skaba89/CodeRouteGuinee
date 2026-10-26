@@ -33,6 +33,14 @@ SUPER_PASS = "SuperAdminPilote2026!"
 
 @pytest.fixture(scope="module")
 def client():
+    # Le seed pilote exige une dérogation explicite hors développement
+    # (seed_pilote_conakry._guard). Base SQLite en mémoire : jetable.
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setenv("ALLOW_DEMO_SEED_NON_DEV", "true")
+        yield from _client()
+
+
+def _client():
     init_db()
     # Créer un super_admin de test
     db = SessionLocal()
