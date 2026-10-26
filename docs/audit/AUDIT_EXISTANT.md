@@ -59,7 +59,7 @@ des examens officiels** tant que les points critiques C1 à C5 ne sont pas levé
 | M2 | `create_all` est non bloquant en cas d'échec (dégradation silencieuse). `AUTO_CREATE_TABLES=True` par défaut. | `db/session.py:106-117`, `core/config.py:21` |
 | M3 | Notifications : les exceptions sont capturées en bloc ; un échec d'envoi n'est que tracé dans Sentry, sans file de réessai. | `routers/exams.py:688-727` |
 | M4 | URL de certificat codée en dur (`https://api.coderoute.gov.gn/...`) dans le flux de soumission, alors qu'un réglage `public_app_url` existe. | `routers/exams.py` (3 occurrences dans `app/`) |
-| M5 | Questions encore lisibles après expiration : le statut `expired` n'est pas dans la liste de refus de `GET /questions`. | `routers/exams.py:452` |
+| M5 | ~~Questions encore lisibles après expiration~~ — **voulu** : la reprise d'une tentative `expired` recharge les questions avant de la finaliser (`timeout-submit`), et aucune réponse n'est acceptée après l'échéance. Pas de correctif. | `routers/exam_media_guard.py:86`, `frontend/src/pages/exam.tsx:280-315` |
 | M6 | Rattachement candidat ↔ compte par **égalité d'e-mail** en plus de `user_id` : un dossier créé par une auto-école avec l'e-mail d'un tiers devient accessible au compte qui porte cet e-mail. Exploitabilité **à vérifier**. | `routers/exams.py:338-342`, `routers/exam_runtime.py:37-41` |
 | M7 | Médias de démonstration tronqués (3 webp de 7,5 Ko et 1 mp4 de 7,5 Ko, illisibles). | `frontend/public/media/exam/guinea/` |
 | M8 | Audio en langues nationales annoncé, mais **aucun enregistrement** : les dossiers `frontend/public/audio/{ff,man,sus,kss,gkp,lom}` sont vides, et la synthèse vocale du navigateur ne couvre pas ces langues. | `question_i18n.py:18-37`, `frontend/public/audio/` |
@@ -81,7 +81,7 @@ Voir `MATRICE_FONCTIONNELLE.md` (73 fonctionnalités classées : 41 ✅, 12 🟡
 | Affirmation du README | Réalité |
 |---|---|
 | « Banque de 19 600 questions — 8 catégories, 8 langues » | 40 questions officielles + 160 d'entraînement, en français uniquement ; 0 traduction, 0 audio |
-| « 111 endpoints », « 5 migrations », « 404+ tests » | Plus de 55 routeurs, 17 migrations, 1 302 tests (1 312 cas exécutés en CI, couverture 84 %) |
+| « 111 endpoints », « 5 migrations », « 404+ tests » | 63 modules de routes, 17 migrations, 1 302 tests (1 312 cas exécutés en CI, couverture 84 %) |
 | « Certificats numériques — QR code vérifiable publiquement » | Vrai (`#/verifier/<id>`, `GET /exams/{id}/certificate/verify`) |
 | « Paiements Mobile Money — Orange, Wave, MTN, Moov » | Dispatcher et webhooks signés présents ; intégrations réelles **non vérifiées** (sandbox en démo) |
 | « Anti-fraude — monitoring examen » | API présente mais non alimentée par le poste candidat (E6) ; détection statistique par centre présente (`center_anomalies.py`) |
