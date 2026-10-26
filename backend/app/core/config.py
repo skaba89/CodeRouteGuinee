@@ -3,7 +3,9 @@ Configuration CodeRoute Guinée — chargée depuis les variables d'environnemen
 Aucun secret réel ne doit figurer dans ce fichier.
 """
 from __future__ import annotations
+
 from functools import lru_cache
+
 from pydantic_settings import BaseSettings
 
 
@@ -113,7 +115,7 @@ class Settings(BaseSettings):
 
     @property
     def is_production(self) -> bool:
-        return self.environment.lower() == "production"
+        return self.environment.strip().lower() == "production"
 
     def validate_production_secrets(self) -> None:
         """Refuse de démarrer en production avec des secrets absents, factices ou faibles."""
@@ -129,6 +131,12 @@ class Settings(BaseSettings):
         MIN_SECRET_LENGTH = 32
 
         errors: list[str] = []
+
+        if self.mobile_money_mode.strip().lower() != "production":
+            errors.append(
+                "MOBILE_MONEY_MODE doit être production lorsque ENVIRONMENT=production ; "
+                "les paiements simulés sont interdits"
+            )
 
         def _is_placeholder(v: str, name: str) -> None:
             if not v or not v.strip() or any(p in v for p in PLACEHOLDER_SUBSTRINGS):
