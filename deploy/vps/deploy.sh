@@ -14,7 +14,10 @@ DOMAIN="$(sed -n 's/^CODEROUTE_DOMAIN=//p' "$ENV_FILE" | tr -d '"'"'"' ' | tail 
 [[ "$DOMAIN" =~ ^[a-z0-9.-]+$ ]] || { echo "❌ CODEROUTE_DOMAIN invalide dans $ENV_FILE"; exit 1; }
 
 git pull --ff-only
-sudo docker network inspect coderoute-edge >/dev/null 2>&1 || sudo docker network create coderoute-edge >/dev/null
+# Le réseau vers Caddy appartient au projet Academy (nom fixe « coderoute-edge ») :
+# le créer ici le rendrait inutilisable par le compose d'Academy.
+sudo docker network inspect coderoute-edge >/dev/null 2>&1 \
+  || { echo "❌ Réseau coderoute-edge absent : redéployer Academy (raccordement Caddy) d'abord."; exit 1; }
 
 $C build --pull
 $C up -d --wait postgres
@@ -26,10 +29,11 @@ $C exec -T backend curl -fsS -H "Host: ${DOMAIN}" http://127.0.0.1:8000/health/r
   || { echo "❌ API non prête : voir « $C logs backend »"; exit 1; }
 
 # Site Caddy (lu par le Caddy d'Academy, voir README « Raccordement à Caddy »).
-mkdir -p deploy/vps/generated
-sed "s/__CODEROUTE_DOMAIN__/${DOMAIN}/g" deploy/vps/coderoute.caddy.template > deploy/vps/generated/coderoute.caddy
+# Le dossier peut avoir été créé par Docker (root) au montage côté Academy.
+sudo mkdir -p deploy/vps/generated
+sed "s/__CODEROUTE_DOMAIN__/${DOMAIN}/g" deploy/vps/coderoute.caddy.template \
+  | sudo tee deploy/vps/generated/coderoute.caddy >/dev/null
 if sudo docker exec "$CADDY_CONTAINER" test -f /etc/caddy/sites/coderoute.caddy 2>/dev/null; then
-  sudo docker network connect coderoute-edge "$CADDY_CONTAINER" 2>/dev/null || true
   sudo docker exec "$CADDY_CONTAINER" caddy reload --config /etc/caddy/Caddyfile
 else
   echo "⚠️  Caddy n'est pas encore raccordé à CodeRoute : site non publié (voir README)."
