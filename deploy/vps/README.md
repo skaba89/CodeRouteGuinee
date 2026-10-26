@@ -1,13 +1,15 @@
 # Production CodeRoute sur le VPS OVH (depuis octobre 2026)
 
-CodeRoute tourne sur le **même VPS qu'Academy Guinéenne**, dans son propre
-projet Docker Compose (`coderoute-prod`). Render n'est plus utilisé
+CodeRoute tourne sur le VPS OVH partagé (Academy Guinéenne, Kora Finance…),
+dans son propre projet Docker Compose (`coderoute-prod`). Le HTTPS est assuré
+par le **proxy commun du VPS**, `~/vps-proxy` : projet Caddy indépendant de
+toutes les applications, seul à publier 80/443. Render n'est plus utilisé
 (`render.yaml` conservé pour mémoire, déploiement automatique désactivé).
 
 ```text
-Internet ─► Caddy d'Academy (80/443, HTTPS Let's Encrypt)
-              ├─ domaine Academy ─► Academy
-              └─ CODEROUTE_DOMAIN ─► réseau « coderoute-edge »
+Internet ─► ~/vps-proxy (Caddy, 80/443, HTTPS Let's Encrypt)
+              ├─ academy-guineenne.org, kora…, minefleet… ─► autres applications
+              └─ CODEROUTE_DOMAIN ─► réseau externe « edge »
                                         ├─ /api, /health ─► coderoute-backend:8000
                                         └─ le reste      ─► coderoute-frontend:4173
                  réseau interne ─► PostgreSQL 16 + db-backup (dump quotidien)
@@ -23,8 +25,9 @@ ports publiés : un `ports:` ouvrirait le service à Internet malgré le pare-fe
 |---|---|
 | `docker-compose.vps.yml` | PostgreSQL, API, frontend, sauvegarde locale ; aucun port publié |
 | `deploy.sh` | Mise à jour : pull → build → migrations → redémarrage → site Caddy → contrôle |
-| `coderoute.caddy.template` | Bloc de site Caddy ; `deploy.sh` génère `generated/coderoute.caddy` |
+| `coderoute.caddy.template` | Site du proxy commun ; `deploy.sh` l'écrit dans `~/vps-proxy/sites/coderoute.caddy` puis recharge |
 | `.env.vps.example` | Modèle de `.env.vps` (racine du dépôt, jamais commité) |
+| `scripts/generer-env.sh` | Crée `.env.vps` avec des secrets aléatoires, jamais affichés (refuse d'écraser) |
 | `scripts/creer-admin.sh` | Premier super-administrateur (mot de passe saisi sans écho) |
 | `scripts/configurer-sauvegarde-b2.sh` | Copie chiffrée vers Backblaze B2 : dossier et clés propres à CodeRoute |
 | `scripts/sauvegarde-distante.sh` + `coderoute-offsite.cron` | Copie nocturne (3 h 30, après celle d'Academy) |
@@ -38,28 +41,24 @@ modifier `CODEROUTE_DOMAIN` dans `.env.vps`, puis `./deploy/vps/deploy.sh`
 
 ## Première installation
 
-1. `cp deploy/vps/.env.vps.example .env.vps && chmod 600 .env.vps`, puis
-   remplir chaque secret avec `openssl rand -hex 32` (valeurs toutes différentes).
+1. `./deploy/vps/scripts/generer-env.sh` (ou copier `.env.vps.example`).
    **Sauvegarder `AUDIT_CHAIN_HMAC_KEY` hors du VPS.**
-2. Raccorder le Caddy d'Academy (une seule fois, voir ci-dessous).
+2. Prérequis : proxy commun installé (`~/vps-proxy`, réseau `edge`).
 3. `./deploy/vps/deploy.sh` — s'arrête en erreur si `/health/readiness` n'est pas `ready`.
 4. `./deploy/vps/scripts/creer-admin.sh`, puis activer la 2FA du compte.
 5. Sauvegardes distantes : `sudo ./deploy/vps/scripts/configurer-sauvegarde-b2.sh`,
    puis `sudo cp deploy/vps/coderoute-offsite.cron /etc/cron.d/coderoute-offsite`.
 
-## Raccordement au Caddy d'Academy (modification du dépôt Academy)
+## Proxy commun (`~/vps-proxy`)
 
-À faire dans `gestion-scolaire-pro`, avec validation (infra Academy) :
-
-- `deploy/vps/Caddyfile` : ajouter en fin de fichier `import /etc/caddy/sites/*.caddy` ;
-- `deploy/vps/docker-compose.vps.yml`, service `caddy` :
-  - volume `${CODEROUTE_CADDY_SITES_DIR:-/home/ubuntu/CodeRouteGuinee/deploy/vps/generated}:/etc/caddy/sites:ro` ;
-  - réseau externe `coderoute-edge` (déclaré `external: true`) ;
-- redéployer Academy (`./deploy/vps/deploy.sh`) : Caddy est recréé une fois.
-
-Ensuite, chaque `deploy.sh` de CodeRoute recharge Caddy (`caddy reload`,
-sans coupure pour Academy). Retour arrière : retirer la ligne `import` et le
-volume, redéployer Academy.
+- CodeRoute rejoint le réseau externe `edge` avec les alias `coderoute-backend`
+  et `coderoute-frontend` ; aucune autre application n'est touchée.
+- `deploy.sh` écrit `~/vps-proxy/sites/coderoute.caddy`, puis lance
+  `~/vps-proxy/reload.sh` (validation + rechargement sans coupure). Si la
+  validation échoue, l'ancien fichier est remis en place.
+- Autre emplacement du proxy : `VPS_PROXY_DIR=/chemin ./deploy/vps/deploy.sh`.
+- Retirer CodeRoute du proxy : supprimer `~/vps-proxy/sites/coderoute.caddy`
+  puis `~/vps-proxy/reload.sh`.
 
 ## Mise à jour courante
 
@@ -105,7 +104,7 @@ sudo tail /var/log/coderoute-offsite.log
 
 Limites mémoire : PostgreSQL 768 Mo, API 768 Mo, frontend et sauvegarde 128 Mo
 chacun (~1,8 Go au total) ; 3 workers Gunicorn. Le VPS (6 vCPU, 11 Go) est
-partagé avec Academy et Kora Finance : un VPS dédié est recommandé avant une
+partagé avec Academy, Kora Finance et MineFleet : un VPS dédié est recommandé avant une
 exploitation nationale.
 
 ## Pas encore en place

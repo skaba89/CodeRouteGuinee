@@ -47,7 +47,7 @@ def test_local_compose_files_bind_ports_to_loopback_only() -> None:
 def test_vps_production_compose_publishes_no_port() -> None:
     compose = (ROOT / "deploy" / "vps" / "docker-compose.vps.yml").read_text(encoding="utf-8")
     assert not re.search(r"^\s+ports:", compose, re.MULTILINE), (
-        "La production VPS ne publie aucun port : seul le Caddy d'Academy est exposé."
+        "La production VPS ne publie aucun port : seul le proxy commun ~/vps-proxy est exposé."
     )
 
 
