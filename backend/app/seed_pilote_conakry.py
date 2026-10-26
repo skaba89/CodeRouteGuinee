@@ -1,23 +1,29 @@
 """
 Seed pilote Conakry — Centre unique, 50 candidats Permis B, paiement espèces.
-À exécuter UNE SEULE FOIS sur la base Neon de production du pilote.
+Données fictives réservées au développement ou à une base jetable explicitement
+autorisée. Toujours interdit en production, même avec un mot de passe personnalisé.
 
 Usage :
     cd /app && python -c "from app.seed_pilote_conakry import run; run()"
 """
 from __future__ import annotations
+
+import hashlib
 import logging
-from datetime import date, timedelta
+import os
+import uuid
+from datetime import date, datetime, timedelta
+from datetime import time as dtime
+
+from app.core.config import get_settings
 from app.db.session import SessionLocal
+from app.models_booking import Booking
 from app.models_candidate import Candidate
-from app.models_user import User
 from app.models_center import Center as ExamCenter
 from app.models_question import Question
 from app.models_session import ExamSession
-from app.models_booking import Booking
+from app.models_user import User
 from app.seed_full import seed_questions
-import uuid, hashlib, os
-from datetime import datetime, time as dtime
 
 log = logging.getLogger("seed.pilote")
 
@@ -106,7 +112,24 @@ def _hash_password(raw: str) -> str:
     return ctx.hash(raw)
 
 
+def _guard() -> None:
+    # Vérifier l'override effectif, même si Settings a été mis en cache avant
+    # un changement d'environnement. Aucun accès DB ne précède cette garde.
+    environment = os.environ.get("ENVIRONMENT", get_settings().environment).strip().lower()
+    if environment == "production":
+        raise RuntimeError(
+            "Seed pilote bloqué en production : comptes et données de démonstration. "
+            "Utiliser les imports officiels validés et app.bootstrap_admin."
+        )
+    if environment != "development" and os.environ.get("ALLOW_DEMO_SEED_NON_DEV") != "true":
+        raise RuntimeError(
+            "Seed pilote réservé au développement ; ALLOW_DEMO_SEED_NON_DEV=true "
+            "est requis uniquement pour une base jetable hors production."
+        )
+
+
 def run():
+    _guard()
     db = SessionLocal()
     try:
         log.info("=== SEED PILOTE CONAKRY ===")
@@ -177,7 +200,7 @@ def run():
         # 5. Sessions d'examen pilote (2 sessions demain : 9h et 14h, 35 max chacune)
         tomorrow = date.today() + timedelta(days=1)
         sessions = []
-        for i, hour in enumerate((9, 14), start=1):
+        for _i, hour in enumerate((9, 14), start=1):
             ref = f"SES-PILOT-{tomorrow.isoformat()}-{hour:02d}H"
             existing_s = db.query(ExamSession).filter_by(reference=ref).first()
             if existing_s:

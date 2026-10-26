@@ -18,6 +18,7 @@ from app.core.config import Settings
 def _settings(**overrides) -> Settings:
     base = dict(
         environment="production",
+        mobile_money_mode="production",
         secret_key=secrets.token_hex(32),
         csrf_secret=secrets.token_hex(32),
         database_url="postgresql://user:pass@host:5432/db",

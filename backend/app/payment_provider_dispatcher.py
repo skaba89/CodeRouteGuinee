@@ -5,6 +5,7 @@ import uuid
 from datetime import UTC, datetime
 from urllib.parse import urlparse
 
+from app.core.config import get_settings
 from app.mobile_money import (
     ProviderResult,
     _mtn_money_payment,
@@ -135,7 +136,17 @@ def dispatch_mobile_money_payment(provider: str, phone: str, amount_gnf: int) ->
     if normalized not in _CANONICAL_PROVIDERS:
         return _failed(normalized, f"Provider non supporté : {normalized or 'vide'}")
 
-    mode = os.environ.get("MOBILE_MONEY_MODE", "sandbox").strip().lower()
+    settings = get_settings()
+    # Relire les overrides effectifs : le cache Settings ne doit pas permettre
+    # de simuler un paiement après un changement de configuration du processus.
+    environment = os.environ.get("ENVIRONMENT", settings.environment).strip().lower()
+    mode = os.environ.get("MOBILE_MONEY_MODE", settings.mobile_money_mode).strip().lower()
+    if environment == "production" and mode != "production":
+        return _failed(
+            normalized,
+            "Paiement refusé : MOBILE_MONEY_MODE doit être production lorsque "
+            "ENVIRONMENT=production. Aucun paiement simulé n'est autorisé.",
+        )
     if mode != "production":
         if normalized == "celcom_money":
             return _celcom_money_payment_safe(phone, amount_gnf)
@@ -143,6 +154,29 @@ def dispatch_mobile_money_payment(provider: str, phone: str, amount_gnf: int) ->
 
     if normalized not in _PRODUCTION_PROVIDERS:
         return _failed(normalized, f"Provider {normalized} désactivé en production")
+
+    # Les providers historiques ont aussi leurs propres modes de test. Le
+    # mode global ne doit pas transformer une confirmation sandbox en recette.
+    if environment == "production" and normalized == "paydunya":
+        if os.environ.get("PAYDUNYA_MODE", "test") != "live":
+            return _failed(normalized, "Paiement refusé : PAYDUNYA_MODE doit être live en production.")
+    if environment == "production" and normalized == "mtn_money":
+        target = os.environ.get("MTN_MONEY_ENVIRONMENT", "sandbox").strip().lower()
+        try:
+            base_url = urlparse(os.environ.get("MTN_MONEY_BASE_URL", "https://sandbox.momodeveloper.mtn.com"))
+        except ValueError:
+            return _failed(normalized, "Paiement refusé : MTN_MONEY_BASE_URL invalide.")
+        if (
+            target in {"", "sandbox", "test", "development"}
+            or base_url.scheme != "https"
+            or not base_url.hostname
+            or "sandbox" in base_url.hostname.lower()
+        ):
+            return _failed(
+                normalized,
+                "Paiement refusé : configurer MTN_MONEY_ENVIRONMENT et MTN_MONEY_BASE_URL "
+                "pour le contrat réel, hors sandbox et en HTTPS.",
+            )
 
     try:
         if normalized == "orange_money":

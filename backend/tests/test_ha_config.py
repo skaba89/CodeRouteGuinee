@@ -6,6 +6,7 @@ from app.core.config import Settings
 def _production_settings(**overrides):
     values = {
         "environment": "production",
+        "mobile_money_mode": "production",
         "secret_key": "a-strong-secret-key-for-production-1234567890",
         "csrf_secret": "a-different-csrf-secret-for-production-0987654321",
         "database_url": "postgresql+psycopg://coderoute:secret@db.internal/coderoute",
