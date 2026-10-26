@@ -76,6 +76,21 @@ change rien en production tant que `deploy.sh` n'est pas lancé.
 
 ## Seeds et données
 
+`ENVIRONMENT=production` exige `MOBILE_MONEY_MODE=production`. Une ancienne
+configuration `.env.vps` restée en `sandbox` empêche le démarrage de l'API.
+Avant toute promotion, configurer le mode et les identifiants du fournisseur
+après contrat et recette isolée. Changer le mode ne configure pas les clés et
+ne prouve pas un encaissement. Sans fournisseur configuré, les paiements
+échouent ; les démonstrations simulées restent sur la stack locale de démo.
+Ne pas reclasser les paiements sandbox déjà enregistrés : ils nécessitent un
+rapprochement et une décision métier distincts.
+
+PayDunya exige aussi `PAYDUNYA_MODE=live`. Pour MTN, définir explicitement
+`MTN_MONEY_ENVIRONMENT` et `MTN_MONEY_BASE_URL` selon le contrat opérateur :
+les valeurs par défaut sandbox, les cibles de test et une URL non HTTPS sont
+refusées avant appel. Les identifiants et modes propres aux autres opérateurs
+doivent également être validés avec eux ; ce contrôle ne certifie pas leur contrat.
+
 Production = départ à zéro. Les seeds de démonstration sont refusés
 (`ENVIRONMENT=production`). Centres, candidats et banque officielle s'importent
 par l'administration, après validation DNTT. La démo DNTT se fait sur la stack
