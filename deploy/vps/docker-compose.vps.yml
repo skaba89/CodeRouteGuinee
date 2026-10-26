@@ -1,12 +1,12 @@
 # deploy/vps/docker-compose.vps.yml — Production CodeRoute sur le VPS OVH
-# (à côté d'Academy Guinéenne, voir deploy/vps/README.md).
+# (partagé avec d'autres applications, voir deploy/vps/README.md).
 #
 # Usage : ./deploy/vps/deploy.sh (ne pas lancer à la main sans --env-file).
 #
 # Règles :
 #   - AUCUN port publié sur l'hôte : Docker contourne ufw pour les ports
-#     publiés. Le seul point d'entrée public est le Caddy d'Academy, qui joint
-#     le réseau externe « coderoute-edge » ;
+#     publiés. Le seul point d'entrée public est le proxy HTTPS commun du VPS
+#     (projet indépendant ~/vps-proxy), joint par le réseau externe « edge » ;
 #   - migrations = étape séparée de deploy.sh, jamais au démarrage de l'API ;
 #   - seeds de démonstration impossibles (ENVIRONMENT=production).
 name: coderoute-prod
@@ -73,7 +73,7 @@ services:
     mem_limit: 768m
     networks:
       coderoute-internal:
-      coderoute-edge:
+      edge:
         aliases: [coderoute-backend]
 
   frontend:
@@ -92,7 +92,7 @@ services:
       retries: 3
     mem_limit: 128m
     networks:
-      coderoute-edge:
+      edge:
         aliases: [coderoute-frontend]
 
   db-backup:
@@ -123,6 +123,6 @@ networks:
   # Base et API seulement ; aucune sortie vers l'extérieur n'est nécessaire
   # pour PostgreSQL, mais l'API doit joindre Mobile Money, e-mail, SMS.
   coderoute-internal:
-  # Réseau partagé avec le Caddy d'Academy (créé par deploy.sh).
-  coderoute-edge:
+  # Réseau du proxy commun ~/vps-proxy (créé une fois pour tout le VPS).
+  edge:
     external: true

@@ -1,6 +1,7 @@
-# Site CodeRoute pour le Caddy d'Academy Guinéenne.
-# NE PAS ÉDITER deploy/vps/generated/coderoute.caddy : il est régénéré par
-# deploy.sh à partir de ce modèle (__CODEROUTE_DOMAIN__ ← .env.vps).
+# CodeRoute Guinée : API et frontend sur le réseau edge, alias coderoute-backend
+# et coderoute-frontend. Site du proxy commun (~/vps-proxy/sites/coderoute.caddy),
+# régénéré par deploy/vps/deploy.sh à partir de ce modèle (__CODEROUTE_DOMAIN__
+# ← .env.vps) : ne pas l'éditer à la main.
 __CODEROUTE_DOMAIN__ {
 	encode zstd gzip
 	header {

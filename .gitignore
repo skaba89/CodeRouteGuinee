@@ -36,4 +36,3 @@ nginx/certs/*.key
 
 # Production VPS : secrets et fichiers générés par deploy/vps/deploy.sh
 .env.vps
-deploy/vps/generated/
