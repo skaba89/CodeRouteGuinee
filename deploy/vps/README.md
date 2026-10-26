@@ -23,7 +23,7 @@ ports publiés : un `ports:` ouvrirait le service à Internet malgré le pare-fe
 |---|---|
 | `docker-compose.vps.yml` | PostgreSQL, API, frontend, sauvegarde locale ; aucun port publié |
 | `deploy.sh` | Mise à jour : pull → build → migrations → redémarrage → site Caddy → contrôle |
-| `coderoute.caddy.template` | Bloc de site Caddy ; `deploy.sh` génère `generated/coderoute.caddy` |
+| `coderoute.caddy.template` | Bloc de site pour le Caddy d'Academy ; `deploy.sh` génère `generated/coderoute.caddy` |
 | `.env.vps.example` | Modèle de `.env.vps` (racine du dépôt, jamais commité) |
 | `scripts/creer-admin.sh` | Premier super-administrateur (mot de passe saisi sans écho) |
 | `scripts/configurer-sauvegarde-b2.sh` | Copie chiffrée vers Backblaze B2 : dossier et clés propres à CodeRoute |
@@ -47,19 +47,23 @@ modifier `CODEROUTE_DOMAIN` dans `.env.vps`, puis `./deploy/vps/deploy.sh`
 5. Sauvegardes distantes : `sudo ./deploy/vps/scripts/configurer-sauvegarde-b2.sh`,
    puis `sudo cp deploy/vps/coderoute-offsite.cron /etc/cron.d/coderoute-offsite`.
 
-## Raccordement au Caddy d'Academy (modification du dépôt Academy)
+## Raccordement au Caddy d'Academy
 
-À faire dans `gestion-scolaire-pro`, avec validation (infra Academy) :
+Le Caddy d'Academy est le seul point d'entrée public du VPS. Côté Academy
+(`gestion-scolaire-pro`, section « Autres applications sur ce VPS » de son
+`deploy/vps/README.md`) :
 
-- `deploy/vps/Caddyfile` : ajouter en fin de fichier `import /etc/caddy/sites/*.caddy` ;
-- `deploy/vps/docker-compose.vps.yml`, service `caddy` :
-  - volume `${CODEROUTE_CADDY_SITES_DIR:-/home/ubuntu/CodeRouteGuinee/deploy/vps/generated}:/etc/caddy/sites:ro` ;
-  - réseau externe `coderoute-edge` (déclaré `external: true`) ;
-- redéployer Academy (`./deploy/vps/deploy.sh`) : Caddy est recréé une fois.
+- `Caddyfile` : `import /etc/caddy/sites/*.caddy` ;
+- service `caddy` : `deploy/vps/generated` de CodeRoute monté en lecture seule
+  sur `/etc/caddy/sites` (`CODEROUTE_CADDY_SITES_DIR` pour un autre chemin) ;
+- réseau `coderoute-edge` **créé par le projet Academy** ; CodeRoute s'y
+  raccorde en `external`.
 
-Ensuite, chaque `deploy.sh` de CodeRoute recharge Caddy (`caddy reload`,
-sans coupure pour Academy). Retour arrière : retirer la ligne `import` et le
-volume, redéployer Academy.
+Ordre : redéployer Academy une fois (Caddy recréé, quelques secondes), puis
+`./deploy/vps/deploy.sh` de CodeRoute, qui s'arrête si le réseau manque.
+Ensuite, chaque déploiement CodeRoute recharge Caddy (`caddy reload`, sans
+coupure pour Academy). Retour arrière : vider `deploy/vps/generated/` puis
+`sudo docker exec gestion-scolaire-pro-caddy-1 caddy reload --config /etc/caddy/Caddyfile`.
 
 ## Mise à jour courante
 
