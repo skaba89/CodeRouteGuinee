@@ -1,0 +1,49 @@
+........................FFF.................                             [100%]
+=================================== FAILURES ===================================
+_______________ test_root_trust_accepts_matching_signed_p9_stage _______________
+
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-2/test_root_trust_accepts_matchi0')
+
+    def test_root_trust_accepts_matching_signed_p9_stage(tmp_path: Path) -> None:
+        staged, trust = _signed_stage(tmp_path)
+>       verified = verify_staged_release_for_root(staged, release_root=tmp_path / "releases", trust_store_path=trust)
+E       TypeError: verify_staged_release_for_root() missing 3 required keyword-only arguments: 'expected_node_id', 'expected_center_id', and 'expected_current_version'
+
+edge_agent/tests/test_release_trust.py:73: TypeError
+_____ test_root_trust_rejects_manifest_tampered_after_daemon_verification ______
+
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-2/test_root_trust_rejects_manife0')
+
+    def test_root_trust_rejects_manifest_tampered_after_daemon_verification(tmp_path: Path) -> None:
+        staged, trust = _signed_stage(tmp_path)
+        staged["manifest"]["software_version"] = "edge-agent-9.9.9"
+        staged["software_version"] = "edge-agent-9.9.9"
+        staged["manifest_hash"] = sha256_hex(canonical_json(staged["manifest"]))
+        with pytest.raises(RuntimeError, match="Signature Ed25519"):
+>           verify_staged_release_for_root(staged, release_root=tmp_path / "releases", trust_store_path=trust)
+E           TypeError: verify_staged_release_for_root() missing 3 required keyword-only arguments: 'expected_node_id', 'expected_center_id', and 'expected_current_version'
+
+edge_agent/tests/test_release_trust.py:85: TypeError
+________ test_root_trust_rejects_untrusted_key_and_writable_trust_store ________
+
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-2/test_root_trust_rejects_untrus0')
+
+    def test_root_trust_rejects_untrusted_key_and_writable_trust_store(tmp_path: Path) -> None:
+        staged, trust = _signed_stage(tmp_path)
+        trust.write_text(json.dumps({"trusted_keys": [{"key_id": "other", "public_key_b64": "x"}]}), encoding="utf-8")
+        with pytest.raises(RuntimeError, match="non approuvée"):
+>           verify_staged_release_for_root(staged, release_root=tmp_path / "releases", trust_store_path=trust)
+E           TypeError: verify_staged_release_for_root() missing 3 required keyword-only arguments: 'expected_node_id', 'expected_center_id', and 'expected_current_version'
+
+edge_agent/tests/test_release_trust.py:92: TypeError
+=============================== warnings summary ===============================
+../../../../tmp/coderoute-audit-venv/lib/python3.12/site-packages/starlette/testclient.py:40
+  /tmp/coderoute-audit-venv/lib/python3.12/site-packages/starlette/testclient.py:40: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+    _PortalFactoryType = typing.Callable[[], typing.ContextManager[anyio.abc.BlockingPortal]]
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED edge_agent/tests/test_release_trust.py::test_root_trust_accepts_matching_signed_p9_stage
+FAILED edge_agent/tests/test_release_trust.py::test_root_trust_rejects_manifest_tampered_after_daemon_verification
+FAILED edge_agent/tests/test_release_trust.py::test_root_trust_rejects_untrusted_key_and_writable_trust_store
+3 failed, 41 passed, 1 warning in 0.54s

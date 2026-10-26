@@ -1,0 +1,16 @@
+{
+  "PAY-01": {
+    "startup_accepts_default_mode": "sandbox",
+    "runtime_status": "paid",
+    "network_calls": 0
+  },
+  "SEC-01": {
+    "production_reaches_database_factory_before_any_guard": true,
+    "real_database_opened": false
+  },
+  "SEC-02": {
+    "user_id_matches": false,
+    "access_allowed": true,
+    "profile_returned": "audit-dossier"
+  }
+}

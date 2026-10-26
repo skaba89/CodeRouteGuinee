@@ -1,0 +1,14 @@
+{
+  "source": "https://github.com/skaba89/CodeRouteGuinee/actions/runs/40271492015",
+  "job_id": 121405080091,
+  "observed_at_utc": "2026-10-26T04:55:49Z",
+  "expected_sha": "2b4e9b809ff27ed9111bc51c074e599e166b1793",
+  "deployed_sha": "4fa5291b0febc1714336e4eb7899160aa74d01df",
+  "liveness_http": 200,
+  "readiness_http": 503,
+  "readiness_status": "not_ready",
+  "readiness_blocking_checks": [
+    "configuration"
+  ],
+  "media_check_passed": true
+}
