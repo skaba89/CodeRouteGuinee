@@ -71,6 +71,44 @@ def _question_key(category: str, text: str) -> tuple[str, str]:
     return category.strip().lower(), " ".join(text.strip().lower().split())
 
 
+def _official_content(question: Question) -> tuple:
+    """Contenu soumis à validation : toute différence exige une nouvelle validation."""
+    return (
+        question.category,
+        question.text,
+        list(question.options or []),
+        question.correct_answer,
+        question.explanation,
+        question.media_type,
+        question.media_url,
+        question.media_alt,
+    )
+
+
+def _imported_content(row, media: tuple[str, str] | None) -> tuple:
+    media_type, media_url = media if media else (None, None)
+    return (
+        row.category.strip(),
+        row.text.strip(),
+        [option.strip() for option in row.options],
+        row.correct_answer.strip(),
+        row.explanation.strip() if row.explanation else None,
+        media_type,
+        media_url,
+        row.media_alt.strip() if row.media_alt else None,
+    )
+
+
+def _requires_revalidation(question: Question | None, row, media: tuple[str, str] | None) -> bool:
+    """Une question déjà validée (ou en cours de validation) dont l'import change
+    le contenu ne peut pas rester éligible à l'examen officiel."""
+    return (
+        question is not None
+        and question.validation_status != "draft"
+        and _official_content(question) != _imported_content(row, media)
+    )
+
+
 @router.post("/import-official", response_model=QuestionOfficialImportResult)
 def import_official_questions(
     payload: QuestionOfficialImportRequest,
@@ -106,6 +144,11 @@ def import_official_questions(
     ordered_keys = [_question_key(row.category, row.text) for row in payload.questions]
     if payload.dry_run:
         existing_keys = [key for key in ordered_keys if key in existing_by_key]
+        revalidation = [
+            existing_by_key[key].id
+            for key, row in zip(ordered_keys, payload.questions)
+            if _requires_revalidation(existing_by_key.get(key), row, validated_media.get(key))
+        ]
         return QuestionOfficialImportResult(
             dry_run=True,
             imported=len(ordered_keys),
@@ -113,15 +156,19 @@ def import_official_questions(
             updated=len(existing_keys),
             skipped=0,
             question_ids=[existing_by_key[key].id for key in existing_keys],
+            returned_to_validation=len(revalidation),
+            returned_to_validation_ids=revalidation,
         )
 
     created = 0
     updated = 0
     question_ids: list[str] = []
+    returned_to_validation: list[str] = []
 
     for row in payload.questions:
         key = _question_key(row.category, row.text)
         question = existing_by_key.get(key)
+        revalidate = _requires_revalidation(question, row, validated_media.get(key))
         if question is None:
             question = Question(category=row.category.strip(), text=row.text.strip())
             created += 1
@@ -139,9 +186,34 @@ def import_official_questions(
             question.media_url = None
         question.media_alt = row.media_alt.strip() if row.media_alt else None
         question.is_active = row.is_active
+        if revalidate:
+            # Un contenu modifié n'a jamais été validé : retour en brouillon,
+            # hors du pool officiel, jusqu'à une nouvelle soumission/approbation.
+            previous_status = question.validation_status
+            question.validation_status = "draft"
+            question.validated_by = None
+            question.validated_at = None
+            question.rejection_reason = None
+            question.version = (question.version or 1) + 1
+            db.add(
+                AuditLog(
+                    actor_id=current_user.id,
+                    action="question.returned_to_validation",
+                    entity="question",
+                    entity_id=question.id,
+                    details={
+                        "reason": "official_import_content_change",
+                        "previous_status": previous_status,
+                        "version": question.version,
+                        "source": payload.source,
+                    },
+                )
+            )
         db.add(question)
         db.flush()
         question_ids.append(question.id)
+        if revalidate:
+            returned_to_validation.append(question.id)
 
     db.add(
         AuditLog(
@@ -156,6 +228,7 @@ def import_official_questions(
                 "created": created,
                 "updated": updated,
                 "with_media": len(validated_media),
+                "returned_to_validation": len(returned_to_validation),
                 "question_ids": question_ids[:50],
             },
         )
@@ -168,6 +241,8 @@ def import_official_questions(
         updated=updated,
         skipped=0,
         question_ids=question_ids,
+        returned_to_validation=len(returned_to_validation),
+        returned_to_validation_ids=returned_to_validation,
     )
 
 
